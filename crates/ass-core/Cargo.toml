@@ -1,0 +1,25 @@
+[package]
+name = "ass-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+license = "MIT OR Apache-2.0"
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[features]
+# std enables the Rust standard library. When disabled, we compile for no_std environments like WASM.
+default = ["std"]
+std = ["alloc", "memchr/std"]
+alloc = []
+wasm = ["std", "wasm-bindgen"]
+dynamic-loading = ["std", "libloading"]
+
+[dependencies]
+wasm-bindgen = { version = "0.2", optional = true }
+memchr = { version = "2.7", default-features = false }
+libloading = { version = "0.8", optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }

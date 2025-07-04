@@ -1,0 +1,21 @@
+[package]
+name = "ass-io"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[features]
+# std is on by default since io helpers rely on std::fs
+default = ["std", "alloc"]
+std = ["ass-core/std"]
+alloc = ["ass-core/alloc"]
+# Enable tokio-based async helpers
+async = ["tokio"]
+
+[dependencies]
+ass-core = { path = "../ass-core", default-features = false, features = ["alloc"] }
+tokio = { version = "1.0", features = ["io-util", "fs"], optional = true }
+
+[dev-dependencies]
+# For tests
+tempfile = "3"

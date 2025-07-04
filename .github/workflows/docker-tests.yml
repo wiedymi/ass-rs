@@ -1,0 +1,154 @@
+name: Docker Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  docker-tests:
+    name: Docker Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    strategy:
+      matrix:
+        test-suite: [quality, unit, integration, wasm, audit]
+      fail-fast: false
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Free disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+        
+    - name: Run ${{ matrix.test-suite }} tests
+      run: |
+        ./scripts/docker-test.sh ${{ matrix.test-suite }} --build
+      env:
+        CI: true
+        GITHUB_ACTIONS: true
+        
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-${{ matrix.test-suite }}
+        path: |
+          target/llvm-cov/
+          target/criterion/
+          test_output/
+        retention-days: 7
+
+  docker-benchmarks:
+    name: Docker Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Free disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        
+    - name: Run benchmarks
+      run: |
+        ./scripts/docker-test.sh benchmarks --build
+      env:
+        CI: true
+        GITHUB_ACTIONS: true
+        
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results
+        path: target/criterion/
+        retention-days: 30
+
+  docker-coverage:
+    name: Docker Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Generate coverage report
+      run: |
+        ./scripts/docker-test.sh coverage --build
+      env:
+        CI: true
+        GITHUB_ACTIONS: true
+        
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: target/llvm-cov/lcov.info
+        fail_ci_if_error: false
+        
+    - name: Upload coverage artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: target/llvm-cov/
+        retention-days: 7
+
+  docker-comprehensive:
+    name: Comprehensive Docker Test (CI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Free disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+        
+    - name: Run comprehensive CI test suite
+      run: |
+        ./scripts/ci-docker.sh
+      env:
+        CI: true
+        GITHUB_ACTIONS: true
+        BUILD_NUMBER: ${{ github.run_number }}
+        
+    - name: Upload all artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: comprehensive-test-artifacts
+        path: artifacts/
+        retention-days: 30

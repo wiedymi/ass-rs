@@ -1,0 +1,77 @@
+# Rust build artefacts
+/target
+**/target
+
+# Intermediate cargo outputs
+**/*.rs.bk
+
+# Wasm-pack / wasm-bindgen outputs
+/pkg
+/wasm/pkg
+
+# Node modules (if JS glue is added)
+/node_modules
+
+# Visual Studio Code
+.vscode/
+
+# Other
+.DS_Store
+.idea/
+
+# Test outputs
+/test_output/
+**/test_output/
+
+# Coverage reports
+/target/llvm-cov/
+**/target/llvm-cov/
+lcov.info
+*.lcov
+coverage.json
+tarpaulin-report.html
+
+# Benchmark results
+/target/criterion/
+**/target/criterion/
+*.json.baseline
+*.baseline
+benchmark_results/
+
+# Test artifacts and temporary files
+test_temp/
+**/test_temp/
+*.test
+*.tmp
+test_*.ass
+test_*.png
+test_*.json
+test_*.xml
+test_*.yaml
+
+# Performance baselines
+criterion_baselines/
+bench_baselines/
+
+# Test logs
+test.log
+tests.log
+*.test.log
+
+# WASM test outputs
+/crates/ass-wasm/pkg/
+**/pkg/
+*.wasm.d.ts
+
+# Documentation build outputs
+/target/doc/
+**/target/doc/
+docs/
+
+# Temporary directories created by tests
+tmp/
+temp/
+.tmp/
+# Docker-related artifacts
+artifacts/
+.docker/

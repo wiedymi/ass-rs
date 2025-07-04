@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  # Main testing service
+  tests:
+    build:
+      context: .
+      target: test
+    volumes:
+      - .:/workspace
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/workspace/target
+    environment:
+      - RUST_BACKTRACE=1
+      - RUST_LOG=info
+      - BENCH_FONT=/workspace/assets/NotoSans-Regular.ttf
+    command: ["./test_runner.sh"]
+
+  # Quick unit tests only
+  unit-tests:
+    build:
+      context: .
+      target: test
+    volumes:
+      - .:/workspace
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/workspace/target
+    environment:
+      - RUST_BACKTRACE=1
+    command: ["cargo", "test", "--workspace", "--lib"]
+
+  # Integration tests only
+  integration-tests:
+    build:
+      context: .
+      target: test
+    volumes:
+      - .:/workspace
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/workspace/target
+    environment:
+      - RUST_BACKTRACE=1
+    command: ["cargo", "test", "--workspace", "--test", "*"]
+
+  # Benchmark service
+  benchmarks:
+    build:
+      context: .
+      target: benchmark
+    volumes:
+      - .:/workspace
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/workspace/target
+    environment:
+      - RUST_BACKTRACE=1
+      - BENCH_FONT=/workspace/assets/NotoSans-Regular.ttf
+    command: ["cargo", "bench", "--workspace"]
+
+  # WASM tests
+  wasm-tests:
+    build:
+      context: .
+      target: test
+    volumes:
+      - .:/workspace
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/workspace/target
+    command: ["wasm-pack", "test", "crates/ass-wasm", "--node"]
+
+  # Code quality checks
+  quality:
+    build:
+      context: .
+      target: test
+    volumes:
+      - .:/workspace
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/workspace/target
+    command: ["sh", "-c", "cargo fmt --all -- --check && cargo clippy --all-targets --all-features -- -D warnings"]
+
+  # Coverage analysis
+  coverage:
+    build:
+      context: .
+      target: test
+    volumes:
+      - .:/workspace
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/workspace/target
+    environment:
+      - RUST_BACKTRACE=1
+    command: ["cargo", "llvm-cov", "--workspace", "--html"]
+
+  # Security audit
+  audit:
+    build:
+      context: .
+      target: test
+    volumes:
+      - .:/workspace
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/workspace/target
+    command: ["cargo", "audit"]
+
+  # CI simulation service
+  ci:
+    build:
+      context: .
+      target: ci
+    volumes:
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/workspace/target
+    environment:
+      - CI=true
+      - RUST_BACKTRACE=1
+      - CARGO_TERM_COLOR=always
+    command: ["./test_runner.sh"]
+
+  # Development environment
+  dev:
+    build:
+      context: .
+      target: dev
+    volumes:
+      - .:/workspace
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/workspace/target
+    environment:
+      - RUST_BACKTRACE=1
+      - RUST_LOG=debug
+    stdin_open: true
+    tty: true
+    command: ["bash"]
+
+volumes:
+  cargo-cache:
+  target-cache:

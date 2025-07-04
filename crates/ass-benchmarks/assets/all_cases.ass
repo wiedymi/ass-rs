@@ -1,0 +1,66 @@
+[Script Info]
+Title: Comprehensive Benchmark Test Suite
+ScriptType: v4.00+
+WrapStyle: 0
+PlayResX: 1920
+PlayResY: 1080
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,36,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,0,2,30,30,30,1
+Style: Title,Arial,48,&H00FFFF00,&H000000FF,&H00000000,&H80000000,1,0,0,0,110,110,0,0,1,3,0,2,30,30,60,1
+Style: Subtitle,Arial,32,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,1,0,0,95,95,0,0,1,2,0,2,30,30,30,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,Simple dialogue line 1
+Dialogue: 0,0:00:02.00,0:00:06.00,Default,,0,0,0,,{\b1}Bold text{\b0} with formatting
+Dialogue: 0,0:00:03.00,0:00:07.00,Default,,0,0,0,,{\i1}Italic{\i0} and {\u1}underlined{\u0} text
+Dialogue: 0,0:00:04.00,0:00:08.00,Default,,0,0,0,,{\c&HFF0000&}Red{\c&H00FF00&} green {\c&H0000FF&}blue{\r} colors
+Dialogue: 0,0:00:05.00,0:00:09.00,Default,,0,0,0,,{\fs50}Big{\fs20} small{\r} font sizes
+Dialogue: 0,0:00:06.00,0:00:10.00,Default,,0,0,0,,{\pos(960,540)}Positioned text in center
+Dialogue: 0,0:00:07.00,0:00:11.00,Default,,0,0,0,,{\move(100,100,1820,100)}Moving text across screen
+Dialogue: 0,0:00:08.00,0:00:12.00,Default,,0,0,0,,{\frz45}Rotated text at 45 degrees
+Dialogue: 0,0:00:09.00,0:00:13.00,Default,,0,0,0,,{\fscx150\fscy75}Scaled text wide and short
+Dialogue: 0,0:00:10.00,0:00:14.00,Default,,0,0,0,,{\alpha&H80&}Semi-transparent text
+Dialogue: 0,0:00:11.00,0:00:15.00,Default,,0,0,0,,{\fade(255,0,255,0,1000,3000)}Fading in and out
+Dialogue: 0,0:00:12.00,0:00:16.00,Default,,0,0,0,,{\t(0,2000,\frz360)}Spinning transformation
+Dialogue: 0,0:00:13.00,0:00:17.00,Default,,0,0,0,,{\t(0,3000,\fscx200\fscy200)}Growing animation
+Dialogue: 0,0:00:14.00,0:00:18.00,Default,,0,0,0,,{\clip(200,200,1720,880)}Clipped text region
+Dialogue: 0,0:00:15.00,0:00:19.00,Default,,0,0,0,,{\org(960,540)\frz90}Origin rotation test
+Dialogue: 0,0:00:16.00,0:00:20.00,Default,,0,0,0,,{\bord5\shad3}Heavy border and shadow
+Dialogue: 0,0:00:17.00,0:00:21.00,Default,,0,0,0,,{\blur3}Blurred text effect
+Dialogue: 0,0:00:18.00,0:00:22.00,Default,,0,0,0,,{\an1}Bottom left alignment
+Dialogue: 0,0:00:19.00,0:00:23.00,Default,,0,0,0,,{\an3}Bottom right alignment
+Dialogue: 0,0:00:20.00,0:00:24.00,Default,,0,0,0,,{\an7}Top left alignment
+Dialogue: 0,0:00:21.00,0:00:25.00,Default,,0,0,0,,{\an9}Top right alignment
+Dialogue: 0,0:00:22.00,0:00:26.00,Default,,0,0,0,,{\fry45}Y-axis rotation
+Dialogue: 0,0:00:23.00,0:00:27.00,Default,,0,0,0,,{\frx30}X-axis rotation
+Dialogue: 0,0:00:24.00,0:00:28.00,Default,,0,0,0,,こんにちは世界！Japanese text
+Dialogue: 0,0:00:25.00,0:00:29.00,Default,,0,0,0,,Привет мир! Russian text
+Dialogue: 0,0:00:26.00,0:00:30.00,Default,,0,0,0,,مرحبا بالعالم Arabic text
+Dialogue: 0,0:00:27.00,0:00:31.00,Default,,0,0,0,,你好世界 Chinese text
+Dialogue: 0,0:00:28.00,0:00:32.00,Default,,0,0,0,,🌍🚀✨🎭🎪 Emoji test
+Dialogue: 0,0:00:29.00,0:00:33.00,Default,,0,0,0,,∑∫∂∇∞≠≤≥±∓ Mathematical symbols
+Dialogue: 0,0:00:30.00,0:00:34.00,Title,,0,0,0,,{\pos(960,100)}Main Title Style
+Dialogue: 0,0:00:31.00,0:00:35.00,Subtitle,,0,0,0,,Subtitle style text
+Comment: 0,0:00:32.00,0:00:36.00,Default,,0,0,0,,This is a comment line
+Dialogue: 0,0:00:33.00,0:00:37.00,Default,,0,0,0,,{\k20}Ka{\k25}ra{\k30}o{\k25}ke {\k40}timing
+Dialogue: 0,0:00:34.00,0:00:38.00,Default,,0,0,0,,{\kf50}Fill karaoke {\kf75}timing
+Dialogue: 0,0:00:35.00,0:00:39.00,Default,,0,0,0,,{\ko30}Outline karaoke effect
+Dialogue: 0,0:00:36.00,0:00:40.00,Default,,0,0,0,,{\q2}Wrap style smart wrapping test with long text that should wrap
+Dialogue: 0,0:00:37.00,0:00:41.00,Default,,0,0,0,,{\be1}Border edge blur effect
+Dialogue: 0,0:00:38.00,0:00:42.00,Default,,0,0,0,,{\fn Comic Sans MS}Custom font family
+Dialogue: 0,0:00:39.00,0:00:43.00,Default,,0,0,0,,{\fsp5}Letter spacing adjustment
+Dialogue: 0,0:00:40.00,0:00:44.00,Default,,0,0,0,,{\p1}m 0 0 l 100 0 l 100 100 l 0 100{\p0} Drawing mode
+Dialogue: 0,0:00:41.00,0:00:45.00,Default,,0,0,0,,{\1c&HFF0000&\2c&H00FF00&\3c&H0000FF&\4c&HFFFF00&}Multi-color test
+Dialogue: 0,0:00:42.00,0:00:46.00,Default,,0,0,0,,{\1a&H80&\2a&H40&\3a&HC0&\4a&H20&}Multi-alpha test
+Dialogue: 0,0:00:43.00,0:00:47.00,Default,,0,0,0,,{\iclip(300,300,1620,780)}Inverse clipping test
+Dialogue: 0,0:00:44.00,0:00:48.00,Default,,0,0,0,,{\move(100,540,1820,540,1000,3000)}Delayed movement
+Dialogue: 0,0:00:45.00,0:00:49.00,Default,,0,0,0,,{\t(1000,3000,\c&HFF0000&)}Color transition
+Dialogue: 0,0:00:46.00,0:00:50.00,Default,,0,0,0,,{\t(0,2000,\alpha&HFF&)\t(2000,4000,\alpha&H00&)}Alpha transition
+Dialogue: 0,0:00:47.00,0:00:51.00,Default,,0,0,0,,{\r\b1\i1\u1}Reset then format
+Dialogue: 0,0:00:48.00,0:00:52.00,Default,,0,0,0,,{\fad(500,500)}Fade in and out
+Dialogue: 0,0:00:49.00,0:00:53.00,Default,,0,0,0,,{\3c&HFF0000&\bord10}Red border effect
+Dialogue: 0,0:00:50.00,0:00:54.00,Default,,0,0,0,,Very long text line that tests the renderer's ability to handle extended content without performance degradation or memory issues during processing

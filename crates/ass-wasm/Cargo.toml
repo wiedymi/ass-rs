@@ -1,0 +1,43 @@
+[package]
+name = "ass-wasm"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+console_error_panic_hook = ["dep:console_error_panic_hook"]
+
+[dependencies]
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+ass-core = { path = "../ass-core", features = ["wasm"], default-features = false }
+ass-render = { path = "../ass-render", default-features = false, features = ["software"] }
+web-sys = { version = "0.3", features = [
+    "Window", 
+    "Performance", 
+    "console",
+    "CanvasRenderingContext2d",
+    "HtmlCanvasElement",
+    "ImageData",
+    "HtmlVideoElement",
+    "OffscreenCanvas",
+    "OffscreenCanvasRenderingContext2d",
+    "WebGlRenderingContext",
+    "WebGlProgram",
+    "WebGlShader",
+    "WebGlTexture",
+], default-features = false }
+js-sys = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+console_error_panic_hook = { version = "0.1", optional = true }
+
+[dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+# WASM-specific optimizations
+[package.metadata.wasm-pack.profile.release]
+wee_alloc = false  # Use default allocator for better performance

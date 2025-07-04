@@ -1,0 +1,16 @@
+[package]
+name = "wave_plugin"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ass-core = { path = "../crates/ass-core", default-features = false, features = ["std", "dynamic-loading"] }
+
+[features]
+default = []

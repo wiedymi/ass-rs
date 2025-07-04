@@ -1,0 +1,75 @@
+# Ignore unnecessary files for Docker builds
+
+# Git files
+.git/
+.gitignore
+
+# Build artifacts and target directories
+target/
+*/target/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
+
+# Log files
+*.log
+
+# Documentation builds
+docs/_build/
+site/
+
+# Test output
+test_output/
+coverage/
+target/llvm-cov/
+
+# Benchmark data
+criterion/
+target/criterion/
+
+# WASM build artifacts
+pkg/
+*.wasm
+
+# Node modules (if any)
+node_modules/
+
+# Python cache (if any build scripts)
+__pycache__/
+*.pyc
+
+# Rust cache directories that we don't want to copy
+.cargo/
+
+# CI/CD specific files (keep local)
+.github/
+
+# Docker related files (avoid recursion)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# README and docs (include only essential docs)
+README.md
+CHANGELOG.md
+LICENSE*
+
+# Keep these essential files
+!Cargo.toml
+!Cargo.lock
+!test_runner.sh
+!BENCHMARKING.md
+!assets/

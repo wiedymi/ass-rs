@@ -1,0 +1,18 @@
+[package]
+name = "ass-benchmarks"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = []
+libass-comparison = ["libass"]
+
+[dependencies]
+ass-core = { path = "../ass-core" }
+ass-render = { path = "../ass-render" }
+criterion = { workspace = true }
+libass = { git = "https://github.com/tadeokondrak/libass-rs.git", optional = true }
+
+[[bench]]
+name = "comparison_benchmarks"
+harness = false
