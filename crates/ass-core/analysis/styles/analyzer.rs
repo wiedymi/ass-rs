@@ -194,10 +194,7 @@ impl<'a> StyleAnalyzer<'a> {
         let mut name_counts: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
 
         for style in styles {
-            name_counts
-                .entry(style.name)
-                .or_insert_with(Vec::new)
-                .push(style.name);
+            name_counts.entry(style.name).or_default().push(style.name);
         }
 
         for (_name, instances) in name_counts {

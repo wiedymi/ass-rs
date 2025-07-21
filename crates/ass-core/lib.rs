@@ -303,14 +303,11 @@ Comment: 0,0:00:30.00,0:00:35.00,Default,,0,0,0,,This is a comment
         let invalid_script = "This is not a valid ASS script";
         let result = Script::parse(invalid_script);
 
-        match result {
-            Ok(script) => {
-                assert!(
-                    !script.issues().is_empty(),
-                    "Invalid script should have parse issues"
-                );
-            }
-            Err(_) => {}
+        if let Ok(script) = result {
+            assert!(
+                !script.issues().is_empty(),
+                "Invalid script should have parse issues"
+            );
         }
     }
 

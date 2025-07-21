@@ -110,12 +110,14 @@ impl AccessibilityRule {
     /// Check reading speed based on text length and duration
     fn check_reading_speed(&self, issues: &mut Vec<LintIssue>, event: &crate::parser::Event) {
         if let (Ok(start), Ok(end)) = (parse_ass_time(event.start), parse_ass_time(event.end)) {
-            let duration_ms = end - start;
+            let duration_centiseconds = end - start;
             let _text_length = event.text.chars().count();
             let clean_text_length = self.count_readable_characters(event.text);
 
-            if clean_text_length > 0 && duration_ms > 0 {
-                let chars_per_second = (clean_text_length as f64 * 1000.0) / duration_ms as f64;
+            if clean_text_length > 0 && duration_centiseconds > 0 {
+                // Convert centiseconds to seconds: 1 second = 100 centiseconds
+                let duration_seconds = duration_centiseconds as f64 / 100.0;
+                let chars_per_second = clean_text_length as f64 / duration_seconds;
 
                 if chars_per_second > 20.0 {
                     let issue = LintIssue::new(
@@ -265,10 +267,12 @@ Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{}"#,
         let rule = AccessibilityRule;
 
         assert_eq!(rule.count_readable_characters("Hello world"), 11);
+        // "Hello {\i1}world{\i0}" after removing tags becomes "Hello world" (11 chars)
         assert_eq!(
             rule.count_readable_characters("Hello {\\i1}world{\\i0}"),
-            10
+            11
         );
+        // "{\b1}Bold{\b0} text" after removing tags becomes "Bold text" (9 chars)
         assert_eq!(rule.count_readable_characters("{\\b1}Bold{\\b0} text"), 9);
         assert_eq!(rule.count_readable_characters(""), 0);
     }

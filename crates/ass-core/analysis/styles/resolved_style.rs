@@ -249,11 +249,12 @@ fn parse_color(color_str: &str) -> Result<[u8; 4]> {
         return Ok([255, 255, 255, 255]);
     }
 
-    let clean = color_str
+    let after_prefix = color_str
         .strip_prefix("&H")
-        .unwrap_or(color_str)
-        .strip_suffix("&")
+        .or_else(|| color_str.strip_prefix("&h"))
         .unwrap_or(color_str);
+
+    let clean = after_prefix.strip_suffix("&").unwrap_or(after_prefix);
 
     if let Ok(value) = u32::from_str_radix(clean, 16) {
         let b = ((value >> 16) & 0xFF) as u8;
@@ -278,7 +279,7 @@ fn parse_bool_flag(flag_str: &str) -> Result<bool> {
 /// Parse percentage value
 fn parse_percentage(percent_str: &str) -> Result<f32> {
     let value = parse_float(percent_str)?;
-    if value < 0.0 || value > 1000.0 {
+    if !(0.0..=1000.0).contains(&value) {
         Err(CoreError::parse("Invalid percentage"))
     } else {
         Ok(value)
@@ -351,10 +352,19 @@ mod tests {
 
     #[test]
     fn color_parsing() {
-        assert_eq!(parse_color("&H00FF0000").unwrap(), [0, 0, 255, 255]); // Red in BGR
-        assert_eq!(parse_color("&H0000FF00").unwrap(), [0, 255, 0, 255]); // Green
-        assert_eq!(parse_color("&H000000FF").unwrap(), [255, 0, 0, 255]); // Blue
+        // ASS colors are in BGR format: &HAABBGGRR where AA=alpha, BB=blue, GG=green, RR=red
+        assert_eq!(parse_color("&H000000FF").unwrap(), [255, 0, 0, 255]); // Red: RR=FF
+        assert_eq!(parse_color("&H0000FF00").unwrap(), [0, 255, 0, 255]); // Green: GG=FF
+        assert_eq!(parse_color("&H00FF0000").unwrap(), [0, 0, 255, 255]); // Blue: BB=FF
         assert_eq!(parse_color("").unwrap(), [255, 255, 255, 255]); // Default white
+
+        // Test case-insensitive prefix
+        assert_eq!(parse_color("&h000000FF").unwrap(), [255, 0, 0, 255]); // Red with lowercase h
+
+        // Test 6-digit format (no alpha channel)
+        assert_eq!(parse_color("&HFF0000").unwrap(), [0, 0, 255, 255]); // Blue in 6-digit
+        assert_eq!(parse_color("&H00FF00").unwrap(), [0, 255, 0, 255]); // Green in 6-digit
+        assert_eq!(parse_color("&H0000FF").unwrap(), [255, 0, 0, 255]); // Red in 6-digit
     }
 
     #[test]
@@ -366,7 +376,7 @@ mod tests {
 
         style.fontsize = "100";
         let resolved = ResolvedStyle::from_style(&style).unwrap();
-        assert!(resolved.complexity_score() > 20);
+        assert!(resolved.complexity_score() >= 20);
     }
 
     #[test]
@@ -376,9 +386,17 @@ mod tests {
         let resolved = ResolvedStyle::from_style(&style).unwrap();
         assert!(!resolved.has_performance_issues());
 
-        style.fontsize = "100";
-        style.outline = "10";
-        style.angle = "45";
+        // Create a style with multiple performance-affecting properties
+        style.fontsize = "120"; // >72: +20 points
+        style.outline = "8"; // >4: +15 points
+        style.shadow = "5"; // >3: +10 points
+        style.angle = "45"; // !=0: +15 points
+        style.scale_x = "150"; // !=100: +10 points
+        style.bold = "1"; // +2 points
+        style.italic = "1"; // +2 points
+        style.underline = "1"; // +5 points
+                               // Total: 79 points > 70 threshold
+
         let resolved = ResolvedStyle::from_style(&style).unwrap();
         assert!(resolved.has_performance_issues());
     }

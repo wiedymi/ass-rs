@@ -120,21 +120,21 @@ impl EncodingRule {
             issues.push(issue);
         }
 
-        if event.text.len() != event.text.chars().count() * 4 {
-            let char_count = event.text.chars().count();
-            let byte_count = event.text.len();
-            if byte_count > char_count * 3 {
-                let issue = LintIssue::new(
-                    IssueSeverity::Hint,
-                    IssueCategory::Encoding,
-                    self.id(),
-                    "Event contains many multi-byte characters".to_string(),
-                )
-                .with_description(
-                    "Heavy use of multi-byte characters may impact performance".to_string(),
-                );
-                issues.push(issue);
-            }
+        let char_count = event.text.chars().count();
+        let byte_count = event.text.len();
+
+        // Check for heavy multi-byte character usage
+        if char_count > 0 && byte_count > char_count * 3 {
+            let issue = LintIssue::new(
+                IssueSeverity::Hint,
+                IssueCategory::Encoding,
+                self.id(),
+                "Event contains many multi-byte characters".to_string(),
+            )
+            .with_description(
+                "Heavy use of multi-byte characters may impact performance".to_string(),
+            );
+            issues.push(issue);
         }
     }
 

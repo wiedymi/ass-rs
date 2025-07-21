@@ -161,15 +161,15 @@ fn parse_hex_simd_impl(hex_str: &str) -> Option<u32> {
 
         let mut valid_mask = u8x16::splat(0);
         for digit in b'0'..=b'9' {
-            valid_mask = valid_mask | simd_chunk.cmp_eq(u8x16::splat(digit));
+            valid_mask |= simd_chunk.cmp_eq(u8x16::splat(digit));
         }
 
         for hex_char in b'A'..=b'F' {
-            valid_mask = valid_mask | simd_chunk.cmp_eq(u8x16::splat(hex_char));
+            valid_mask |= simd_chunk.cmp_eq(u8x16::splat(hex_char));
         }
 
         for hex_char in b'a'..=b'f' {
-            valid_mask = valid_mask | simd_chunk.cmp_eq(u8x16::splat(hex_char));
+            valid_mask |= simd_chunk.cmp_eq(u8x16::splat(hex_char));
         }
 
         let mask_bits = valid_mask.move_mask();
@@ -289,7 +289,7 @@ mod tests {
     fn validate_utf8_valid() {
         assert!(validate_utf8_batch(b"Hello, World!").is_ok());
         assert!(validate_utf8_batch("Hello, 世界! 🎵".as_bytes()).is_ok());
-        assert!(validate_utf8_batch(&"a".repeat(50).as_bytes()).is_ok());
+        assert!(validate_utf8_batch("a".repeat(50).as_bytes()).is_ok());
     }
 
     #[test]
