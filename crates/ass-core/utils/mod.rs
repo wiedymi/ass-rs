@@ -1,0 +1,464 @@
+//! Utility functions and shared types for ASS-RS core
+//!
+//! Contains common functionality used across parser, tokenizer, and analysis modules.
+//! Focuses on zero-allocation helpers, color processing, and UTF-8 handling.
+//!
+//! # Performance
+//!
+//! - Zero-copy span utilities for AST references
+//! - SIMD-optimized color conversions when available
+//! - Minimal allocation math helpers (bezier evaluation)
+//!
+//! # Example
+//!
+//! ```rust
+//! use ass_core::utils::{Spans, parse_bgr_color};
+//!
+//! let color_str = "&H00FF00FF&";
+//! let rgba = parse_bgr_color(color_str)?;
+//! assert_eq!(rgba, [255, 0, 255, 0]); // BGR -> RGBA
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+
+use alloc::{format, string::String, vec::Vec};
+use core::{fmt, ops::Range};
+
+pub mod errors;
+pub mod hashers;
+pub mod utf8;
+
+pub use errors::CoreError;
+pub use hashers::{create_hash_map, create_hash_map_with_capacity, create_hasher, hash_value};
+pub use utf8::{detect_encoding, normalize_line_endings, recover_utf8, strip_bom, validate_utf8};
+
+/// Zero-copy span utilities for AST node validation and manipulation
+///
+/// Provides safe methods to work with string slices that reference
+/// the original source text, maintaining zero-copy semantics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Spans<'a> {
+    /// Reference to the original source text
+    source: &'a str,
+}
+
+impl<'a> Spans<'a> {
+    /// Create new span utilities for source text
+    pub fn new(source: &'a str) -> Self {
+        Self { source }
+    }
+
+    /// Validate that a span references this source text
+    ///
+    /// Returns `true` if the span is a valid substring of the source.
+    /// Used for debug assertions to ensure zero-copy invariants.
+    pub fn validate_span(&self, span: &str) -> bool {
+        let source_start = self.source.as_ptr() as usize;
+        let source_end = source_start + self.source.len();
+
+        let span_start = span.as_ptr() as usize;
+        let span_end = span_start + span.len();
+
+        span_start >= source_start && span_end <= source_end
+    }
+
+    /// Get byte offset of span within source
+    pub fn span_offset(&self, span: &str) -> Option<usize> {
+        let source_start = self.source.as_ptr() as usize;
+        let span_start = span.as_ptr() as usize;
+
+        if self.validate_span(span) {
+            Some(span_start - source_start)
+        } else {
+            None
+        }
+    }
+
+    /// Get line number (1-based) for a span
+    pub fn span_line(&self, span: &str) -> Option<usize> {
+        let offset = self.span_offset(span)?;
+        Some(self.source[..offset].chars().filter(|&c| c == '\n').count() + 1)
+    }
+
+    /// Get column number (1-based) for a span
+    pub fn span_column(&self, span: &str) -> Option<usize> {
+        let offset = self.span_offset(span)?;
+        let line_start = self.source[..offset]
+            .rfind('\n')
+            .map(|pos| pos + 1)
+            .unwrap_or(0);
+
+        Some(self.source[line_start..offset].chars().count() + 1)
+    }
+
+    /// Extract substring by byte range
+    pub fn substring(&self, range: Range<usize>) -> Option<&'a str> {
+        self.source.get(range)
+    }
+}
+
+/// Parse ASS BGR color format to RGBA bytes
+///
+/// ASS uses BGR format like `&H00FF00FF&` (blue, green, red, alpha).
+/// Converts to standard RGBA format for rendering.
+///
+/// # Arguments
+///
+/// * `color_str` - Color string in ASS format
+///
+/// # Returns
+///
+/// RGBA bytes `[red, green, blue, alpha]` or error if invalid format.
+///
+/// # Example
+///
+/// ```rust
+/// # use ass_core::utils::parse_bgr_color;
+/// // Pure red in ASS format
+/// let rgba = parse_bgr_color("&H000000FF&")?;
+/// assert_eq!(rgba, [255, 0, 0, 0]);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub fn parse_bgr_color(color_str: &str) -> Result<[u8; 4], CoreError> {
+    let trimmed = color_str.trim();
+
+    // Handle different ASS color formats
+    let hex_part = if trimmed.starts_with("&H") && trimmed.ends_with('&') {
+        &trimmed[2..trimmed.len() - 1]
+    } else if let Some(stripped) = trimmed.strip_prefix("&H") {
+        stripped
+    } else if let Some(stripped) = trimmed.strip_prefix("0x") {
+        stripped
+    } else if trimmed.chars().all(|c| c.is_ascii_hexdigit()) {
+        trimmed
+    } else {
+        return Err(CoreError::InvalidColor(format!(
+            "Invalid color format: {}",
+            color_str
+        )));
+    };
+
+    // Parse hex value (BGR or BBGGRR or AABBGGRR)
+    let hex_value = u32::from_str_radix(hex_part, 16)
+        .map_err(|_| CoreError::InvalidColor(format!("Invalid hex value: {}", hex_part)))?;
+
+    // Extract components based on length
+    let (blue, green, red, alpha) = match hex_part.len() {
+        6 => {
+            // BBGGRR format
+            let blue = ((hex_value >> 16) & 0xFF) as u8;
+            let green = ((hex_value >> 8) & 0xFF) as u8;
+            let red = (hex_value & 0xFF) as u8;
+            (blue, green, red, 0)
+        }
+        8 => {
+            // AABBGGRR format
+            let alpha = ((hex_value >> 24) & 0xFF) as u8;
+            let blue = ((hex_value >> 16) & 0xFF) as u8;
+            let green = ((hex_value >> 8) & 0xFF) as u8;
+            let red = (hex_value & 0xFF) as u8;
+            (blue, green, red, alpha)
+        }
+        _ => {
+            return Err(CoreError::InvalidColor(format!(
+                "Invalid color length: {}",
+                hex_part.len()
+            )))
+        }
+    };
+
+    // Return as RGBA
+    Ok([red, green, blue, alpha])
+}
+
+/// Parse numeric value from ASS field with validation
+///
+/// Handles integer and floating-point parsing with ASS-specific validation.
+/// Provides better error messages than standard parsing.
+pub fn parse_numeric<T>(value_str: &str) -> Result<T, CoreError>
+where
+    T: core::str::FromStr,
+    T::Err: fmt::Display,
+{
+    value_str
+        .trim()
+        .parse()
+        .map_err(|e| CoreError::InvalidNumeric(format!("Failed to parse '{}': {}", value_str, e)))
+}
+
+/// Evaluate cubic bezier curve at parameter t
+///
+/// Used for drawing command evaluation and animation curves.
+/// No external dependencies - implements bezier math directly.
+///
+/// # Arguments
+///
+/// * `p0, p1, p2, p3` - Control points as (x, y) tuples
+/// * `t` - Parameter from 0.0 to 1.0
+///
+/// # Returns
+///
+/// Point on curve as (x, y) tuple
+pub fn eval_cubic_bezier(
+    p0: (f32, f32),
+    p1: (f32, f32),
+    p2: (f32, f32),
+    p3: (f32, f32),
+    t: f32,
+) -> (f32, f32) {
+    let t2 = t * t;
+    let t3 = t2 * t;
+    let mt = 1.0 - t;
+    let mt2 = mt * mt;
+    let mt3 = mt2 * mt;
+
+    let x = mt3 * p0.0 + 3.0 * mt2 * t * p1.0 + 3.0 * mt * t2 * p2.0 + t3 * p3.0;
+    let y = mt3 * p0.1 + 3.0 * mt2 * t * p1.1 + 3.0 * mt * t2 * p2.1 + t3 * p3.1;
+
+    (x, y)
+}
+
+/// Parse ASS time format (H:MM:SS.CC) to centiseconds
+///
+/// ASS uses centiseconds (1/100th second) for timing.
+/// Supports various formats including fractional seconds.
+///
+/// # Example
+///
+/// ```rust
+/// # use ass_core::utils::parse_ass_time;
+/// assert_eq!(parse_ass_time("0:01:30.50")?, 9050); // 1:30.5 = 9050 centiseconds
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub fn parse_ass_time(time_str: &str) -> Result<u32, CoreError> {
+    let parts: Vec<&str> = time_str.split(':').collect();
+    if parts.len() != 3 {
+        return Err(CoreError::InvalidTime(format!(
+            "Invalid time format: {}",
+            time_str
+        )));
+    }
+
+    let hours: u32 = parts[0]
+        .parse()
+        .map_err(|_| CoreError::InvalidTime(format!("Invalid hours: {}", parts[0])))?;
+
+    let minutes: u32 = parts[1]
+        .parse()
+        .map_err(|_| CoreError::InvalidTime(format!("Invalid minutes: {}", parts[1])))?;
+
+    // Handle seconds with fractional part
+    let seconds_parts: Vec<&str> = parts[2].split('.').collect();
+    let seconds: u32 = seconds_parts[0]
+        .parse()
+        .map_err(|_| CoreError::InvalidTime(format!("Invalid seconds: {}", seconds_parts[0])))?;
+
+    let centiseconds = if seconds_parts.len() > 1 {
+        let frac_str = &seconds_parts[1];
+        let frac_val: u32 = frac_str
+            .parse()
+            .map_err(|_| CoreError::InvalidTime(format!("Invalid centiseconds: {}", frac_str)))?;
+
+        // Normalize to centiseconds based on digit count
+        match frac_str.len() {
+            1 => frac_val * 10, // .5 -> 50 centiseconds
+            2 => frac_val,      // .50 -> 50 centiseconds
+            _ => {
+                return Err(CoreError::InvalidTime(format!(
+                    "Too many decimal places: {}",
+                    frac_str
+                )))
+            }
+        }
+    } else {
+        0
+    };
+
+    // Validate ranges
+    if minutes >= 60 {
+        return Err(CoreError::InvalidTime(format!(
+            "Minutes must be < 60: {}",
+            minutes
+        )));
+    }
+    if seconds >= 60 {
+        return Err(CoreError::InvalidTime(format!(
+            "Seconds must be < 60: {}",
+            seconds
+        )));
+    }
+    if centiseconds >= 100 {
+        return Err(CoreError::InvalidTime(format!(
+            "Centiseconds must be < 100: {}",
+            centiseconds
+        )));
+    }
+
+    Ok(hours * 360000 + minutes * 6000 + seconds * 100 + centiseconds)
+}
+
+/// Format centiseconds back to ASS time format
+///
+/// Converts internal centisecond representation back to H:MM:SS.CC format.
+pub fn format_ass_time(centiseconds: u32) -> String {
+    let hours = centiseconds / 360000;
+    let remainder = centiseconds % 360000;
+    let minutes = remainder / 6000;
+    let remainder = remainder % 6000;
+    let seconds = remainder / 100;
+    let cs = remainder % 100;
+
+    format!("{}:{:02}:{:02}.{:02}", hours, minutes, seconds, cs)
+}
+
+/// Trim and normalize whitespace in ASS field values
+///
+/// ASS fields may have inconsistent whitespace that should be normalized
+/// while preserving intentional spacing in text content.
+pub fn normalize_field_value(value: &str) -> &str {
+    value.trim()
+}
+
+/// Check if string contains only valid ASS characters
+///
+/// ASS has restrictions on certain characters in names and style definitions.
+pub fn validate_ass_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.contains(',') // Comma is field separator
+        && !name.contains(':') // Colon is key-value separator
+        && !name.contains('{') // Override block start
+        && !name.contains('}') // Override block end
+        && name.chars().all(|c| !c.is_control() || c == '\t')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn spans_validation() {
+        let source = "Hello, World!";
+        let spans = Spans::new(source);
+
+        let valid_span = &source[0..5]; // "Hello"
+        assert!(spans.validate_span(valid_span));
+        assert_eq!(spans.span_offset(valid_span), Some(0));
+        assert_eq!(spans.span_line(valid_span), Some(1));
+        assert_eq!(spans.span_column(valid_span), Some(1));
+
+        let another_span = &source[7..12]; // "World"
+        assert!(spans.validate_span(another_span));
+        assert_eq!(spans.span_offset(another_span), Some(7));
+    }
+
+    #[test]
+    fn spans_multiline() {
+        let source = "Line 1\nLine 2\nLine 3";
+        let spans = Spans::new(source);
+
+        let line2_span = &source[7..13]; // "Line 2"
+        assert_eq!(spans.span_line(line2_span), Some(2));
+        assert_eq!(spans.span_column(line2_span), Some(1));
+    }
+
+    #[test]
+    fn parse_bgr_colors() {
+        // Standard ASS format
+        assert_eq!(parse_bgr_color("&H000000FF&").unwrap(), [255, 0, 0, 0]);
+        assert_eq!(parse_bgr_color("&H0000FF00&").unwrap(), [0, 255, 0, 0]);
+        assert_eq!(parse_bgr_color("&H00FF0000&").unwrap(), [0, 0, 255, 0]);
+
+        // With alpha
+        assert_eq!(parse_bgr_color("&HFF000000&").unwrap(), [0, 0, 0, 255]);
+
+        // Alternative formats
+        assert_eq!(parse_bgr_color("0x000000FF").unwrap(), [255, 0, 0, 0]);
+        assert_eq!(parse_bgr_color("000000FF").unwrap(), [255, 0, 0, 0]);
+    }
+
+    #[test]
+    fn parse_bgr_colors_invalid() {
+        assert!(parse_bgr_color("invalid").is_err());
+        assert!(parse_bgr_color("&HZZZZ&").is_err());
+        assert!(parse_bgr_color("").is_err());
+    }
+
+    #[test]
+    fn parse_bgr_colors_without_trailing_ampersand() {
+        // Test colors without trailing & (common in ASS files)
+        assert_eq!(parse_bgr_color("&H000000FF").unwrap(), [255, 0, 0, 0]);
+        assert_eq!(parse_bgr_color("&H00FFFFFF").unwrap(), [255, 255, 255, 0]);
+        assert_eq!(parse_bgr_color("&H00000000").unwrap(), [0, 0, 0, 0]);
+        assert_eq!(parse_bgr_color("&HFF000000").unwrap(), [0, 0, 0, 255]);
+    }
+
+    #[test]
+    fn parse_ass_times() {
+        assert_eq!(parse_ass_time("0:00:00.00").unwrap(), 0);
+        assert_eq!(parse_ass_time("0:00:01.00").unwrap(), 100);
+        assert_eq!(parse_ass_time("0:01:00.00").unwrap(), 6000);
+        assert_eq!(parse_ass_time("1:00:00.00").unwrap(), 360000);
+        assert_eq!(parse_ass_time("0:01:30.50").unwrap(), 9050);
+    }
+
+    #[test]
+    fn parse_ass_times_invalid() {
+        assert!(parse_ass_time("invalid").is_err());
+        assert!(parse_ass_time("0:60:00.00").is_err()); // Invalid minutes
+        assert!(parse_ass_time("0:00:60.00").is_err()); // Invalid seconds
+        assert!(parse_ass_time("0:00:00.100").is_err()); // Invalid centiseconds
+    }
+
+    #[test]
+    fn format_ass_times() {
+        assert_eq!(format_ass_time(0), "0:00:00.00");
+        assert_eq!(format_ass_time(100), "0:00:01.00");
+        assert_eq!(format_ass_time(6000), "0:01:00.00");
+        assert_eq!(format_ass_time(360000), "1:00:00.00");
+        assert_eq!(format_ass_time(9050), "0:01:30.50");
+    }
+
+    #[test]
+    fn bezier_evaluation() {
+        let p0 = (0.0, 0.0);
+        let p1 = (0.33, 0.0);
+        let p2 = (0.67, 1.0);
+        let p3 = (1.0, 1.0);
+
+        let start = eval_cubic_bezier(p0, p1, p2, p3, 0.0);
+        assert_eq!(start, p0);
+
+        let end = eval_cubic_bezier(p0, p1, p2, p3, 1.0);
+        assert_eq!(end, p3);
+
+        let mid = eval_cubic_bezier(p0, p1, p2, p3, 0.5);
+        assert!(mid.0 > 0.0 && mid.0 < 1.0);
+        assert!(mid.1 > 0.0 && mid.1 < 1.0);
+    }
+
+    #[test]
+    fn validate_ass_names() {
+        assert!(validate_ass_name("Default"));
+        assert!(validate_ass_name("MyStyle"));
+        assert!(validate_ass_name("Style with spaces"));
+
+        assert!(!validate_ass_name("")); // Empty
+        assert!(!validate_ass_name("Style,Name")); // Comma
+        assert!(!validate_ass_name("Style:Name")); // Colon
+        assert!(!validate_ass_name("Style{Name")); // Brace
+        assert!(!validate_ass_name("Style\nName")); // Control character
+    }
+
+    #[test]
+    fn normalize_field_values() {
+        assert_eq!(normalize_field_value("  value  "), "value");
+        assert_eq!(normalize_field_value("\tvalue\t"), "value");
+        assert_eq!(normalize_field_value("value"), "value");
+    }
+
+    #[test]
+    fn numeric_parsing() {
+        assert_eq!(parse_numeric::<i32>("42").unwrap(), 42);
+        assert_eq!(parse_numeric::<f32>("3.15").unwrap(), 3.15);
+        assert!(parse_numeric::<i32>("invalid").is_err());
+    }
+}

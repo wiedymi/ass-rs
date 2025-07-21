@@ -1,0 +1,25 @@
+[workspace]
+members = ["crates/ass-core"]
+resolver = "2"
+
+[workspace.dependencies]
+# Shared dependencies with pinned versions for security and reproducibility
+thiserror = "1.0.63"
+ahash = "0.8.11"
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/your-org/ass-rs"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+strip = false

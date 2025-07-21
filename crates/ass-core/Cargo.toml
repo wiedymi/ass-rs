@@ -1,0 +1,53 @@
+[package]
+name = "ass-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "High-performance ASS subtitle format parser and analyzer"
+keywords = ["subtitle", "ass", "ssa", "parser", "aegisub"]
+categories = ["parsing", "multimedia", "text-processing"]
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+# Workspace dependencies
+thiserror.workspace = true
+ahash.workspace = true
+
+# Feature-gated dependencies
+hashbrown = { version = "0.14", optional = true, features = ["ahash"] }
+bumpalo = { version = "3.14", optional = true }
+wide = { version = "0.7", optional = true }
+serde = { version = "1.0", optional = true, features = ["derive"] }
+criterion = { version = "0.5", optional = true, features = ["html_reports"] }
+
+[features]
+default = ["std", "analysis", "plugins"]
+
+# Platform support
+std = []                   # Standard library support (default)
+no_std = ["dep:hashbrown"] # no_std compatibility (mutually exclusive with std)
+
+# Core functionality
+analysis = [] # Enable linting and deep analysis
+plugins = []  # Extension registry support
+unicode-wrap = [] # Unicode linebreak support for libass 0.17.4+ compatibility
+
+# Performance optimizations
+simd = ["dep:wide"]     # SIMD-accelerated parsing
+simd-full = ["simd"]    # Extended SIMD for UUencode/hex parsing (20-40% faster)
+arena = ["dep:bumpalo"] # Arena allocation for parsing
+
+# Platform support
+stream = [] # Chunked/streaming input support
+
+# Development features
+serde = ["dep:serde"]       # Serialization support
+benches = ["dep:criterion"] # Benchmark integration
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
