@@ -61,7 +61,10 @@ pub mod events;
 pub mod linting;
 pub mod styles;
 
-pub use events::DialogueInfo;
+pub use events::{
+    count_overlapping_dialogue_events, count_overlapping_events, find_overlapping_events,
+    DialogueInfo,
+};
 pub use linting::{lint_script, LintConfig, LintIssue, LintRule};
 pub use styles::{ResolvedStyle, StyleAnalyzer};
 
@@ -228,19 +231,10 @@ impl<'a> ScriptAnalysis<'a> {
         Ok(())
     }
 
-    /// Count overlapping events
+    /// Count overlapping events using efficient O(n log n) algorithm
     fn count_overlapping_events(&self) -> usize {
-        let mut overlaps = 0;
-        for (i, info1) in self.dialogue_info.iter().enumerate() {
-            for info2 in self.dialogue_info.iter().skip(i + 1) {
-                if info1.start_time_cs() < info2.end_time_cs()
-                    && info2.start_time_cs() < info1.end_time_cs()
-                {
-                    overlaps += 1;
-                }
-            }
-        }
-        overlaps
+        // Use already analyzed dialogue info for efficient overlap detection
+        count_overlapping_dialogue_events(&self.dialogue_info)
     }
 
     /// Count complex animations (transforms, etc.)

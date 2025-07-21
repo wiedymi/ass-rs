@@ -57,6 +57,221 @@ use crate::{
 use alloc::{string::String, vec::Vec};
 use core::cmp::Ordering;
 
+/// Event type for sweep-line algorithm
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SweepEventType {
+    Start,
+    End,
+}
+
+/// Event for sweep-line overlap detection
+#[derive(Debug, Clone)]
+struct SweepEvent {
+    time: u32,
+    event_type: SweepEventType,
+    event_index: usize,
+}
+
+impl PartialEq for SweepEvent {
+    fn eq(&self, other: &Self) -> bool {
+        self.time == other.time && self.event_type == other.event_type
+    }
+}
+
+impl Eq for SweepEvent {}
+
+impl PartialOrd for SweepEvent {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for SweepEvent {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Sort by time first, then by event type (End before Start for same time)
+        match self.time.cmp(&other.time) {
+            Ordering::Equal => match (self.event_type, other.event_type) {
+                (SweepEventType::End, SweepEventType::Start) => Ordering::Less,
+                (SweepEventType::Start, SweepEventType::End) => Ordering::Greater,
+                _ => Ordering::Equal,
+            },
+            other => other,
+        }
+    }
+}
+
+/// Efficiently find overlapping events using sweep-line algorithm
+///
+/// Uses O(n log n) algorithm instead of naive O(n²) approach.
+/// Returns pairs of (event1_index, event2_index) for overlapping events.
+///
+/// # Arguments
+///
+/// * `events` - Slice of events to check for overlaps
+///
+/// # Returns
+///
+/// Vector of overlapping event index pairs, or error if parsing fails.
+///
+/// # Performance
+///
+/// - Time complexity: O(n log n) where n is number of events
+/// - Space complexity: O(n) for sweep events
+/// - Significantly faster than O(n²) naive approach for large scripts
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use ass_core::analysis::events::find_overlapping_events;
+/// use ass_core::parser::{Script, Section};
+///
+/// # let script_text = "[Events]\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text";
+/// let script = Script::parse(script_text)?;
+/// if let Some(Section::Events(events)) = script.sections().first() {
+///     let overlaps = find_overlapping_events(events)?;
+///     for (i, j) in overlaps {
+///         println!("Events {} and {} overlap", i, j);
+///     }
+/// }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub fn find_overlapping_events(events: &[Event]) -> Result<Vec<(usize, usize)>> {
+    if events.len() < 2 {
+        return Ok(Vec::new());
+    }
+
+    // Create sweep events
+    let mut sweep_events = Vec::with_capacity(events.len() * 2);
+
+    for (index, event) in events.iter().enumerate() {
+        let start_time = parse_ass_time(event.start)
+            .map_err(|_| CoreError::parse("Invalid start time format"))?;
+        let end_time =
+            parse_ass_time(event.end).map_err(|_| CoreError::parse("Invalid end time format"))?;
+
+        sweep_events.push(SweepEvent {
+            time: start_time,
+            event_type: SweepEventType::Start,
+            event_index: index,
+        });
+
+        sweep_events.push(SweepEvent {
+            time: end_time,
+            event_type: SweepEventType::End,
+            event_index: index,
+        });
+    }
+
+    // Sort sweep events by time
+    sweep_events.sort();
+
+    // Sweep through events maintaining active set
+    let mut active_events = Vec::new();
+    let mut overlaps = Vec::new();
+
+    for sweep_event in sweep_events {
+        match sweep_event.event_type {
+            SweepEventType::Start => {
+                // Check for overlaps with all currently active events
+                for &active_index in &active_events {
+                    overlaps.push((active_index, sweep_event.event_index));
+                }
+                active_events.push(sweep_event.event_index);
+            }
+            SweepEventType::End => {
+                // Remove event from active set
+                if let Some(pos) = active_events
+                    .iter()
+                    .position(|&x| x == sweep_event.event_index)
+                {
+                    active_events.remove(pos);
+                }
+            }
+        }
+    }
+
+    Ok(overlaps)
+}
+
+/// Efficiently find overlapping events using sweep-line algorithm (for references)
+///
+/// Uses O(n log n) algorithm instead of naive O(n²) approach.
+/// Returns pairs of (event1_index, event2_index) for overlapping events.
+/// This version works with Event references for better memory efficiency.
+pub fn find_overlapping_event_refs(events: &[&Event]) -> Result<Vec<(usize, usize)>> {
+    if events.len() < 2 {
+        return Ok(Vec::new());
+    }
+
+    // Create sweep events
+    let mut sweep_events = Vec::with_capacity(events.len() * 2);
+
+    for (index, event) in events.iter().enumerate() {
+        let start_time = parse_ass_time(event.start)
+            .map_err(|_| CoreError::parse("Invalid start time format"))?;
+        let end_time =
+            parse_ass_time(event.end).map_err(|_| CoreError::parse("Invalid end time format"))?;
+
+        sweep_events.push(SweepEvent {
+            time: start_time,
+            event_type: SweepEventType::Start,
+            event_index: index,
+        });
+
+        sweep_events.push(SweepEvent {
+            time: end_time,
+            event_type: SweepEventType::End,
+            event_index: index,
+        });
+    }
+
+    // Sort sweep events by time
+    sweep_events.sort();
+
+    // Sweep through events maintaining active set
+    let mut active_events = Vec::new();
+    let mut overlaps = Vec::new();
+
+    for sweep_event in sweep_events {
+        match sweep_event.event_type {
+            SweepEventType::Start => {
+                // Check for overlaps with all currently active events
+                for &active_index in &active_events {
+                    overlaps.push((active_index, sweep_event.event_index));
+                }
+                active_events.push(sweep_event.event_index);
+            }
+            SweepEventType::End => {
+                // Remove event from active set
+                if let Some(pos) = active_events
+                    .iter()
+                    .position(|&x| x == sweep_event.event_index)
+                {
+                    active_events.remove(pos);
+                }
+            }
+        }
+    }
+
+    Ok(overlaps)
+}
+
+/// Count overlapping events efficiently
+///
+/// Wrapper around `find_overlapping_events` that just returns the count.
+/// Useful for performance analysis where specific overlap pairs aren't needed.
+///
+/// # Arguments
+///
+/// * `events` - Slice of events to check for overlaps
+///
+/// # Returns
+///
+/// Number of overlapping event pairs, or error if parsing fails.
+pub fn count_overlapping_events(events: &[Event]) -> Result<usize> {
+    Ok(find_overlapping_events(events)?.len())
+}
+
 /// Comprehensive analysis information for a dialogue event
 ///
 /// Contains timing, styling, and content analysis results for a single
@@ -559,24 +774,31 @@ impl<'a> TextAnalysis<'a> {
 }
 
 /// Find all overlapping events in a collection
+/// Find overlapping dialogue events using efficient timing analysis
 ///
 /// Returns pairs of event indices that have overlapping timing.
+/// Delegates to the efficient O(n log n) algorithm for better performance.
 /// Useful for detecting rendering conflicts and performance issues.
-pub fn find_overlapping_events(events: &[DialogueInfo<'_>]) -> Vec<(usize, usize)> {
-    let mut overlaps = Vec::new();
+pub fn find_overlapping_dialogue_events(events: &[DialogueInfo<'_>]) -> Vec<(usize, usize)> {
+    // Extract Event references and delegate to efficient O(n log n) algorithm
+    let event_refs: Vec<&Event> = events.iter().map(|info| info.event).collect();
+    find_overlapping_event_refs(&event_refs).unwrap_or_else(|_| Vec::new())
+}
 
-    for (i, event1) in events.iter().enumerate() {
-        for (j, event2) in events.iter().enumerate().skip(i + 1) {
-            match event1.timing_relation(event2) {
-                TimingRelation::PartialOverlap | TimingRelation::FullOverlap => {
-                    overlaps.push((i, j));
-                }
-                TimingRelation::NoOverlap | TimingRelation::Identical => {}
-            }
-        }
-    }
-
-    overlaps
+/// Count overlapping dialogue events efficiently
+///
+/// Convenience wrapper around find_overlapping_dialogue_events that just returns the count.
+/// Uses the efficient O(n log n) algorithm for better performance with large scripts.
+///
+/// # Arguments
+///
+/// * `events` - Slice of DialogueInfo to check for overlaps
+///
+/// # Returns
+///
+/// Number of overlapping event pairs
+pub fn count_overlapping_dialogue_events(events: &[DialogueInfo<'_>]) -> usize {
+    find_overlapping_dialogue_events(events).len()
 }
 
 /// Sort events by start time
@@ -748,7 +970,7 @@ mod tests {
             DialogueInfo::analyze(&event3).unwrap(),
         ];
 
-        let overlaps = find_overlapping_events(&infos);
+        let overlaps = find_overlapping_dialogue_events(&infos);
         assert_eq!(overlaps.len(), 1);
         assert_eq!(overlaps[0], (0, 1));
     }
@@ -784,5 +1006,50 @@ mod tests {
         assert_eq!(infos[0].start_time_cs(), 0); // Event 2
         assert_eq!(infos[1].start_time_cs(), 200); // Event 3
         assert_eq!(infos[2].start_time_cs(), 500); // Event 1
+    }
+
+    #[test]
+    fn efficient_overlap_detection() {
+        // Test the O(n log n) efficient overlap detection algorithm
+        let event1 = create_test_event("0:00:00.00", "0:00:05.00", "Event 1");
+        let event2 = create_test_event("0:00:03.00", "0:00:08.00", "Event 2"); // Overlaps with 1
+        let event3 = create_test_event("0:00:10.00", "0:00:15.00", "Event 3"); // No overlap
+        let event4 = create_test_event("0:00:04.00", "0:00:06.00", "Event 4"); // Overlaps with 1 and 2
+
+        let events = vec![&event1, &event2, &event3, &event4];
+        let overlaps = find_overlapping_event_refs(&events).unwrap();
+
+        // Should find 3 overlaps: (0,1), (0,3), (1,3)
+        assert_eq!(overlaps.len(), 3);
+
+        // Check specific overlaps (order may vary)
+        assert!(overlaps.contains(&(0, 1))); // Event 1 and 2 overlap
+        assert!(overlaps.contains(&(0, 3))); // Event 1 and 4 overlap
+        assert!(overlaps.contains(&(1, 3))); // Event 2 and 4 overlap
+    }
+
+    #[test]
+    fn efficient_overlap_detection_no_overlaps() {
+        // Test with no overlapping events
+        let event1 = create_test_event("0:00:00.00", "0:00:05.00", "Event 1");
+        let event2 = create_test_event("0:00:06.00", "0:00:10.00", "Event 2");
+        let event3 = create_test_event("0:00:11.00", "0:00:15.00", "Event 3");
+
+        let events = vec![&event1, &event2, &event3];
+        let overlaps = find_overlapping_event_refs(&events).unwrap();
+
+        assert_eq!(overlaps.len(), 0);
+    }
+
+    #[test]
+    fn efficient_overlap_detection_edge_cases() {
+        // Test with events that touch but don't overlap
+        let event1 = create_test_event("0:00:00.00", "0:00:05.00", "Event 1");
+        let event2 = create_test_event("0:00:05.00", "0:00:10.00", "Event 2"); // Touches but no overlap
+
+        let events = vec![&event1, &event2];
+        let overlaps = find_overlapping_event_refs(&events).unwrap();
+
+        assert_eq!(overlaps.len(), 0);
     }
 }

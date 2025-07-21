@@ -163,6 +163,8 @@ struct Parser<'a> {
     version: ScriptVersion,
     sections: Vec<Section<'a>>,
     issues: Vec<ParseIssue>,
+    styles_format: Option<Vec<&'a str>>,
+    events_format: Option<Vec<&'a str>>,
 }
 
 impl<'a> Parser<'a> {
@@ -175,6 +177,8 @@ impl<'a> Parser<'a> {
             version: ScriptVersion::AssV4, // Default, updated when ScriptType found
             sections: Vec::new(),
             issues: Vec::new(),
+            styles_format: None,
+            events_format: None,
         }
     }
 
@@ -331,7 +335,11 @@ impl<'a> Parser<'a> {
             }
 
             if line.starts_with("Format:") {
-                // Skip format line for now - we assume standard V4+ format
+                // Parse format line to store field mapping
+                if let Some(format_data) = line.strip_prefix("Format:") {
+                    let fields: Vec<&'a str> = format_data.split(',').map(|s| s.trim()).collect();
+                    self.styles_format = Some(fields);
+                }
                 self.skip_line();
                 continue;
             } else if line.starts_with("Style:") {
@@ -351,45 +359,87 @@ impl<'a> Parser<'a> {
         Ok(Section::Styles(styles))
     }
 
-    /// Parse a single style line
+    /// Parse a single style line using format mapping
     fn parse_style_line(&mut self, line: &'a str) -> Result<Option<Style<'a>>> {
         let parts: Vec<&str> = line.split(',').collect();
 
-        // V4+ styles should have 23 fields minimum
-        if parts.len() < 23 {
+        // Use format mapping if available, otherwise fall back to default order
+        let format = self.styles_format.as_deref().unwrap_or(&[
+            "Name",
+            "Fontname",
+            "Fontsize",
+            "PrimaryColour",
+            "SecondaryColour",
+            "OutlineColour",
+            "BackColour",
+            "Bold",
+            "Italic",
+            "Underline",
+            "StrikeOut",
+            "ScaleX",
+            "ScaleY",
+            "Spacing",
+            "Angle",
+            "BorderStyle",
+            "Outline",
+            "Shadow",
+            "Alignment",
+            "MarginL",
+            "MarginR",
+            "MarginV",
+            "Encoding",
+        ]);
+
+        if parts.len() != format.len() {
             self.issues.push(ParseIssue::new(
                 IssueSeverity::Warning,
                 IssueCategory::Format,
-                format!("Style line has {} fields, expected 23", parts.len()),
+                format!(
+                    "Style line has {} fields, expected {}",
+                    parts.len(),
+                    format.len()
+                ),
                 self.line,
             ));
-            return Ok(None);
+            if parts.len() < format.len() {
+                return Ok(None);
+            }
         }
 
+        // Helper function to get field by name
+        let get_field = |name: &str| -> &'a str {
+            format
+                .iter()
+                .position(|&field| field.eq_ignore_ascii_case(name))
+                .and_then(|idx| parts.get(idx))
+                .map(|s| s.trim())
+                .unwrap_or("")
+        };
+
         let style = Style {
-            name: parts[0].trim(),
-            fontname: parts[1].trim(),
-            fontsize: parts[2].trim(),
-            primary_colour: parts[3].trim(),
-            secondary_colour: parts[4].trim(),
-            outline_colour: parts[5].trim(),
-            back_colour: parts[6].trim(),
-            bold: parts[7].trim(),
-            italic: parts[8].trim(),
-            underline: parts[9].trim(),
-            strikeout: parts[10].trim(),
-            scale_x: parts[11].trim(),
-            scale_y: parts[12].trim(),
-            spacing: parts[13].trim(),
-            angle: parts[14].trim(),
-            border_style: parts[15].trim(),
-            outline: parts[16].trim(),
-            shadow: parts[17].trim(),
-            alignment: parts[18].trim(),
-            margin_l: parts[19].trim(),
-            margin_r: parts[20].trim(),
-            margin_v: parts[21].trim(),
-            encoding: parts[22].trim(),
+            name: get_field("Name"),
+            fontname: get_field("Fontname"),
+            fontsize: get_field("Fontsize"),
+            primary_colour: get_field("PrimaryColour"),
+            secondary_colour: get_field("SecondaryColour"),
+            outline_colour: get_field("OutlineColour"),
+            back_colour: get_field("BackColour"),
+            bold: get_field("Bold"),
+            italic: get_field("Italic"),
+            underline: get_field("Underline"),
+            strikeout: get_field("StrikeOut"),
+            scale_x: get_field("ScaleX"),
+            scale_y: get_field("ScaleY"),
+            spacing: get_field("Spacing"),
+            angle: get_field("Angle"),
+            border_style: get_field("BorderStyle"),
+            outline: get_field("Outline"),
+            shadow: get_field("Shadow"),
+            alignment: get_field("Alignment"),
+            margin_l: get_field("MarginL"),
+            margin_r: get_field("MarginR"),
+            margin_v: get_field("MarginV"),
+            encoding: get_field("Encoding"),
         };
 
         Ok(Some(style))
@@ -413,7 +463,11 @@ impl<'a> Parser<'a> {
             }
 
             if line.starts_with("Format:") {
-                // Skip format line for now - we assume standard format
+                // Parse format line to store field mapping
+                if let Some(format_data) = line.strip_prefix("Format:") {
+                    let fields: Vec<&'a str> = format_data.split(',').map(|s| s.trim()).collect();
+                    self.events_format = Some(fields);
+                }
                 self.skip_line();
                 continue;
             } else if let Some(event) = self.parse_event_line(line)? {
@@ -428,7 +482,7 @@ impl<'a> Parser<'a> {
         Ok(Section::Events(events))
     }
 
-    /// Parse a single event line
+    /// Parse a single event line using format mapping
     fn parse_event_line(&mut self, line: &'a str) -> Result<Option<ast::Event<'a>>> {
         // Find the event type prefix
         let colon_pos = line
@@ -457,31 +511,61 @@ impl<'a> Parser<'a> {
             }
         };
 
-        // Parse comma-separated fields using splitn for robust text handling
-        let mut parts = event_data.splitn(10, ',');
-        let layer = parts.next().unwrap_or("").trim();
-        let start = parts.next().unwrap_or("").trim();
-        let end = parts.next().unwrap_or("").trim();
-        let style = parts.next().unwrap_or("").trim();
-        let name = parts.next().unwrap_or("").trim();
-        let margin_l = parts.next().unwrap_or("").trim();
-        let margin_r = parts.next().unwrap_or("").trim();
-        let margin_v = parts.next().unwrap_or("").trim();
-        let effect = parts.next().unwrap_or("").trim();
-        let text = parts.next().unwrap_or("").trim(); // The rest of the string
+        // Use format mapping if available, otherwise fall back to default order
+        let format = self.events_format.as_deref().unwrap_or(&[
+            "Layer", "Start", "End", "Style", "Name", "MarginL", "MarginR", "MarginV", "Effect",
+            "Text",
+        ]);
+
+        // Parse comma-separated fields, but be careful with Text field which may contain commas
+        let text_index = format
+            .iter()
+            .position(|&field| field.eq_ignore_ascii_case("Text"))
+            .unwrap_or(format.len() - 1);
+
+        let parts: Vec<&str> = if text_index < format.len() - 1 {
+            // Text is not the last field - split normally
+            event_data.split(',').collect()
+        } else {
+            // Text is the last field - use splitn to preserve commas in text
+            event_data.splitn(format.len(), ',').collect()
+        };
+
+        if parts.len() != format.len() && parts.len() < format.len() {
+            self.issues.push(ParseIssue::new(
+                IssueSeverity::Warning,
+                IssueCategory::Format,
+                format!(
+                    "Event line has {} fields, expected {}",
+                    parts.len(),
+                    format.len()
+                ),
+                self.line,
+            ));
+        }
+
+        // Helper function to get field by name
+        let get_field = |name: &str| -> &'a str {
+            format
+                .iter()
+                .position(|&field| field.eq_ignore_ascii_case(name))
+                .and_then(|idx| parts.get(idx))
+                .map(|s| s.trim())
+                .unwrap_or("")
+        };
 
         let event = ast::Event {
             event_type,
-            layer,
-            start,
-            end,
-            style,
-            name,
-            margin_l,
-            margin_r,
-            margin_v,
-            effect,
-            text,
+            layer: get_field("Layer"),
+            start: get_field("Start"),
+            end: get_field("End"),
+            style: get_field("Style"),
+            name: get_field("Name"),
+            margin_l: get_field("MarginL"),
+            margin_r: get_field("MarginR"),
+            margin_v: get_field("MarginV"),
+            effect: get_field("Effect"),
+            text: get_field("Text"),
         };
 
         Ok(Some(event))
@@ -625,5 +709,56 @@ mod tests {
         assert_eq!(script.sections().len(), 1);
         assert_eq!(script.issues().len(), 1);
         assert_eq!(script.issues()[0].severity, IssueSeverity::Warning);
+    }
+
+    #[test]
+    fn parse_with_custom_format() {
+        let script_text = r#"[Script Info]
+Title: Format Test
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Fontsize, Name, Fontname, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: 20,Custom,Arial,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+
+[Events]
+Format: Start, Layer, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0:00:00.00,0,0:00:05.00,Custom,,0,0,0,,Custom format test
+"#;
+
+        let script = Script::parse(script_text).unwrap();
+        assert_eq!(script.sections().len(), 3);
+
+        // Find the styles section and verify custom format was used correctly
+        if let Some(Section::Styles(styles)) = script
+            .sections()
+            .iter()
+            .find(|s| matches!(s, Section::Styles(_)))
+        {
+            assert_eq!(styles.len(), 1);
+            let style = &styles[0];
+            assert_eq!(style.name, "Custom");
+            assert_eq!(style.fontname, "Arial");
+            assert_eq!(style.fontsize, "20"); // This was first in our custom format
+        } else {
+            panic!("Should have found styles section");
+        }
+
+        // Find the events section and verify custom format was used correctly
+        if let Some(Section::Events(events)) = script
+            .sections()
+            .iter()
+            .find(|s| matches!(s, Section::Events(_)))
+        {
+            assert_eq!(events.len(), 1);
+            let event = &events[0];
+            assert_eq!(event.start, "0:00:00.00");
+            assert_eq!(event.layer, "0"); // Layer was second in our custom format
+            assert_eq!(event.end, "0:00:05.00");
+            assert_eq!(event.style, "Custom");
+            assert_eq!(event.text, "Custom format test");
+        } else {
+            panic!("Should have found events section");
+        }
     }
 }
