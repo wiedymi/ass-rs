@@ -88,7 +88,6 @@ pub fn create_hasher() -> AHasher {
 #[cfg(test)]
 pub fn create_deterministic_hasher() -> AHasher {
     use ahash::RandomState;
-    // Use fixed seeds for deterministic testing
     RandomState::with_seeds(0x1234_5678_9abc_def0, 0xfedc_ba98_7654_3210, 0, 0).build_hasher()
 }
 
@@ -202,8 +201,6 @@ mod tests {
         "test".hash(&mut hasher);
         let hash2 = hasher.finish();
 
-        // Hashes should be the same for same input (within same run)
-        // But different seeds mean they might differ between runs
         assert!(hash1 > 0);
         assert!(hash2 > 0);
     }
@@ -218,7 +215,6 @@ mod tests {
         "test".hash(&mut hasher2);
         let hash2 = hasher2.finish();
 
-        // Deterministic hashes should be identical
         assert_eq!(hash1, hash2);
         assert!(hash1 > 0);
     }
@@ -233,7 +229,6 @@ mod tests {
         map2.insert("a", 1);
         map2.insert("b", 2);
 
-        // Maps should behave identically
         assert_eq!(map1.get("a"), Some(&1));
         assert_eq!(map2.get("a"), Some(&1));
         assert_eq!(map1.len(), map2.len());
@@ -245,8 +240,6 @@ mod tests {
         let hash2 = hash_value(&"test");
         let hash3 = hash_value(&"different");
 
-        // Same input might produce different hashes due to random seeds
-        // But function should work without panicking
         assert!(hash1 > 0);
         assert!(hash2 > 0);
         assert!(hash3 > 0);
@@ -281,8 +274,6 @@ mod tests {
         let int_hash = hash_value(&42i32);
         let u64_hash = hash_value(&42u64);
 
-        // Different types should generally produce different hashes
-        // (Though collisions are theoretically possible)
         assert!(str_hash > 0);
         assert!(int_hash > 0);
         assert!(u64_hash > 0);

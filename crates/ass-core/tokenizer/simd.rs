@@ -18,6 +18,8 @@
 use crate::utils::CoreError;
 
 #[cfg(feature = "simd")]
+use wide::u8x16;
+
 /// Scan for delimiter characters using SIMD acceleration
 ///
 /// Searches for common ASS delimiters (comma, colon, braces, brackets)
@@ -43,27 +45,59 @@ use crate::utils::CoreError;
 pub fn scan_delimiters(text: &str) -> Option<usize> {
     let bytes = text.as_bytes();
 
-    // Use SIMD for bulk scanning when we have enough data
-    if bytes.len() >= 16 {
-        scan_delimiters_simd_impl(bytes)
-    } else {
-        scan_delimiters_scalar(bytes)
+    #[cfg(feature = "simd")]
+    {
+        if bytes.len() >= 16 {
+            return scan_delimiters_simd_impl(bytes);
+        }
     }
-}
 
-/// Scalar fallback for delimiter scanning
-#[cfg(feature = "simd")]
-fn scan_delimiters_simd_impl(bytes: &[u8]) -> Option<usize> {
-    // Note: This is a simplified SIMD implementation
-    // Real implementation would use proper SIMD instructions
-    // For now, fall back to scalar to maintain safety
     scan_delimiters_scalar(bytes)
 }
 
-/// Fallback implementation when SIMD is not available
-#[cfg(not(feature = "simd"))]
-pub fn scan_delimiters(text: &str) -> Option<usize> {
-    scan_delimiters_scalar(text.as_bytes())
+/// SIMD implementation for delimiter scanning
+#[cfg(feature = "simd")]
+fn scan_delimiters_simd_impl(bytes: &[u8]) -> Option<usize> {
+    let delim_colon = u8x16::splat(b':');
+    let delim_comma = u8x16::splat(b',');
+    let delim_open_brace = u8x16::splat(b'{');
+    let delim_close_brace = u8x16::splat(b'}');
+    let delim_open_bracket = u8x16::splat(b'[');
+    let delim_close_bracket = u8x16::splat(b']');
+    let delim_newline = u8x16::splat(b'\n');
+    let delim_carriage = u8x16::splat(b'\r');
+
+    let chunks = bytes.chunks_exact(16);
+    let remainder = chunks.remainder();
+
+    for (chunk_idx, chunk) in chunks.enumerate() {
+        let chunk_array: [u8; 16] = chunk.try_into().unwrap();
+        let simd_chunk = u8x16::from(chunk_array);
+
+        let mask = simd_chunk.cmp_eq(delim_colon)
+            | simd_chunk.cmp_eq(delim_comma)
+            | simd_chunk.cmp_eq(delim_open_brace)
+            | simd_chunk.cmp_eq(delim_close_brace)
+            | simd_chunk.cmp_eq(delim_open_bracket)
+            | simd_chunk.cmp_eq(delim_close_bracket)
+            | simd_chunk.cmp_eq(delim_newline)
+            | simd_chunk.cmp_eq(delim_carriage);
+
+        let mask_bits = mask.move_mask();
+        if mask_bits != 0 {
+            let first_match = mask_bits.trailing_zeros() as usize;
+            return Some(chunk_idx * 16 + first_match);
+        }
+    }
+
+    if !remainder.is_empty() {
+        let remainder_offset = bytes.len() - remainder.len();
+        if let Some(pos) = scan_delimiters_scalar(remainder) {
+            return Some(remainder_offset + pos);
+        }
+    }
+
+    None
 }
 
 /// Scalar implementation for delimiter scanning
@@ -98,20 +132,58 @@ fn scan_delimiters_scalar(bytes: &[u8]) -> Option<usize> {
 /// let value = parse_hex_u32("00FF00FF").unwrap();
 /// assert_eq!(value, 0x00FF00FF);
 /// ```
-#[cfg(feature = "simd")]
 pub fn parse_hex_u32(hex_str: &str) -> Option<u32> {
-    if hex_str.len() <= 8 && hex_str.chars().all(|c| c.is_ascii_hexdigit()) {
-        // For now, use standard parsing as SIMD hex parsing is complex
-        // Future optimization could implement vectorized hex digit conversion
-        parse_hex_scalar(hex_str)
-    } else {
-        None
+    if hex_str.is_empty() || hex_str.len() > 8 {
+        return None;
     }
+
+    #[cfg(feature = "simd")]
+    {
+        if hex_str.len() >= 4 {
+            return parse_hex_simd_impl(hex_str);
+        }
+    }
+
+    parse_hex_scalar(hex_str)
 }
 
-/// Fallback hex parsing when SIMD not available
-#[cfg(not(feature = "simd"))]
-pub fn parse_hex_u32(hex_str: &str) -> Option<u32> {
+/// SIMD implementation for hex parsing
+#[cfg(feature = "simd")]
+fn parse_hex_simd_impl(hex_str: &str) -> Option<u32> {
+    let bytes = hex_str.as_bytes();
+
+    let chunks = bytes.chunks_exact(16);
+    let remainder = chunks.remainder();
+
+    for chunk in chunks {
+        let chunk_array: [u8; 16] = chunk.try_into().unwrap();
+        let simd_chunk = u8x16::from(chunk_array);
+
+        let mut valid_mask = u8x16::splat(0);
+        for digit in b'0'..=b'9' {
+            valid_mask = valid_mask | simd_chunk.cmp_eq(u8x16::splat(digit));
+        }
+
+        for hex_char in b'A'..=b'F' {
+            valid_mask = valid_mask | simd_chunk.cmp_eq(u8x16::splat(hex_char));
+        }
+
+        for hex_char in b'a'..=b'f' {
+            valid_mask = valid_mask | simd_chunk.cmp_eq(u8x16::splat(hex_char));
+        }
+
+        let mask_bits = valid_mask.move_mask();
+        if mask_bits != 0xFFFF {
+            return None; // Contains non-hex characters
+        }
+    }
+
+    for &byte in remainder {
+        if !byte.is_ascii_hexdigit() {
+            return None;
+        }
+    }
+
     parse_hex_scalar(hex_str)
 }
 
@@ -124,18 +196,39 @@ fn parse_hex_scalar(hex_str: &str) -> Option<u32> {
 ///
 /// Validates multiple bytes at once for UTF-8 compliance.
 /// Provides faster validation for large text blocks.
-#[cfg(feature = "simd")]
 pub fn validate_utf8_batch(bytes: &[u8]) -> Result<(), CoreError> {
-    // For now, fall back to standard validation
-    // Proper SIMD UTF-8 validation is complex and error-prone
-    core::str::from_utf8(bytes)
-        .map(|_| ())
-        .map_err(|e| CoreError::utf8_error(e.valid_up_to(), format!("{}", e)))
+    #[cfg(feature = "simd")]
+    {
+        if bytes.len() >= 16 {
+            return validate_utf8_simd_impl(bytes);
+        }
+    }
+
+    validate_utf8_scalar(bytes)
 }
 
-/// Fallback UTF-8 validation
-#[cfg(not(feature = "simd"))]
-pub fn validate_utf8_batch(bytes: &[u8]) -> Result<(), CoreError> {
+/// SIMD implementation for UTF-8 validation
+#[cfg(feature = "simd")]
+fn validate_utf8_simd_impl(bytes: &[u8]) -> Result<(), CoreError> {
+    let chunks = bytes.chunks_exact(16);
+    let remainder = chunks.remainder();
+
+    for chunk in chunks {
+        let chunk_array: [u8; 16] = chunk.try_into().unwrap();
+        let simd_chunk = u8x16::from(chunk_array);
+        let ascii_mask = u8x16::splat(0x80);
+
+        let has_non_ascii = (simd_chunk & ascii_mask).move_mask();
+        if has_non_ascii != 0 {
+            return validate_utf8_scalar(bytes);
+        }
+    }
+
+    validate_utf8_scalar(remainder)
+}
+
+/// Scalar UTF-8 validation implementation
+fn validate_utf8_scalar(bytes: &[u8]) -> Result<(), CoreError> {
     core::str::from_utf8(bytes)
         .map(|_| ())
         .map_err(|e| CoreError::utf8_error(e.valid_up_to(), format!("{}", e)))
@@ -170,10 +263,18 @@ mod tests {
     }
 
     #[test]
+    fn scan_delimiters_long_text() {
+        let text = "a".repeat(50) + ":value";
+        assert_eq!(scan_delimiters(&text), Some(50));
+    }
+
+    #[test]
     fn parse_hex_valid() {
         assert_eq!(parse_hex_u32("FF"), Some(0xFF));
         assert_eq!(parse_hex_u32("00FF00FF"), Some(0x00FF00FF));
         assert_eq!(parse_hex_u32("12345678"), Some(0x12345678));
+        assert_eq!(parse_hex_u32("abcdef"), Some(0xabcdef));
+        assert_eq!(parse_hex_u32("ABCDEF"), Some(0xABCDEF));
     }
 
     #[test]
@@ -188,17 +289,11 @@ mod tests {
     fn validate_utf8_valid() {
         assert!(validate_utf8_batch(b"Hello, World!").is_ok());
         assert!(validate_utf8_batch("Hello, 世界! 🎵".as_bytes()).is_ok());
+        assert!(validate_utf8_batch(&"a".repeat(50).as_bytes()).is_ok());
     }
 
     #[test]
     fn validate_utf8_invalid() {
         assert!(validate_utf8_batch(&[0xFF, 0xFE]).is_err());
-    }
-
-    #[test]
-    fn scalar_implementation_works() {
-        // Test that scalar fallbacks work correctly
-        assert_eq!(scan_delimiters_scalar(b"test:value"), Some(4));
-        assert_eq!(parse_hex_scalar("ABCD"), Some(0xABCD));
     }
 }

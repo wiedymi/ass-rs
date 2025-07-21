@@ -132,33 +132,26 @@ impl EncodingInfo {
 pub fn strip_bom(text: &str) -> (&str, bool) {
     let bytes = text.as_bytes();
 
-    // Check for UTF-8 BOM first (most common for ASS files)
     if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
         return (&text[3..], true);
     }
 
-    // Check for UTF-16/32 BOMs (less common but possible)
     if bytes.starts_with(&[0xFF, 0xFE, 0x00, 0x00]) {
-        // UTF-32LE - but we can't handle this as &str, return as-is
         return (text, false);
     }
 
     if bytes.starts_with(&[0x00, 0x00, 0xFE, 0xFF]) {
-        // UTF-32BE - but we can't handle this as &str, return as-is
         return (text, false);
     }
 
     if bytes.starts_with(&[0xFF, 0xFE]) {
-        // UTF-16LE - but we can't handle this as &str, return as-is
         return (text, false);
     }
 
     if bytes.starts_with(&[0xFE, 0xFF]) {
-        // UTF-16BE - but we can't handle this as &str, return as-is
         return (text, false);
     }
 
-    // No BOM detected
     (text, false)
 }
 
@@ -167,7 +160,6 @@ pub fn strip_bom(text: &str) -> (&str, bool) {
 /// Returns the detected BOM type and the number of bytes to skip.
 /// Returns None if no BOM is detected.
 pub fn detect_bom(bytes: &[u8]) -> Option<(BomType, usize)> {
-    // Check longer BOMs first to avoid false matches
     if bytes.starts_with(&[0xFF, 0xFE, 0x00, 0x00]) {
         Some((BomType::Utf32Le, 4))
     } else if bytes.starts_with(&[0x00, 0x00, 0xFE, 0xFF]) {
@@ -199,7 +191,6 @@ pub fn detect_bom(bytes: &[u8]) -> Option<(BomType, usize)> {
 /// assert!(encoding.confidence > 0.8);
 /// ```
 pub fn detect_encoding(bytes: &[u8]) -> EncodingInfo {
-    // Check for BOM first
     if let Some((bom_type, _)) = detect_bom(bytes) {
         return EncodingInfo::with_bom(
             bom_type.encoding_name().to_string(),
@@ -208,10 +199,8 @@ pub fn detect_encoding(bytes: &[u8]) -> EncodingInfo {
         );
     }
 
-    // Try UTF-8 validation
-    match str::from_utf8(bytes) {
+    match core::str::from_utf8(bytes) {
         Ok(_) => {
-            // Valid UTF-8, check for ASS-specific patterns to increase confidence
             let confidence = if is_likely_ass_content(bytes) {
                 0.95
             } else {
@@ -219,10 +208,7 @@ pub fn detect_encoding(bytes: &[u8]) -> EncodingInfo {
             };
             EncodingInfo::new("UTF-8".to_string(), confidence)
         }
-        Err(_) => {
-            // Not valid UTF-8, try to detect other common encodings
-            detect_non_utf8_encoding(bytes)
-        }
+        Err(_) => detect_non_utf8_encoding(bytes),
     }
 }
 
@@ -233,7 +219,6 @@ fn is_likely_ass_content(bytes: &[u8]) -> bool {
         Err(_) => return false,
     };
 
-    // Look for ASS-specific patterns
     text.contains("[Script Info]")
         || text.contains("[V4+ Styles]")
         || text.contains("[Events]")
@@ -244,17 +229,11 @@ fn is_likely_ass_content(bytes: &[u8]) -> bool {
 
 /// Attempt to detect non-UTF-8 encodings commonly used in older ASS files
 fn detect_non_utf8_encoding(bytes: &[u8]) -> EncodingInfo {
-    // Check for common Windows codepages used in subtitle files
-
-    // Look for high-bit characters that might indicate Windows-1252 or similar
     let has_extended_ascii = bytes.iter().any(|&b| b >= 0x80);
 
     if has_extended_ascii {
-        // Could be Windows-1252, ISO-8859-1, or similar
-        // Without proper decoding libraries, we make a conservative guess
         EncodingInfo::new("Windows-1252".to_string(), 0.6)
     } else {
-        // Pure ASCII - safe to treat as UTF-8
         EncodingInfo::new("ASCII".to_string(), 0.9)
     }
 }
@@ -312,7 +291,6 @@ pub fn recover_utf8(bytes: &[u8]) -> (String, usize) {
     match str::from_utf8(bytes) {
         Ok(s) => (s.to_string(), 0),
         Err(_) => {
-            // Use lossy conversion which replaces invalid sequences
             let recovered = String::from_utf8_lossy(bytes);
             let replacements = recovered.matches('\u{FFFD}').count();
             (recovered.into_owned(), replacements)
@@ -335,7 +313,6 @@ pub fn recover_utf8(bytes: &[u8]) -> (String, usize) {
 /// assert_eq!(normalized, "Line 1\nLine 2\nLine 3\n");
 /// ```
 pub fn normalize_line_endings(text: &str) -> String {
-    // Replace \r\n first, then \r to avoid double conversion
     text.replace("\r\n", "\n").replace('\r', "\n")
 }
 
@@ -364,7 +341,6 @@ pub fn truncate_at_char_boundary(text: &str, max_bytes: usize) -> (&str, bool) {
         return (text, false);
     }
 
-    // Find the largest valid UTF-8 boundary <= max_bytes
     let mut boundary = max_bytes;
     while boundary > 0 && !text.is_char_boundary(boundary) {
         boundary -= 1;

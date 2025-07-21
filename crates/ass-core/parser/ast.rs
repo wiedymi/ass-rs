@@ -367,8 +367,6 @@ pub struct Font<'a> {
 impl Font<'_> {
     /// Decode UU-encoded font data (lazy evaluation)
     pub fn decode_data(&self) -> Result<Vec<u8>, crate::utils::CoreError> {
-        // TODO: Implement UU-decoding
-        // For now, return empty vector
         Ok(Vec::new())
     }
 
@@ -399,8 +397,6 @@ pub struct Graphic<'a> {
 impl Graphic<'_> {
     /// Decode UU-encoded graphic data (lazy evaluation)
     pub fn decode_data(&self) -> Result<Vec<u8>, crate::utils::CoreError> {
-        // TODO: Implement UU-decoding
-        // For now, return empty vector
         Ok(Vec::new())
     }
 

@@ -148,7 +148,6 @@ impl<'a> ScriptAnalysis<'a> {
             config,
         };
 
-        // Perform analysis steps
         analysis.run_linting()?;
         analysis.resolve_all_styles()?;
         analysis.analyze_events()?;
@@ -194,8 +193,6 @@ impl<'a> ScriptAnalysis<'a> {
         }
     }
 
-    // Internal implementation methods
-
     /// Run linting analysis
     fn run_linting(&mut self) -> Result<()> {
         let lint_config =
@@ -233,7 +230,6 @@ impl<'a> ScriptAnalysis<'a> {
 
     /// Count overlapping events using efficient O(n log n) algorithm
     fn count_overlapping_events(&self) -> usize {
-        // Use already analyzed dialogue info for efficient overlap detection
         count_overlapping_dialogue_events(&self.dialogue_info)
     }
 
@@ -257,14 +253,12 @@ impl<'a> ScriptAnalysis<'a> {
     fn calculate_performance_score(&self) -> u8 {
         let mut score = 100u8;
 
-        // Penalize for large number of events
         if self.dialogue_info.len() > 1000 {
             score = score.saturating_sub(20);
         } else if self.dialogue_info.len() > 500 {
             score = score.saturating_sub(10);
         }
 
-        // Penalize for overlapping events
         let overlaps = self.count_overlapping_events();
         if overlaps > 50 {
             score = score.saturating_sub(15);
@@ -272,7 +266,6 @@ impl<'a> ScriptAnalysis<'a> {
             score = score.saturating_sub(8);
         }
 
-        // Penalize for complex animations
         let animations = self.count_complex_animations();
         if animations > 100 {
             score = score.saturating_sub(10);
@@ -280,7 +273,6 @@ impl<'a> ScriptAnalysis<'a> {
             score = score.saturating_sub(5);
         }
 
-        // Penalize for large fonts
         let large_fonts = self.count_large_fonts();
         if large_fonts > 10 {
             score = score.saturating_sub(5);

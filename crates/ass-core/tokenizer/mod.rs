@@ -131,7 +131,6 @@ impl<'a> AssTokenizer<'a> {
     /// let tokenizer = AssTokenizer::new("[Script Info]");
     /// ```
     pub fn new(source: &'a str) -> Self {
-        // Skip BOM if present
         let (source, position) = if let Some(stripped) = source.strip_prefix('\u{FEFF}') {
             (stripped, 0)
         } else {
@@ -160,7 +159,6 @@ impl<'a> AssTokenizer<'a> {
     /// Uses SIMD-accelerated scanning for delimiters when `simd` feature enabled.
     /// Falls back to scalar implementation for compatibility.
     pub fn next_token(&mut self) -> Result<Option<Token<'a>>> {
-        // Only skip whitespace when not in field value context
         if self.context != TokenContext::FieldValue {
             self.skip_whitespace();
         }
@@ -176,7 +174,6 @@ impl<'a> AssTokenizer<'a> {
         let current_char = self.peek_char()?;
 
         let token = match (current_char, self.context) {
-            // Section headers
             ('[', TokenContext::Document) => {
                 self.context = TokenContext::SectionHeader;
                 self.scan_section_header()
@@ -187,14 +184,12 @@ impl<'a> AssTokenizer<'a> {
                 Ok(TokenType::SectionClose)
             }
 
-            // Field separators
             (':', TokenContext::Document) => {
                 self.context = TokenContext::FieldValue;
                 self.advance_char()?;
                 Ok(TokenType::Colon)
             }
 
-            // Style override blocks
             ('{', _) => {
                 let _saved_context = self.context;
                 self.context = TokenContext::StyleOverride;
@@ -206,13 +201,11 @@ impl<'a> AssTokenizer<'a> {
                 Ok(TokenType::OverrideClose)
             }
 
-            // Comma-separated values
             (',', _) => {
                 self.advance_char()?;
                 Ok(TokenType::Comma)
             }
 
-            // Line endings
             ('\n', _) => {
                 self.context = TokenContext::Document;
                 self.advance_char()?;
@@ -227,19 +220,15 @@ impl<'a> AssTokenizer<'a> {
                 Ok(TokenType::Newline)
             }
 
-            // Comments
             (';', TokenContext::Document) => self.scan_comment(),
             ('!', TokenContext::Document) if self.peek_next()? == ':' => self.scan_comment(),
 
-            // Text content
             _ => self.scan_text(),
         }?;
 
         let end_pos = self.position;
 
-        // Adjust span for override blocks to exclude braces
         let span = if token == TokenType::OverrideBlock {
-            // Skip opening brace in span (start_pos + 1) and exclude closing brace if present
             let span_start = start_pos + 1;
             let span_end =
                 if end_pos > span_start && self.source.as_bytes().get(end_pos - 1) == Some(&b'}') {
@@ -305,8 +294,6 @@ impl<'a> AssTokenizer<'a> {
         self.issues.clear();
     }
 
-    // Internal implementation methods
-
     /// Peek at current character without advancing
     fn peek_char(&mut self) -> Result<char> {
         if let Some(ch) = self.peek_char {
@@ -365,9 +352,8 @@ impl<'a> AssTokenizer<'a> {
     /// Scan section header like [Script Info]
     fn scan_section_header(&mut self) -> Result<TokenType> {
         let _start = self.position;
-        self.advance_char()?; // Skip '['
+        self.advance_char()?;
 
-        // Find closing bracket
         while self.position < self.source.len() {
             let ch = self.peek_char()?;
             if ch == ']' {
@@ -382,9 +368,8 @@ impl<'a> AssTokenizer<'a> {
     /// Scan style override block like {\b1\i1}
     fn scan_style_override(&mut self) -> Result<TokenType> {
         let _start = self.position;
-        self.advance_char()?; // Skip '{'
+        self.advance_char()?;
 
-        // Scan until closing brace, handling nested braces
         let mut brace_depth = 1;
         while self.position < self.source.len() && brace_depth > 0 {
             let ch = self.peek_char()?;
@@ -406,7 +391,6 @@ impl<'a> AssTokenizer<'a> {
     fn scan_comment(&mut self) -> Result<TokenType> {
         let _start = self.position;
 
-        // Consume entire line
         while self.position < self.source.len() {
             let ch = self.peek_char()?;
             if ch == '\n' || ch == '\r' {
@@ -422,11 +406,9 @@ impl<'a> AssTokenizer<'a> {
     fn scan_text(&mut self) -> Result<TokenType> {
         let start = self.position;
 
-        // Scan until delimiter or special character
         while self.position < self.source.len() {
             let ch = self.peek_char()?;
 
-            // Stop at delimiters and special characters
             if matches!(ch, ',' | ':' | '{' | '}' | '[' | ']' | '\n' | '\r')
                 || (ch == ';' && self.context == TokenContext::Document)
             {
@@ -436,7 +418,6 @@ impl<'a> AssTokenizer<'a> {
             self.advance_char()?;
         }
 
-        // Determine text type based on context and content
         let span = &self.source[start..self.position];
 
         if self.context == TokenContext::SectionHeader {
@@ -455,12 +436,10 @@ impl<'a> AssTokenizer<'a> {
 
     /// Check if a span represents a hex value (pure hex or ASS color format)
     fn is_hex_value(&self, span: &str) -> bool {
-        // Pure hex digits
         if span.chars().all(|c| c.is_ascii_hexdigit()) && span.len() % 2 == 0 && !span.is_empty() {
             return true;
         }
 
-        // ASS color format: &H[hexdigits]& or &H[hexdigits]
         if let Some(after_prefix) = span.strip_prefix("&H") {
             let hex_part = if let Some(stripped) = after_prefix.strip_suffix('&') {
                 stripped
@@ -555,13 +534,11 @@ mod tests {
         let mut tokenizer = AssTokenizer::new("&H00FF00FF&");
         let tokens = tokenizer.tokenize_all().unwrap();
 
-        // Should detect hex pattern in the middle
         assert!(tokens.iter().any(|t| t.token_type == TokenType::HexValue));
     }
 
     #[test]
     fn handle_invalid_utf8_recovery() {
-        // Test with valid UTF-8 - invalid bytes would be rejected by Rust strings
         let mut tokenizer = AssTokenizer::new("[Script Info]\nTitle: Test");
         let tokens = tokenizer.tokenize_all().unwrap();
 

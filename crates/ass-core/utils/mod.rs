@@ -121,7 +121,6 @@ impl<'a> Spans<'a> {
 pub fn parse_bgr_color(color_str: &str) -> Result<[u8; 4], CoreError> {
     let trimmed = color_str.trim();
 
-    // Handle different ASS color formats
     let hex_part = if trimmed.starts_with("&H") && trimmed.ends_with('&') {
         &trimmed[2..trimmed.len() - 1]
     } else if let Some(stripped) = trimmed.strip_prefix("&H") {
@@ -137,21 +136,17 @@ pub fn parse_bgr_color(color_str: &str) -> Result<[u8; 4], CoreError> {
         )));
     };
 
-    // Parse hex value (BGR or BBGGRR or AABBGGRR)
     let hex_value = u32::from_str_radix(hex_part, 16)
         .map_err(|_| CoreError::InvalidColor(format!("Invalid hex value: {}", hex_part)))?;
 
-    // Extract components based on length
     let (blue, green, red, alpha) = match hex_part.len() {
         6 => {
-            // BBGGRR format
             let blue = ((hex_value >> 16) & 0xFF) as u8;
             let green = ((hex_value >> 8) & 0xFF) as u8;
             let red = (hex_value & 0xFF) as u8;
             (blue, green, red, 0)
         }
         8 => {
-            // AABBGGRR format
             let alpha = ((hex_value >> 24) & 0xFF) as u8;
             let blue = ((hex_value >> 16) & 0xFF) as u8;
             let green = ((hex_value >> 8) & 0xFF) as u8;
@@ -166,7 +161,6 @@ pub fn parse_bgr_color(color_str: &str) -> Result<[u8; 4], CoreError> {
         }
     };
 
-    // Return as RGBA
     Ok([red, green, blue, alpha])
 }
 
@@ -246,7 +240,6 @@ pub fn parse_ass_time(time_str: &str) -> Result<u32, CoreError> {
         .parse()
         .map_err(|_| CoreError::InvalidTime(format!("Invalid minutes: {}", parts[1])))?;
 
-    // Handle seconds with fractional part
     let seconds_parts: Vec<&str> = parts[2].split('.').collect();
     let seconds: u32 = seconds_parts[0]
         .parse()
@@ -258,10 +251,9 @@ pub fn parse_ass_time(time_str: &str) -> Result<u32, CoreError> {
             .parse()
             .map_err(|_| CoreError::InvalidTime(format!("Invalid centiseconds: {}", frac_str)))?;
 
-        // Normalize to centiseconds based on digit count
         match frac_str.len() {
-            1 => frac_val * 10, // .5 -> 50 centiseconds
-            2 => frac_val,      // .50 -> 50 centiseconds
+            1 => frac_val * 10,
+            2 => frac_val,
             _ => {
                 return Err(CoreError::InvalidTime(format!(
                     "Too many decimal places: {}",
@@ -273,7 +265,6 @@ pub fn parse_ass_time(time_str: &str) -> Result<u32, CoreError> {
         0
     };
 
-    // Validate ranges
     if minutes >= 60 {
         return Err(CoreError::InvalidTime(format!(
             "Minutes must be < 60: {}",
@@ -362,15 +353,12 @@ mod tests {
 
     #[test]
     fn parse_bgr_colors() {
-        // Standard ASS format
         assert_eq!(parse_bgr_color("&H000000FF&").unwrap(), [255, 0, 0, 0]);
         assert_eq!(parse_bgr_color("&H0000FF00&").unwrap(), [0, 255, 0, 0]);
         assert_eq!(parse_bgr_color("&H00FF0000&").unwrap(), [0, 0, 255, 0]);
 
-        // With alpha
         assert_eq!(parse_bgr_color("&HFF000000&").unwrap(), [0, 0, 0, 255]);
 
-        // Alternative formats
         assert_eq!(parse_bgr_color("0x000000FF").unwrap(), [255, 0, 0, 0]);
         assert_eq!(parse_bgr_color("000000FF").unwrap(), [255, 0, 0, 0]);
     }
@@ -384,7 +372,6 @@ mod tests {
 
     #[test]
     fn parse_bgr_colors_without_trailing_ampersand() {
-        // Test colors without trailing & (common in ASS files)
         assert_eq!(parse_bgr_color("&H000000FF").unwrap(), [255, 0, 0, 0]);
         assert_eq!(parse_bgr_color("&H00FFFFFF").unwrap(), [255, 255, 255, 0]);
         assert_eq!(parse_bgr_color("&H00000000").unwrap(), [0, 0, 0, 0]);

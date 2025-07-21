@@ -291,7 +291,6 @@ pub fn lint_script<'a>(script: &'a Script<'a>, config: &LintConfig) -> Result<Ve
 
         issues.extend(rule_issues);
 
-        // Check max issues limit
         if config.max_issues > 0 && issues.len() >= config.max_issues {
             issues.truncate(config.max_issues);
             break;

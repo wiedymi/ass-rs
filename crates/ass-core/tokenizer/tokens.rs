@@ -104,8 +104,6 @@ impl<'a> Token<'a> {
 
     /// Validate that span references valid UTF-8
     pub fn validate_utf8(&self) -> bool {
-        // Since we're using &str, it's already valid UTF-8
-        // This method exists for consistency with span validation patterns
         true
     }
 }
@@ -517,7 +515,6 @@ mod tests {
         let token = Token::new(TokenType::Text, "valid utf8", 1, 1);
         assert!(token.validate_utf8());
 
-        // Since we're using &str, all spans are guaranteed to be valid UTF-8
         let unicode_token = Token::new(TokenType::Text, "🎵", 1, 1);
         assert!(unicode_token.validate_utf8());
     }

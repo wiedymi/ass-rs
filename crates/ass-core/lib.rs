@@ -51,11 +51,9 @@
 
 extern crate alloc;
 
-// Core modules
 pub mod parser;
 pub mod tokenizer;
 
-// Feature-gated modules
 #[cfg(feature = "analysis")]
 #[cfg_attr(docsrs, doc(cfg(feature = "analysis")))]
 pub mod analysis;
@@ -66,7 +64,6 @@ pub mod plugin;
 
 pub mod utils;
 
-// Primary public API re-exports
 pub use parser::{ParseError, Script, Section};
 pub use tokenizer::{AssTokenizer, Token};
 
@@ -76,7 +73,6 @@ pub use analysis::ScriptAnalysis;
 #[cfg(feature = "plugins")]
 pub use plugin::ExtensionRegistry;
 
-// Utility re-exports
 pub use utils::{CoreError, Spans};
 
 /// Crate version for runtime compatibility checks
@@ -230,14 +226,12 @@ Dialogue: 0,0:00:10.00,0:00:15.00,Large,,0,0,0,,{\t(0,1000,\fscx200\fscy200)}Lar
 Comment: 0,0:00:30.00,0:00:35.00,Default,,0,0,0,,This is a comment
 "#;
 
-        // Test basic parsing
         let script = Script::parse(script_text).expect("Should parse script successfully");
         assert!(
             script.sections().len() >= 2,
             "Should have parsed multiple sections"
         );
 
-        // Test script version detection
         let version = ScriptVersion::from_header("v4.00+").expect("Should detect script version");
         assert_eq!(version, ScriptVersion::AssV4);
         assert!(!version.supports_extensions());
@@ -247,48 +241,40 @@ Comment: 0,0:00:30.00,0:00:35.00,Default,,0,0,0,,This is a comment
         assert_eq!(version_plus, ScriptVersion::AssV4Plus);
         assert!(version_plus.supports_extensions());
 
-        // Test analysis functionality (if available)
         #[cfg(feature = "analysis")]
         {
             let analysis =
                 ScriptAnalysis::analyze(&script).expect("Should analyze script successfully");
 
-            // Should have some resolved styles
             assert!(
                 !analysis.resolved_styles().is_empty(),
                 "Should resolve styles"
             );
 
-            // Should have analyzed dialogue events
             assert!(
                 !analysis.dialogue_info().is_empty(),
                 "Should analyze dialogue events"
             );
 
-            // Performance summary should be reasonable
             let perf = analysis.performance_summary();
             assert!(
                 perf.performance_score <= 100,
                 "Performance score should be valid"
             );
 
-            // Should be able to resolve Default style
             let default_style = analysis.resolve_style("Default");
             assert!(default_style.is_some(), "Should find Default style");
 
-            // Test linting system
             let lint_config = LintConfig::default();
             let issues =
                 lint_script(&script, &lint_config).expect("Should run linting successfully");
 
-            // Should detect some issues (overlapping events, etc.)
             assert!(!issues.is_empty(), "Should detect some lint issues");
         }
     }
 
     #[test]
     fn test_script_version_functionality() {
-        // Test all script version variants
         assert_eq!(
             ScriptVersion::from_header("v4.00"),
             Some(ScriptVersion::SsaV4)
@@ -307,7 +293,6 @@ Comment: 0,0:00:30.00,0:00:35.00,Default,,0,0,0,,This is a comment
         );
         assert_eq!(ScriptVersion::from_header("invalid"), None);
 
-        // Test extension support
         assert!(!ScriptVersion::SsaV4.supports_extensions());
         assert!(!ScriptVersion::AssV4.supports_extensions());
         assert!(ScriptVersion::AssV4Plus.supports_extensions());
@@ -315,22 +300,17 @@ Comment: 0,0:00:30.00,0:00:35.00,Default,,0,0,0,,This is a comment
 
     #[test]
     fn test_error_handling() {
-        // Test parsing invalid input
         let invalid_script = "This is not a valid ASS script";
         let result = Script::parse(invalid_script);
 
-        // Should either succeed with issues or fail gracefully
         match result {
             Ok(script) => {
-                // If it succeeds, it should have issues
                 assert!(
                     !script.issues().is_empty(),
                     "Invalid script should have parse issues"
                 );
             }
-            Err(_) => {
-                // Or it can fail gracefully
-            }
+            Err(_) => {}
         }
     }
 
@@ -339,7 +319,6 @@ Comment: 0,0:00:30.00,0:00:35.00,Default,,0,0,0,,This is a comment
         let empty_script = "";
         let result = Script::parse(empty_script);
 
-        // Should handle empty input gracefully
         assert!(result.is_ok(), "Should handle empty script gracefully");
 
         let script = result.unwrap();

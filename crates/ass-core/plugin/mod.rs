@@ -30,8 +30,6 @@
 //! registry.register_tag_handler(Box::new(CustomColorTag));
 //! ```
 
-#![allow(missing_docs)]
-
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::fmt;
 
