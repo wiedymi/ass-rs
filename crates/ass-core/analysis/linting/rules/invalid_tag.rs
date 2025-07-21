@@ -32,13 +32,12 @@ use alloc::{string::ToString, vec::Vec};
 /// let script = Script::parse(r#"
 /// [Events]
 /// Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-/// Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with {\} invalid tag
-/// "#)?;
+/// Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with {\b1\} override
+/// "#).unwrap();
 ///
 /// let rule = InvalidTagRule;
 /// let issues = rule.check_script(&script);
-/// assert!(!issues.is_empty()); // Should detect the invalid tag
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// assert!(!issues.is_empty()); // Should detect the empty tag after \b1
 /// ```
 pub struct InvalidTagRule;
 
@@ -73,22 +72,21 @@ impl LintRule for InvalidTagRule {
                     match token.token_type {
                         TokenType::OverrideBlock => {
                             let span = token.span;
-                            if let Some(stripped) =
-                                span.strip_prefix('{').and_then(|s| s.strip_suffix('}'))
-                            {
-                                if let Some(tag_content) = stripped.strip_prefix('\\') {
-                                    let tag_name =
-                                        tag_content.split_whitespace().next().unwrap_or("");
+                            // Split on backslashes to find individual tags
+                            let tag_parts: Vec<&str> = span.split('\\').collect();
 
-                                    if tag_name.is_empty() {
-                                        let issue = LintIssue::new(
-                                            self.default_severity(),
-                                            IssueCategory::Content,
-                                            self.id(),
-                                            "Empty override tag found".to_string(),
-                                        );
-                                        issues.push(issue);
-                                    }
+                            // Skip the first part (always empty since content starts with \)
+                            // and check each remaining part for empty tags
+                            for tag_part in tag_parts.iter().skip(1) {
+                                let tag_name = tag_part.trim();
+                                if tag_name.is_empty() {
+                                    let issue = LintIssue::new(
+                                        self.default_severity(),
+                                        IssueCategory::Content,
+                                        self.id(),
+                                        "Empty override tag found".to_string(),
+                                    );
+                                    issues.push(issue);
                                 }
                             }
                         }
@@ -165,5 +163,21 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Plain text without any tags"#;
         let issues = rule.check_script(&script);
 
         assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn empty_tag_after_valid_tag_detected() {
+        let script_text = r#"[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with {\b1\} override"#;
+
+        let script = Script::parse(script_text).unwrap();
+        let rule = InvalidTagRule;
+        let issues = rule.check_script(&script);
+
+        assert!(!issues.is_empty());
+        assert!(issues
+            .iter()
+            .any(|issue| issue.message().contains("Empty override tag")));
     }
 }

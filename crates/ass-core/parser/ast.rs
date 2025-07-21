@@ -218,6 +218,36 @@ impl Style<'_> {
     }
 }
 
+impl Default for Style<'_> {
+    fn default() -> Self {
+        Self {
+            name: "Default",
+            fontname: "Arial",
+            fontsize: "20",
+            primary_colour: "&Hffffff",
+            secondary_colour: "&H0000ff",
+            outline_colour: "&H000000",
+            back_colour: "&H000000",
+            bold: "0",
+            italic: "0",
+            underline: "0",
+            strikeout: "0",
+            scale_x: "100",
+            scale_y: "100",
+            spacing: "0",
+            angle: "0",
+            border_style: "1",
+            outline: "0",
+            shadow: "0",
+            alignment: "2",
+            margin_l: "10",
+            margin_r: "10",
+            margin_v: "10",
+            encoding: "1",
+        }
+    }
+}
+
 /// Event from [Events] section (dialogue, comments, etc.)
 #[derive(Debug, Clone, PartialEq)]
 pub struct Event<'a> {
@@ -351,6 +381,24 @@ impl Event<'_> {
             let ptr = span.as_ptr() as usize;
             source_range.contains(&ptr)
         })
+    }
+}
+
+impl Default for Event<'_> {
+    fn default() -> Self {
+        Self {
+            event_type: EventType::Dialogue,
+            layer: "",
+            start: "0:00:00.00",
+            end: "0:00:00.00",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+            text: "",
+        }
     }
 }
 

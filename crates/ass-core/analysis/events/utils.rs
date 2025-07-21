@@ -41,9 +41,11 @@ use core::cmp::Ordering;
 /// # use ass_core::analysis::events::utils::find_overlapping_dialogue_events;
 /// # use ass_core::analysis::events::dialogue_info::DialogueInfo;
 /// # use ass_core::parser::Event;
+/// let event1 = Event { start: "0:00:00.00", end: "0:00:05.00", ..Default::default() };
+/// let event2 = Event { start: "0:00:03.00", end: "0:00:08.00", ..Default::default() };
 /// let events = vec![
-///     DialogueInfo::analyze(&Event { start: "0:00:00.00", end: "0:00:05.00", ..Default::default() })?,
-///     DialogueInfo::analyze(&Event { start: "0:00:03.00", end: "0:00:08.00", ..Default::default() })?,
+///     DialogueInfo::analyze(&event1)?,
+///     DialogueInfo::analyze(&event2)?,
 /// ];
 ///
 /// let overlaps = find_overlapping_dialogue_events(&events);
@@ -91,9 +93,23 @@ pub fn count_overlapping_dialogue_events(events: &[DialogueInfo<'_>]) -> usize {
 /// ```rust
 /// # use ass_core::analysis::events::utils::sort_events_by_time;
 /// # use ass_core::analysis::events::dialogue_info::DialogueInfo;
+/// # use ass_core::parser::Event;
+/// let event1 = Event {
+///     start: "0:00:05.00",
+///     end: "0:00:10.00",
+///     ..Default::default()
+/// };
+/// let event2 = Event {
+///     start: "0:00:01.00",
+///     end: "0:00:06.00",
+///     ..Default::default()
+/// };
+/// let dialogue_info1 = DialogueInfo::analyze(&event1)?;
+/// let dialogue_info2 = DialogueInfo::analyze(&event2)?;
 /// let mut events = vec![dialogue_info1, dialogue_info2];
 /// sort_events_by_time(&mut events);
 /// // Events are now sorted by start time, then end time
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub fn sort_events_by_time(events: &mut [DialogueInfo<'_>]) {
     events.sort_by(|a, b| match a.start_time_cs().cmp(&b.start_time_cs()) {
@@ -124,10 +140,24 @@ pub fn sort_events_by_time(events: &mut [DialogueInfo<'_>]) {
 /// ```rust
 /// # use ass_core::analysis::events::utils::calculate_total_duration;
 /// # use ass_core::analysis::events::dialogue_info::DialogueInfo;
+/// # use ass_core::parser::Event;
+/// let event1 = Event {
+///     start: "0:00:01.00",
+///     end: "0:00:05.00",
+///     ..Default::default()
+/// };
+/// let event2 = Event {
+///     start: "0:00:03.00",
+///     end: "0:00:08.00",
+///     ..Default::default()
+/// };
+/// let dialogue_info1 = DialogueInfo::analyze(&event1)?;
+/// let dialogue_info2 = DialogueInfo::analyze(&event2)?;
 /// let events = vec![dialogue_info1, dialogue_info2];
-/// if let Some(duration_cs) = calculate_total_duration(&events) {
-///     println!("Total duration: {}ms", duration_cs * 10);
+/// if let Some(duration) = calculate_total_duration(&events) {
+///     println!("Total span: {}ms", duration);
 /// }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub fn calculate_total_duration(events: &[DialogueInfo<'_>]) -> Option<u32> {
     if events.is_empty() {

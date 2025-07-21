@@ -91,7 +91,7 @@ impl<'a> ResolvedStyle<'a> {
     /// ```rust
     /// # use ass_core::analysis::styles::resolved_style::ResolvedStyle;
     /// # use ass_core::parser::Style;
-    /// let style = Style { name: "Default", font_name: "Arial", font_size: "20", ..Default::default() };
+    /// let style = Style { name: "Default", fontname: "Arial", fontsize: "20", ..Default::default() };
     /// let resolved = ResolvedStyle::from_style(&style)?;
     /// assert_eq!(resolved.font_name(), "Arial");
     /// assert_eq!(resolved.font_size(), 20.0);

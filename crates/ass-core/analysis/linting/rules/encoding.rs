@@ -34,11 +34,8 @@ use alloc::{string::ToString, vec::Vec};
 /// use ass_core::analysis::linting::LintRule;
 /// use ass_core::parser::Script;
 ///
-/// let script = Script::parse(r#"
-/// [Events]
-/// Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-/// Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with\x00invalid character
-/// "#)?;
+/// let script_text = format!("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with{}invalid character", '\x00');
+/// let script = Script::parse(&script_text)?;
 ///
 /// let rule = EncodingRule;
 /// let issues = rule.check_script(&script);
