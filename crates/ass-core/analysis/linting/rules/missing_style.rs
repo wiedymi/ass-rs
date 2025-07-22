@@ -4,8 +4,11 @@
 //! rendering errors or fallback to default styling behavior.
 
 use crate::{
-    analysis::linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
-    parser::{Script, Section},
+    analysis::{
+        linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+        ScriptAnalysis,
+    },
+    parser::Section,
 };
 use alloc::{format, vec::Vec};
 
@@ -26,9 +29,10 @@ use alloc::{format, vec::Vec};
 /// ```rust
 /// use ass_core::analysis::linting::rules::missing_style::MissingStyleRule;
 /// use ass_core::analysis::linting::LintRule;
+/// use ass_core::analysis::ScriptAnalysis;
 /// use ass_core::parser::Script;
 ///
-/// let script = Script::parse(r#"
+/// let script = crate::parser::Script::parse(r#"
 /// [V4+ Styles]
 /// Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 /// Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
@@ -38,8 +42,9 @@ use alloc::{format, vec::Vec};
 /// Dialogue: 0,0:00:00.00,0:00:05.00,Undefined,,0,0,0,,Text with undefined style
 /// "#)?;
 ///
+/// let analysis = ScriptAnalysis::analyze(&script)?;
 /// let rule = MissingStyleRule;
-/// let issues = rule.check_script(&script);
+/// let issues = rule.check_script(&analysis);
 /// assert!(!issues.is_empty()); // Should detect the missing style reference
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -66,21 +71,17 @@ impl LintRule for MissingStyleRule {
         IssueCategory::Styling
     }
 
-    fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>> {
+    fn check_script(&self, analysis: &ScriptAnalysis) -> Vec<LintIssue> {
         let mut issues = Vec::new();
 
-        let mut style_names = Vec::new();
-        if let Some(Section::Styles(styles)) = script
-            .sections()
+        let style_names: Vec<&str> = analysis
+            .resolved_styles()
             .iter()
-            .find(|s| matches!(s, Section::Styles(_)))
-        {
-            for style in styles {
-                style_names.push(style.name);
-            }
-        }
+            .map(|style| style.name)
+            .collect();
 
-        if let Some(Section::Events(events)) = script
+        if let Some(Section::Events(events)) = analysis
+            .script()
             .sections()
             .iter()
             .find(|s| matches!(s, Section::Events(_)))
@@ -122,10 +123,11 @@ mod tests {
     #[test]
     fn empty_script_no_issues() {
         let script_text = "[Script Info]\nTitle: Test";
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
 
         let rule = MissingStyleRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -140,9 +142,10 @@ Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Valid event";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = MissingStyleRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -157,9 +160,10 @@ Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Undefined,,0,0,0,,Invalid event";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = MissingStyleRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].severity(), IssueSeverity::Error);
@@ -179,9 +183,10 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Missing1,,0,0,0,,First invalid
 Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,Valid event
 Dialogue: 0,0:00:10.00,0:00:15.00,Missing2,,0,0,0,,Second invalid";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = MissingStyleRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert_eq!(issues.len(), 2);
     }
@@ -192,9 +197,10 @@ Dialogue: 0,0:00:10.00,0:00:15.00,Missing2,,0,0,0,,Second invalid";
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Should be invalid";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = MissingStyleRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert_eq!(issues.len(), 1);
     }

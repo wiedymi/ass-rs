@@ -48,12 +48,21 @@
 
 pub mod dialogue_info;
 pub mod overlap;
+pub mod scoring;
+pub mod tags;
 pub mod text_analysis;
 pub mod utils;
 
-pub use dialogue_info::{DialogueInfo, PerformanceImpact, TimingRelation};
+pub use dialogue_info::{DialogueInfo, TimingRelation};
 pub use overlap::{count_overlapping_events, find_overlapping_event_refs, find_overlapping_events};
-pub use text_analysis::{OverrideTag, TextAnalysis};
+pub use scoring::{
+    calculate_animation_score, calculate_complexity_score, get_performance_impact,
+    PerformanceImpact,
+};
+pub use tags::{
+    calculate_tag_complexity, parse_override_block, DiagnosticKind, OverrideTag, TagDiagnostic,
+};
+pub use text_analysis::TextAnalysis;
 pub use utils::{
     calculate_average_duration, calculate_total_duration, count_overlapping_dialogue_events,
     find_events_in_range, find_overlapping_dialogue_events, sort_events_by_time,

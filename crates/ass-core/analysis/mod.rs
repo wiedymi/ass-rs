@@ -76,10 +76,10 @@ pub use styles::{ResolvedStyle, StyleAnalyzer};
 #[allow(dead_code)]
 pub struct ScriptAnalysis<'a> {
     /// Reference to analyzed script
-    script: &'a Script<'a>,
+    pub script: &'a Script<'a>,
 
     /// Detected lint issues
-    lint_issues: Vec<LintIssue<'a>>,
+    lint_issues: Vec<LintIssue>,
 
     /// Resolved styles cache
     resolved_styles: Vec<ResolvedStyle<'a>>,
@@ -156,7 +156,7 @@ impl<'a> ScriptAnalysis<'a> {
     }
 
     /// Get all lint issues found during analysis
-    pub fn lint_issues(&self) -> &[LintIssue<'a>] {
+    pub fn lint_issues(&self) -> &[LintIssue] {
         &self.lint_issues
     }
 
@@ -168,6 +168,11 @@ impl<'a> ScriptAnalysis<'a> {
     /// Get dialogue analysis results
     pub fn dialogue_info(&self) -> &[DialogueInfo<'a>] {
         &self.dialogue_info
+    }
+
+    /// Get reference to the analyzed script
+    pub fn script(&self) -> &'a Script<'a> {
+        self.script
     }
 
     /// Find resolved style by name

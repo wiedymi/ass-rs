@@ -5,10 +5,11 @@
 
 use crate::{
     analysis::{
-        events::text_analysis::{DiagnosticKind, TextAnalysis},
+        events::{text_analysis::TextAnalysis, DiagnosticKind},
         linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+        ScriptAnalysis,
     },
-    parser::{Script, Section},
+    parser::Section,
 };
 use alloc::{string::ToString, vec::Vec};
 
@@ -29,17 +30,20 @@ use alloc::{string::ToString, vec::Vec};
 /// ```rust
 /// use ass_core::analysis::linting::rules::invalid_tag::InvalidTagRule;
 /// use ass_core::analysis::linting::LintRule;
+/// use ass_core::analysis::ScriptAnalysis;
 /// use ass_core::parser::Script;
 ///
-/// let script = Script::parse(r#"
+/// let script = crate::parser::Script::parse(r#"
 /// [Events]
 /// Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-/// Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with {\b1\} override
-/// "#).unwrap();
+/// Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with {\invalid_tag}
+/// "#)?;
 ///
+/// let analysis = ScriptAnalysis::analyze(&script)?;
 /// let rule = InvalidTagRule;
-/// let issues = rule.check_script(&script);
-/// assert!(!issues.is_empty()); // Should detect the empty tag after \b1
+/// let issues = rule.check_script(&analysis);
+/// assert!(!issues.is_empty()); // Should detect the invalid tag
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct InvalidTagRule;
 
@@ -64,10 +68,11 @@ impl LintRule for InvalidTagRule {
         IssueCategory::Content
     }
 
-    fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>> {
+    fn check_script(&self, analysis: &ScriptAnalysis) -> Vec<LintIssue> {
         let mut issues = Vec::new();
 
-        if let Some(Section::Events(events)) = script
+        if let Some(Section::Events(events)) = analysis
+            .script()
             .sections()
             .iter()
             .find(|s| matches!(s, Section::Events(_)))
@@ -118,10 +123,11 @@ mod tests {
     #[test]
     fn empty_script_no_issues() {
         let script_text = "[Script Info]\nTitle: Test";
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
 
         let rule = InvalidTagRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -132,9 +138,10 @@ mod tests {
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with {\i1}valid{\i0} tags";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
         let rule = InvalidTagRule;
-        let issues = rule.check_script(&script);
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -148,9 +155,10 @@ Title: Test
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(&script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = InvalidTagRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -161,9 +169,10 @@ Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Plain text without any tags";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = InvalidTagRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -174,9 +183,10 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Plain text without any tags";
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with {\b1\} override";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(&script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = InvalidTagRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(!issues.is_empty());
         assert!(issues

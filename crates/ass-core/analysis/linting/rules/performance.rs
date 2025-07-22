@@ -3,12 +3,9 @@
 //! Detects potential performance issues in subtitle scripts that could
 //! impact rendering speed, memory usage, or playback smoothness.
 
-use crate::{
-    analysis::{
-        events::text_analysis::TextAnalysis,
-        linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
-    },
-    parser::{Script, Section},
+use crate::analysis::{
+    linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+    ScriptAnalysis,
 };
 use alloc::{format, string::ToString, vec::Vec};
 
@@ -35,15 +32,17 @@ use alloc::{format, string::ToString, vec::Vec};
 /// ```rust
 /// use ass_core::analysis::linting::rules::performance::PerformanceRule;
 /// use ass_core::analysis::linting::LintRule;
+/// use ass_core::analysis::ScriptAnalysis;
 /// use ass_core::parser::Script;
 ///
-/// let script = Script::parse(r#"
+/// let script = crate::parser::Script::parse(r#"
 /// [Events]
 /// Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 /// "#)?; // Script with many events would trigger warnings
 ///
+/// let analysis = ScriptAnalysis::analyze(&script)?;
 /// let rule = PerformanceRule;
-/// let issues = rule.check_script(&script);
+/// let issues = rule.check_script(&analysis);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct PerformanceRule;
@@ -69,17 +68,12 @@ impl LintRule for PerformanceRule {
         IssueCategory::Performance
     }
 
-    fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>> {
+    fn check_script(&self, analysis: &ScriptAnalysis) -> Vec<LintIssue> {
         let mut issues = Vec::new();
 
-        if let Some(Section::Events(events)) = script
-            .sections()
-            .iter()
-            .find(|s| matches!(s, Section::Events(_)))
-        {
-            self.check_event_count(&mut issues, events.len());
-            self.check_complex_events(&mut issues, events);
-        }
+        let dialogue_info = analysis.dialogue_info();
+        self.check_event_count(&mut issues, dialogue_info.len());
+        self.check_complex_events(&mut issues, dialogue_info);
 
         issues
     }
@@ -105,9 +99,14 @@ impl PerformanceRule {
     }
 
     /// Check for performance-impacting patterns in individual events
-    fn check_complex_events(&self, issues: &mut Vec<LintIssue>, events: &[crate::parser::Event]) {
-        for event in events {
-            let text_length = event.text.len();
+    fn check_complex_events(
+        &self,
+        issues: &mut Vec<LintIssue>,
+        dialogue_info: &[crate::analysis::DialogueInfo],
+    ) {
+        for info in dialogue_info {
+            let text_analysis = info.text_analysis();
+            let text_length = text_analysis.char_count();
 
             if text_length > 500 {
                 let issue = LintIssue::new(
@@ -126,10 +125,6 @@ impl PerformanceRule {
                 issues.push(issue);
             }
 
-            let text_analysis = match TextAnalysis::analyze(event.text) {
-                Ok(analysis) => analysis,
-                Err(_) => continue, // Skip analysis if text parsing fails
-            };
             let override_count = text_analysis.override_tags().len();
             if override_count > 20 {
                 let issue = LintIssue::new(
@@ -166,10 +161,11 @@ mod tests {
     #[test]
     fn empty_script_no_issues() {
         let script_text = "[Script Info]\nTitle: Test";
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
 
         let rule = PerformanceRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -181,9 +177,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Short text
 Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,Another short text";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = PerformanceRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -197,9 +194,10 @@ Title: Test
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = PerformanceRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -214,9 +212,10 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{}",
             long_text
         );
 
-        let script = Script::parse(&script_text).unwrap();
+        let script = crate::parser::Script::parse(&script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = PerformanceRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(!issues.is_empty());
         assert!(issues
@@ -238,9 +237,10 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{}",
             text_with_tags
         );
 
-        let script = Script::parse(&script_text).unwrap();
+        let script = crate::parser::Script::parse(&script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = PerformanceRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(!issues.is_empty());
         assert!(issues

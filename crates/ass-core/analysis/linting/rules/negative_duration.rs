@@ -4,8 +4,11 @@
 //! rendering issues or indicate timing errors in subtitle scripts.
 
 use crate::{
-    analysis::linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
-    parser::{Script, Section},
+    analysis::{
+        linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+        ScriptAnalysis,
+    },
+    parser::Section,
     utils::parse_ass_time,
 };
 use alloc::{format, string::ToString, vec::Vec};
@@ -27,16 +30,18 @@ use alloc::{format, string::ToString, vec::Vec};
 /// ```rust
 /// use ass_core::analysis::linting::rules::negative_duration::NegativeDurationRule;
 /// use ass_core::analysis::linting::LintRule;
+/// use ass_core::analysis::ScriptAnalysis;
 /// use ass_core::parser::Script;
 ///
-/// let script = Script::parse(r#"
+/// let script = crate::parser::Script::parse(r#"
 /// [Events]
 /// Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 /// Dialogue: 0,0:00:05.00,0:00:02.00,Default,,0,0,0,,Invalid event
 /// "#)?;
 ///
+/// let analysis = ScriptAnalysis::analyze(&script)?;
 /// let rule = NegativeDurationRule;
-/// let issues = rule.check_script(&script);
+/// let issues = rule.check_script(&analysis);
 /// assert!(!issues.is_empty()); // Should detect the negative duration
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -63,10 +68,11 @@ impl LintRule for NegativeDurationRule {
         IssueCategory::Timing
     }
 
-    fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>> {
+    fn check_script(&self, analysis: &ScriptAnalysis) -> Vec<LintIssue> {
         let mut issues = Vec::new();
 
-        if let Some(Section::Events(events)) = script
+        if let Some(Section::Events(events)) = analysis
+            .script()
             .sections()
             .iter()
             .find(|s| matches!(s, Section::Events(_)))
@@ -114,10 +120,11 @@ mod tests {
     #[test]
     fn empty_script_no_issues() {
         let script_text = "[Script Info]\nTitle: Test";
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
 
         let rule = NegativeDurationRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -128,9 +135,10 @@ mod tests {
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Valid event";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = NegativeDurationRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -141,9 +149,10 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Valid event";
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:05.00,0:00:02.00,Default,,0,0,0,,Invalid event";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = NegativeDurationRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].severity(), IssueSeverity::Error);
@@ -156,9 +165,10 @@ Dialogue: 0,0:00:05.00,0:00:02.00,Default,,0,0,0,,Invalid event";
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:05.00,0:00:05.00,Default,,0,0,0,,Zero duration";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = NegativeDurationRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].severity(), IssueSeverity::Error);
@@ -172,9 +182,10 @@ Dialogue: 0,0:00:05.00,0:00:02.00,Default,,0,0,0,,First invalid
 Dialogue: 0,0:00:01.00,0:00:06.00,Default,,0,0,0,,Valid event
 Dialogue: 0,0:00:10.00,0:00:10.00,Default,,0,0,0,,Second invalid";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = NegativeDurationRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert_eq!(issues.len(), 2);
     }

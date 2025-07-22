@@ -13,8 +13,9 @@ use ass_core::{
         events::{dialogue_info::DialogueInfo, text_analysis::TextAnalysis},
         linting::rules::{invalid_tag::InvalidTagRule, performance::PerformanceRule},
         linting::LintRule,
+        ScriptAnalysis,
     },
-    parser::{streaming::StreamingParser, Script},
+    parser::{ast::EventType, streaming::StreamingParser, Event, Script, Section},
 };
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::hint::black_box as std_black_box;
@@ -148,8 +149,8 @@ PlayResY: 1080"#,
         );
 
         for i in 0..self.events_count {
-            let start_time = self.format_time(i * 3000); // 3 seconds apart
-            let end_time = self.format_time(i * 3000 + 2500); // 2.5 second duration
+            let start_time = self.format_time((i * 3000) as u32); // 3 seconds apart
+            let end_time = self.format_time((i * 3000 + 2500) as u32); // 2.5 second duration
             let style = if self.styles_count > 1 {
                 format!("Style{}", i % self.styles_count)
             } else {
@@ -214,6 +215,7 @@ fn bench_parsing(c: &mut Criterion) {
         let simple_script = ScriptGenerator::simple(size).generate();
         let moderate_script = ScriptGenerator::moderate(size).generate();
         let complex_script = ScriptGenerator::complex(size).generate();
+        let extreme_script = ScriptGenerator::extreme(size).generate();
 
         group.throughput(Throughput::Bytes(simple_script.len() as u64));
         group.bench_with_input(
@@ -245,8 +247,19 @@ fn bench_parsing(c: &mut Criterion) {
             &complex_script,
             |b, script| {
                 b.iter(|| {
-                    let result = Script::parse(black_box(script));
-                    std_black_box(result)
+                    let parsed = Script::parse(black_box(script));
+                    black_box(parsed)
+                })
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("extreme", size),
+            &extreme_script,
+            |b, script| {
+                b.iter(|| {
+                    let parsed = Script::parse(black_box(script));
+                    black_box(parsed)
                 })
             },
         );
@@ -277,7 +290,7 @@ fn bench_streaming(c: &mut Criterion) {
 
                         for chunk in chunks {
                             let result = parser.feed_chunk(black_box(chunk));
-                            std_black_box(result);
+                            let _ = std_black_box(result);
                         }
                     })
                 },
@@ -365,25 +378,27 @@ fn bench_linting(c: &mut Criterion) {
 
         // Test InvalidTagRule
         let invalid_tag_rule = InvalidTagRule;
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         group.bench_with_input(
             BenchmarkId::new("invalid_tag", size),
-            &script,
-            |b, script| {
+            &analysis,
+            |b, analysis| {
                 b.iter(|| {
-                    let result = invalid_tag_rule.check_script(black_box(script));
+                    let result = invalid_tag_rule.check_script(black_box(analysis));
                     std_black_box(result)
                 })
             },
         );
 
         // Test PerformanceRule
-        let performance_rule = PerformanceRule::new();
+        let performance_rule = PerformanceRule;
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         group.bench_with_input(
             BenchmarkId::new("performance", size),
-            &script,
-            |b, script| {
+            &analysis,
+            |b, analysis| {
                 b.iter(|| {
-                    let result = performance_rule.check_script(black_box(script));
+                    let result = performance_rule.check_script(black_box(analysis));
                     std_black_box(result)
                 })
             },
@@ -400,11 +415,12 @@ fn bench_memory_usage(c: &mut Criterion) {
     let sizes = [100, 1000, 5000, 10000];
 
     for &size in &sizes {
-        let script = ScriptGenerator::complex(size).generate();
+        let complex_script = ScriptGenerator::complex(size).generate();
+        let extreme_script = ScriptGenerator::extreme(size).generate();
 
         group.bench_with_input(
-            BenchmarkId::new("parse_and_analyze", size),
-            &script,
+            BenchmarkId::new("parse_and_analyze_complex", size),
+            &complex_script,
             |b, script| {
                 b.iter(|| {
                     // Parse script
@@ -414,12 +430,39 @@ fn bench_memory_usage(c: &mut Criterion) {
                     if let Some(events_section) = parsed
                         .sections()
                         .iter()
-                        .find(|s| matches!(s, crate::parser::Section::Events(_)))
+                        .find(|s| matches!(s, Section::Events(_)))
                     {
-                        if let crate::parser::Section::Events(events) = events_section {
+                        if let Section::Events(events) = events_section {
                             for event in events {
                                 let dialogue_info = DialogueInfo::analyze(event);
-                                std_black_box(dialogue_info);
+                                let _ = std_black_box(dialogue_info);
+                            }
+                        }
+                    }
+
+                    std_black_box(parsed)
+                })
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("parse_and_analyze_extreme", size),
+            &extreme_script,
+            |b, script| {
+                b.iter(|| {
+                    // Parse script
+                    let parsed = Script::parse(black_box(script)).unwrap();
+
+                    // Analyze all events
+                    if let Some(events_section) = parsed
+                        .sections()
+                        .iter()
+                        .find(|s| matches!(s, Section::Events(_)))
+                    {
+                        if let Section::Events(events) = events_section {
+                            for event in events {
+                                let dialogue_info = DialogueInfo::analyze(event);
+                                let _ = std_black_box(dialogue_info);
                             }
                         }
                     }
@@ -434,17 +477,17 @@ fn bench_memory_usage(c: &mut Criterion) {
 }
 
 /// Helper function to create test events
-fn create_test_event(start: &str, end: &str, text: &str) -> crate::parser::Event {
-    crate::parser::Event {
-        event_type: crate::parser::EventType::Dialogue,
-        layer: 0,
+fn create_test_event<'a>(start: &'a str, end: &'a str, text: &'a str) -> Event<'a> {
+    Event {
+        event_type: EventType::Dialogue,
+        layer: "0",
         start,
         end,
         style: "Default",
-        name: "Speaker",
-        margin_l: 0,
-        margin_r: 0,
-        margin_v: 0,
+        name: "",
+        margin_l: "0",
+        margin_r: "0",
+        margin_v: "0",
         effect: "",
         text,
     }

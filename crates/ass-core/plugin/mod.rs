@@ -39,6 +39,9 @@ use std::collections::HashMap;
 #[cfg(not(feature = "std"))]
 use hashbrown::HashMap;
 
+pub mod sections;
+pub mod tags;
+
 /// Result of tag processing operations
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TagResult {
@@ -302,3 +305,11 @@ impl fmt::Debug for ExtensionRegistry {
 
 /// Result type for plugin operations
 pub type Result<T> = core::result::Result<T, PluginError>;
+
+pub use sections::aegisub::{
+    create_aegisub_processors, AegisubExtradataProcessor, AegisubProjectProcessor,
+};
+pub use tags::formatting::{
+    create_formatting_handlers, BoldTagHandler, ItalicTagHandler, StrikeoutTagHandler,
+    UnderlineTagHandler,
+};

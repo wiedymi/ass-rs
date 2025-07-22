@@ -53,7 +53,7 @@ pub enum SectionType {
 /// let section = Section::ScriptInfo(info);
 /// assert_eq!(section.section_type(), SectionType::ScriptInfo);
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Section<'a> {
     /// [Script Info] section with metadata
     ///
@@ -100,6 +100,7 @@ impl Section<'_> {
     /// let info = Section::ScriptInfo(ScriptInfo { fields: Vec::new() });
     /// assert_eq!(info.section_type(), SectionType::ScriptInfo);
     /// ```
+    #[must_use]
     pub const fn section_type(&self) -> SectionType {
         match self {
             Section::ScriptInfo(_) => SectionType::ScriptInfo,
@@ -127,6 +128,7 @@ impl Section<'_> {
     ///
     /// `true` if all spans are valid, `false` otherwise
     #[cfg(debug_assertions)]
+    #[must_use]
     pub fn validate_spans(&self, source_range: &Range<usize>) -> bool {
         match self {
             Section::ScriptInfo(info) => info.validate_spans(source_range),
@@ -151,13 +153,14 @@ impl SectionType {
     /// assert_eq!(SectionType::ScriptInfo.header_name(), "Script Info");
     /// assert_eq!(SectionType::Styles.header_name(), "V4+ Styles");
     /// ```
+    #[must_use]
     pub const fn header_name(self) -> &'static str {
         match self {
-            SectionType::ScriptInfo => "Script Info",
-            SectionType::Styles => "V4+ Styles",
-            SectionType::Events => "Events",
-            SectionType::Fonts => "Fonts",
-            SectionType::Graphics => "Graphics",
+            Self::ScriptInfo => "Script Info",
+            Self::Styles => "V4+ Styles",
+            Self::Events => "Events",
+            Self::Fonts => "Fonts",
+            Self::Graphics => "Graphics",
         }
     }
 
@@ -165,16 +168,18 @@ impl SectionType {
     ///
     /// Returns `true` for sections that must be present for a valid
     /// ASS file (Script Info and Events), `false` for optional sections.
-    pub fn is_required(self) -> bool {
-        matches!(self, SectionType::ScriptInfo | SectionType::Events)
+    #[must_use]
+    pub const fn is_required(self) -> bool {
+        matches!(self, Self::ScriptInfo | Self::Events)
     }
 
     /// Check if this section type contains timed content
     ///
     /// Returns `true` for sections with time-based content that affects
     /// subtitle timing and playback.
-    pub fn is_timed(self) -> bool {
-        matches!(self, SectionType::Events)
+    #[must_use]
+    pub const fn is_timed(self) -> bool {
+        matches!(self, Self::Events)
     }
 }
 

@@ -29,10 +29,10 @@ pub enum IssueSeverity {
 impl fmt::Display for IssueSeverity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            IssueSeverity::Info => write!(f, "info"),
-            IssueSeverity::Warning => write!(f, "warning"),
-            IssueSeverity::Error => write!(f, "error"),
-            IssueSeverity::Critical => write!(f, "critical"),
+            Self::Info => write!(f, "info"),
+            Self::Warning => write!(f, "warning"),
+            Self::Error => write!(f, "error"),
+            Self::Critical => write!(f, "critical"),
         }
     }
 }

@@ -320,11 +320,26 @@ impl<'a> Parser<'a> {
             "Fonts" => self.parse_fonts(),
             "Graphics" => self.parse_graphics(),
             _ => {
-                self.skip_to_next_section();
-                Err(CoreError::from(ParseError::UnknownSection {
+                let suggestion = self.skip_to_next_section();
+                let error = ParseError::UnknownSection {
                     section: section_name.to_string(),
                     line: self.line,
-                }))
+                };
+
+                // Add suggestion to issues if we found one
+                if let Some(suggestion_text) = suggestion {
+                    self.issues.push(ParseIssue {
+                        severity: IssueSeverity::Info,
+                        category: IssueCategory::Structure,
+                        message: suggestion_text,
+                        line: self.line,
+                        column: Some(0),
+                        span: None,
+                        suggestion: None,
+                    });
+                }
+
+                Err(CoreError::from(error))
             }
         }
     }
@@ -495,13 +510,53 @@ impl<'a> Parser<'a> {
     }
 
     /// Skip to next section for error recovery
-    fn skip_to_next_section(&mut self) {
+    fn skip_to_next_section(&mut self) -> Option<String> {
+        let mut suggestion = None;
+        let _start_pos = self.position;
+
         while self.position < self.source.len() {
             if self.at_next_section() {
                 break;
             }
+
+            // Look for patterns that suggest what section this might be
+            let line_start = self.position;
+            let line_end = self.source[self.position..]
+                .find('\n')
+                .map(|i| self.position + i)
+                .unwrap_or(self.source.len());
+
+            if line_end > line_start {
+                let line = &self.source[line_start..line_end];
+
+                // Check for common section entry patterns
+                if suggestion.is_none() {
+                    if line.trim_start().starts_with("Style:") {
+                        suggestion = Some("Did you mean '[V4+ Styles]'?".to_string());
+                    } else if line.trim_start().starts_with("Dialogue:")
+                        || line.trim_start().starts_with("Comment:")
+                    {
+                        suggestion = Some("Did you mean '[Events]'?".to_string());
+                    } else if line.trim_start().starts_with("Title:")
+                        || line.trim_start().starts_with("ScriptType:")
+                    {
+                        suggestion = Some("Did you mean '[Script Info]'?".to_string());
+                    } else if line.trim_start().starts_with("Format:") {
+                        // Format lines could be in styles or events
+                        let remaining = &self.source[self.position..];
+                        if remaining.contains("Dialogue:") {
+                            suggestion = Some("Did you mean '[Events]'?".to_string());
+                        } else if remaining.contains("Style:") {
+                            suggestion = Some("Did you mean '[V4+ Styles]'?".to_string());
+                        }
+                    }
+                }
+            }
+
             self.skip_line();
         }
+
+        suggestion
     }
 }
 

@@ -18,30 +18,11 @@
 //! - Memory: Minimal allocations via string slices
 //! - Unicode: Efficient detection without full normalization
 
-use crate::Result;
+use crate::{
+    analysis::events::tags::{parse_override_block, DiagnosticKind, OverrideTag, TagDiagnostic},
+    Result,
+};
 use alloc::{string::String, vec::Vec};
-
-/// Diagnostic information for tag parsing issues
-#[derive(Debug, Clone)]
-pub struct TagDiagnostic<'a> {
-    /// Text span containing the issue
-    pub span: &'a str,
-    /// Byte offset in original text
-    pub offset: usize,
-    /// Type of diagnostic issue
-    pub kind: DiagnosticKind,
-}
-
-/// Types of tag parsing diagnostics
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DiagnosticKind {
-    /// Empty override tag like {}
-    EmptyOverride,
-    /// Malformed tag syntax
-    MalformedTag,
-    /// Unknown or invalid tag name
-    UnknownTag(String),
-}
 
 /// Analysis results for dialogue text content
 ///
@@ -63,22 +44,6 @@ pub struct TextAnalysis<'a> {
     override_tags: Vec<OverrideTag<'a>>,
     /// Parse diagnostics collected during analysis
     parse_diagnostics: Vec<TagDiagnostic<'a>>,
-}
-
-/// Single ASS override tag with analysis results
-///
-/// Represents a parsed override tag like `{\b1}` or `{\pos(100,200)}`.
-/// Contains zero-copy references to original text for efficiency.
-#[derive(Debug, Clone)]
-pub struct OverrideTag<'a> {
-    /// Tag name (e.g., "b", "pos", "move")
-    name: &'a str,
-    /// Tag arguments as original text slice
-    args: &'a str,
-    /// Complexity score for rendering (0-5)
-    complexity: u8,
-    /// Byte position in original text
-    position: usize,
 }
 
 impl<'a> TextAnalysis<'a> {
@@ -132,14 +97,13 @@ impl<'a> TextAnalysis<'a> {
 
                 if position > tag_start {
                     let tag_content = &text[tag_start..position];
-                    Self::parse_override_block(
+                    parse_override_block(
                         tag_content,
                         tag_start,
                         &mut override_tags,
                         &mut parse_diagnostics,
                     );
                 } else {
-                    // Empty override tag
                     parse_diagnostics.push(TagDiagnostic {
                         span: &text[tag_start..position.max(tag_start + 1)],
                         offset: tag_start,
@@ -216,131 +180,16 @@ impl<'a> TextAnalysis<'a> {
         &self.parse_diagnostics
     }
 
-    /// Parse override tags within a tag block
-    fn parse_override_block(
-        content: &'a str,
-        start_pos: usize,
-        tags: &mut Vec<OverrideTag<'a>>,
-        diagnostics: &mut Vec<TagDiagnostic<'a>>,
-    ) {
-        let mut pos = 0;
-        let chars: Vec<char> = content.chars().collect();
-
-        while pos < chars.len() {
-            if chars[pos] == '\\' {
-                let tag_start = pos;
-                pos += 1;
-
-                let name_start = pos;
-                while pos < chars.len() && chars[pos].is_ascii_alphabetic() {
-                    pos += 1;
-                }
-
-                if pos > name_start {
-                    let name_end = pos;
-                    let args_start = pos;
-
-                    while pos < chars.len() && chars[pos] != '\\' {
-                        pos += 1;
-                    }
-
-                    let tag_name = &content[name_start..name_end];
-                    let args = &content[args_start..pos];
-
-                    let complexity = Self::calculate_tag_complexity(tag_name);
-
-                    // Check for empty tag name
-                    if tag_name.trim().is_empty() {
-                        diagnostics.push(TagDiagnostic {
-                            span: &content[tag_start..pos],
-                            offset: start_pos + tag_start,
-                            kind: DiagnosticKind::EmptyOverride,
-                        });
-                    } else {
-                        tags.push(OverrideTag {
-                            name: tag_name,
-                            args,
-                            complexity,
-                            position: start_pos + tag_start,
-                        });
-                    }
-                } else {
-                    // Empty tag - backslash not followed by alphabetic characters
-
-                    let span_end = (tag_start + 2).min(content.len());
-                    diagnostics.push(TagDiagnostic {
-                        span: &content[tag_start..span_end],
-                        offset: start_pos + tag_start,
-                        kind: DiagnosticKind::EmptyOverride,
-                    });
-                    pos += 1;
-                }
-            } else {
-                pos += 1;
-            }
-        }
-    }
-
-    /// Calculate rendering complexity for a tag
-    fn calculate_tag_complexity(tag_name: &str) -> u8 {
-        match tag_name {
-            "b" | "i" | "u" | "s" | "c" | "1c" | "2c" | "3c" | "4c" | "alpha" | "1a" | "2a"
-            | "3a" | "4a" | "fn" | "fs" => 1,
-            "pos" | "an" | "a" | "org" | "be" | "blur" | "bord" | "shad" | "xbord" | "ybord"
-            | "xshad" | "yshad" => 2,
-            "move" | "fad" | "fade" | "frx" | "fry" | "frz" | "fscx" | "fscy" | "fsp" | "clip"
-            | "iclip" => 3,
-            "t" | "pbo" => 4,
-            "p" => 5,
-            _ => 2,
-        }
-    }
-
     /// Detect bidirectional text (RTL scripts)
     fn detect_bidi_text(text: &str) -> bool {
-        text.chars().any(|ch| {
-            matches!(ch as u32,
-                0x0590..=0x05FF | // Hebrew
-                0x0600..=0x06FF | // Arabic
-                0x0750..=0x077F | // Arabic Supplement
-                0x08A0..=0x08FF   // Arabic Extended-A
-            )
-        })
+        text.chars().any(|ch| matches!(ch as u32, 0x0590..=0x05FF | 0x0600..=0x06FF | 0x0750..=0x077F | 0x08A0..=0x08FF))
     }
 
     /// Detect complex Unicode beyond basic Latin
     fn detect_complex_unicode(text: &str) -> bool {
         text.chars().any(|ch| {
             let code = ch as u32;
-            code > 0x00FF
-                || matches!(code,
-                    0x0000..=0x001F | // Control characters
-                    0x007F..=0x009F | // Extended control
-                    0x200C..=0x200D | // Zero-width joiners
-                    0x2060..=0x206F   // Unicode controls
-                )
+            code > 0x00FF || matches!(code, 0x0000..=0x001F | 0x007F..=0x009F | 0x200C..=0x200D | 0x2060..=0x206F)
         })
-    }
-}
-
-impl<'a> OverrideTag<'a> {
-    /// Get tag name
-    pub fn name(&self) -> &'a str {
-        self.name
-    }
-
-    /// Get tag arguments
-    pub fn args(&self) -> &'a str {
-        self.args
-    }
-
-    /// Get complexity score
-    pub fn complexity(&self) -> u8 {
-        self.complexity
-    }
-
-    /// Get position in original text
-    pub fn position(&self) -> usize {
-        self.position
     }
 }

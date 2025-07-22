@@ -7,8 +7,9 @@ use crate::{
     analysis::{
         events::text_analysis::TextAnalysis,
         linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+        ScriptAnalysis,
     },
-    parser::{Script, Section},
+    parser::Section,
     utils::parse_bgr_color,
 };
 use alloc::{format, string::ToString, vec::Vec};
@@ -30,16 +31,18 @@ use alloc::{format, string::ToString, vec::Vec};
 /// ```rust
 /// use ass_core::analysis::linting::rules::invalid_color::InvalidColorRule;
 /// use ass_core::analysis::linting::LintRule;
+/// use ass_core::analysis::ScriptAnalysis;
 /// use ass_core::parser::Script;
 ///
-/// let script = Script::parse(r#"
+/// let script = crate::parser::Script::parse(r#"
 /// [V4+ Styles]
 /// Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 /// Style: Default,Arial,20,&HINVALID&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
 /// "#)?;
 ///
+/// let analysis = ScriptAnalysis::analyze(&script)?;
 /// let rule = InvalidColorRule;
-/// let issues = rule.check_script(&script);
+/// let issues = rule.check_script(&analysis);
 /// assert!(!issues.is_empty()); // Should detect the invalid color
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -66,10 +69,11 @@ impl LintRule for InvalidColorRule {
         IssueCategory::Styling
     }
 
-    fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>> {
+    fn check_script(&self, analysis: &ScriptAnalysis) -> Vec<LintIssue> {
         let mut issues = Vec::new();
 
-        if let Some(Section::Styles(styles)) = script
+        if let Some(Section::Styles(styles)) = analysis
+            .script()
             .sections()
             .iter()
             .find(|s| matches!(s, Section::Styles(_)))
@@ -82,7 +86,8 @@ impl LintRule for InvalidColorRule {
             }
         }
 
-        if let Some(Section::Events(events)) = script
+        if let Some(Section::Events(events)) = analysis
+            .script()
             .sections()
             .iter()
             .find(|s| matches!(s, Section::Events(_)))
@@ -181,10 +186,11 @@ mod tests {
     #[test]
     fn empty_script_no_issues() {
         let script_text = "[Script Info]\nTitle: Test";
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
 
         let rule = InvalidColorRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }

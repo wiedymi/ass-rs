@@ -8,8 +8,9 @@ use crate::{
     analysis::{
         events::text_analysis::TextAnalysis,
         linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+        ScriptAnalysis,
     },
-    parser::{Script, Section},
+    parser::Section,
     utils::parse_ass_time,
 };
 use alloc::{format, string::ToString, vec::Vec};
@@ -37,17 +38,18 @@ use alloc::{format, string::ToString, vec::Vec};
 /// ```rust
 /// use ass_core::analysis::linting::rules::accessibility::AccessibilityRule;
 /// use ass_core::analysis::linting::LintRule;
+/// use ass_core::analysis::ScriptAnalysis;
 /// use ass_core::parser::Script;
 ///
-/// let script = Script::parse(r#"
+/// let script = crate::parser::Script::parse(r#"
 /// [Events]
 /// Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-/// Dialogue: 0,0:00:00.00,0:00:00.10,Default,,0,0,0,,Too fast!
+/// Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text without proper contrast
 /// "#)?;
 ///
+/// let analysis = ScriptAnalysis::analyze(&script)?;
 /// let rule = AccessibilityRule;
-/// let issues = rule.check_script(&script);
-/// assert!(!issues.is_empty()); // Should detect the short duration
+/// let issues = rule.check_script(&analysis);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct AccessibilityRule;
@@ -73,10 +75,11 @@ impl LintRule for AccessibilityRule {
         IssueCategory::Accessibility
     }
 
-    fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>> {
+    fn check_script(&self, analysis: &ScriptAnalysis) -> Vec<LintIssue> {
         let mut issues = Vec::new();
 
-        if let Some(Section::Events(events)) = script
+        if let Some(Section::Events(events)) = analysis
+            .script()
             .sections()
             .iter()
             .find(|s| matches!(s, Section::Events(_)))
@@ -187,10 +190,11 @@ mod tests {
     #[test]
     fn empty_script_no_issues() {
         let script_text = "[Script Info]\nTitle: Test";
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
 
         let rule = AccessibilityRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -201,9 +205,10 @@ mod tests {
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Normal duration text";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = AccessibilityRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -214,9 +219,10 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Normal duration text";
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:00.30,Default,,0,0,0,,Too fast!";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
         let rule = AccessibilityRule;
-        let issues = rule.check_script(&script);
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
+        let issues = rule.check_script(&analysis);
 
         assert!(!issues.is_empty());
         assert!(issues
@@ -234,9 +240,10 @@ Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{}",
             long_text
         );
 
-        let script = Script::parse(&script_text).unwrap();
+        let script = crate::parser::Script::parse(&script_text).unwrap();
         let rule = AccessibilityRule;
-        let issues = rule.check_script(&script);
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
+        let issues = rule.check_script(&analysis);
 
         assert!(issues
             .iter()
@@ -272,9 +279,10 @@ Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{}",
             long_text
         );
 
-        let script = Script::parse(&script_text).unwrap();
+        let script = crate::parser::Script::parse(&script_text).unwrap();
         let rule = AccessibilityRule;
-        let issues = rule.check_script(&script);
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
+        let issues = rule.check_script(&analysis);
 
         assert!(issues
             .iter()
@@ -290,9 +298,10 @@ Title: Test
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
         let rule = AccessibilityRule;
-        let issues = rule.check_script(&script);
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }

@@ -25,7 +25,7 @@ use thiserror::Error;
 #[derive(Debug, Clone, PartialEq)]
 pub enum CoreError {
     /// Parsing errors from parser module
-    Parse(String),
+    Parse(crate::parser::ParseError),
 
     /// Tokenization errors
     Tokenization(String),
@@ -86,7 +86,10 @@ pub enum CoreError {
 impl CoreError {
     /// Create parse error from message
     pub fn parse<T: fmt::Display>(message: T) -> Self {
-        Self::Parse(format!("{}", message))
+        Self::Parse(crate::parser::ParseError::InternalError {
+            line: 0,
+            message: format!("{}", message),
+        })
     }
 
     /// Create internal error (indicates a bug)
@@ -97,8 +100,13 @@ impl CoreError {
     /// Check if error is recoverable
     pub fn is_recoverable(&self) -> bool {
         match self {
-            Self::Parse(_)
-            | Self::Tokenization(_)
+            Self::Parse(parse_err) => !matches!(
+                parse_err,
+                crate::parser::ParseError::OutOfMemory { .. }
+                    | crate::parser::ParseError::InputTooLarge { .. }
+                    | crate::parser::ParseError::InternalError { .. }
+            ),
+            Self::Tokenization(_)
             | Self::InvalidColor(_)
             | Self::InvalidNumeric(_)
             | Self::InvalidTime(_)
@@ -123,6 +131,59 @@ impl CoreError {
     pub fn is_internal_bug(&self) -> bool {
         matches!(self, Self::Internal(_))
     }
+
+    /// Get the underlying parse error if this is a parse error
+    pub fn as_parse_error(&self) -> Option<&crate::parser::ParseError> {
+        match self {
+            Self::Parse(parse_err) => Some(parse_err),
+            _ => None,
+        }
+    }
+
+    /// Get line number for errors that have location information
+    pub fn line_number(&self) -> Option<usize> {
+        match self {
+            Self::Parse(parse_err) => match parse_err {
+                crate::parser::ParseError::ExpectedSectionHeader { line } => Some(*line),
+                crate::parser::ParseError::UnclosedSectionHeader { line } => Some(*line),
+                crate::parser::ParseError::UnknownSection { line, .. } => Some(*line),
+                crate::parser::ParseError::InvalidFieldFormat { line } => Some(*line),
+                crate::parser::ParseError::InvalidFormatLine { line, .. } => Some(*line),
+                crate::parser::ParseError::FieldCountMismatch { line, .. } => Some(*line),
+                crate::parser::ParseError::InvalidTimeFormat { line, .. } => Some(*line),
+                crate::parser::ParseError::InvalidColorFormat { line, .. } => Some(*line),
+                crate::parser::ParseError::InvalidNumericValue { line, .. } => Some(*line),
+                crate::parser::ParseError::InvalidStyleOverride { line, .. } => Some(*line),
+                crate::parser::ParseError::InvalidDrawingCommand { line, .. } => Some(*line),
+                crate::parser::ParseError::UuDecodeError { line, .. } => Some(*line),
+                crate::parser::ParseError::MaxNestingDepth { line, .. } => Some(*line),
+                crate::parser::ParseError::InternalError { line, .. } => Some(*line),
+                _ => None,
+            },
+            Self::Utf8Error { position, .. } => Some(*position),
+            _ => None,
+        }
+    }
+
+    /// Check if this is a specific type of parse error
+    pub fn is_parse_error_type(&self, error_type: &str) -> bool {
+        match self {
+            Self::Parse(parse_err) => match (error_type, parse_err) {
+                ("section_header", crate::parser::ParseError::ExpectedSectionHeader { .. }) => true,
+                ("unclosed_header", crate::parser::ParseError::UnclosedSectionHeader { .. }) => {
+                    true
+                }
+                ("unknown_section", crate::parser::ParseError::UnknownSection { .. }) => true,
+                ("field_format", crate::parser::ParseError::InvalidFieldFormat { .. }) => true,
+                ("time_format", crate::parser::ParseError::InvalidTimeFormat { .. }) => true,
+                ("color_format", crate::parser::ParseError::InvalidColorFormat { .. }) => true,
+                ("numeric_value", crate::parser::ParseError::InvalidNumericValue { .. }) => true,
+                ("utf8", crate::parser::ParseError::Utf8Error { .. }) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
 }
 
 /// Result type alias for convenience
@@ -133,7 +194,7 @@ pub type Result<T> = core::result::Result<T, CoreError>;
 impl fmt::Display for CoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CoreError::Parse(msg) => write!(f, "Parse error: {}", msg),
+            CoreError::Parse(parse_err) => write!(f, "Parse error: {}", parse_err),
             CoreError::Tokenization(msg) => write!(f, "Tokenization error: {}", msg),
             CoreError::Analysis(msg) => write!(f, "Analysis error: {}", msg),
             CoreError::Plugin(msg) => write!(f, "Plugin error: {}", msg),
@@ -192,7 +253,7 @@ impl core::error::Error for CoreError {}
 impl fmt::Display for CoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CoreError::Parse(msg) => write!(f, "Parse error: {}", msg),
+            CoreError::Parse(parse_err) => write!(f, "Parse error: {}", parse_err),
             CoreError::Tokenization(msg) => write!(f, "Tokenization error: {}", msg),
             CoreError::Analysis(msg) => write!(f, "Analysis error: {}", msg),
             CoreError::Plugin(msg) => write!(f, "Plugin error: {}", msg),

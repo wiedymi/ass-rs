@@ -129,7 +129,7 @@ impl<'a> ScriptInfo<'a> {
             .unwrap_or(0)
     }
 
-    /// Validate all spans in this ScriptInfo reference valid source
+    /// Validate all spans in this `ScriptInfo` reference valid source
     ///
     /// Debug helper to ensure zero-copy invariants are maintained.
     /// Validates that all string references point to memory within
@@ -137,6 +137,7 @@ impl<'a> ScriptInfo<'a> {
     ///
     /// Only available in debug builds to avoid performance overhead.
     #[cfg(debug_assertions)]
+    #[must_use]
     pub fn validate_spans(&self, source_range: &Range<usize>) -> bool {
         self.fields.iter().all(|(key, value)| {
             let key_ptr = key.as_ptr() as usize;

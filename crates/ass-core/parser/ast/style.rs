@@ -27,7 +27,7 @@ use core::ops::Range;
 /// assert_eq!(style.name, "Default");
 /// assert_eq!(style.fontname, "Arial");
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Style<'a> {
     /// Style name (must be unique within script)
     pub name: &'a str,
@@ -108,6 +108,7 @@ impl Style<'_> {
     ///
     /// Only available in debug builds to avoid performance overhead.
     #[cfg(debug_assertions)]
+    #[must_use]
     pub fn validate_spans(&self, source_range: &Range<usize>) -> bool {
         let spans = [
             self.name,

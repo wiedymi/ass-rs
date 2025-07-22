@@ -19,11 +19,12 @@
 //! use ass_core::analysis::linting::LintRule;
 //! use ass_core::parser::Script;
 //!
-//! let script = Script::parse("...")?;
+//! let script = crate::parser::Script::parse("...")?;
 //! let rules = BuiltinRules::all_rules();
 //!
 //! for rule in rules {
-//!     let issues = rule.check_script(&script);
+//!     let analysis = ScriptAnalysis::analyze(&script).unwrap();
+//!     let issues = rule.check_script(&analysis);
 //!     for issue in issues {
 //!         println!("{}: {}", rule.name(), issue.message());
 //!     }

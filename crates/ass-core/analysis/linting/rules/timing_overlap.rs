@@ -7,8 +7,9 @@ use crate::{
     analysis::{
         events::find_overlapping_events,
         linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+        ScriptAnalysis,
     },
-    parser::{Script, Section},
+    parser::Section,
 };
 use alloc::{format, string::ToString, vec::Vec};
 
@@ -29,17 +30,19 @@ use alloc::{format, string::ToString, vec::Vec};
 /// ```rust
 /// use ass_core::analysis::linting::rules::timing_overlap::TimingOverlapRule;
 /// use ass_core::analysis::linting::LintRule;
+/// use ass_core::analysis::ScriptAnalysis;
 /// use ass_core::parser::Script;
 ///
-/// let script = Script::parse(r#"
+/// let script = crate::parser::Script::parse(r#"
 /// [Events]
 /// Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 /// Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,First event
 /// Dialogue: 0,0:00:03.00,0:00:08.00,Default,,0,0,0,,Overlapping event
 /// "#)?;
 ///
+/// let analysis = ScriptAnalysis::analyze(&script)?;
 /// let rule = TimingOverlapRule;
-/// let issues = rule.check_script(&script);
+/// let issues = rule.check_script(&analysis);
 /// assert!(!issues.is_empty()); // Should detect the overlap
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -66,10 +69,11 @@ impl LintRule for TimingOverlapRule {
         IssueCategory::Timing
     }
 
-    fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>> {
+    fn check_script(&self, analysis: &ScriptAnalysis) -> Vec<LintIssue> {
         let mut issues = Vec::new();
 
-        if let Some(Section::Events(events)) = script
+        if let Some(Section::Events(events)) = analysis
+            .script()
             .sections()
             .iter()
             .find(|s| matches!(s, Section::Events(_)))
@@ -127,10 +131,11 @@ mod tests {
     #[test]
     fn empty_script_no_issues() {
         let script_text = "[Script Info]\nTitle: Test";
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
 
         let rule = TimingOverlapRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -139,12 +144,13 @@ mod tests {
     fn non_overlapping_events_no_issues() {
         let script_text = r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,First
-Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,Second";
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,First event
+Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,Second event";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = TimingOverlapRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }

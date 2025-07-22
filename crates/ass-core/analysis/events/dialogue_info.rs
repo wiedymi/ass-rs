@@ -18,7 +18,13 @@
 //! - Caching: Results stored for repeated queries
 
 use crate::{
-    analysis::events::text_analysis::TextAnalysis,
+    analysis::events::{
+        scoring::{
+            calculate_animation_score, calculate_complexity_score, get_performance_impact,
+            PerformanceImpact,
+        },
+        text_analysis::TextAnalysis,
+    },
     parser::Event,
     utils::{parse_ass_time, CoreError},
     Result,
@@ -36,21 +42,6 @@ pub enum TimingRelation {
     FullOverlap,
     /// Events have identical timing
     Identical,
-}
-
-/// Performance impact category for rendering complexity
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum PerformanceImpact {
-    /// Minimal impact - simple static text
-    Minimal,
-    /// Low impact - basic formatting
-    Low,
-    /// Medium impact - animations or complex styling
-    Medium,
-    /// High impact - many animations or large text
-    High,
-    /// Critical impact - may cause performance issues
-    Critical,
 }
 
 /// Comprehensive analysis results for a dialogue event
@@ -116,8 +107,8 @@ impl<'a> DialogueInfo<'a> {
         }
 
         let text_info = TextAnalysis::analyze(event.text)?;
-        let animation_score = Self::calculate_animation_score(text_info.override_tags());
-        let complexity_score = Self::calculate_complexity_score(
+        let animation_score = calculate_animation_score(text_info.override_tags());
+        let complexity_score = calculate_complexity_score(
             animation_score,
             text_info.char_count(),
             text_info.override_tags().len(),
@@ -171,13 +162,7 @@ impl<'a> DialogueInfo<'a> {
 
     /// Get performance impact category
     pub fn performance_impact(&self) -> PerformanceImpact {
-        match self.complexity_score {
-            0..=20 => PerformanceImpact::Minimal,
-            21..=40 => PerformanceImpact::Low,
-            41..=60 => PerformanceImpact::Medium,
-            61..=80 => PerformanceImpact::High,
-            _ => PerformanceImpact::Critical,
-        }
+        get_performance_impact(self.complexity_score)
     }
 
     /// Check timing relationship with another event
@@ -208,53 +193,5 @@ impl<'a> DialogueInfo<'a> {
     /// Get reference to original event
     pub fn event(&self) -> &'a Event<'a> {
         self.event
-    }
-
-    /// Calculate animation complexity from override tags
-    fn calculate_animation_score(
-        tags: &[crate::analysis::events::text_analysis::OverrideTag<'_>],
-    ) -> u8 {
-        tags.iter()
-            .map(|tag| match tag.name() {
-                "b" | "i" | "u" | "s" | "c" | "1c" | "2c" | "3c" | "4c" | "alpha" | "1a" | "2a"
-                | "3a" | "4a" => 1,
-                "pos" | "an" | "a" | "org" => 2,
-                "frx" | "fry" | "frz" | "fscx" | "fscy" | "fsp" | "fad" | "fade" | "clip"
-                | "iclip" => 3,
-                "move" => 4,
-                "t" => 5,
-                "pbo" => 5,
-                "p" => 8,
-                _ => 2,
-            })
-            .sum::<u8>()
-            .min(10)
-    }
-
-    /// Calculate overall complexity score
-    fn calculate_complexity_score(
-        animation_score: u8,
-        char_count: usize,
-        override_count: usize,
-    ) -> u8 {
-        let mut score = animation_score as u32 * 5;
-
-        score += match char_count {
-            0..=50 => 0,
-            51..=200 => 5,
-            201..=500 => 15,
-            501..=1000 => 30,
-            _ => 50,
-        };
-
-        score += match override_count {
-            0 => 0,
-            1..=5 => 5,
-            6..=15 => 15,
-            16..=30 => 25,
-            _ => 35,
-        };
-
-        (score as u8).min(100)
     }
 }

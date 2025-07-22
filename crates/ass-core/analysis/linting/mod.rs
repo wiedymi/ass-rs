@@ -20,7 +20,7 @@
 //! - Performance: Complex animations, large fonts, excessive overlaps
 //! - Spec compliance: Invalid sections, deprecated features, compatibility
 
-use crate::{parser::Script, Result};
+use crate::{analysis::ScriptAnalysis, parser::Script, Result};
 use alloc::{string::String, vec::Vec};
 use core::fmt;
 
@@ -90,7 +90,7 @@ impl fmt::Display for IssueCategory {
 
 /// Location information for a lint issue.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IssueLocation<'a> {
+pub struct IssueLocation {
     /// Line number (1-based)
     pub line: usize,
     /// Column number (1-based)
@@ -100,12 +100,12 @@ pub struct IssueLocation<'a> {
     /// Length of the problematic span
     pub length: usize,
     /// The problematic text span
-    pub span: &'a str,
+    pub span: String,
 }
 
 /// A single lint issue found in the script.
 #[derive(Debug, Clone)]
-pub struct LintIssue<'a> {
+pub struct LintIssue {
     /// Severity level
     severity: IssueSeverity,
     /// Category of issue
@@ -115,14 +115,14 @@ pub struct LintIssue<'a> {
     /// Optional detailed description
     description: Option<String>,
     /// Location in source (if available)
-    location: Option<IssueLocation<'a>>,
+    location: Option<IssueLocation>,
     /// Rule ID that generated this issue
     rule_id: &'static str,
     /// Suggested fix (if available)
     suggested_fix: Option<String>,
 }
 
-impl<'a> LintIssue<'a> {
+impl LintIssue {
     /// Create a new lint issue.
     pub fn new(
         severity: IssueSeverity,
@@ -148,7 +148,7 @@ impl<'a> LintIssue<'a> {
     }
 
     /// Add location information.
-    pub fn with_location(mut self, location: IssueLocation<'a>) -> Self {
+    pub fn with_location(mut self, location: IssueLocation) -> Self {
         self.location = Some(location);
         self
     }
@@ -180,7 +180,7 @@ impl<'a> LintIssue<'a> {
     }
 
     /// Get location information.
-    pub fn location(&self) -> Option<&IssueLocation<'a>> {
+    pub fn location(&self) -> Option<&IssueLocation> {
         self.location.as_ref()
     }
 
@@ -273,14 +273,15 @@ pub trait LintRule: Send + Sync {
     fn category(&self) -> IssueCategory;
 
     /// Check script and return issues.
-    fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>>;
+    fn check_script(&self, analysis: &ScriptAnalysis) -> Vec<LintIssue>;
 }
 
 /// Lint a script with the given configuration.
 ///
 /// Runs all enabled rules against the script and returns found issues,
 /// respecting the configuration limits and filters.
-pub fn lint_script<'a>(script: &'a Script<'a>, config: &LintConfig) -> Result<Vec<LintIssue<'a>>> {
+pub fn lint_script(script: &Script, config: &LintConfig) -> Result<Vec<LintIssue>> {
+    let analysis = ScriptAnalysis::analyze(script)?;
     let mut issues = Vec::new();
     let rules = BuiltinRules::all_rules();
 
@@ -289,7 +290,7 @@ pub fn lint_script<'a>(script: &'a Script<'a>, config: &LintConfig) -> Result<Ve
             continue;
         }
 
-        let mut rule_issues = rule.check_script(script);
+        let mut rule_issues = rule.check_script(&analysis);
         rule_issues.retain(|issue| config.should_report_severity(issue.severity()));
 
         issues.extend(rule_issues);

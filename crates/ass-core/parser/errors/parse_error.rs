@@ -1,6 +1,6 @@
 //! Primary parse error type for ASS script parsing
 //!
-//! Contains the main ParseError enum representing unrecoverable parsing errors
+//! Contains the main `ParseError` enum representing unrecoverable parsing errors
 //! that prevent script construction. These errors indicate fundamental issues
 //! with the script structure or content that cannot be recovered from.
 
@@ -22,7 +22,7 @@ use thiserror::Error;
 /// - **Content errors**: Invalid time/color formats, bad numeric values
 /// - **System errors**: Memory limits, UTF-8 issues, I/O problems
 #[cfg_attr(feature = "std", derive(Error))]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseError {
     /// Expected section header but found something else
     ExpectedSectionHeader { line: usize },
@@ -104,121 +104,127 @@ pub enum ParseError {
     InternalError { line: usize, message: String },
 }
 
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl ParseError {
+    /// Format structural errors
+    fn fmt_structural(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParseError::ExpectedSectionHeader { line } => {
+            Self::ExpectedSectionHeader { line } => {
                 write!(
                     f,
-                    "Expected section header like [Script Info] at line {}",
-                    line
+                    "Expected section header like [Script Info] at line {line}"
                 )
             }
-            ParseError::UnclosedSectionHeader { line } => {
-                write!(f, "Unclosed section header at line {}: missing ']'", line)
+            Self::UnclosedSectionHeader { line } => {
+                write!(f, "Unclosed section header at line {line}: missing ']'")
             }
-            ParseError::UnknownSection { section, line } => {
-                write!(f, "Unknown section '{}' at line {}", section, line)
+            Self::UnknownSection { section, line } => {
+                write!(f, "Unknown section '{section}' at line {line}")
             }
-            ParseError::InvalidFieldFormat { line } => {
+            Self::InvalidFieldFormat { line } => {
                 write!(
                     f,
-                    "Invalid field format at line {}: expected 'key: value'",
-                    line
+                    "Invalid field format at line {line}: expected 'key: value'"
                 )
             }
-            ParseError::MissingRequiredField { field, section } => {
-                write!(
-                    f,
-                    "Missing required field '{}' in {} section",
-                    field, section
-                )
+            Self::MissingRequiredField { field, section } => {
+                write!(f, "Missing required field '{field}' in {section} section")
             }
-            ParseError::InvalidFormatLine { line, reason } => {
-                write!(f, "Invalid format line at line {}: {}", line, reason)
+            Self::InvalidFormatLine { line, reason } => {
+                write!(f, "Invalid format line at line {line}: {reason}")
             }
-            ParseError::FieldCountMismatch {
+            Self::FieldCountMismatch {
                 line,
                 expected,
                 found,
             } => {
                 write!(
                     f,
-                    "Field count mismatch at line {}: expected {}, found {}",
-                    line, expected, found
+                    "Field count mismatch at line {line}: expected {expected}, found {found}"
                 )
             }
-            ParseError::InvalidTimeFormat { time, line, reason } => {
-                write!(
-                    f,
-                    "Invalid time format '{}' at line {}: {}",
-                    time, line, reason
-                )
+            _ => Err(fmt::Error),
+        }
+    }
+
+    /// Format content errors
+    fn fmt_content(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidTimeFormat { time, line, reason } => {
+                write!(f, "Invalid time format '{time}' at line {line}: {reason}")
             }
-            ParseError::InvalidColorFormat {
+            Self::InvalidColorFormat {
                 color,
                 line,
                 reason,
             } => {
-                write!(
-                    f,
-                    "Invalid color format '{}' at line {}: {}",
-                    color, line, reason
-                )
+                write!(f, "Invalid color format '{color}' at line {line}: {reason}")
             }
-            ParseError::InvalidNumericValue {
+            Self::InvalidNumericValue {
                 value,
                 line,
                 reason,
             } => {
                 write!(
                     f,
-                    "Invalid numeric value '{}' at line {}: {}",
-                    value, line, reason
+                    "Invalid numeric value '{value}' at line {line}: {reason}"
                 )
             }
-            ParseError::InvalidStyleOverride { line, reason } => {
-                write!(f, "Invalid style override at line {}: {}", line, reason)
+            Self::InvalidStyleOverride { line, reason } => {
+                write!(f, "Invalid style override at line {line}: {reason}")
             }
-            ParseError::InvalidDrawingCommand { line, reason } => {
-                write!(f, "Invalid drawing command at line {}: {}", line, reason)
+            Self::InvalidDrawingCommand { line, reason } => {
+                write!(f, "Invalid drawing command at line {line}: {reason}")
             }
-            ParseError::UuDecodeError { line, reason } => {
-                write!(f, "UU-decode error at line {}: {}", line, reason)
+            Self::UuDecodeError { line, reason } => {
+                write!(f, "UU-decode error at line {line}: {reason}")
             }
-            ParseError::Utf8Error { position, reason } => {
-                write!(f, "UTF-8 encoding error at byte {}: {}", position, reason)
-            }
-            ParseError::UnsupportedVersion { version } => {
-                write!(
-                    f,
-                    "Unsupported script version '{}': expected v4.00+ or compatible",
-                    version
-                )
-            }
-            ParseError::CircularStyleReference { chain } => {
-                write!(f, "Circular style reference detected: {}", chain)
-            }
-            ParseError::MaxNestingDepth { line, limit } => {
-                write!(
-                    f,
-                    "Maximum nesting depth exceeded at line {}: limit is {}",
-                    line, limit
-                )
-            }
-            ParseError::InputTooLarge { size, limit } => {
-                write!(f, "Input size {} bytes exceeds limit {} bytes", size, limit)
-            }
-            ParseError::IoError { message } => {
-                write!(f, "I/O error during parsing: {}", message)
-            }
-            ParseError::OutOfMemory { message } => {
-                write!(f, "Memory allocation failed: {}", message)
-            }
-            ParseError::InternalError { line, message } => {
-                write!(f, "Internal parser error at line {}: {}", line, message)
-            }
+            _ => Err(fmt::Error),
         }
+    }
+
+    /// Format system errors
+    fn fmt_system(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Utf8Error { position, reason } => {
+                write!(f, "UTF-8 encoding error at byte {position}: {reason}")
+            }
+            Self::UnsupportedVersion { version } => {
+                write!(
+                    f,
+                    "Unsupported script version '{version}': expected v4.00+ or compatible"
+                )
+            }
+            Self::CircularStyleReference { chain } => {
+                write!(f, "Circular style reference detected: {chain}")
+            }
+            Self::MaxNestingDepth { line, limit } => {
+                write!(
+                    f,
+                    "Maximum nesting depth exceeded at line {line}: limit is {limit}"
+                )
+            }
+            Self::InputTooLarge { size, limit } => {
+                write!(f, "Input size {size} bytes exceeds limit {limit} bytes")
+            }
+            Self::IoError { message } => {
+                write!(f, "I/O error during parsing: {message}")
+            }
+            Self::OutOfMemory { message } => {
+                write!(f, "Memory allocation failed: {message}")
+            }
+            Self::InternalError { line, message } => {
+                write!(f, "Internal parser error at line {line}: {message}")
+            }
+            _ => Err(fmt::Error),
+        }
+    }
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.fmt_structural(f)
+            .or_else(|_| self.fmt_content(f))
+            .or_else(|_| self.fmt_system(f))
     }
 }
 

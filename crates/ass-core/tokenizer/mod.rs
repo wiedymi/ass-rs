@@ -299,12 +299,18 @@ impl<'a> AssTokenizer<'a> {
             Ok(ch)
         } else if self.position < self.source.len() {
             let ch = self.chars.next().ok_or_else(|| {
-                CoreError::Parse(format!("Invalid UTF-8 at position {}", self.position))
+                CoreError::Parse(crate::parser::ParseError::Utf8Error {
+                    position: self.position,
+                    reason: format!("Invalid UTF-8 at position {}", self.position),
+                })
             })?;
             self.peek_char = Some(ch);
             Ok(ch)
         } else {
-            Err(CoreError::Parse("Unexpected end of input".into()))
+            Err(CoreError::Parse(crate::parser::ParseError::InternalError {
+                line: self.line,
+                message: "Unexpected end of input".to_string(),
+            }))
         }
     }
 
@@ -312,9 +318,12 @@ impl<'a> AssTokenizer<'a> {
     fn peek_next(&self) -> Result<char> {
         let mut chars = self.source[self.position..].chars();
         chars.next(); // Skip current
-        chars
-            .next()
-            .ok_or_else(|| CoreError::Parse("Unexpected end of input".into()))
+        chars.next().ok_or_else(|| {
+            CoreError::Parse(crate::parser::ParseError::InternalError {
+                line: self.line,
+                message: "Unexpected end of input".to_string(),
+            })
+        })
     }
 
     /// Advance by one character
@@ -401,16 +410,52 @@ impl<'a> AssTokenizer<'a> {
     fn scan_text(&mut self) -> Result<TokenType> {
         let start = self.position;
 
-        while self.position < self.source.len() {
-            let ch = self.peek_char()?;
-
-            if matches!(ch, ',' | ':' | '{' | '}' | '[' | ']' | '\n' | '\r')
-                || (ch == ';' && self.context == TokenContext::Document)
-            {
-                break;
+        // Use SIMD delimiter scanning when available
+        #[cfg(feature = "simd")]
+        {
+            if let Some(delimiter_pos) = self.scan_delimiters_simd(start) {
+                // Check if we found a semicolon in document context
+                if delimiter_pos < self.source.len() {
+                    let ch = self.source.as_bytes()[delimiter_pos] as char;
+                    if ch == ';' && self.context == TokenContext::Document {
+                        self.position = delimiter_pos;
+                    } else if matches!(ch, ',' | ':' | '{' | '}' | '[' | ']' | '\n' | '\r') {
+                        self.position = delimiter_pos;
+                    } else {
+                        // Continue scanning manually from this position
+                        self.position = delimiter_pos + 1;
+                        while self.position < self.source.len() {
+                            let ch = self.peek_char()?;
+                            if matches!(ch, ',' | ':' | '{' | '}' | '[' | ']' | '\n' | '\r')
+                                || (ch == ';' && self.context == TokenContext::Document)
+                            {
+                                break;
+                            }
+                            self.advance_char()?;
+                        }
+                    }
+                } else {
+                    self.position = self.source.len();
+                }
+            } else {
+                self.position = self.source.len();
             }
+        }
 
-            self.advance_char()?;
+        // Fallback to scalar scanning when SIMD is not available
+        #[cfg(not(feature = "simd"))]
+        {
+            while self.position < self.source.len() {
+                let ch = self.peek_char()?;
+
+                if matches!(ch, ',' | ':' | '{' | '}' | '[' | ']' | '\n' | '\r')
+                    || (ch == ';' && self.context == TokenContext::Document)
+                {
+                    break;
+                }
+
+                self.advance_char()?;
+            }
         }
 
         let span = &self.source[start..self.position];
@@ -431,20 +476,50 @@ impl<'a> AssTokenizer<'a> {
 
     /// Check if a span represents a hex value (pure hex or ASS color format)
     fn is_hex_value(&self, span: &str) -> bool {
-        if span.chars().all(|c| c.is_ascii_hexdigit()) && span.len() % 2 == 0 && !span.is_empty() {
-            return true;
+        // Use SIMD hex parsing when available for validation
+        #[cfg(feature = "simd")]
+        {
+            if span.chars().all(|c| c.is_ascii_hexdigit())
+                && span.len() % 2 == 0
+                && !span.is_empty()
+            {
+                return self.parse_hex_simd(span).is_some();
+            }
+
+            if let Some(after_prefix) = span.strip_prefix("&H") {
+                let hex_part = if let Some(stripped) = after_prefix.strip_suffix('&') {
+                    stripped
+                } else {
+                    after_prefix
+                };
+
+                return !hex_part.is_empty()
+                    && hex_part.len() % 2 == 0
+                    && self.parse_hex_simd(hex_part).is_some();
+            }
         }
 
-        if let Some(after_prefix) = span.strip_prefix("&H") {
-            let hex_part = if let Some(stripped) = after_prefix.strip_suffix('&') {
-                stripped
-            } else {
-                after_prefix
-            };
+        // Fallback to scalar validation when SIMD is not available
+        #[cfg(not(feature = "simd"))]
+        {
+            if span.chars().all(|c| c.is_ascii_hexdigit())
+                && span.len() % 2 == 0
+                && !span.is_empty()
+            {
+                return true;
+            }
 
-            return !hex_part.is_empty()
-                && hex_part.chars().all(|c| c.is_ascii_hexdigit())
-                && hex_part.len() % 2 == 0;
+            if let Some(after_prefix) = span.strip_prefix("&H") {
+                let hex_part = if let Some(stripped) = after_prefix.strip_suffix('&') {
+                    stripped
+                } else {
+                    after_prefix
+                };
+
+                return !hex_part.is_empty()
+                    && hex_part.chars().all(|c| c.is_ascii_hexdigit())
+                    && hex_part.len() % 2 == 0;
+            }
         }
 
         false
@@ -452,14 +527,12 @@ impl<'a> AssTokenizer<'a> {
 
     /// Fast delimiter scanning using SIMD when available
     #[cfg(feature = "simd")]
-    #[allow(dead_code)]
     fn scan_delimiters_simd(&self, start: usize) -> Option<usize> {
         simd::scan_delimiters(&self.source[start..]).map(|offset| start + offset)
     }
 
     /// Fast hex parsing using SIMD when available
     #[cfg(feature = "simd")]
-    #[allow(dead_code)]
     fn parse_hex_simd(&self, hex_str: &str) -> Option<u32> {
         simd::parse_hex_u32(hex_str)
     }

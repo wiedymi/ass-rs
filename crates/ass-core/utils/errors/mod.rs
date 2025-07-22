@@ -79,7 +79,7 @@ impl CoreError {
 /// Convert from parser errors
 impl From<crate::parser::ParseError> for CoreError {
     fn from(err: crate::parser::ParseError) -> Self {
-        Self::Parse(format!("{}", err))
+        Self::Parse(err)
     }
 }
 

@@ -4,8 +4,11 @@
 //! that could cause display problems or compatibility issues.
 
 use crate::{
-    analysis::linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
-    parser::{Script, Section},
+    analysis::{
+        linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+        ScriptAnalysis,
+    },
+    parser::Section,
 };
 use alloc::{string::ToString, vec::Vec};
 
@@ -35,10 +38,11 @@ use alloc::{string::ToString, vec::Vec};
 /// use ass_core::parser::Script;
 ///
 /// let script_text = format!("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with{}invalid character", '\x00');
-/// let script = Script::parse(&script_text)?;
+/// let script = crate::parser::Script::parse(&script_text)?;
 ///
 /// let rule = EncodingRule;
-/// let issues = rule.check_script(&script);
+/// let analysis = ScriptAnalysis::analyze(&script).unwrap();
+/// let issues = rule.check_script(&analysis);
 /// assert!(!issues.is_empty()); // Should detect the control character
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -65,10 +69,11 @@ impl LintRule for EncodingRule {
         IssueCategory::Encoding
     }
 
-    fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>> {
+    fn check_script(&self, analysis: &ScriptAnalysis) -> Vec<LintIssue> {
         let mut issues = Vec::new();
 
-        if let Some(Section::Events(events)) = script
+        if let Some(Section::Events(events)) = analysis
+            .script()
             .sections()
             .iter()
             .find(|s| matches!(s, Section::Events(_)))
@@ -78,7 +83,7 @@ impl LintRule for EncodingRule {
             }
         }
 
-        self.check_script_info_encoding(&mut issues, script);
+        self.check_script_info_encoding(&mut issues, analysis.script());
 
         issues
     }
@@ -140,7 +145,11 @@ impl EncodingRule {
     }
 
     /// Check encoding issues in script info section
-    fn check_script_info_encoding(&self, issues: &mut Vec<LintIssue>, script: &Script) {
+    fn check_script_info_encoding(
+        &self,
+        issues: &mut Vec<LintIssue>,
+        script: &crate::parser::Script,
+    ) {
         if let Some(Section::ScriptInfo(info)) = script
             .sections()
             .iter()
@@ -179,10 +188,11 @@ mod tests {
     #[test]
     fn empty_script_no_issues() {
         let script_text = "[Script Info]\nTitle: Test";
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
 
         let rule = EncodingRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -193,9 +203,10 @@ mod tests {
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Valid text with unicode: ñáéíóú";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
         let rule = EncodingRule;
-        let issues = rule.check_script(&script);
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -206,9 +217,10 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Valid text with unicode: ñá�
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with\Nline break";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
         let rule = EncodingRule;
-        let issues = rule.check_script(&script);
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -217,9 +229,10 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with\Nline break";
     fn tabs_allowed() {
         let script_text = "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with\ttab";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
         let rule = EncodingRule;
-        let issues = rule.check_script(&script);
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -230,9 +243,10 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with\Nline break";
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with � replacement";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
         let rule = EncodingRule;
-        let issues = rule.check_script(&script);
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
+        let issues = rule.check_script(&analysis);
 
         assert!(!issues.is_empty());
         assert!(issues
@@ -244,9 +258,10 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with � replacement";
     fn control_character_in_script_info() {
         let script_text = "[Script Info]\nTitle: Test\x00\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
         let rule = EncodingRule;
-        let issues = rule.check_script(&script);
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
+        let issues = rule.check_script(&analysis);
 
         assert!(!issues.is_empty());
         assert!(issues
@@ -263,9 +278,10 @@ Title: Test
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1";
 
-        let script = Script::parse(script_text).unwrap();
+        let script = crate::parser::Script::parse(script_text).unwrap();
         let rule = EncodingRule;
-        let issues = rule.check_script(&script);
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
+        let issues = rule.check_script(&analysis);
 
         assert!(issues.is_empty());
     }
@@ -280,9 +296,10 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{}",
             heavy_unicode
         );
 
-        let script = Script::parse(&script_text).unwrap();
+        let script = crate::parser::Script::parse(&script_text).unwrap();
         let rule = EncodingRule;
-        let issues = rule.check_script(&script);
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
+        let issues = rule.check_script(&analysis);
 
         assert!(issues
             .iter()
