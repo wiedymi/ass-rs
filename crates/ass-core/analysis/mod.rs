@@ -148,9 +148,9 @@ impl<'a> ScriptAnalysis<'a> {
             config,
         };
 
-        analysis.run_linting()?;
         analysis.resolve_all_styles()?;
         analysis.analyze_events()?;
+        analysis.run_linting()?;
 
         Ok(analysis)
     }
@@ -203,8 +203,26 @@ impl<'a> ScriptAnalysis<'a> {
         let lint_config =
             LintConfig::default().with_strict_compliance(self.config.strict_compliance);
 
-        self.lint_issues = lint_script(self.script, &lint_config)?;
+        let mut issues = Vec::new();
+        let rules = linting::rules::BuiltinRules::all_rules();
 
+        for rule in rules {
+            if !lint_config.is_rule_enabled(rule.id()) {
+                continue;
+            }
+
+            let mut rule_issues = rule.check_script(self);
+            rule_issues.retain(|issue| lint_config.should_report_severity(issue.severity()));
+
+            issues.extend(rule_issues);
+
+            if lint_config.max_issues > 0 && issues.len() >= lint_config.max_issues {
+                issues.truncate(lint_config.max_issues);
+                break;
+            }
+        }
+
+        self.lint_issues = issues;
         Ok(())
     }
 

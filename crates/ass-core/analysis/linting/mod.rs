@@ -20,7 +20,11 @@
 //! - Performance: Complex animations, large fonts, excessive overlaps
 //! - Spec compliance: Invalid sections, deprecated features, compatibility
 
-use crate::{analysis::ScriptAnalysis, parser::Script, Result};
+use crate::{
+    analysis::{AnalysisConfig, ScriptAnalysis},
+    parser::Script,
+    Result,
+};
 use alloc::{string::String, vec::Vec};
 use core::fmt;
 
@@ -277,11 +281,14 @@ pub trait LintRule: Send + Sync {
 }
 
 /// Lint a script with the given configuration.
+/// Lint script with existing analysis
 ///
-/// Runs all enabled rules against the script and returns found issues,
+/// Runs all enabled rules against the provided analysis and returns found issues,
 /// respecting the configuration limits and filters.
-pub fn lint_script(script: &Script, config: &LintConfig) -> Result<Vec<LintIssue>> {
-    let analysis = ScriptAnalysis::analyze(script)?;
+pub fn lint_script_with_analysis(
+    analysis: &ScriptAnalysis,
+    config: &LintConfig,
+) -> Result<Vec<LintIssue>> {
     let mut issues = Vec::new();
     let rules = BuiltinRules::all_rules();
 
@@ -290,7 +297,7 @@ pub fn lint_script(script: &Script, config: &LintConfig) -> Result<Vec<LintIssue
             continue;
         }
 
-        let mut rule_issues = rule.check_script(&analysis);
+        let mut rule_issues = rule.check_script(analysis);
         rule_issues.retain(|issue| config.should_report_severity(issue.severity()));
 
         issues.extend(rule_issues);
@@ -302,4 +309,27 @@ pub fn lint_script(script: &Script, config: &LintConfig) -> Result<Vec<LintIssue
     }
 
     Ok(issues)
+}
+
+/// Lint script with configuration
+///
+/// Creates a minimal analysis without linting, then runs all enabled rules
+/// against the script and returns found issues, respecting the configuration
+/// limits and filters.
+pub fn lint_script(script: &Script, config: &LintConfig) -> Result<Vec<LintIssue>> {
+    // Create analysis without linting to avoid circular dependency
+    let mut analysis = ScriptAnalysis {
+        script,
+        lint_issues: Vec::new(),
+        resolved_styles: Vec::new(),
+        dialogue_info: Vec::new(),
+        config: AnalysisConfig::default(),
+    };
+
+    // Run only style resolution and event analysis (no linting)
+    analysis.resolve_all_styles()?;
+    analysis.analyze_events()?;
+
+    // Now run linting with the prepared analysis
+    lint_script_with_analysis(&analysis, config)
 }

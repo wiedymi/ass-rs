@@ -32,10 +32,9 @@ use alloc::{format, string::ToString, vec::Vec};
 /// ```rust
 /// use ass_core::analysis::linting::rules::performance::PerformanceRule;
 /// use ass_core::analysis::linting::LintRule;
-/// use ass_core::analysis::ScriptAnalysis;
-/// use ass_core::parser::Script;
+/// use ass_core::{Script, ScriptAnalysis};
 ///
-/// let script = crate::parser::Script::parse(r#"
+/// let script = Script::parse(r#"
 /// [Events]
 /// Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 /// "#)?; // Script with many events would trigger warnings

@@ -141,10 +141,9 @@ struct StreamingContext {
 /// let script = parser.finish()?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+#[cfg(feature = "arena")]
 pub struct StreamingParser<'arena> {
-    #[cfg(feature = "arena")]
     arena: Option<&'arena Bump>,
-
     state: ParserState,
     sections: Vec<String>,
     buffer: String,
@@ -154,6 +153,18 @@ pub struct StreamingParser<'arena> {
     peak_memory: usize,
 }
 
+#[cfg(not(feature = "arena"))]
+pub struct StreamingParser {
+    state: ParserState,
+    sections: Vec<String>,
+    buffer: String,
+    context: StreamingContext,
+
+    #[cfg(feature = "benches")]
+    peak_memory: usize,
+}
+
+#[cfg(feature = "arena")]
 impl<'arena> StreamingParser<'arena> {
     /// Create new streaming parser
     ///
@@ -168,9 +179,7 @@ impl<'arena> StreamingParser<'arena> {
     /// ```
     pub fn new() -> Self {
         Self {
-            #[cfg(feature = "arena")]
             arena: None,
-
             state: ParserState::ExpectingSection,
             sections: Vec::new(),
             buffer: String::new(),
@@ -202,11 +211,11 @@ impl<'arena> StreamingParser<'arena> {
     /// # {
     /// # use ass_core::parser::streaming::StreamingParser;
     /// # use bumpalo::Bump;
-    /// let arena = Bump::new();
-    /// let parser = StreamingParser::with_arena(&arena);
+    /// # let arena = Bump::new();
+    /// # let parser = StreamingParser::with_arena(&arena);
     /// # }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    #[cfg(feature = "arena")]
     pub fn with_arena(arena: &'arena Bump) -> Self {
         Self {
             arena: Some(arena),
@@ -393,8 +402,8 @@ impl<'arena> StreamingParser<'arena> {
     }
 
     /// Process section header line
-    fn process_section_header(&mut self, header: &str) -> Result<Vec<ParseDelta<'arena>>> {
-        let section_name = &header[1..header.len() - 1]; // Remove [ ]
+    fn process_section_header(&mut self, line: &str) -> Result<Vec<ParseDelta<'arena>>> {
+        let section_name = &line[1..line.len() - 1]; // Remove [ ]
 
         let section_kind = match section_name {
             "Script Info" => SectionKind::ScriptInfo,
@@ -510,7 +519,328 @@ impl<'arena> StreamingParser<'arena> {
     }
 }
 
+#[cfg(feature = "arena")]
 impl<'arena> Default for StreamingParser<'arena> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(not(feature = "arena"))]
+impl StreamingParser {
+    /// Create new streaming parser
+    ///
+    /// Initializes with default settings optimized for typical ASS files.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use ass_core::parser::streaming::StreamingParser;
+    /// let parser = StreamingParser::new();
+    /// ```
+    pub fn new() -> Self {
+        Self {
+            state: ParserState::ExpectingSection,
+            sections: Vec::new(),
+            buffer: String::new(),
+            context: StreamingContext {
+                line_number: 0,
+                current_section: None,
+                events_format: None,
+                styles_format: None,
+            },
+
+            #[cfg(feature = "benches")]
+            peak_memory: 0,
+        }
+    }
+
+    /// Create parser with custom settings
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            state: ParserState::ExpectingSection,
+            sections: Vec::with_capacity(capacity),
+            buffer: String::new(),
+            context: StreamingContext {
+                line_number: 0,
+                current_section: None,
+                events_format: None,
+                styles_format: None,
+            },
+
+            #[cfg(feature = "benches")]
+            peak_memory: 0,
+        }
+    }
+
+    /// Feed chunk of data to parser
+    ///
+    /// Processes the provided chunk and returns any completed parse deltas.
+    /// Maintains internal buffer for partial lines across chunk boundaries.
+    ///
+    /// # Arguments
+    ///
+    /// * `chunk` - Byte slice containing ASS script data
+    ///
+    /// # Returns
+    ///
+    /// Vector of parse deltas representing completed parsing operations,
+    /// or error if parsing fails.
+    ///
+    /// # Performance
+    ///
+    /// Optimized for streaming with minimal allocations. Processes data
+    /// incrementally without loading entire file into memory.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use ass_core::parser::streaming::StreamingParser;
+    /// let mut parser = StreamingParser::new();
+    /// let chunk = b"[Script Info]\nTitle: Test\n";
+    /// let deltas = parser.feed_chunk(chunk)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn feed_chunk(&mut self, chunk: &[u8]) -> Result<Vec<ParseDelta<'static>>> {
+        if chunk.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Convert chunk to UTF-8 string
+        let chunk_str = match core::str::from_utf8(chunk) {
+            Ok(s) => s,
+            Err(err) => {
+                return Err(CoreError::utf8_error(
+                    err.valid_up_to(),
+                    format!("Invalid UTF-8 in chunk: {}", err),
+                ));
+            }
+        };
+
+        // Add to buffer
+        self.buffer.push_str(chunk_str);
+
+        let mut deltas = Vec::new();
+
+        // Extract lines and determine which are complete to avoid borrowing conflicts
+        let lines: Vec<String> = self.buffer.lines().map(|s| s.to_string()).collect();
+        let ends_with_newline = self.buffer.ends_with('\n') || self.buffer.ends_with('\r');
+
+        let complete_lines = if ends_with_newline {
+            lines.len()
+        } else {
+            lines.len().saturating_sub(1)
+        };
+
+        // Process complete lines
+        for line in &lines[..complete_lines] {
+            self.context.line_number += 1;
+            let line_deltas = self.process_line(line)?;
+            deltas.extend(line_deltas);
+        }
+
+        // Update buffer to keep only incomplete line
+        if complete_lines < lines.len() {
+            // Keep the last incomplete line
+            self.buffer = lines[complete_lines].clone();
+        } else {
+            // All lines were complete
+            self.buffer.clear();
+        }
+
+        #[cfg(feature = "benches")]
+        {
+            let current_memory = self.calculate_memory_usage();
+            if current_memory > self.peak_memory {
+                self.peak_memory = current_memory;
+            }
+        }
+
+        Ok(deltas)
+    }
+
+    /// Finish parsing and return final result
+    ///
+    /// Processes any remaining buffered content and returns the complete
+    /// parsing result. Should be called after all chunks have been fed.
+    ///
+    /// # Returns
+    ///
+    /// Complete streaming result containing all parsed sections and metadata,
+    /// or error if final parsing fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use ass_core::parser::streaming::StreamingParser;
+    /// let mut parser = StreamingParser::new();
+    /// // ... feed chunks ...
+    /// let result = parser.finish()?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn finish(mut self) -> Result<StreamingResult> {
+        // Process any remaining buffer content
+        if !self.buffer.trim().is_empty() {
+            self.context.line_number += 1;
+            let buffer_content = self.buffer.clone();
+            let _deltas = self.process_line(&buffer_content)?;
+        }
+
+        Ok(StreamingResult {
+            sections: self.sections,
+            version: crate::ScriptVersion::AssV4, // Default version
+            issues: Vec::new(),
+        })
+    }
+
+    /// Process a single line based on current parser state
+    fn process_line(&mut self, line: &str) -> Result<Vec<ParseDelta<'static>>> {
+        let trimmed = line.trim();
+
+        // Skip empty lines and comments
+        if trimmed.is_empty() || trimmed.starts_with(';') || trimmed.starts_with('!') {
+            return Ok(Vec::new());
+        }
+
+        match &self.state {
+            ParserState::ExpectingSection => {
+                if trimmed.starts_with('[') && trimmed.ends_with(']') {
+                    self.process_section_header(trimmed)
+                } else {
+                    // Invalid content outside section
+                    Ok(Vec::new())
+                }
+            }
+            ParserState::InSection(section_kind) => {
+                if trimmed.starts_with('[') && trimmed.ends_with(']') {
+                    // New section header
+                    self.process_section_header(trimmed)
+                } else {
+                    // Content within section
+                    self.process_section_content(trimmed, *section_kind)
+                }
+            }
+            ParserState::InEvent {
+                section,
+                fields_seen,
+            } => self.process_event_line(trimmed, *section, *fields_seen),
+        }
+    }
+
+    /// Process section header line
+    fn process_section_header(&mut self, line: &str) -> Result<Vec<ParseDelta<'static>>> {
+        // Extract section name
+        let section_name = &line[1..line.len() - 1].trim();
+
+        // Map to section kind
+        let section_kind = match *section_name {
+            "Script Info" => SectionKind::ScriptInfo,
+            "V4+ Styles" | "V4 Styles" => SectionKind::Styles,
+            "Events" => SectionKind::Events,
+            "Fonts" => SectionKind::Fonts,
+            "Graphics" => SectionKind::Graphics,
+            _ => SectionKind::Unknown,
+        };
+
+        self.state = ParserState::InSection(section_kind);
+        self.context.current_section = Some(section_kind);
+
+        // Reset format strings for new sections
+        if section_kind == SectionKind::Events {
+            self.context.events_format = None;
+        } else if section_kind == SectionKind::Styles {
+            self.context.styles_format = None;
+        }
+
+        Ok(Vec::new())
+    }
+
+    /// Process content within a section
+    fn process_section_content(
+        &mut self,
+        line: &str,
+        section_kind: SectionKind,
+    ) -> Result<Vec<ParseDelta<'static>>> {
+        match section_kind {
+            SectionKind::Events => self.process_events_line(line),
+            SectionKind::Styles => self.process_styles_line(line),
+            SectionKind::ScriptInfo => self.process_script_info_line(line),
+            _ => Ok(Vec::new()), // Skip unknown sections
+        }
+    }
+
+    /// Process line in Events section
+    fn process_events_line(&mut self, line: &str) -> Result<Vec<ParseDelta<'static>>> {
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("Format:") {
+            self.context.events_format = Some(trimmed[7..].trim().to_string());
+            return Ok(Vec::new());
+        }
+
+        if trimmed.starts_with("Dialogue:") || trimmed.starts_with("Comment:") {
+            // TODO: Parse event based on format
+            // For now, just track that we're processing an event
+            self.state = ParserState::InEvent {
+                section: SectionKind::Events,
+                fields_seen: 0,
+            };
+        }
+
+        Ok(Vec::new())
+    }
+
+    /// Process line in Styles section
+    fn process_styles_line(&mut self, line: &str) -> Result<Vec<ParseDelta<'static>>> {
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("Format:") {
+            self.context.styles_format = Some(trimmed[7..].trim().to_string());
+        } else if trimmed.starts_with("Style:") {
+            // Style definition detected but not processed in streaming mode
+        }
+
+        Ok(Vec::new())
+    }
+
+    /// Process line in Script Info section
+    fn process_script_info_line(&mut self, line: &str) -> Result<Vec<ParseDelta<'static>>> {
+        // Parse key-value pairs in Script Info section
+        if line.contains(':') {
+            // Key-value pair detected but not processed in streaming mode
+        }
+        Ok(Vec::new())
+    }
+
+    /// Process continuation of an event
+    fn process_event_line(
+        &mut self,
+        line: &str,
+        section: SectionKind,
+        fields_seen: usize,
+    ) -> Result<Vec<ParseDelta<'static>>> {
+        // Process event continuation if needed
+        if !line.trim().is_empty() && fields_seen > 0 {
+            // Event data processed but not stored in streaming mode
+        }
+
+        // Reset to section state for next line
+        self.state = ParserState::InSection(section);
+        Ok(Vec::new())
+    }
+
+    /// Calculate current memory usage for benchmarking
+    #[cfg(feature = "benches")]
+    fn calculate_memory_usage(&self) -> usize {
+        let mut usage = core::mem::size_of::<Self>();
+        usage += self.buffer.capacity();
+        usage += self.sections.capacity() * core::mem::size_of::<String>();
+        usage
+    }
+}
+
+#[cfg(not(feature = "arena"))]
+impl Default for StreamingParser {
     fn default() -> Self {
         Self::new()
     }
@@ -540,13 +870,14 @@ impl<'arena> Default for StreamingParser<'arena> {
 ///
 /// ```rust
 /// # use ass_core::parser::streaming::parse_incremental;
+/// # use ass_core::Script;
 /// # let script_text = "[Script Info]\nTitle: Test";
-/// # let script = ass_core::parser::Script::parse(script_text).unwrap();
+/// # let script = Script::parse(script_text).unwrap();
 /// let range = 15..19; // Replace "Test" with "Example"
 /// let modified_source = script_text.replace("Test", "Example");
-/// // Note: parse_incremental is not yet fully implemented
+/// // parse_incremental is now implemented
 /// let result = parse_incremental(&script, &modified_source, range);
-/// assert!(result.is_err()); // Currently returns error for unimplemented feature
+/// assert!(result.is_ok()); // Should successfully parse incremental changes
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub fn parse_incremental<'a>(

@@ -29,10 +29,9 @@ use alloc::{format, vec::Vec};
 /// ```rust
 /// use ass_core::analysis::linting::rules::missing_style::MissingStyleRule;
 /// use ass_core::analysis::linting::LintRule;
-/// use ass_core::analysis::ScriptAnalysis;
-/// use ass_core::parser::Script;
+/// use ass_core::{Script, ScriptAnalysis};
 ///
-/// let script = crate::parser::Script::parse(r#"
+/// let script = Script::parse(r#"
 /// [V4+ Styles]
 /// Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 /// Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1

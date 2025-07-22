@@ -30,10 +30,9 @@ use alloc::{format, string::ToString, vec::Vec};
 /// ```rust
 /// use ass_core::analysis::linting::rules::negative_duration::NegativeDurationRule;
 /// use ass_core::analysis::linting::LintRule;
-/// use ass_core::analysis::ScriptAnalysis;
-/// use ass_core::parser::Script;
+/// use ass_core::{Script, ScriptAnalysis};
 ///
-/// let script = crate::parser::Script::parse(r#"
+/// let script = Script::parse(r#"
 /// [Events]
 /// Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 /// Dialogue: 0,0:00:05.00,0:00:02.00,Default,,0,0,0,,Invalid event

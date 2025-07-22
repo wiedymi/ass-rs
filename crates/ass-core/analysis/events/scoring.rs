@@ -59,7 +59,7 @@ pub enum PerformanceImpact {
 ///
 /// ```rust
 /// # use ass_core::analysis::events::scoring::calculate_animation_score;
-/// # use ass_core::analysis::events::text_analysis::OverrideTag;
+/// # use ass_core::analysis::events::tags::OverrideTag;
 /// let tags = vec![];  // Empty for this example
 /// let score = calculate_animation_score(&tags);
 /// assert_eq!(score, 0);

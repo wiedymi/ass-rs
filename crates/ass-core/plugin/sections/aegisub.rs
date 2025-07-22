@@ -41,10 +41,10 @@ impl SectionProcessor for AegisubProjectProcessor {
                 continue;
             }
 
-            // Aegisub project lines should be in key=value format
-            if !line.contains('=') {
+            // Aegisub project lines should be in key=value or key: value format
+            if !line.contains('=') && !line.contains(':') {
                 return SectionResult::Failed(String::from(
-                    "Invalid Aegisub project line format (expected key=value)",
+                    "Invalid Aegisub project line format (expected key=value or key: value)",
                 ));
             }
         }

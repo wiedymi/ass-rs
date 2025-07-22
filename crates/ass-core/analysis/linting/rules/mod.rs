@@ -17,9 +17,9 @@
 //! ```rust
 //! use ass_core::analysis::linting::rules::BuiltinRules;
 //! use ass_core::analysis::linting::LintRule;
-//! use ass_core::parser::Script;
+//! use ass_core::{Script, ScriptAnalysis};
 //!
-//! let script = crate::parser::Script::parse("...")?;
+//! let script = Script::parse("...")?;
 //! let rules = BuiltinRules::all_rules();
 //!
 //! for rule in rules {

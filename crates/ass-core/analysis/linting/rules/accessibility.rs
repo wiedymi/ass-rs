@@ -38,10 +38,9 @@ use alloc::{format, string::ToString, vec::Vec};
 /// ```rust
 /// use ass_core::analysis::linting::rules::accessibility::AccessibilityRule;
 /// use ass_core::analysis::linting::LintRule;
-/// use ass_core::analysis::ScriptAnalysis;
-/// use ass_core::parser::Script;
+/// use ass_core::{Script, ScriptAnalysis};
 ///
-/// let script = crate::parser::Script::parse(r#"
+/// let script = Script::parse(r#"
 /// [Events]
 /// Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 /// Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text without proper contrast
@@ -99,20 +98,22 @@ impl AccessibilityRule {
     /// Check for very short display durations that may be hard to read
     fn check_event_duration(&self, issues: &mut Vec<LintIssue>, event: &crate::parser::Event) {
         if let (Ok(start), Ok(end)) = (parse_ass_time(event.start), parse_ass_time(event.end)) {
-            let duration_ms = end - start;
-            if duration_ms < 500 {
-                let issue = LintIssue::new(
-                    self.default_severity(),
-                    IssueCategory::Accessibility,
-                    self.id(),
-                    format!("Very short event duration: {}ms", duration_ms),
-                )
-                .with_description("Short durations may be difficult to read".to_string())
-                .with_suggested_fix(
-                    "Consider extending duration to at least 500ms for readability".to_string(),
-                );
+            if end >= start {
+                let duration_ms = end - start;
+                if duration_ms < 500 {
+                    let issue = LintIssue::new(
+                        self.default_severity(),
+                        IssueCategory::Accessibility,
+                        self.id(),
+                        format!("Very short event duration: {}ms", duration_ms),
+                    )
+                    .with_description("Short durations may be difficult to read".to_string())
+                    .with_suggested_fix(
+                        "Consider extending duration to at least 500ms for readability".to_string(),
+                    );
 
-                issues.push(issue);
+                    issues.push(issue);
+                }
             }
         }
     }
@@ -120,34 +121,36 @@ impl AccessibilityRule {
     /// Check reading speed based on text length and duration
     fn check_reading_speed(&self, issues: &mut Vec<LintIssue>, event: &crate::parser::Event) {
         if let (Ok(start), Ok(end)) = (parse_ass_time(event.start), parse_ass_time(event.end)) {
-            let duration_centiseconds = end - start;
+            if end >= start {
+                let duration_centiseconds = end - start;
 
-            if let Ok(analysis) = TextAnalysis::analyze(event.text) {
-                let clean_text_length = analysis.char_count();
+                if let Ok(analysis) = TextAnalysis::analyze(event.text) {
+                    let clean_text_length = analysis.char_count();
 
-                if clean_text_length > 0 && duration_centiseconds > 0 {
-                    // Convert centiseconds to seconds: 1 second = 100 centiseconds
-                    let duration_seconds = duration_centiseconds as f64 / 100.0;
-                    let chars_per_second = clean_text_length as f64 / duration_seconds;
+                    if clean_text_length > 0 && duration_centiseconds > 0 {
+                        // Convert centiseconds to seconds: 1 second = 100 centiseconds
+                        let duration_seconds = duration_centiseconds as f64 / 100.0;
+                        let chars_per_second = clean_text_length as f64 / duration_seconds;
 
-                    if chars_per_second > 20.0 {
-                        let issue = LintIssue::new(
-                            self.default_severity(),
-                            IssueCategory::Accessibility,
-                            self.id(),
-                            format!(
-                                "Fast reading speed: {:.1} characters/second",
-                                chars_per_second
-                            ),
-                        )
-                        .with_description(
-                            "Fast reading speeds may be difficult for some users".to_string(),
-                        )
-                        .with_suggested_fix(
-                            "Consider extending duration or reducing text length".to_string(),
-                        );
+                        if chars_per_second > 20.0 {
+                            let issue = LintIssue::new(
+                                self.default_severity(),
+                                IssueCategory::Accessibility,
+                                self.id(),
+                                format!(
+                                    "Fast reading speed: {:.1} characters/second",
+                                    chars_per_second
+                                ),
+                            )
+                            .with_description(
+                                "Fast reading speeds may be difficult for some users".to_string(),
+                            )
+                            .with_suggested_fix(
+                                "Consider extending duration or reducing text length".to_string(),
+                            );
 
-                        issues.push(issue);
+                            issues.push(issue);
+                        }
                     }
                 }
             }

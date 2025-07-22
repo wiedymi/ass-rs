@@ -80,17 +80,17 @@ pub enum IssueCategory {
 impl fmt::Display for IssueCategory {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            IssueCategory::Structure => write!(f, "structure"),
-            IssueCategory::Style => write!(f, "style"),
-            IssueCategory::Event => write!(f, "event"),
-            IssueCategory::Timing => write!(f, "timing"),
-            IssueCategory::Color => write!(f, "color"),
-            IssueCategory::Font => write!(f, "font"),
-            IssueCategory::Drawing => write!(f, "drawing"),
-            IssueCategory::Performance => write!(f, "performance"),
-            IssueCategory::Compatibility => write!(f, "compatibility"),
-            IssueCategory::Security => write!(f, "security"),
-            IssueCategory::Format => write!(f, "format"),
+            Self::Structure => write!(f, "structure"),
+            Self::Style => write!(f, "style"),
+            Self::Event => write!(f, "event"),
+            Self::Timing => write!(f, "timing"),
+            Self::Color => write!(f, "color"),
+            Self::Font => write!(f, "font"),
+            Self::Drawing => write!(f, "drawing"),
+            Self::Performance => write!(f, "performance"),
+            Self::Compatibility => write!(f, "compatibility"),
+            Self::Security => write!(f, "security"),
+            Self::Format => write!(f, "format"),
         }
     }
 }
@@ -100,7 +100,7 @@ impl fmt::Display for IssueCategory {
 /// Used for problems that don't prevent parsing but may affect
 /// rendering quality or indicate potential script issues.
 /// Includes location information for editor integration.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseIssue {
     /// Issue severity level
     pub severity: IssueSeverity,
@@ -126,7 +126,8 @@ pub struct ParseIssue {
 
 impl ParseIssue {
     /// Create new parse issue with minimal information
-    pub fn new(
+    #[must_use]
+    pub const fn new(
         severity: IssueSeverity,
         category: IssueCategory,
         message: String,
@@ -144,7 +145,8 @@ impl ParseIssue {
     }
 
     /// Create issue with full location information
-    pub fn with_location(
+    #[must_use]
+    pub const fn with_location(
         severity: IssueSeverity,
         category: IssueCategory,
         message: String,
@@ -164,38 +166,43 @@ impl ParseIssue {
     }
 
     /// Add suggestion to existing issue
+    #[must_use]
     pub fn with_suggestion(mut self, suggestion: String) -> Self {
         self.suggestion = Some(suggestion);
         self
     }
 
     /// Create info-level issue
+    #[must_use]
     pub fn info(category: IssueCategory, message: String, line: usize) -> Self {
         Self::new(IssueSeverity::Info, category, message, line)
     }
 
     /// Create warning-level issue
+    #[must_use]
     pub fn warning(category: IssueCategory, message: String, line: usize) -> Self {
         Self::new(IssueSeverity::Warning, category, message, line)
     }
 
     /// Create error-level issue
+    #[must_use]
     pub fn error(category: IssueCategory, message: String, line: usize) -> Self {
         Self::new(IssueSeverity::Error, category, message, line)
     }
 
     /// Create critical-level issue
+    #[must_use]
     pub fn critical(category: IssueCategory, message: String, line: usize) -> Self {
         Self::new(IssueSeverity::Critical, category, message, line)
     }
 
     /// Format issue for display in editor or console
+    #[must_use]
     pub fn format_for_display(&self) -> String {
-        let location = if let Some(column) = self.column {
-            format!("{}:{}", self.line, column)
-        } else {
-            format!("{}", self.line)
-        };
+        let location = self.column.map_or_else(
+            || format!("{}", self.line),
+            |column| format!("{}:{}", self.line, column),
+        );
 
         let mut result = format!(
             "[{}:{}] {}: {}",
@@ -203,14 +210,15 @@ impl ParseIssue {
         );
 
         if let Some(suggestion) = &self.suggestion {
-            result.push_str(&format!("\n  Suggestion: {}", suggestion));
+            result.push_str(&format!("\n  Suggestion: {suggestion}"));
         }
 
         result
     }
 
     /// Check if this is a blocking error that should prevent further processing
-    pub fn is_blocking(&self) -> bool {
+    #[must_use]
+    pub const fn is_blocking(&self) -> bool {
         matches!(self.severity, IssueSeverity::Critical)
     }
 }

@@ -131,18 +131,18 @@ impl<'a> AssTokenizer<'a> {
     /// let tokenizer = AssTokenizer::new("[Script Info]");
     /// ```
     pub fn new(source: &'a str) -> Self {
-        let (source, position) = if let Some(stripped) = source.strip_prefix('\u{FEFF}') {
-            (stripped, 0)
+        let initial_position = if source.starts_with('\u{FEFF}') {
+            3 // BOM is 3 bytes
         } else {
-            (source, 0)
+            0
         };
 
         Self {
             source,
-            position,
+            position: initial_position,
             line: 1,
             column: 1,
-            chars: source.chars(),
+            chars: source[initial_position..].chars(),
             peek_char: None,
             context: TokenContext::Document,
             issues: Vec::new(),
@@ -298,7 +298,8 @@ impl<'a> AssTokenizer<'a> {
         if let Some(ch) = self.peek_char {
             Ok(ch)
         } else if self.position < self.source.len() {
-            let ch = self.chars.next().ok_or_else(|| {
+            // Get character at current position without advancing iterator
+            let ch = self.source[self.position..].chars().next().ok_or_else(|| {
                 CoreError::Parse(crate::parser::ParseError::Utf8Error {
                     position: self.position,
                     reason: format!("Invalid UTF-8 at position {}", self.position),
@@ -330,6 +331,10 @@ impl<'a> AssTokenizer<'a> {
     fn advance_char(&mut self) -> Result<char> {
         let ch = self.peek_char()?;
         self.peek_char = None;
+
+        // Advance the chars iterator to stay in sync
+        let _ = self.chars.next();
+
         self.position += ch.len_utf8();
 
         if ch == '\n' {
@@ -414,31 +419,17 @@ impl<'a> AssTokenizer<'a> {
         #[cfg(feature = "simd")]
         {
             if let Some(delimiter_pos) = self.scan_delimiters_simd(start) {
-                // Check if we found a semicolon in document context
-                if delimiter_pos < self.source.len() {
-                    let ch = self.source.as_bytes()[delimiter_pos] as char;
-                    if ch == ';' && self.context == TokenContext::Document {
-                        self.position = delimiter_pos;
-                    } else if matches!(ch, ',' | ':' | '{' | '}' | '[' | ']' | '\n' | '\r') {
-                        self.position = delimiter_pos;
-                    } else {
-                        // Continue scanning manually from this position
-                        self.position = delimiter_pos + 1;
-                        while self.position < self.source.len() {
-                            let ch = self.peek_char()?;
-                            if matches!(ch, ',' | ':' | '{' | '}' | '[' | ']' | '\n' | '\r')
-                                || (ch == ';' && self.context == TokenContext::Document)
-                            {
-                                break;
-                            }
-                            self.advance_char()?;
-                        }
-                    }
-                } else {
-                    self.position = self.source.len();
-                }
+                // Move position to the delimiter (stopping just before it)
+                self.position = delimiter_pos;
+                // Clear cached peek_char and resync chars iterator
+                self.peek_char = None;
+                self.chars = self.source[self.position..].chars();
             } else {
+                // No delimiter found, consume all remaining text
                 self.position = self.source.len();
+                // Clear cached peek_char and resync chars iterator
+                self.peek_char = None;
+                self.chars = self.source[self.position..].chars();
             }
         }
 
@@ -454,7 +445,12 @@ impl<'a> AssTokenizer<'a> {
                     break;
                 }
 
+                let old_pos = self.position;
                 self.advance_char()?;
+                println!(
+                    "DEBUG: Scalar advanced from {} to {}",
+                    old_pos, self.position
+                );
             }
         }
 

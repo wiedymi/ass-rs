@@ -86,8 +86,7 @@ pub enum CoreError {
 impl CoreError {
     /// Create parse error from message
     pub fn parse<T: fmt::Display>(message: T) -> Self {
-        Self::Parse(crate::parser::ParseError::InternalError {
-            line: 0,
+        Self::Parse(crate::parser::ParseError::IoError {
             message: format!("{}", message),
         })
     }
