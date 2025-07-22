@@ -221,7 +221,7 @@ impl<'a> ScriptAnalysis<'a> {
             for event in events {
                 match DialogueInfo::analyze(event) {
                     Ok(info) => self.dialogue_info.push(info),
-                    Err(_) => continue, // Skip invalid events
+                    Err(_) => {} // Skip invalid events
                 }
             }
         }
@@ -338,10 +338,9 @@ mod tests {
 
     #[test]
     fn script_analysis_basic() {
-        let script_text = r#"
+        let script_text = r"
 [Script Info]
 Title: Test Script
-ScriptType: v4.00+
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
@@ -350,7 +349,8 @@ Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Hello World!
-"#;
+Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,Second line
+";
 
         let script = crate::parser::Script::parse(script_text).unwrap();
         let analysis = ScriptAnalysis::analyze(&script).unwrap();

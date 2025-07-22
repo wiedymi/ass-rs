@@ -176,10 +176,10 @@ mod tests {
 
     #[test]
     fn small_script_no_issues() {
-        let script_text = r#"[Events]
+        let script_text = r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Short text
-Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,Another short text"#;
+Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,Another short text";
 
         let script = Script::parse(script_text).unwrap();
         let rule = PerformanceRule;
@@ -190,12 +190,12 @@ Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,Another short text"#;
 
     #[test]
     fn no_events_section_no_issues() {
-        let script_text = r#"[Script Info]
+        let script_text = r"[Script Info]
 Title: Test
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1"#;
+Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1";
 
         let script = Script::parse(script_text).unwrap();
         let rule = PerformanceRule;
@@ -208,9 +208,9 @@ Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,
     fn long_text_event_detected() {
         let long_text = "a".repeat(600);
         let script_text = format!(
-            r#"[Events]
+            r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{}"#,
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{}",
             long_text
         );
 
@@ -232,9 +232,9 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{}"#,
         }
 
         let script_text = format!(
-            r#"[Events]
+            r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{}"#,
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{}",
             text_with_tags
         );
 

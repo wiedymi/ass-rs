@@ -1,6 +1,6 @@
 //! Script Info AST node for ASS script metadata
 //!
-//! Contains the ScriptInfo struct representing the [Script Info] section
+//! Contains the `ScriptInfo` struct representing the [Script Info] section
 //! of ASS files with zero-copy design and convenient accessor methods
 //! for common metadata fields.
 
@@ -25,7 +25,7 @@ use core::ops::Range;
 /// assert_eq!(info.title(), "Test Script");
 /// assert_eq!(info.script_type(), Some("v4.00+"));
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScriptInfo<'a> {
     /// Key-value pairs as zero-copy spans
     pub fields: Vec<(&'a str, &'a str)>,
@@ -55,6 +55,7 @@ impl<'a> ScriptInfo<'a> {
     /// assert_eq!(info.get_field("Title"), Some("Test"));
     /// assert_eq!(info.get_field("Unknown"), None);
     /// ```
+    #[must_use]
     pub fn get_field(&self, key: &str) -> Option<&'a str> {
         self.fields.iter().find(|(k, _)| *k == key).map(|(_, v)| *v)
     }
@@ -63,27 +64,30 @@ impl<'a> ScriptInfo<'a> {
     ///
     /// Returns the "Title" field value or a default if not specified.
     /// This is a convenience method for the most commonly accessed field.
+    #[must_use]
     pub fn title(&self) -> &str {
         self.get_field("Title").unwrap_or("<untitled>")
     }
 
     /// Get script type version
     ///
-    /// Returns the "ScriptType" field which indicates the ASS version
+    /// Returns the "`ScriptType`" field which indicates the ASS version
     /// and feature compatibility (e.g., "v4.00+", "v4.00").
+    #[must_use]
     pub fn script_type(&self) -> Option<&'a str> {
         self.get_field("ScriptType")
     }
 
     /// Get play resolution as (width, height)
     ///
-    /// Parses PlayResX and PlayResY fields to determine the intended
+    /// Parses `PlayResX` and `PlayResY` fields to determine the intended
     /// video resolution for subtitle rendering.
     ///
     /// # Returns
     ///
     /// Tuple of (width, height) if both fields are present and valid,
     /// `None` if either field is missing or invalid.
+    #[must_use]
     pub fn play_resolution(&self) -> Option<(u32, u32)> {
         let width = self.get_field("PlayResX")?.parse().ok()?;
         let height = self.get_field("PlayResY")?.parse().ok()?;
@@ -100,6 +104,7 @@ impl<'a> ScriptInfo<'a> {
     ///
     /// Tuple of (width, height) if both fields are present and valid,
     /// `None` if either field is missing or invalid.
+    #[must_use]
     pub fn layout_resolution(&self) -> Option<(u32, u32)> {
         let width = self.get_field("LayoutResX")?.parse().ok()?;
         let height = self.get_field("LayoutResY")?.parse().ok()?;
@@ -108,7 +113,7 @@ impl<'a> ScriptInfo<'a> {
 
     /// Get wrap style setting
     ///
-    /// Returns the WrapStyle field which controls how long lines are wrapped.
+    /// Returns the `WrapStyle` field which controls how long lines are wrapped.
     /// Defaults to 0 (smart wrapping) if not specified.
     ///
     /// # Wrap Styles
@@ -117,6 +122,7 @@ impl<'a> ScriptInfo<'a> {
     /// - 1: End-of-line wrapping
     /// - 2: No wrapping
     /// - 3: Smart wrapping with lower line longer
+    #[must_use]
     pub fn wrap_style(&self) -> u8 {
         self.get_field("WrapStyle")
             .and_then(|s| s.parse().ok())

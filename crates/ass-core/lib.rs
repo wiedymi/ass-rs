@@ -1,6 +1,6 @@
 //! # ASS-RS Core
 //!
-//! High-performance, memory-efficient ASS (Advanced SubStation Alpha) subtitle format parser,
+//! High-performance, memory-efficient ASS (Advanced `SubStation` Alpha) subtitle format parser,
 //! analyzer, and manipulator. Surpasses libass in modularity, reusability, and efficiency
 //! through zero-copy parsing, trait-based extensibility, and strict memory management.
 //!
@@ -208,7 +208,7 @@ mod integration_tests {
     /// Comprehensive integration test verifying core functionality works correctly
     #[test]
     fn test_core_functionality_integration() {
-        let script_text = r#"
+        let script_text = r"
 [Script Info]
 Title: Test Script
 ScriptType: v4.00+
@@ -224,7 +224,7 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Hello World!
 Dialogue: 0,0:00:02.00,0:00:07.00,Default,,0,0,0,,Overlapping dialogue
 Dialogue: 0,0:00:10.00,0:00:15.00,Large,,0,0,0,,{\t(0,1000,\fscx200\fscy200)}Large animated text
 Comment: 0,0:00:30.00,0:00:35.00,Default,,0,0,0,,This is a comment
-"#;
+";
 
         let script = Script::parse(script_text).expect("Should parse script successfully");
         assert!(

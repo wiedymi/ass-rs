@@ -67,9 +67,7 @@ pub struct DialogueInfo<'a> {
     end_cs: u32,
     /// Animation complexity score (0-10)
     animation_score: u8,
-    /// Number of override blocks
-    #[allow(dead_code)]
-    override_count: usize,
+
     /// Overall rendering complexity (0-100)
     complexity_score: u8,
     /// Text analysis results
@@ -130,7 +128,7 @@ impl<'a> DialogueInfo<'a> {
             start_cs,
             end_cs,
             animation_score,
-            override_count: text_info.override_tags().len(),
+
             complexity_score,
             text_info,
         })
@@ -200,6 +198,11 @@ impl<'a> DialogueInfo<'a> {
     /// Check if event overlaps with time range
     pub fn overlaps_time_range(&self, start_cs: u32, end_cs: u32) -> bool {
         !(self.end_cs <= start_cs || end_cs <= self.start_cs)
+    }
+
+    /// Get override tag count from text analysis
+    pub fn override_count(&self) -> usize {
+        self.text_info.override_tags().len()
     }
 
     /// Get reference to original event

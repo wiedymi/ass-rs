@@ -7,7 +7,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use ass_core::utils::utf8::encoding::{detect_encoding, EncodingInfo};
+//! use ass_core::utils::utf8::{detect_encoding, EncodingInfo};
 //!
 //! let text = "[Script Info]\nTitle: Test";
 //! let encoding = detect_encoding(text.as_bytes());
@@ -89,7 +89,7 @@ impl EncodingInfo {
 /// # Examples
 ///
 /// ```rust
-/// # use ass_core::utils::utf8::encoding::detect_encoding;
+/// # use ass_core::utils::utf8::detect_encoding;
 /// let text = "[Script Info]\nTitle: Test";
 /// let encoding = detect_encoding(text.as_bytes());
 /// assert_eq!(encoding.encoding, "UTF-8");

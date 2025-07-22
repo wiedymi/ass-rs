@@ -166,9 +166,8 @@ impl HashConfig {
             return create_deterministic_hash_map();
             #[cfg(not(test))]
             return create_hash_map_with_capacity(self.default_capacity);
-        } else {
-            create_hash_map_with_capacity(self.default_capacity)
         }
+        create_hash_map_with_capacity(self.default_capacity)
     }
 }
 

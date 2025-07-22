@@ -197,9 +197,9 @@ mod tests {
 
     #[test]
     fn normal_duration_no_issues() {
-        let script_text = r#"[Events]
+        let script_text = r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Normal duration text"#;
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Normal duration text";
 
         let script = Script::parse(script_text).unwrap();
         let rule = AccessibilityRule;
@@ -210,9 +210,9 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Normal duration text"#;
 
     #[test]
     fn short_duration_detected() {
-        let script_text = r#"[Events]
+        let script_text = r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:00.30,Default,,0,0,0,,Too fast!"#;
+Dialogue: 0,0:00:00.00,0:00:00.30,Default,,0,0,0,,Too fast!";
 
         let script = Script::parse(script_text).unwrap();
         let rule = AccessibilityRule;
@@ -228,9 +228,9 @@ Dialogue: 0,0:00:00.00,0:00:00.30,Default,,0,0,0,,Too fast!"#;
     fn fast_reading_speed_detected() {
         let long_text = "This is a very long text that would require fast reading speed to comprehend in the given short duration which may be difficult for some users";
         let script_text = format!(
-            r#"[Events]
+            r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{}"#,
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{}",
             long_text
         );
 
@@ -266,9 +266,9 @@ Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{}"#,
     fn long_text_detected() {
         let long_text = "a".repeat(250);
         let script_text = format!(
-            r#"[Events]
+            r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{}"#,
+Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{}",
             long_text
         );
 
@@ -283,12 +283,12 @@ Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{}"#,
 
     #[test]
     fn no_events_section_no_issues() {
-        let script_text = r#"[Script Info]
+        let script_text = r"[Script Info]
 Title: Test
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1"#;
+Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1";
 
         let script = Script::parse(script_text).unwrap();
         let rule = AccessibilityRule;

@@ -21,7 +21,7 @@ use core::fmt;
 /// # Examples
 ///
 /// ```rust
-/// use ass_core::utils::errors::encoding::utf8_error;
+/// use ass_core::utils::errors::{utf8_error, CoreError};
 ///
 /// let error = utf8_error(42, "Invalid UTF-8 sequence".to_string());
 /// assert!(matches!(error, CoreError::Utf8Error { .. }));

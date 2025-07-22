@@ -27,7 +27,7 @@ use core::ops::Range;
 /// let decoded = font.decode_data()?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Font<'a> {
     /// Font filename as it appears in the [Fonts] section
     pub filename: &'a str,
@@ -45,6 +45,10 @@ impl Font<'_> {
     /// # Returns
     ///
     /// Decoded binary font data on success, error if UU-decoding fails
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the UU-encoded data is malformed or cannot be decoded.
     ///
     /// # Examples
     ///
@@ -68,6 +72,7 @@ impl Font<'_> {
     ///
     /// Only available in debug builds to avoid performance overhead.
     #[cfg(debug_assertions)]
+    #[must_use]
     pub fn validate_spans(&self, source_range: &Range<usize>) -> bool {
         let filename_ptr = self.filename.as_ptr() as usize;
         let filename_valid = source_range.contains(&filename_ptr);
@@ -100,7 +105,7 @@ impl Font<'_> {
 /// let decoded = graphic.decode_data()?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Graphic<'a> {
     /// Graphic filename as it appears in the [Graphics] section
     pub filename: &'a str,
@@ -118,6 +123,10 @@ impl Graphic<'_> {
     /// # Returns
     ///
     /// Decoded binary image data on success, error if UU-decoding fails
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the UU-encoded data is malformed or cannot be decoded.
     pub fn decode_data(&self) -> Result<Vec<u8>, crate::utils::CoreError> {
         crate::utils::decode_uu_data(self.data_lines.iter().copied())
     }
@@ -130,6 +139,7 @@ impl Graphic<'_> {
     ///
     /// Only available in debug builds to avoid performance overhead.
     #[cfg(debug_assertions)]
+    #[must_use]
     pub fn validate_spans(&self, source_range: &Range<usize>) -> bool {
         let filename_ptr = self.filename.as_ptr() as usize;
         let filename_valid = source_range.contains(&filename_ptr);

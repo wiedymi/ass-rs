@@ -7,7 +7,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use ass_core::utils::utf8::bom::{strip_bom, detect_bom, BomType};
+//! use ass_core::utils::utf8::{strip_bom, detect_bom, BomType};
 //!
 //! let input = "\u{FEFF}Hello World";
 //! let (stripped, had_bom) = strip_bom(input);
@@ -95,7 +95,7 @@ impl BomType {
 /// # Examples
 ///
 /// ```rust
-/// # use ass_core::utils::utf8::bom::strip_bom;
+/// # use ass_core::utils::utf8::strip_bom;
 /// let input = "\u{FEFF}Hello World";
 /// let (stripped, had_bom) = strip_bom(input);
 /// assert_eq!(stripped, "Hello World");

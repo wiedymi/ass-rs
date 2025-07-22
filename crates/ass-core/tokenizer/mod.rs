@@ -191,7 +191,6 @@ impl<'a> AssTokenizer<'a> {
             }
 
             ('{', _) => {
-                let _saved_context = self.context;
                 self.context = TokenContext::StyleOverride;
                 self.scan_style_override()
             }
@@ -351,7 +350,6 @@ impl<'a> AssTokenizer<'a> {
 
     /// Scan section header like [Script Info]
     fn scan_section_header(&mut self) -> Result<TokenType> {
-        let _start = self.position;
         self.advance_char()?;
 
         while self.position < self.source.len() {
@@ -367,7 +365,6 @@ impl<'a> AssTokenizer<'a> {
 
     /// Scan style override block like {\b1\i1}
     fn scan_style_override(&mut self) -> Result<TokenType> {
-        let _start = self.position;
         self.advance_char()?;
 
         let mut brace_depth = 1;
@@ -389,8 +386,6 @@ impl<'a> AssTokenizer<'a> {
 
     /// Scan comment line starting with ; or !:
     fn scan_comment(&mut self) -> Result<TokenType> {
-        let _start = self.position;
-
         while self.position < self.source.len() {
             let ch = self.peek_char()?;
             if ch == '\n' || ch == '\r' {

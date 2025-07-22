@@ -287,15 +287,15 @@ pub fn parse_ass_time(time_str: &str) -> Result<u32, CoreError> {
         )));
     }
 
-    Ok(hours * 360000 + minutes * 6000 + seconds * 100 + centiseconds)
+    Ok(hours * 360_000 + minutes * 6_000 + seconds * 100 + centiseconds)
 }
 
 /// Format centiseconds back to ASS time format
 ///
 /// Converts internal centisecond representation back to H:MM:SS.CC format.
 pub fn format_ass_time(centiseconds: u32) -> String {
-    let hours = centiseconds / 360000;
-    let remainder = centiseconds % 360000;
+    let hours = centiseconds / 360_000;
+    let remainder = centiseconds % 360_000;
     let minutes = remainder / 6000;
     let remainder = remainder % 6000;
     let seconds = remainder / 100;
@@ -347,6 +347,7 @@ pub fn validate_ass_name(name: &str) -> bool {
 /// assert!(decoded.len() >= 0);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+#[allow(clippy::similar_names)]
 pub fn decode_uu_data<'a, I>(lines: I) -> Result<Vec<u8>, CoreError>
 where
     I: Iterator<Item = &'a str>,
@@ -364,20 +365,20 @@ where
             break;
         }
 
-        let bytes = line.as_bytes();
-        if bytes.is_empty() {
+        let input_bytes = line.as_bytes();
+        if input_bytes.is_empty() {
             continue;
         }
 
         // First character encodes the line length
-        let expected_length = (bytes[0].wrapping_sub(b' ')) as usize;
+        let expected_length = (input_bytes[0].wrapping_sub(b' ')) as usize;
 
         // If length is 0, this indicates end of data
         if expected_length == 0 {
             break;
         }
 
-        let data_part = &bytes[1..];
+        let data_part = &input_bytes[1..];
         let mut decoded_bytes = Vec::new();
 
         // Process groups of 4 characters into 3 bytes
@@ -393,16 +394,16 @@ where
             let c3 = group[2].wrapping_sub(b' ');
             let c4 = group[3].wrapping_sub(b' ');
 
-            let byte1 = (c1 << 2) | (c2 >> 4);
-            let byte2 = ((c2 & 0x0F) << 4) | (c3 >> 2);
-            let byte3 = ((c3 & 0x03) << 6) | c4;
+            let decoded_byte1 = (c1 << 2) | (c2 >> 4);
+            let decoded_byte2 = ((c2 & 0x0F) << 4) | (c3 >> 2);
+            let decoded_byte3 = ((c3 & 0x03) << 6) | c4;
 
-            decoded_bytes.push(byte1);
+            decoded_bytes.push(decoded_byte1);
             if chunk.len() > 2 {
-                decoded_bytes.push(byte2);
+                decoded_bytes.push(decoded_byte2);
             }
             if chunk.len() > 3 {
-                decoded_bytes.push(byte3);
+                decoded_bytes.push(decoded_byte3);
             }
         }
 
@@ -476,7 +477,7 @@ mod tests {
         assert_eq!(parse_ass_time("0:00:00.00").unwrap(), 0);
         assert_eq!(parse_ass_time("0:00:01.00").unwrap(), 100);
         assert_eq!(parse_ass_time("0:01:00.00").unwrap(), 6000);
-        assert_eq!(parse_ass_time("1:00:00.00").unwrap(), 360000);
+        assert_eq!(parse_ass_time("1:00:00.00").unwrap(), 360_000);
         assert_eq!(parse_ass_time("0:01:30.50").unwrap(), 9050);
     }
 
@@ -493,7 +494,7 @@ mod tests {
         assert_eq!(format_ass_time(0), "0:00:00.00");
         assert_eq!(format_ass_time(100), "0:00:01.00");
         assert_eq!(format_ass_time(6000), "0:01:00.00");
-        assert_eq!(format_ass_time(360000), "1:00:00.00");
+        assert_eq!(format_ass_time(360_000), "1:00:00.00");
         assert_eq!(format_ass_time(9050), "0:01:30.50");
     }
 

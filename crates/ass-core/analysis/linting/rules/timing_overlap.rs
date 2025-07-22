@@ -137,10 +137,10 @@ mod tests {
 
     #[test]
     fn non_overlapping_events_no_issues() {
-        let script_text = r#"[Events]
+        let script_text = r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,First
-Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,Second"#;
+Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,Second";
 
         let script = Script::parse(script_text).unwrap();
         let rule = TimingOverlapRule;

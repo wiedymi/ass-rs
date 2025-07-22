@@ -105,7 +105,7 @@ fn scan_delimiters_scalar(bytes: &[u8]) -> Option<usize> {
     for (i, &byte) in bytes.iter().enumerate() {
         match byte {
             b':' | b',' | b'{' | b'}' | b'[' | b']' | b'\n' | b'\r' => return Some(i),
-            _ => continue,
+            _ => {}
         }
     }
     None
@@ -309,10 +309,10 @@ mod tests {
     #[test]
     fn parse_hex_valid() {
         assert_eq!(parse_hex_u32("FF"), Some(0xFF));
-        assert_eq!(parse_hex_u32("00FF00FF"), Some(0x00FF00FF));
-        assert_eq!(parse_hex_u32("12345678"), Some(0x12345678));
-        assert_eq!(parse_hex_u32("abcdef"), Some(0xabcdef));
-        assert_eq!(parse_hex_u32("ABCDEF"), Some(0xABCDEF));
+        assert_eq!(parse_hex_u32("00FF00FF"), Some(0x00FF_00FF));
+        assert_eq!(parse_hex_u32("12345678"), Some(0x1234_5678));
+        assert_eq!(parse_hex_u32("abcdef"), Some(0x00ab_cdef));
+        assert_eq!(parse_hex_u32("ABCDEF"), Some(0x00AB_CDEF));
     }
 
     #[test]

@@ -124,9 +124,9 @@ mod tests {
 
     #[test]
     fn valid_duration_no_issues() {
-        let script_text = r#"[Events]
+        let script_text = r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Valid event"#;
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Valid event";
 
         let script = Script::parse(script_text).unwrap();
         let rule = NegativeDurationRule;
@@ -137,9 +137,9 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Valid event"#;
 
     #[test]
     fn negative_duration_detected() {
-        let script_text = r#"[Events]
+        let script_text = r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:05.00,0:00:02.00,Default,,0,0,0,,Invalid event"#;
+Dialogue: 0,0:00:05.00,0:00:02.00,Default,,0,0,0,,Invalid event";
 
         let script = Script::parse(script_text).unwrap();
         let rule = NegativeDurationRule;
@@ -152,9 +152,9 @@ Dialogue: 0,0:00:05.00,0:00:02.00,Default,,0,0,0,,Invalid event"#;
 
     #[test]
     fn zero_duration_detected() {
-        let script_text = r#"[Events]
+        let script_text = r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:05.00,0:00:05.00,Default,,0,0,0,,Zero duration"#;
+Dialogue: 0,0:00:05.00,0:00:05.00,Default,,0,0,0,,Zero duration";
 
         let script = Script::parse(script_text).unwrap();
         let rule = NegativeDurationRule;
@@ -166,11 +166,11 @@ Dialogue: 0,0:00:05.00,0:00:05.00,Default,,0,0,0,,Zero duration"#;
 
     #[test]
     fn multiple_invalid_durations() {
-        let script_text = r#"[Events]
+        let script_text = r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:05.00,0:00:02.00,Default,,0,0,0,,First invalid
 Dialogue: 0,0:00:01.00,0:00:06.00,Default,,0,0,0,,Valid event
-Dialogue: 0,0:00:10.00,0:00:10.00,Default,,0,0,0,,Second invalid"#;
+Dialogue: 0,0:00:10.00,0:00:10.00,Default,,0,0,0,,Second invalid";
 
         let script = Script::parse(script_text).unwrap();
         let rule = NegativeDurationRule;

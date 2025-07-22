@@ -1,6 +1,6 @@
 //! Event AST node for ASS dialogue and commands
 //!
-//! Contains the Event struct and EventType enum representing events from the
+//! Contains the Event struct and `EventType` enum representing events from the
 //! [Events] section with zero-copy design and time parsing utilities.
 
 #[cfg(debug_assertions)]
@@ -27,7 +27,7 @@ use core::ops::Range;
 ///
 /// assert!(event.is_dialogue());
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Event<'a> {
     /// Event type (Dialogue, Comment, etc.)
     pub event_type: EventType,
@@ -102,6 +102,7 @@ impl EventType {
     /// assert_eq!(EventType::parse_type("Comment"), Some(EventType::Comment));
     /// assert_eq!(EventType::parse_type("Unknown"), None);
     /// ```
+    #[must_use]
     pub fn parse_type(s: &str) -> Option<Self> {
         match s.trim() {
             "Dialogue" => Some(Self::Dialogue),
@@ -117,7 +118,8 @@ impl EventType {
     /// Get string representation for serialization
     ///
     /// Returns the canonical ASS event type name for this variant.
-    pub fn as_str(self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Dialogue => "Dialogue",
             Self::Comment => "Comment",
@@ -133,14 +135,16 @@ impl Event<'_> {
     /// Check if this is a dialogue event
     ///
     /// Returns `true` for events that should be displayed during playback.
-    pub fn is_dialogue(&self) -> bool {
+    #[must_use]
+    pub const fn is_dialogue(&self) -> bool {
         matches!(self.event_type, EventType::Dialogue)
     }
 
-    /// Check if this is a comment
+    /// Check if this is a comment event
     ///
-    /// Returns `true` for events that are ignored during playback.
-    pub fn is_comment(&self) -> bool {
+    /// Returns `true` for events that are comments and not displayed.
+    #[must_use]
+    pub const fn is_comment(&self) -> bool {
         matches!(self.event_type, EventType::Comment)
     }
 
@@ -148,6 +152,10 @@ impl Event<'_> {
     ///
     /// Converts the start time string to centiseconds for timing calculations.
     /// Uses the standard ASS time format parser.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the time format is invalid or cannot be parsed.
     pub fn start_time_cs(&self) -> Result<u32, crate::utils::CoreError> {
         crate::utils::parse_ass_time(self.start)
     }
@@ -156,6 +164,10 @@ impl Event<'_> {
     ///
     /// Converts the end time string to centiseconds for timing calculations.
     /// Uses the standard ASS time format parser.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the time format is invalid or cannot be parsed.
     pub fn end_time_cs(&self) -> Result<u32, crate::utils::CoreError> {
         crate::utils::parse_ass_time(self.end)
     }
@@ -164,6 +176,10 @@ impl Event<'_> {
     ///
     /// Calculates the event duration by subtracting start time from end time.
     /// Returns 0 if start time is greater than end time.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either start or end time format is invalid.
     pub fn duration_cs(&self) -> Result<u32, crate::utils::CoreError> {
         let start = self.start_time_cs()?;
         let end = self.end_time_cs()?;
@@ -178,6 +194,7 @@ impl Event<'_> {
     ///
     /// Only available in debug builds to avoid performance overhead.
     #[cfg(debug_assertions)]
+    #[must_use]
     pub fn validate_spans(&self, source_range: &Range<usize>) -> bool {
         let spans = [
             self.layer,

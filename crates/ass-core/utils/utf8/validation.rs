@@ -7,7 +7,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use ass_core::utils::utf8::validation::{validate_utf8, recover_utf8};
+//! use ass_core::utils::utf8::{validate_utf8, recover_utf8};
 //!
 //! let valid_text = "Hello, 世界! 🎵";
 //! assert!(validate_utf8(valid_text.as_bytes()).is_ok());
@@ -39,7 +39,7 @@ use core::str;
 /// # Examples
 ///
 /// ```rust
-/// # use ass_core::utils::utf8::validation::validate_utf8;
+/// # use ass_core::utils::utf8::validate_utf8;
 /// let valid_text = "Hello, 世界!";
 /// assert!(validate_utf8(valid_text.as_bytes()).is_ok());
 ///
@@ -82,7 +82,7 @@ pub fn validate_utf8(bytes: &[u8]) -> Result<(), CoreError> {
 /// # Examples
 ///
 /// ```rust
-/// # use ass_core::utils::utf8::validation::recover_utf8;
+/// # use ass_core::utils::utf8::recover_utf8;
 /// let valid_text = "Hello, World!";
 /// let (recovered, replacements) = recover_utf8(valid_text.as_bytes());
 /// assert_eq!(recovered, "Hello, World!");
@@ -146,7 +146,7 @@ pub fn is_valid_ass_text(text: &str) -> bool {
 /// # Examples
 ///
 /// ```rust
-/// # use ass_core::utils::utf8::validation::truncate_at_char_boundary;
+/// # use ass_core::utils::utf8::truncate_at_char_boundary;
 /// let text = "Hello World";
 /// let (truncated, was_truncated) = truncate_at_char_boundary(text, 5);
 /// assert_eq!(truncated, "Hello");

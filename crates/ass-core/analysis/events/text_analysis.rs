@@ -21,6 +21,28 @@
 use crate::Result;
 use alloc::{string::String, vec::Vec};
 
+/// Diagnostic information for tag parsing issues
+#[derive(Debug, Clone)]
+pub struct TagDiagnostic<'a> {
+    /// Text span containing the issue
+    pub span: &'a str,
+    /// Byte offset in original text
+    pub offset: usize,
+    /// Type of diagnostic issue
+    pub kind: DiagnosticKind,
+}
+
+/// Types of tag parsing diagnostics
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiagnosticKind {
+    /// Empty override tag like {}
+    EmptyOverride,
+    /// Malformed tag syntax
+    MalformedTag,
+    /// Unknown or invalid tag name
+    UnknownTag(String),
+}
+
 /// Analysis results for dialogue text content
 ///
 /// Contains extracted plain text, override tag information, and Unicode
@@ -39,6 +61,8 @@ pub struct TextAnalysis<'a> {
     has_complex_unicode: bool,
     /// Parsed override tags
     override_tags: Vec<OverrideTag<'a>>,
+    /// Parse diagnostics collected during analysis
+    parse_diagnostics: Vec<TagDiagnostic<'a>>,
 }
 
 /// Single ASS override tag with analysis results
@@ -83,6 +107,7 @@ impl<'a> TextAnalysis<'a> {
     /// ```
     pub fn analyze(text: &'a str) -> Result<Self> {
         let mut override_tags = Vec::new();
+        let mut parse_diagnostics = Vec::new();
         let mut plain_text = String::new();
         let mut position = 0;
 
@@ -107,7 +132,19 @@ impl<'a> TextAnalysis<'a> {
 
                 if position > tag_start {
                     let tag_content = &text[tag_start..position];
-                    Self::parse_override_block(tag_content, tag_start, &mut override_tags);
+                    Self::parse_override_block(
+                        tag_content,
+                        tag_start,
+                        &mut override_tags,
+                        &mut parse_diagnostics,
+                    );
+                } else {
+                    // Empty override tag
+                    parse_diagnostics.push(TagDiagnostic {
+                        span: &text[tag_start..position.max(tag_start + 1)],
+                        offset: tag_start,
+                        kind: DiagnosticKind::EmptyOverride,
+                    });
                 }
             } else if ch == '\\' {
                 if let Some(next_ch) = chars.next() {
@@ -140,6 +177,7 @@ impl<'a> TextAnalysis<'a> {
             has_bidi_text,
             has_complex_unicode,
             override_tags,
+            parse_diagnostics,
         })
     }
 
@@ -173,13 +211,23 @@ impl<'a> TextAnalysis<'a> {
         &self.override_tags
     }
 
+    /// Get parse diagnostics collected during analysis
+    pub fn diagnostics(&self) -> &[TagDiagnostic<'a>] {
+        &self.parse_diagnostics
+    }
+
     /// Parse override tags within a tag block
-    fn parse_override_block(content: &'a str, start_pos: usize, tags: &mut Vec<OverrideTag<'a>>) {
+    fn parse_override_block(
+        content: &'a str,
+        start_pos: usize,
+        tags: &mut Vec<OverrideTag<'a>>,
+        diagnostics: &mut Vec<TagDiagnostic<'a>>,
+    ) {
         let mut pos = 0;
         let chars: Vec<char> = content.chars().collect();
 
         while pos < chars.len() {
-            if chars[pos] == '\\' && pos + 1 < chars.len() {
+            if chars[pos] == '\\' {
                 let tag_start = pos;
                 pos += 1;
 
@@ -198,15 +246,33 @@ impl<'a> TextAnalysis<'a> {
 
                     let tag_name = &content[name_start..name_end];
                     let args = &content[args_start..pos];
+
                     let complexity = Self::calculate_tag_complexity(tag_name);
 
-                    tags.push(OverrideTag {
-                        name: tag_name,
-                        args,
-                        complexity,
-                        position: start_pos + tag_start,
-                    });
+                    // Check for empty tag name
+                    if tag_name.trim().is_empty() {
+                        diagnostics.push(TagDiagnostic {
+                            span: &content[tag_start..pos],
+                            offset: start_pos + tag_start,
+                            kind: DiagnosticKind::EmptyOverride,
+                        });
+                    } else {
+                        tags.push(OverrideTag {
+                            name: tag_name,
+                            args,
+                            complexity,
+                            position: start_pos + tag_start,
+                        });
+                    }
                 } else {
+                    // Empty tag - backslash not followed by alphabetic characters
+
+                    let span_end = (tag_start + 2).min(content.len());
+                    diagnostics.push(TagDiagnostic {
+                        span: &content[tag_start..span_end],
+                        offset: start_pos + tag_start,
+                        kind: DiagnosticKind::EmptyOverride,
+                    });
                     pos += 1;
                 }
             } else {

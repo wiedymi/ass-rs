@@ -48,6 +48,38 @@ stream = [] # Chunked/streaming input support
 serde = ["dep:serde"]       # Serialization support
 benches = ["dep:criterion"] # Benchmark integration
 
+[lints.rust]
+unused_variables = "deny"
+dead_code = "deny"
+unused_imports = "deny"
+unused_mut = "deny"
+unreachable_code = "warn"
+
+[lints.clippy]
+all = "deny"
+pedantic = "warn"
+nursery = "warn"
+cargo = "warn"
+# Allow some pedantic lints that conflict with project style
+module_name_repetitions = "allow"
+similar_names = "allow"
+too_many_lines = "allow"
+# Performance-related lints
+inefficient_to_string = "deny"
+string_add = "deny"
+string_add_assign = "deny"
+# Safety-related lints
+cast_ptr_alignment = "deny"
+fn_to_numeric_cast_any = "deny"
+# Documentation lints
+missing_docs_in_private_items = "warn"
+undocumented_unsafe_blocks = "deny"
+
+[[bench]]
+name = "parser_benchmarks"
+harness = false
+required-features = ["benches"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]

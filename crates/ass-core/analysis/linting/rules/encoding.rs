@@ -189,9 +189,9 @@ mod tests {
 
     #[test]
     fn valid_text_no_issues() {
-        let script_text = r#"[Events]
+        let script_text = r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Valid text with unicode: ñáéíóú"#;
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Valid text with unicode: ñáéíóú";
 
         let script = Script::parse(script_text).unwrap();
         let rule = EncodingRule;
@@ -202,9 +202,9 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Valid text with unicode: ñá�
 
     #[test]
     fn newlines_allowed() {
-        let script_text = r#"[Events]
+        let script_text = r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with\Nline break"#;
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with\Nline break";
 
         let script = Script::parse(script_text).unwrap();
         let rule = EncodingRule;
@@ -226,9 +226,9 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with\Nline break"#;
 
     #[test]
     fn replacement_character_detected() {
-        let script_text = r#"[Events]
+        let script_text = r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with � replacement"#;
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with � replacement";
 
         let script = Script::parse(script_text).unwrap();
         let rule = EncodingRule;
@@ -256,12 +256,12 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with � replacement"#;
 
     #[test]
     fn no_events_section_no_issues() {
-        let script_text = r#"[Script Info]
+        let script_text = r"[Script Info]
 Title: Test
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1"#;
+Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1";
 
         let script = Script::parse(script_text).unwrap();
         let rule = EncodingRule;
@@ -274,9 +274,9 @@ Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,
     fn multibyte_characters_hint() {
         let heavy_unicode = "🎵🎶🎵🎶".repeat(20);
         let script_text = format!(
-            r#"[Events]
+            r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{}"#,
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{}",
             heavy_unicode
         );
 

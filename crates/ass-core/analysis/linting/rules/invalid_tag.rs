@@ -5,7 +5,7 @@
 
 use crate::{
     analysis::{
-        events::text_analysis::TextAnalysis,
+        events::text_analysis::{DiagnosticKind, TextAnalysis},
         linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
     },
     parser::{Script, Section},
@@ -77,42 +77,24 @@ impl LintRule for InvalidTagRule {
                     Ok(analysis) => analysis,
                     Err(_) => continue, // Skip analysis if text parsing fails
                 };
-                // Check for empty tags in parsed override tags
-                for tag in text_analysis.override_tags() {
-                    if tag.name().trim().is_empty() {
-                        let issue = LintIssue::new(
-                            self.default_severity(),
-                            IssueCategory::Content,
-                            self.id(),
-                            "Empty override tag found".to_string(),
-                        );
-                        issues.push(issue);
-                    }
-                }
 
-                // Check for malformed tags that TextAnalysis might miss
-                // Look for cases like {\b1\} where there's an empty tag after a valid one
-                if event.text.contains('{') && event.text.contains('}') {
-                    let start = event.text.find('{').unwrap_or(0);
-                    let end = event.text.rfind('}').unwrap_or(event.text.len());
-                    if start < end {
-                        let override_block = &event.text[start + 1..end];
-                        let tag_parts: Vec<&str> = override_block.split('\\').collect();
-
-                        // Skip the first part and check each remaining part for empty tags
-                        for tag_part in tag_parts.iter().skip(1) {
-                            let tag_name = tag_part.trim();
-                            if tag_name.is_empty() {
-                                let issue = LintIssue::new(
-                                    self.default_severity(),
-                                    IssueCategory::Content,
-                                    self.id(),
-                                    "Empty override tag found".to_string(),
-                                );
-                                issues.push(issue);
-                            }
+                // Use diagnostics collected during text analysis
+                for diagnostic in text_analysis.diagnostics() {
+                    let message = match diagnostic.kind {
+                        DiagnosticKind::EmptyOverride => "Empty override tag found".to_string(),
+                        DiagnosticKind::MalformedTag => "Malformed override tag syntax".to_string(),
+                        DiagnosticKind::UnknownTag(ref tag_name) => {
+                            format!("Unknown tag: {}", tag_name)
                         }
-                    }
+                    };
+
+                    let issue = LintIssue::new(
+                        self.default_severity(),
+                        IssueCategory::Content,
+                        self.id(),
+                        message,
+                    );
+                    issues.push(issue);
                 }
             }
         }
@@ -146,9 +128,9 @@ mod tests {
 
     #[test]
     fn valid_tags_no_issues() {
-        let script_text = r#"[Events]
+        let script_text = r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with {\i1}valid{\i0} tags"#;
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with {\i1}valid{\i0} tags";
 
         let script = Script::parse(script_text).unwrap();
         let rule = InvalidTagRule;
@@ -159,12 +141,12 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with {\i1}valid{\i0} tags
 
     #[test]
     fn no_events_section_no_issues() {
-        let script_text = r#"[Script Info]
+        let script_text = r"[Script Info]
 Title: Test
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1"#;
+Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1";
 
         let script = Script::parse(script_text).unwrap();
         let rule = InvalidTagRule;
@@ -175,9 +157,9 @@ Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,
 
     #[test]
     fn plain_text_no_issues() {
-        let script_text = r#"[Events]
+        let script_text = r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Plain text without any tags"#;
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Plain text without any tags";
 
         let script = Script::parse(script_text).unwrap();
         let rule = InvalidTagRule;
@@ -188,9 +170,9 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Plain text without any tags"#;
 
     #[test]
     fn empty_tag_after_valid_tag_detected() {
-        let script_text = r#"[Events]
+        let script_text = r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with {\b1\} override"#;
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with {\b1\} override";
 
         let script = Script::parse(script_text).unwrap();
         let rule = InvalidTagRule;

@@ -20,7 +20,7 @@ use core::fmt;
 /// # Examples
 ///
 /// ```rust
-/// use ass_core::utils::errors::format::invalid_color;
+/// use ass_core::utils::errors::{invalid_color, CoreError};
 ///
 /// let error = invalid_color("invalid_color");
 /// assert!(matches!(error, CoreError::InvalidColor(_)));

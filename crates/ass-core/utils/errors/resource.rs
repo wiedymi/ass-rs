@@ -20,7 +20,7 @@ use core::fmt;
 /// # Examples
 ///
 /// ```rust
-/// use ass_core::utils::errors::resource::out_of_memory;
+/// use ass_core::utils::errors::{out_of_memory, CoreError};
 ///
 /// let error = out_of_memory("Failed to allocate parser buffer");
 /// assert!(matches!(error, CoreError::OutOfMemory(_)));

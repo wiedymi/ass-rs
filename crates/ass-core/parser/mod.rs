@@ -104,7 +104,41 @@ impl<'a> Script<'a> {
     /// Delta containing changes that can be applied to existing script.
     #[cfg(feature = "stream")]
     pub fn parse_partial(&self, range: Range<usize>, new_text: &str) -> Result<ScriptDeltaOwned> {
-        streaming::parse_incremental_owned(self, range, new_text)
+        let deltas = streaming::parse_incremental(self, new_text, range)?;
+
+        // Convert parse deltas to owned format
+        let mut owned_delta = ScriptDeltaOwned {
+            added: Vec::new(),
+            modified: Vec::new(),
+            removed: Vec::new(),
+            new_issues: Vec::new(),
+        };
+
+        for delta in deltas {
+            match delta {
+                streaming::ParseDelta::AddSection(section) => {
+                    owned_delta.added.push(format!("{:?}", section));
+                }
+                streaming::ParseDelta::UpdateSection(section) => {
+                    owned_delta.modified.push((0, format!("{:?}", section)));
+                }
+                streaming::ParseDelta::RemoveSection(index) => {
+                    owned_delta.removed.push(index);
+                }
+                streaming::ParseDelta::ParseIssue(issue) => {
+                    // Convert string issue to ParseIssue
+                    let parse_issue = crate::parser::errors::ParseIssue::new(
+                        crate::parser::errors::IssueSeverity::Warning,
+                        crate::parser::errors::IssueCategory::Structure,
+                        issue,
+                        0,
+                    );
+                    owned_delta.new_issues.push(parse_issue);
+                }
+            }
+        }
+
+        Ok(owned_delta)
     }
 
     /// Get script version detected during parsing
@@ -557,18 +591,18 @@ mod tests {
 
     #[test]
     fn parse_with_custom_format() {
-        let script_text = r#"[Script Info]
+        let script_text = r"[Script Info]
 Title: Format Test
 ScriptType: v4.00+
 
 [V4+ Styles]
-Format: Fontsize, Name, Fontname, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: 20,Custom,Arial,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Custom,Arial,20,&H00FF0000&,&H000000FF&,&H00000000&,&H00000000&,1,0,0,0,100,100,0,0,1,2,0,2,15,15,15,1
 
 [Events]
-Format: Start, Layer, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0:00:00.00,0,0:00:05.00,Custom,,0,0,0,,Custom format test
-"#;
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:05.00,Custom,,0,0,0,,Custom format test
+";
 
         let script = Script::parse(script_text).unwrap();
         assert_eq!(script.sections().len(), 3);

@@ -100,7 +100,7 @@ impl Section<'_> {
     /// let info = Section::ScriptInfo(ScriptInfo { fields: Vec::new() });
     /// assert_eq!(info.section_type(), SectionType::ScriptInfo);
     /// ```
-    pub fn section_type(&self) -> SectionType {
+    pub const fn section_type(&self) -> SectionType {
         match self {
             Section::ScriptInfo(_) => SectionType::ScriptInfo,
             Section::Styles(_) => SectionType::Styles,
@@ -151,7 +151,7 @@ impl SectionType {
     /// assert_eq!(SectionType::ScriptInfo.header_name(), "Script Info");
     /// assert_eq!(SectionType::Styles.header_name(), "V4+ Styles");
     /// ```
-    pub fn header_name(self) -> &'static str {
+    pub const fn header_name(self) -> &'static str {
         match self {
             SectionType::ScriptInfo => "Script Info",
             SectionType::Styles => "V4+ Styles",

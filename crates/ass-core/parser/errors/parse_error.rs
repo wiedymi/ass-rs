@@ -337,8 +337,8 @@ mod tests {
     #[test]
     fn parse_error_display_input_too_large() {
         let error = ParseError::InputTooLarge {
-            size: 1000000,
-            limit: 500000,
+            size: 1_000_000,
+            limit: 500_000,
         };
         let message = format!("{}", error);
         assert!(message.contains("1000000"));

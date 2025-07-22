@@ -14,7 +14,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use ass_core::utils::{CoreError, Result, ErrorCategory};
+//! use ass_core::utils::errors::{CoreError, Result, ErrorCategory};
 //!
 //! // Create specific error types
 //! let color_err = CoreError::invalid_color("invalid");

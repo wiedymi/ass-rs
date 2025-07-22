@@ -7,7 +7,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use ass_core::utils::utf8::normalization::{normalize_line_endings, normalize_whitespace};
+//! use ass_core::utils::utf8::{normalize_line_endings, normalize_whitespace};
 //!
 //! let input = "Line 1\r\nLine 2\rLine 3\n";
 //! let normalized = normalize_line_endings(input);
@@ -33,7 +33,7 @@ use alloc::string::String;
 /// # Examples
 ///
 /// ```rust
-/// # use ass_core::utils::utf8::normalization::normalize_line_endings;
+/// # use ass_core::utils::utf8::normalize_line_endings;
 /// let input = "Line 1\r\nLine 2\rLine 3\n";
 /// let normalized = normalize_line_endings(input);
 /// assert_eq!(normalized, "Line 1\nLine 2\nLine 3\n");
