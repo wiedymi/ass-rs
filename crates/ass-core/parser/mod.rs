@@ -43,7 +43,7 @@ pub mod streaming;
 
 use sections::{EventsParser, ScriptInfoParser, StylesParser};
 
-pub use ast::{Event, ScriptInfo, Section, Style};
+pub use ast::{Event, ScriptInfo, Section, SectionType, Style};
 pub use errors::{IssueCategory, IssueSeverity, ParseError, ParseIssue, ParseResult};
 
 /// Main ASS script container with zero-copy lifetime-generic design
@@ -103,8 +103,8 @@ impl<'a> Script<'a> {
     ///
     /// Delta containing changes that can be applied to existing script.
     #[cfg(feature = "stream")]
-    pub fn parse_partial(&self, range: Range<usize>, new_text: &'a str) -> Result<ScriptDelta<'a>> {
-        streaming::parse_incremental(self, range, new_text)
+    pub fn parse_partial(&self, range: Range<usize>, new_text: &str) -> Result<ScriptDeltaOwned> {
+        streaming::parse_incremental_owned(self, range, new_text)
     }
 
     /// Get script version detected during parsing
@@ -146,16 +146,6 @@ impl<'a> Script<'a> {
             .iter()
             .all(|section| section.validate_spans(&source_range))
     }
-}
-
-/// Section type discriminant for efficient lookup
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SectionType {
-    ScriptInfo,
-    Styles,
-    Events,
-    Fonts,
-    Graphics,
 }
 
 /// Internal parser state machine
@@ -305,16 +295,138 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Parse [Fonts] section
+    /// Parse [Fonts] section with embedded font data
     fn parse_fonts(&mut self) -> Result<Section<'a>> {
-        self.skip_to_next_section();
-        Ok(Section::Fonts(Vec::new()))
+        let mut fonts = Vec::new();
+
+        while self.position < self.source.len() && !self.at_next_section() {
+            self.skip_whitespace_and_comments();
+
+            if self.position >= self.source.len() || self.at_next_section() {
+                break;
+            }
+
+            // Parse fontname: line
+            let line_start = self.position;
+            let line_end = self.source[self.position..]
+                .find('\n')
+                .map(|pos| self.position + pos)
+                .unwrap_or(self.source.len());
+
+            let line = &self.source[line_start..line_end];
+            if let Some(colon_pos) = line.find(':') {
+                let key = &line[..colon_pos].trim();
+                if key == &"fontname" {
+                    let filename = &line[colon_pos + 1..].trim();
+                    self.skip_line();
+
+                    // Collect UU-encoded data lines
+                    let mut data_lines = Vec::new();
+                    while self.position < self.source.len() && !self.at_next_section() {
+                        let data_line_start = self.position;
+                        if let Some(newline_pos) = self.source[self.position..].find('\n') {
+                            let data_line =
+                                &self.source[data_line_start..self.position + newline_pos];
+                            let trimmed = data_line.trim();
+
+                            // Check for section end or empty line
+                            if trimmed.is_empty() || trimmed.starts_with('[') {
+                                break;
+                            }
+
+                            data_lines.push(data_line);
+                            self.skip_line();
+                        } else {
+                            // Handle last line without newline
+                            let data_line = &self.source[data_line_start..];
+                            if !data_line.trim().is_empty() {
+                                data_lines.push(data_line);
+                            }
+                            self.position = self.source.len();
+                            break;
+                        }
+                    }
+
+                    fonts.push(ast::Font {
+                        filename,
+                        data_lines,
+                    });
+                } else {
+                    self.skip_line();
+                }
+            } else {
+                self.skip_line();
+            }
+        }
+
+        Ok(Section::Fonts(fonts))
     }
 
-    /// Parse [Graphics] section
+    /// Parse [Graphics] section with embedded graphic data
     fn parse_graphics(&mut self) -> Result<Section<'a>> {
-        self.skip_to_next_section();
-        Ok(Section::Graphics(Vec::new()))
+        let mut graphics = Vec::new();
+
+        while self.position < self.source.len() && !self.at_next_section() {
+            self.skip_whitespace_and_comments();
+
+            if self.position >= self.source.len() || self.at_next_section() {
+                break;
+            }
+
+            // Parse filename: line
+            let line_start = self.position;
+            let line_end = self.source[self.position..]
+                .find('\n')
+                .map(|pos| self.position + pos)
+                .unwrap_or(self.source.len());
+
+            let line = &self.source[line_start..line_end];
+            if let Some(colon_pos) = line.find(':') {
+                let key = &line[..colon_pos].trim();
+                if key == &"filename" {
+                    let filename = &line[colon_pos + 1..].trim();
+                    self.skip_line();
+
+                    // Collect UU-encoded data lines
+                    let mut data_lines = Vec::new();
+                    while self.position < self.source.len() && !self.at_next_section() {
+                        let data_line_start = self.position;
+                        if let Some(newline_pos) = self.source[self.position..].find('\n') {
+                            let data_line =
+                                &self.source[data_line_start..self.position + newline_pos];
+                            let trimmed = data_line.trim();
+
+                            // Check for section end or empty line
+                            if trimmed.is_empty() || trimmed.starts_with('[') {
+                                break;
+                            }
+
+                            data_lines.push(data_line);
+                            self.skip_line();
+                        } else {
+                            // Handle last line without newline
+                            let data_line = &self.source[data_line_start..];
+                            if !data_line.trim().is_empty() {
+                                data_lines.push(data_line);
+                            }
+                            self.position = self.source.len();
+                            break;
+                        }
+                    }
+
+                    graphics.push(ast::Graphic {
+                        filename,
+                        data_lines,
+                    });
+                } else {
+                    self.skip_line();
+                }
+            } else {
+                self.skip_line();
+            }
+        }
+
+        Ok(Section::Graphics(graphics))
     }
 
     /// Check if at start of next section
@@ -368,6 +480,23 @@ pub struct ScriptDelta<'a> {
 
     /// Sections that were modified (old index -> new section)
     pub modified: Vec<(usize, Section<'a>)>,
+
+    /// Section indices that were removed
+    pub removed: Vec<usize>,
+
+    /// New parse issues
+    pub new_issues: Vec<ParseIssue>,
+}
+
+/// Owned variant of ScriptDelta for incremental parsing with lifetime independence
+#[cfg(feature = "stream")]
+#[derive(Debug, Clone)]
+pub struct ScriptDeltaOwned {
+    /// Sections that were added (serialized as source text)
+    pub added: Vec<String>,
+
+    /// Sections that were modified (old index -> new section as source text)
+    pub modified: Vec<(usize, String)>,
 
     /// Section indices that were removed
     pub removed: Vec<usize>,

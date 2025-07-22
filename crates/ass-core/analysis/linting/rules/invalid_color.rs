@@ -4,9 +4,11 @@
 //! that would cause rendering errors or unexpected visual results.
 
 use crate::{
-    analysis::linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+    analysis::{
+        events::text_analysis::TextAnalysis,
+        linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+    },
     parser::{Script, Section},
-    tokenizer::{AssTokenizer, TokenType},
     utils::parse_bgr_color,
 };
 use alloc::{format, string::ToString, vec::Vec};
@@ -60,6 +62,10 @@ impl LintRule for InvalidColorRule {
         IssueSeverity::Error
     }
 
+    fn category(&self) -> IssueCategory {
+        IssueCategory::Styling
+    }
+
     fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>> {
         let mut issues = Vec::new();
 
@@ -82,11 +88,13 @@ impl LintRule for InvalidColorRule {
             .find(|s| matches!(s, Section::Events(_)))
         {
             for event in events {
-                let mut tokenizer = AssTokenizer::new(event.text);
-                while let Ok(Some(token)) = tokenizer.next_token() {
-                    if let TokenType::OverrideBlock = token.token_type {
-                        self.check_color_override_tags(&mut issues, token.span);
-                    }
+                let text_analysis = match TextAnalysis::analyze(event.text) {
+                    Ok(analysis) => analysis,
+                    Err(_) => continue, // Skip analysis if text parsing fails
+                };
+                for tag in text_analysis.override_tags() {
+                    let tag_content = format!("\\{}{}", tag.name(), tag.args());
+                    self.check_color_override_tags(&mut issues, &tag_content);
                 }
             }
         }

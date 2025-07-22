@@ -152,6 +152,12 @@ pub fn parse_hex_u32(hex_str: &str) -> Option<u32> {
 fn parse_hex_simd_impl(hex_str: &str) -> Option<u32> {
     let bytes = hex_str.as_bytes();
 
+    // For hex strings <= 8 chars, we can process them directly with SIMD
+    if bytes.len() <= 8 {
+        return parse_hex_simd_direct(bytes);
+    }
+
+    // For longer strings, validate with SIMD then fall back to scalar
     let chunks = bytes.chunks_exact(16);
     let remainder = chunks.remainder();
 
@@ -159,22 +165,8 @@ fn parse_hex_simd_impl(hex_str: &str) -> Option<u32> {
         let chunk_array: [u8; 16] = chunk.try_into().unwrap();
         let simd_chunk = u8x16::from(chunk_array);
 
-        let mut valid_mask = u8x16::splat(0);
-        for digit in b'0'..=b'9' {
-            valid_mask |= simd_chunk.cmp_eq(u8x16::splat(digit));
-        }
-
-        for hex_char in b'A'..=b'F' {
-            valid_mask |= simd_chunk.cmp_eq(u8x16::splat(hex_char));
-        }
-
-        for hex_char in b'a'..=b'f' {
-            valid_mask |= simd_chunk.cmp_eq(u8x16::splat(hex_char));
-        }
-
-        let mask_bits = valid_mask.move_mask();
-        if mask_bits != 0xFFFF {
-            return None; // Contains non-hex characters
+        if !validate_hex_chars_simd(simd_chunk) {
+            return None;
         }
     }
 
@@ -185,6 +177,52 @@ fn parse_hex_simd_impl(hex_str: &str) -> Option<u32> {
     }
 
     parse_hex_scalar(hex_str)
+}
+
+/// Validate hex characters using SIMD
+#[cfg(feature = "simd")]
+fn validate_hex_chars_simd(simd_chunk: u8x16) -> bool {
+    let mut valid_mask = u8x16::splat(0);
+
+    // Check for digits 0-9
+    for digit in b'0'..=b'9' {
+        valid_mask |= simd_chunk.cmp_eq(u8x16::splat(digit));
+    }
+
+    // Check for uppercase A-F
+    for hex_char in b'A'..=b'F' {
+        valid_mask |= simd_chunk.cmp_eq(u8x16::splat(hex_char));
+    }
+
+    // Check for lowercase a-f
+    for hex_char in b'a'..=b'f' {
+        valid_mask |= simd_chunk.cmp_eq(u8x16::splat(hex_char));
+    }
+
+    valid_mask.move_mask() == 0xFFFF
+}
+
+/// Direct SIMD hex parsing for strings <= 8 characters
+#[cfg(feature = "simd")]
+fn parse_hex_simd_direct(bytes: &[u8]) -> Option<u32> {
+    if bytes.is_empty() || bytes.len() > 8 {
+        return None;
+    }
+
+    let mut result: u32 = 0;
+
+    for &byte in bytes {
+        let digit_value = match byte {
+            b'0'..=b'9' => byte - b'0',
+            b'A'..=b'F' => byte - b'A' + 10,
+            b'a'..=b'f' => byte - b'a' + 10,
+            _ => return None,
+        };
+
+        result = result.checked_mul(16)?.checked_add(digit_value as u32)?;
+    }
+
+    Some(result)
 }
 
 /// Scalar hex parsing implementation

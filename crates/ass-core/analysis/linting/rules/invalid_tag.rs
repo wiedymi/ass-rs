@@ -4,9 +4,11 @@
 //! cause parsing errors or unexpected rendering behavior.
 
 use crate::{
-    analysis::linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+    analysis::{
+        events::text_analysis::TextAnalysis,
+        linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+    },
     parser::{Script, Section},
-    tokenizer::{AssTokenizer, TokenType},
 };
 use alloc::{string::ToString, vec::Vec};
 
@@ -58,6 +60,10 @@ impl LintRule for InvalidTagRule {
         IssueSeverity::Warning
     }
 
+    fn category(&self) -> IssueCategory {
+        IssueCategory::Content
+    }
+
     fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>> {
         let mut issues = Vec::new();
 
@@ -67,30 +73,45 @@ impl LintRule for InvalidTagRule {
             .find(|s| matches!(s, Section::Events(_)))
         {
             for event in events {
-                let mut tokenizer = AssTokenizer::new(event.text);
-                while let Ok(Some(token)) = tokenizer.next_token() {
-                    match token.token_type {
-                        TokenType::OverrideBlock => {
-                            let span = token.span;
-                            // Split on backslashes to find individual tags
-                            let tag_parts: Vec<&str> = span.split('\\').collect();
+                let text_analysis = match TextAnalysis::analyze(event.text) {
+                    Ok(analysis) => analysis,
+                    Err(_) => continue, // Skip analysis if text parsing fails
+                };
+                // Check for empty tags in parsed override tags
+                for tag in text_analysis.override_tags() {
+                    if tag.name().trim().is_empty() {
+                        let issue = LintIssue::new(
+                            self.default_severity(),
+                            IssueCategory::Content,
+                            self.id(),
+                            "Empty override tag found".to_string(),
+                        );
+                        issues.push(issue);
+                    }
+                }
 
-                            // Skip the first part (always empty since content starts with \)
-                            // and check each remaining part for empty tags
-                            for tag_part in tag_parts.iter().skip(1) {
-                                let tag_name = tag_part.trim();
-                                if tag_name.is_empty() {
-                                    let issue = LintIssue::new(
-                                        self.default_severity(),
-                                        IssueCategory::Content,
-                                        self.id(),
-                                        "Empty override tag found".to_string(),
-                                    );
-                                    issues.push(issue);
-                                }
+                // Check for malformed tags that TextAnalysis might miss
+                // Look for cases like {\b1\} where there's an empty tag after a valid one
+                if event.text.contains('{') && event.text.contains('}') {
+                    let start = event.text.find('{').unwrap_or(0);
+                    let end = event.text.rfind('}').unwrap_or(event.text.len());
+                    if start < end {
+                        let override_block = &event.text[start + 1..end];
+                        let tag_parts: Vec<&str> = override_block.split('\\').collect();
+
+                        // Skip the first part and check each remaining part for empty tags
+                        for tag_part in tag_parts.iter().skip(1) {
+                            let tag_name = tag_part.trim();
+                            if tag_name.is_empty() {
+                                let issue = LintIssue::new(
+                                    self.default_severity(),
+                                    IssueCategory::Content,
+                                    self.id(),
+                                    "Empty override tag found".to_string(),
+                                );
+                                issues.push(issue);
                             }
                         }
-                        _ => continue,
                     }
                 }
             }

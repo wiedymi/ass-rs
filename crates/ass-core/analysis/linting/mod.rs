@@ -269,6 +269,9 @@ pub trait LintRule: Send + Sync {
     /// Default severity level.
     fn default_severity(&self) -> IssueSeverity;
 
+    /// Issue category this rule checks for.
+    fn category(&self) -> IssueCategory;
+
     /// Check script and return issues.
     fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>>;
 }

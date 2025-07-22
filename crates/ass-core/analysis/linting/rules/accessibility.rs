@@ -5,7 +5,10 @@
 //! or reading difficulties.
 
 use crate::{
-    analysis::linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+    analysis::{
+        events::text_analysis::TextAnalysis,
+        linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+    },
     parser::{Script, Section},
     utils::parse_ass_time,
 };
@@ -66,6 +69,10 @@ impl LintRule for AccessibilityRule {
         IssueSeverity::Hint
     }
 
+    fn category(&self) -> IssueCategory {
+        IssueCategory::Accessibility
+    }
+
     fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>> {
         let mut issues = Vec::new();
 
@@ -111,32 +118,34 @@ impl AccessibilityRule {
     fn check_reading_speed(&self, issues: &mut Vec<LintIssue>, event: &crate::parser::Event) {
         if let (Ok(start), Ok(end)) = (parse_ass_time(event.start), parse_ass_time(event.end)) {
             let duration_centiseconds = end - start;
-            let _text_length = event.text.chars().count();
-            let clean_text_length = self.count_readable_characters(event.text);
 
-            if clean_text_length > 0 && duration_centiseconds > 0 {
-                // Convert centiseconds to seconds: 1 second = 100 centiseconds
-                let duration_seconds = duration_centiseconds as f64 / 100.0;
-                let chars_per_second = clean_text_length as f64 / duration_seconds;
+            if let Ok(analysis) = TextAnalysis::analyze(event.text) {
+                let clean_text_length = analysis.char_count();
 
-                if chars_per_second > 20.0 {
-                    let issue = LintIssue::new(
-                        self.default_severity(),
-                        IssueCategory::Accessibility,
-                        self.id(),
-                        format!(
-                            "Fast reading speed: {:.1} characters/second",
-                            chars_per_second
-                        ),
-                    )
-                    .with_description(
-                        "Fast reading speeds may be difficult for some users".to_string(),
-                    )
-                    .with_suggested_fix(
-                        "Consider extending duration or reducing text length".to_string(),
-                    );
+                if clean_text_length > 0 && duration_centiseconds > 0 {
+                    // Convert centiseconds to seconds: 1 second = 100 centiseconds
+                    let duration_seconds = duration_centiseconds as f64 / 100.0;
+                    let chars_per_second = clean_text_length as f64 / duration_seconds;
 
-                    issues.push(issue);
+                    if chars_per_second > 20.0 {
+                        let issue = LintIssue::new(
+                            self.default_severity(),
+                            IssueCategory::Accessibility,
+                            self.id(),
+                            format!(
+                                "Fast reading speed: {:.1} characters/second",
+                                chars_per_second
+                            ),
+                        )
+                        .with_description(
+                            "Fast reading speeds may be difficult for some users".to_string(),
+                        )
+                        .with_suggested_fix(
+                            "Consider extending duration or reducing text length".to_string(),
+                        );
+
+                        issues.push(issue);
+                    }
                 }
             }
         }
@@ -144,50 +153,22 @@ impl AccessibilityRule {
 
     /// Check for excessively long text that may be overwhelming
     fn check_text_length(&self, issues: &mut Vec<LintIssue>, event: &crate::parser::Event) {
-        let clean_text_length = self.count_readable_characters(event.text);
+        if let Ok(analysis) = TextAnalysis::analyze(event.text) {
+            let clean_text_length = analysis.char_count();
 
-        if clean_text_length > 200 {
-            let issue = LintIssue::new(
-                self.default_severity(),
-                IssueCategory::Accessibility,
-                self.id(),
-                format!("Very long text: {} characters", clean_text_length),
-            )
-            .with_description("Long text blocks may be overwhelming for some users".to_string())
-            .with_suggested_fix("Consider splitting into multiple shorter events".to_string());
+            if clean_text_length > 200 {
+                let issue = LintIssue::new(
+                    self.default_severity(),
+                    IssueCategory::Accessibility,
+                    self.id(),
+                    format!("Very long text: {} characters", clean_text_length),
+                )
+                .with_description("Long text blocks may be overwhelming for some users".to_string())
+                .with_suggested_fix("Consider splitting into multiple shorter events".to_string());
 
-            issues.push(issue);
-        }
-    }
-
-    /// Count readable characters, excluding override tags and formatting
-    fn count_readable_characters(&self, text: &str) -> usize {
-        let mut char_count = 0;
-        let mut in_tag = false;
-        let mut brace_depth = 0;
-
-        for ch in text.chars() {
-            match ch {
-                '{' => {
-                    brace_depth += 1;
-                    in_tag = true;
-                }
-                '}' => {
-                    brace_depth -= 1;
-                    if brace_depth <= 0 {
-                        in_tag = false;
-                        brace_depth = 0;
-                    }
-                }
-                _ => {
-                    if !in_tag && !ch.is_control() {
-                        char_count += 1;
-                    }
-                }
+                issues.push(issue);
             }
         }
-
-        char_count
     }
 }
 
@@ -263,18 +244,22 @@ Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{}"#,
     }
 
     #[test]
-    fn count_readable_characters_excludes_tags() {
-        let rule = AccessibilityRule;
+    fn text_analysis_excludes_tags() {
+        use crate::analysis::events::text_analysis::TextAnalysis;
 
-        assert_eq!(rule.count_readable_characters("Hello world"), 11);
+        let analysis1 = TextAnalysis::analyze("Hello world").unwrap();
+        assert_eq!(analysis1.char_count(), 11);
+
         // "Hello {\i1}world{\i0}" after removing tags becomes "Hello world" (11 chars)
-        assert_eq!(
-            rule.count_readable_characters("Hello {\\i1}world{\\i0}"),
-            11
-        );
+        let analysis2 = TextAnalysis::analyze("Hello {\\i1}world{\\i0}").unwrap();
+        assert_eq!(analysis2.char_count(), 11);
+
         // "{\b1}Bold{\b0} text" after removing tags becomes "Bold text" (9 chars)
-        assert_eq!(rule.count_readable_characters("{\\b1}Bold{\\b0} text"), 9);
-        assert_eq!(rule.count_readable_characters(""), 0);
+        let analysis3 = TextAnalysis::analyze("{\\b1}Bold{\\b0} text").unwrap();
+        assert_eq!(analysis3.char_count(), 9);
+
+        let analysis4 = TextAnalysis::analyze("").unwrap();
+        assert_eq!(analysis4.char_count(), 0);
     }
 
     #[test]

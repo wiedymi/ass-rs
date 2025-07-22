@@ -59,6 +59,10 @@ impl LintRule for NegativeDurationRule {
         IssueSeverity::Error
     }
 
+    fn category(&self) -> IssueCategory {
+        IssueCategory::Timing
+    }
+
     fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>> {
         let mut issues = Vec::new();
 

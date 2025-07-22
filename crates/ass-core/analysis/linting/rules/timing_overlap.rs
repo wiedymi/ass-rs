@@ -62,6 +62,10 @@ impl LintRule for TimingOverlapRule {
         IssueSeverity::Warning
     }
 
+    fn category(&self) -> IssueCategory {
+        IssueCategory::Timing
+    }
+
     fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>> {
         let mut issues = Vec::new();
 

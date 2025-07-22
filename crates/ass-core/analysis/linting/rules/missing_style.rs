@@ -62,6 +62,10 @@ impl LintRule for MissingStyleRule {
         IssueSeverity::Error
     }
 
+    fn category(&self) -> IssueCategory {
+        IssueCategory::Styling
+    }
+
     fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>> {
         let mut issues = Vec::new();
 

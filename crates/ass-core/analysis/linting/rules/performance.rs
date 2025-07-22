@@ -4,7 +4,10 @@
 //! impact rendering speed, memory usage, or playback smoothness.
 
 use crate::{
-    analysis::linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+    analysis::{
+        events::text_analysis::TextAnalysis,
+        linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
+    },
     parser::{Script, Section},
 };
 use alloc::{format, string::ToString, vec::Vec};
@@ -60,6 +63,10 @@ impl LintRule for PerformanceRule {
 
     fn default_severity(&self) -> IssueSeverity {
         IssueSeverity::Hint
+    }
+
+    fn category(&self) -> IssueCategory {
+        IssueCategory::Performance
     }
 
     fn check_script<'a>(&self, script: &'a Script<'a>) -> Vec<LintIssue<'a>> {
@@ -119,7 +126,11 @@ impl PerformanceRule {
                 issues.push(issue);
             }
 
-            let override_count = event.text.matches('{').count();
+            let text_analysis = match TextAnalysis::analyze(event.text) {
+                Ok(analysis) => analysis,
+                Err(_) => continue, // Skip analysis if text parsing fails
+            };
+            let override_count = text_analysis.override_tags().len();
             if override_count > 20 {
                 let issue = LintIssue::new(
                     self.default_severity(),

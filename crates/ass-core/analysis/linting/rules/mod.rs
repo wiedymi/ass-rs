@@ -124,12 +124,7 @@ impl BuiltinRules {
     pub fn rules_for_category(category: super::IssueCategory) -> Vec<Box<dyn LintRule>> {
         Self::all_rules()
             .into_iter()
-            .filter(|rule| {
-                let test_script =
-                    crate::parser::Script::parse("[Script Info]\nTitle: Test").unwrap();
-                let issues = rule.check_script(&test_script);
-                issues.is_empty() || issues[0].category() == category
-            })
+            .filter(|rule| rule.category() == category)
             .collect()
     }
 

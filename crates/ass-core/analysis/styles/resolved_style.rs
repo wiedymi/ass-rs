@@ -105,10 +105,10 @@ impl<'a> ResolvedStyle<'a> {
         };
 
         let font_size = parse_font_size(style.fontsize)?;
-        let primary_color = parse_color(style.primary_colour)?;
-        let secondary_color = parse_color(style.secondary_colour)?;
-        let outline_color = parse_color(style.outline_colour)?;
-        let back_color = parse_color(style.back_colour)?;
+        let primary_color = parse_color_with_default(style.primary_colour)?;
+        let secondary_color = parse_color_with_default(style.secondary_colour)?;
+        let outline_color = parse_color_with_default(style.outline_colour)?;
+        let back_color = parse_color_with_default(style.back_colour)?;
 
         let bold = parse_bool_flag(style.bold)?;
         let italic = parse_bool_flag(style.italic)?;
@@ -243,27 +243,12 @@ fn parse_font_size(size_str: &str) -> Result<f32> {
     }
 }
 
-/// Parse color value from ASS format
-fn parse_color(color_str: &str) -> Result<[u8; 4]> {
-    if color_str.is_empty() {
-        return Ok([255, 255, 255, 255]);
-    }
-
-    let after_prefix = color_str
-        .strip_prefix("&H")
-        .or_else(|| color_str.strip_prefix("&h"))
-        .unwrap_or(color_str);
-
-    let clean = after_prefix.strip_suffix("&").unwrap_or(after_prefix);
-
-    if let Ok(value) = u32::from_str_radix(clean, 16) {
-        let b = ((value >> 16) & 0xFF) as u8;
-        let g = ((value >> 8) & 0xFF) as u8;
-        let r = (value & 0xFF) as u8;
-        let a = 255;
-        Ok([r, g, b, a])
+/// Parse color value with default handling for empty strings
+fn parse_color_with_default(color_str: &str) -> Result<[u8; 4]> {
+    if color_str.trim().is_empty() {
+        Ok([255, 255, 255, 255]) // Default white with full alpha
     } else {
-        Err(CoreError::parse("Invalid color format"))
+        crate::utils::parse_bgr_color(color_str)
     }
 }
 
@@ -347,24 +332,44 @@ mod tests {
         assert_eq!(resolved.name, "Test");
         assert_eq!(resolved.font_name(), "Arial");
         assert_eq!(resolved.font_size(), 20.0);
-        assert_eq!(resolved.primary_color(), [255, 255, 255, 255]);
+        assert_eq!(resolved.primary_color(), [255, 255, 255, 0]);
     }
 
     #[test]
     fn color_parsing() {
         // ASS colors are in BGR format: &HAABBGGRR where AA=alpha, BB=blue, GG=green, RR=red
-        assert_eq!(parse_color("&H000000FF").unwrap(), [255, 0, 0, 255]); // Red: RR=FF
-        assert_eq!(parse_color("&H0000FF00").unwrap(), [0, 255, 0, 255]); // Green: GG=FF
-        assert_eq!(parse_color("&H00FF0000").unwrap(), [0, 0, 255, 255]); // Blue: BB=FF
-        assert_eq!(parse_color("").unwrap(), [255, 255, 255, 255]); // Default white
+        assert_eq!(
+            crate::utils::parse_bgr_color("&H000000FF").unwrap(),
+            [255, 0, 0, 0]
+        ); // Red: RR=FF
+        assert_eq!(
+            crate::utils::parse_bgr_color("&H0000FF00").unwrap(),
+            [0, 255, 0, 0]
+        ); // Green: GG=FF
+        assert_eq!(
+            crate::utils::parse_bgr_color("&H00FF0000").unwrap(),
+            [0, 0, 255, 0]
+        ); // Blue: BB=FF
 
         // Test case-insensitive prefix
-        assert_eq!(parse_color("&h000000FF").unwrap(), [255, 0, 0, 255]); // Red with lowercase h
+        assert_eq!(
+            crate::utils::parse_bgr_color("&h000000FF").unwrap(),
+            [255, 0, 0, 0]
+        ); // Red with lowercase h
 
         // Test 6-digit format (no alpha channel)
-        assert_eq!(parse_color("&HFF0000").unwrap(), [0, 0, 255, 255]); // Blue in 6-digit
-        assert_eq!(parse_color("&H00FF00").unwrap(), [0, 255, 0, 255]); // Green in 6-digit
-        assert_eq!(parse_color("&H0000FF").unwrap(), [255, 0, 0, 255]); // Red in 6-digit
+        assert_eq!(
+            crate::utils::parse_bgr_color("&HFF0000").unwrap(),
+            [0, 0, 255, 0]
+        ); // Blue in 6-digit
+        assert_eq!(
+            crate::utils::parse_bgr_color("&H00FF00").unwrap(),
+            [0, 255, 0, 0]
+        ); // Green in 6-digit
+        assert_eq!(
+            crate::utils::parse_bgr_color("&H0000FF").unwrap(),
+            [255, 0, 0, 0]
+        ); // Red in 6-digit
     }
 
     #[test]
