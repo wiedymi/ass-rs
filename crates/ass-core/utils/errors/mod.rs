@@ -119,7 +119,10 @@ impl From<::core::num::ParseFloatError> for CoreError {
 }
 
 #[cfg(test)]
-mod tests {
+mod tests;
+
+#[cfg(test)]
+mod inline_tests {
     use super::*;
 
     #[test]

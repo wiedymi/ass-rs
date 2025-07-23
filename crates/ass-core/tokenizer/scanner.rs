@@ -29,6 +29,8 @@ pub struct CharNavigator<'a> {
     chars: Chars<'a>,
     /// Lookahead character for peeking
     peek_char: Option<char>,
+    /// Last character processed (for \r\n handling)
+    last_char: Option<char>,
 }
 
 impl<'a> CharNavigator<'a> {
@@ -42,6 +44,7 @@ impl<'a> CharNavigator<'a> {
             column,
             chars: source[position..].chars(),
             peek_char: None,
+            last_char: None,
         }
     }
 
@@ -107,13 +110,24 @@ impl<'a> CharNavigator<'a> {
         let _ = self.chars.next();
         self.position += ch.len_utf8();
 
-        if ch == '\n' {
-            self.line += 1;
-            self.column = 1;
-        } else {
-            self.column += 1;
+        match ch {
+            '\r' => {
+                self.line += 1;
+                self.column = 1;
+            }
+            '\n' => {
+                // Only increment line if previous char wasn't \r (to handle \r\n properly)
+                if self.last_char != Some('\r') {
+                    self.line += 1;
+                }
+                self.column = 1;
+            }
+            _ => {
+                self.column += 1;
+            }
         }
 
+        self.last_char = Some(ch);
         Ok(ch)
     }
 
@@ -256,9 +270,20 @@ impl<'a> TokenScanner<'a> {
             while !self.navigator.is_at_end() {
                 let ch = self.navigator.peek_char()?;
 
-                if matches!(ch, ',' | ':' | '{' | '}' | '[' | ']' | '\n' | '\r')
-                    || (ch == ';' && context == TokenContext::Document)
-                {
+                // Check for delimiters based on context
+                let is_delimiter = match context {
+                    TokenContext::FieldValue => {
+                        // In field values, don't treat colon as delimiter (for time formats)
+                        matches!(ch, ',' | '{' | '}' | '[' | ']' | '\n' | '\r')
+                    }
+                    _ => {
+                        // In other contexts, treat colon as delimiter
+                        matches!(ch, ',' | ':' | '{' | '}' | '[' | ']' | '\n' | '\r')
+                            || (ch == ';' && context == TokenContext::Document)
+                    }
+                };
+
+                if is_delimiter {
                     break;
                 }
 
@@ -272,9 +297,10 @@ impl<'a> TokenScanner<'a> {
             Ok(TokenType::SectionName)
         } else if Self::is_hex_value(span) {
             Ok(TokenType::HexValue)
-        } else if span
-            .chars()
-            .all(|c| c.is_ascii_digit() || c == '.' || c == '-')
+        } else if !span.is_empty()
+            && span
+                .chars()
+                .all(|c| c.is_ascii_digit() || c == '.' || c == '-')
         {
             Ok(TokenType::Number)
         } else {
@@ -340,4 +366,41 @@ impl<'a> TokenScanner<'a> {
     fn parse_hex_simd(hex_str: &str) -> Option<u32> {
         simd::parse_hex_u32(hex_str)
     }
+
+    /// Scan field value content in field value context
+    ///
+    /// In field value context, colons are not delimiters (for time formats)
+    /// and we consume until comma, newline, or end of input.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if character navigation fails.
+    pub fn scan_field_value(&mut self) -> Result<TokenType> {
+        let start = self.navigator.position();
+
+        while !self.navigator.is_at_end() {
+            let ch = self.navigator.peek_char()?;
+
+            // Stop at delimiters that end field values
+            if ch == ',' || ch == '\n' || ch == '\r' {
+                break;
+            }
+
+            self.navigator.advance_char()?;
+        }
+
+        let span = &self.source[start..self.navigator.position()];
+
+        if span
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '.' || c == '-' || c == ':')
+        {
+            Ok(TokenType::Number)
+        } else {
+            Ok(TokenType::Text)
+        }
+    }
 }
+
+#[cfg(test)]
+mod tests;

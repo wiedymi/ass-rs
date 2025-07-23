@@ -42,6 +42,9 @@ use hashbrown::HashMap;
 pub mod sections;
 pub mod tags;
 
+#[cfg(test)]
+mod tests;
+
 /// Result of tag processing operations
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TagResult {

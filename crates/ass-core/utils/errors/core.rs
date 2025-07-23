@@ -184,6 +184,7 @@ impl CoreError {
                 ) | (
                     "field_format",
                     crate::parser::ParseError::InvalidFieldFormat { .. }
+                        | crate::parser::ParseError::FieldCountMismatch { .. }
                 ) | (
                     "time_format",
                     crate::parser::ParseError::InvalidTimeFormat { .. }

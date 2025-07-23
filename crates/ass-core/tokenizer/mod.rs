@@ -111,6 +111,7 @@ impl<'a> AssTokenizer<'a> {
                 self.scanner.navigator_mut().advance_char()?;
                 Ok(TokenType::Colon)
             }
+
             ('{', _) => {
                 self.context = TokenContext::StyleOverride;
                 self.scanner.scan_style_override()
@@ -140,11 +141,28 @@ impl<'a> AssTokenizer<'a> {
                     self.scanner.scan_text(self.context)
                 }
             }
-            _ => self.scanner.scan_text(self.context),
+            _ => {
+                // In FieldValue context, consume everything until delimiter
+                if self.context == TokenContext::FieldValue {
+                    self.scanner.scan_field_value()
+                } else {
+                    self.scanner.scan_text(self.context)
+                }
+            }
         }?;
 
         let end_pos = self.scanner.navigator().position();
         let span = &self.source[start_pos..end_pos];
+
+        // Check for infinite loop - position must advance
+        if start_pos == end_pos && !span.is_empty() {
+            eprintln!("DEBUG: WARNING - Position didn't advance but span is not empty!");
+        }
+        if start_pos == end_pos && span.is_empty() && !self.scanner.navigator().is_at_end() {
+            return Err(crate::utils::CoreError::internal(
+                "Tokenizer position not advancing",
+            ));
+        }
 
         Ok(Some(Token {
             token_type,
@@ -161,9 +179,17 @@ impl<'a> AssTokenizer<'a> {
     /// Returns an error if tokenization fails for any token in the input.
     pub fn tokenize_all(&mut self) -> Result<Vec<Token<'a>>> {
         let mut tokens = Vec::new();
+        let mut iteration_count = 0;
         while let Some(token) = self.next_token()? {
             tokens.push(token);
+            iteration_count += 1;
+            if iteration_count > 50 {
+                return Err(crate::utils::CoreError::internal(
+                    "Too many tokenizer iterations",
+                ));
+            }
         }
+
         Ok(tokens)
     }
 
@@ -205,7 +231,10 @@ impl<'a> AssTokenizer<'a> {
 }
 
 #[cfg(test)]
-mod tests {
+mod tests;
+
+#[cfg(test)]
+mod inline_tests {
     use super::*;
 
     #[test]
