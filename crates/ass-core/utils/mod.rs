@@ -43,7 +43,7 @@ pub struct Spans<'a> {
 
 impl<'a> Spans<'a> {
     /// Create new span utilities for source text
-    pub fn new(source: &'a str) -> Self {
+    #[must_use] pub const fn new(source: &'a str) -> Self {
         Self { source }
     }
 
@@ -51,7 +51,7 @@ impl<'a> Spans<'a> {
     ///
     /// Returns `true` if the span is a valid substring of the source.
     /// Used for debug assertions to ensure zero-copy invariants.
-    pub fn validate_span(&self, span: &str) -> bool {
+    #[must_use] pub fn validate_span(&self, span: &str) -> bool {
         let source_start = self.source.as_ptr() as usize;
         let source_end = source_start + self.source.len();
 
@@ -62,7 +62,7 @@ impl<'a> Spans<'a> {
     }
 
     /// Get byte offset of span within source
-    pub fn span_offset(&self, span: &str) -> Option<usize> {
+    #[must_use] pub fn span_offset(&self, span: &str) -> Option<usize> {
         let source_start = self.source.as_ptr() as usize;
         let span_start = span.as_ptr() as usize;
 
@@ -74,24 +74,23 @@ impl<'a> Spans<'a> {
     }
 
     /// Get line number (1-based) for a span
-    pub fn span_line(&self, span: &str) -> Option<usize> {
+    #[must_use] pub fn span_line(&self, span: &str) -> Option<usize> {
         let offset = self.span_offset(span)?;
         Some(self.source[..offset].chars().filter(|&c| c == '\n').count() + 1)
     }
 
     /// Get column number (1-based) for a span
-    pub fn span_column(&self, span: &str) -> Option<usize> {
+    #[must_use] pub fn span_column(&self, span: &str) -> Option<usize> {
         let offset = self.span_offset(span)?;
         let line_start = self.source[..offset]
             .rfind('\n')
-            .map(|pos| pos + 1)
-            .unwrap_or(0);
+            .map_or(0, |pos| pos + 1);
 
         Some(self.source[line_start..offset].chars().count() + 1)
     }
 
     /// Extract substring by byte range
-    pub fn substring(&self, range: Range<usize>) -> Option<&'a str> {
+    #[must_use] pub fn substring(&self, range: Range<usize>) -> Option<&'a str> {
         self.source.get(range)
     }
 }
@@ -134,13 +133,12 @@ pub fn parse_bgr_color(color_str: &str) -> Result<[u8; 4], CoreError> {
             trimmed
         } else {
             return Err(CoreError::InvalidColor(format!(
-                "Invalid color format: {}",
-                color_str
+                "Invalid color format: {color_str}"
             )));
         };
 
     let hex_value = u32::from_str_radix(hex_part, 16)
-        .map_err(|_| CoreError::InvalidColor(format!("Invalid hex value: {}", hex_part)))?;
+        .map_err(|_| CoreError::InvalidColor(format!("Invalid hex value: {hex_part}")))?;
 
     let (blue, green, red, alpha) = match hex_part.len() {
         6 => {
@@ -179,7 +177,7 @@ where
     value_str
         .trim()
         .parse()
-        .map_err(|e| CoreError::InvalidNumeric(format!("Failed to parse '{}': {}", value_str, e)))
+        .map_err(|e| CoreError::InvalidNumeric(format!("Failed to parse '{value_str}': {e}")))
 }
 
 /// Evaluate cubic bezier curve at parameter t
@@ -195,7 +193,7 @@ where
 /// # Returns
 ///
 /// Point on curve as (x, y) tuple
-pub fn eval_cubic_bezier(
+#[must_use] pub fn eval_cubic_bezier(
     p0: (f32, f32),
     p1: (f32, f32),
     p2: (f32, f32),
@@ -208,8 +206,8 @@ pub fn eval_cubic_bezier(
     let mt2 = mt * mt;
     let mt3 = mt2 * mt;
 
-    let x = mt3 * p0.0 + 3.0 * mt2 * t * p1.0 + 3.0 * mt * t2 * p2.0 + t3 * p3.0;
-    let y = mt3 * p0.1 + 3.0 * mt2 * t * p1.1 + 3.0 * mt * t2 * p2.1 + t3 * p3.1;
+    let x = t3.mul_add(p3.0, (3.0 * mt * t2).mul_add(p2.0, mt3.mul_add(p0.0, 3.0 * mt2 * t * p1.0)));
+    let y = t3.mul_add(p3.1, (3.0 * mt * t2).mul_add(p2.1, mt3.mul_add(p0.1, 3.0 * mt2 * t * p1.1)));
 
     (x, y)
 }
@@ -230,8 +228,7 @@ pub fn parse_ass_time(time_str: &str) -> Result<u32, CoreError> {
     let parts: Vec<&str> = time_str.split(':').collect();
     if parts.len() != 3 {
         return Err(CoreError::InvalidTime(format!(
-            "Invalid time format: {}",
-            time_str
+            "Invalid time format: {time_str}"
         )));
     }
 
@@ -252,15 +249,14 @@ pub fn parse_ass_time(time_str: &str) -> Result<u32, CoreError> {
         let frac_str = &seconds_parts[1];
         let frac_val: u32 = frac_str
             .parse()
-            .map_err(|_| CoreError::InvalidTime(format!("Invalid centiseconds: {}", frac_str)))?;
+            .map_err(|_| CoreError::InvalidTime(format!("Invalid centiseconds: {frac_str}")))?;
 
         match frac_str.len() {
             1 => frac_val * 10,
             2 => frac_val,
             _ => {
                 return Err(CoreError::InvalidTime(format!(
-                    "Too many decimal places: {}",
-                    frac_str
+                    "Too many decimal places: {frac_str}"
                 )))
             }
         }
@@ -270,20 +266,17 @@ pub fn parse_ass_time(time_str: &str) -> Result<u32, CoreError> {
 
     if minutes >= 60 {
         return Err(CoreError::InvalidTime(format!(
-            "Minutes must be < 60: {}",
-            minutes
+            "Minutes must be < 60: {minutes}"
         )));
     }
     if seconds >= 60 {
         return Err(CoreError::InvalidTime(format!(
-            "Seconds must be < 60: {}",
-            seconds
+            "Seconds must be < 60: {seconds}"
         )));
     }
     if centiseconds >= 100 {
         return Err(CoreError::InvalidTime(format!(
-            "Centiseconds must be < 100: {}",
-            centiseconds
+            "Centiseconds must be < 100: {centiseconds}"
         )));
     }
 
@@ -293,7 +286,7 @@ pub fn parse_ass_time(time_str: &str) -> Result<u32, CoreError> {
 /// Format centiseconds back to ASS time format
 ///
 /// Converts internal centisecond representation back to H:MM:SS.CC format.
-pub fn format_ass_time(centiseconds: u32) -> String {
+#[must_use] pub fn format_ass_time(centiseconds: u32) -> String {
     let hours = centiseconds / 360_000;
     let remainder = centiseconds % 360_000;
     let minutes = remainder / 6000;
@@ -301,21 +294,21 @@ pub fn format_ass_time(centiseconds: u32) -> String {
     let seconds = remainder / 100;
     let cs = remainder % 100;
 
-    format!("{}:{:02}:{:02}.{:02}", hours, minutes, seconds, cs)
+    format!("{hours}:{minutes:02}:{seconds:02}.{cs:02}")
 }
 
 /// Trim and normalize whitespace in ASS field values
 ///
 /// ASS fields may have inconsistent whitespace that should be normalized
 /// while preserving intentional spacing in text content.
-pub fn normalize_field_value(value: &str) -> &str {
+#[must_use] pub fn normalize_field_value(value: &str) -> &str {
     value.trim()
 }
 
 /// Check if string contains only valid ASS characters
 ///
 /// ASS has restrictions on certain characters in names and style definitions.
-pub fn validate_ass_name(name: &str) -> bool {
+#[must_use] pub fn validate_ass_name(name: &str) -> bool {
     !name.is_empty()
         && !name.contains(',') // Comma is field separator
         && !name.contains(':') // Colon is key-value separator

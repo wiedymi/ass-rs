@@ -164,7 +164,7 @@ impl EncodingRule {
                         self.default_severity(),
                         IssueCategory::Encoding,
                         self.id(),
-                        format!("Script info field '{}' contains control characters", key),
+                        format!("Script info field '{key}' contains control characters"),
                     );
                     issues.push(issue);
                 }

@@ -38,13 +38,13 @@ impl BomType {
     ///
     /// Returns the exact byte sequence that identifies this BOM type
     /// at the beginning of a file or text stream.
-    pub fn signature(self) -> &'static [u8] {
+    #[must_use] pub const fn signature(self) -> &'static [u8] {
         match self {
-            BomType::Utf8 => &[0xEF, 0xBB, 0xBF],
-            BomType::Utf16Le => &[0xFF, 0xFE],
-            BomType::Utf16Be => &[0xFE, 0xFF],
-            BomType::Utf32Le => &[0xFF, 0xFE, 0x00, 0x00],
-            BomType::Utf32Be => &[0x00, 0x00, 0xFE, 0xFF],
+            Self::Utf8 => &[0xEF, 0xBB, 0xBF],
+            Self::Utf16Le => &[0xFF, 0xFE],
+            Self::Utf16Be => &[0xFE, 0xFF],
+            Self::Utf32Le => &[0xFF, 0xFE, 0x00, 0x00],
+            Self::Utf32Be => &[0x00, 0x00, 0xFE, 0xFF],
         }
     }
 
@@ -52,7 +52,7 @@ impl BomType {
     ///
     /// Returns the number of bytes occupied by this BOM type.
     /// Useful for skipping the BOM when processing text.
-    pub fn len(self) -> usize {
+    #[must_use] pub const fn len(self) -> usize {
         self.signature().len()
     }
 
@@ -60,7 +60,7 @@ impl BomType {
     ///
     /// Provided for completeness with Rust conventions.
     /// Always returns `false` since all BOMs have non-zero length.
-    pub fn is_empty(self) -> bool {
+    #[must_use] pub const fn is_empty(self) -> bool {
         false
     }
 
@@ -68,13 +68,13 @@ impl BomType {
     ///
     /// Returns the canonical name of the text encoding associated
     /// with this BOM type.
-    pub fn encoding_name(self) -> &'static str {
+    #[must_use] pub const fn encoding_name(self) -> &'static str {
         match self {
-            BomType::Utf8 => "UTF-8",
-            BomType::Utf16Le => "UTF-16LE",
-            BomType::Utf16Be => "UTF-16BE",
-            BomType::Utf32Le => "UTF-32LE",
-            BomType::Utf32Be => "UTF-32BE",
+            Self::Utf8 => "UTF-8",
+            Self::Utf16Le => "UTF-16LE",
+            Self::Utf16Be => "UTF-16BE",
+            Self::Utf32Le => "UTF-32LE",
+            Self::Utf32Be => "UTF-32BE",
         }
     }
 }
@@ -90,7 +90,7 @@ impl BomType {
 ///
 /// # Returns
 ///
-/// Tuple of (text_without_bom, had_bom)
+/// Tuple of (`text_without_bom`, `had_bom`)
 ///
 /// # Examples
 ///
@@ -101,7 +101,7 @@ impl BomType {
 /// assert_eq!(stripped, "Hello World");
 /// assert!(had_bom);
 /// ```
-pub fn strip_bom(text: &str) -> (&str, bool) {
+#[must_use] pub fn strip_bom(text: &str) -> (&str, bool) {
     let bytes = text.as_bytes();
 
     // Check for UTF-8 BOM first (most common for ASS files)
@@ -145,8 +145,8 @@ pub fn strip_bom(text: &str) -> (&str, bool) {
 ///
 /// # Returns
 ///
-/// Option containing (BomType, bytes_to_skip) if BOM found
-pub fn detect_bom(bytes: &[u8]) -> Option<(BomType, usize)> {
+/// Option containing (`BomType`, `bytes_to_skip`) if BOM found
+#[must_use] pub fn detect_bom(bytes: &[u8]) -> Option<(BomType, usize)> {
     // Check longer BOMs first to avoid false matches
     if bytes.starts_with(&[0xFF, 0xFE, 0x00, 0x00]) {
         Some((BomType::Utf32Le, 4))

@@ -91,7 +91,7 @@ impl BuiltinRules {
     /// let rules = BuiltinRules::all_rules();
     /// assert_eq!(rules.len(), 8); // All built-in rules
     /// ```
-    pub fn all_rules() -> Vec<Box<dyn LintRule>> {
+    #[must_use] pub fn all_rules() -> Vec<Box<dyn LintRule>> {
         vec![
             Box::new(TimingOverlapRule),
             Box::new(NegativeDurationRule),
@@ -122,7 +122,7 @@ impl BuiltinRules {
     /// let timing_rules = BuiltinRules::rules_for_category(IssueCategory::Timing);
     /// // Returns timing-related rules only
     /// ```
-    pub fn rules_for_category(category: super::IssueCategory) -> Vec<Box<dyn LintRule>> {
+    #[must_use] pub fn rules_for_category(category: super::IssueCategory) -> Vec<Box<dyn LintRule>> {
         Self::all_rules()
             .into_iter()
             .filter(|rule| rule.category() == category)
@@ -147,7 +147,7 @@ impl BuiltinRules {
     /// assert!(rule.is_some());
     /// assert_eq!(rule.unwrap().id(), "timing-overlap");
     /// ```
-    pub fn rule_by_id(id: &str) -> Option<Box<dyn LintRule>> {
+    #[must_use] pub fn rule_by_id(id: &str) -> Option<Box<dyn LintRule>> {
         Self::all_rules().into_iter().find(|rule| rule.id() == id)
     }
 
@@ -165,7 +165,7 @@ impl BuiltinRules {
     /// assert!(ids.contains(&"timing-overlap"));
     /// assert!(ids.contains(&"negative-duration"));
     /// ```
-    pub fn all_rule_ids() -> Vec<&'static str> {
+    #[must_use] pub fn all_rule_ids() -> Vec<&'static str> {
         Self::all_rules().iter().map(|rule| rule.id()).collect()
     }
 }

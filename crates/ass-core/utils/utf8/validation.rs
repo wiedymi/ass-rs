@@ -53,11 +53,10 @@ pub fn validate_utf8(bytes: &[u8]) -> Result<(), CoreError> {
             let position = err.valid_up_to();
             let message = if let Some(len) = err.error_len() {
                 format!(
-                    "Invalid UTF-8 sequence of {} bytes at position {}",
-                    len, position
+                    "Invalid UTF-8 sequence of {len} bytes at position {position}"
                 )
             } else {
-                format!("Incomplete UTF-8 sequence at position {}", position)
+                format!("Incomplete UTF-8 sequence at position {position}")
             };
 
             Err(CoreError::utf8_error(position, message))
@@ -77,7 +76,7 @@ pub fn validate_utf8(bytes: &[u8]) -> Result<(), CoreError> {
 ///
 /// # Returns
 ///
-/// Tuple of (recovered_text, replacement_count)
+/// Tuple of (`recovered_text`, `replacement_count`)
 ///
 /// # Examples
 ///
@@ -93,14 +92,11 @@ pub fn validate_utf8(bytes: &[u8]) -> Result<(), CoreError> {
 /// assert_eq!(recovered, "Hi�!");
 /// assert_eq!(replacements, 1);
 /// ```
-pub fn recover_utf8(bytes: &[u8]) -> (String, usize) {
-    match str::from_utf8(bytes) {
-        Ok(s) => (s.to_string(), 0),
-        Err(_) => {
-            let recovered = String::from_utf8_lossy(bytes);
-            let replacements = recovered.matches('\u{FFFD}').count();
-            (recovered.into_owned(), replacements)
-        }
+#[must_use] pub fn recover_utf8(bytes: &[u8]) -> (String, usize) {
+    if let Ok(s) = str::from_utf8(bytes) { (s.to_string(), 0) } else {
+        let recovered = String::from_utf8_lossy(bytes);
+        let replacements = recovered.matches('\u{FFFD}').count();
+        (recovered.into_owned(), replacements)
     }
 }
 
@@ -117,7 +113,7 @@ pub fn recover_utf8(bytes: &[u8]) -> (String, usize) {
 /// # Returns
 ///
 /// `true` if all characters are valid for ASS content
-pub fn is_valid_ass_text(text: &str) -> bool {
+#[must_use] pub fn is_valid_ass_text(text: &str) -> bool {
     text.chars().all(|c| {
         c.is_ascii_graphic()  // Printable ASCII
             || c == ' '       // Space
@@ -141,7 +137,7 @@ pub fn is_valid_ass_text(text: &str) -> bool {
 ///
 /// # Returns
 ///
-/// Tuple of (truncated_text, was_truncated)
+/// Tuple of (`truncated_text`, `was_truncated`)
 ///
 /// # Examples
 ///
@@ -157,7 +153,7 @@ pub fn is_valid_ass_text(text: &str) -> bool {
 /// assert_eq!(truncated, "Hello "); // Stops before the Unicode character
 /// assert!(was_truncated);
 /// ```
-pub fn truncate_at_char_boundary(text: &str, max_bytes: usize) -> (&str, bool) {
+#[must_use] pub fn truncate_at_char_boundary(text: &str, max_bytes: usize) -> (&str, bool) {
     if text.len() <= max_bytes {
         return (text, false);
     }
@@ -183,7 +179,7 @@ pub fn truncate_at_char_boundary(text: &str, max_bytes: usize) -> (&str, bool) {
 /// # Returns
 ///
 /// Number of replacement characters found
-pub fn count_replacement_chars(text: &str) -> usize {
+#[must_use] pub fn count_replacement_chars(text: &str) -> usize {
     text.matches('\u{FFFD}').count()
 }
 

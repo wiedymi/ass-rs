@@ -1,13 +1,13 @@
 //! Hash function utilities for consistent performance across platforms
 //!
-//! Provides ahash-based hashers optimized for ASS-RS use cases with DoS resistance
+//! Provides ahash-based hashers optimized for ASS-RS use cases with `DoS` resistance
 //! and consistent performance across platforms including WASM.
 //!
 //! # Features
 //!
 //! - DoS-resistant hashing via ahash with random seeds
 //! - WASM-compatible implementation
-//! - no_std support when needed
+//! - `no_std` support when needed
 //! - Deterministic hashing for testing when enabled
 
 use ahash::{AHasher, RandomState};
@@ -18,10 +18,10 @@ use hashbrown::HashMap;
 #[cfg(not(feature = "no_std"))]
 use std::collections::HashMap;
 
-/// Create a new HashMap with optimized hasher for ASS-RS use cases
+/// Create a new `HashMap` with optimized hasher for ASS-RS use cases
 ///
-/// Uses ahash for consistent performance across platforms with DoS resistance.
-/// Automatically handles no_std vs std HashMap selection.
+/// Uses ahash for consistent performance across platforms with `DoS` resistance.
+/// Automatically handles `no_std` vs std `HashMap` selection.
 ///
 /// # Example
 ///
@@ -31,11 +31,11 @@ use std::collections::HashMap;
 /// let mut map = create_hash_map::<String, i32>();
 /// map.insert("key".to_string(), 42);
 /// ```
-pub fn create_hash_map<K, V>() -> HashMap<K, V, RandomState> {
+#[must_use] pub fn create_hash_map<K, V>() -> HashMap<K, V, RandomState> {
     HashMap::with_hasher(RandomState::new())
 }
 
-/// Create a new HashMap with specific capacity and optimized hasher
+/// Create a new `HashMap` with specific capacity and optimized hasher
 ///
 /// Pre-allocates the specified capacity to avoid rehashing during construction.
 /// Useful when the approximate size is known in advance.
@@ -48,14 +48,14 @@ pub fn create_hash_map<K, V>() -> HashMap<K, V, RandomState> {
 /// // Pre-allocate for expected 100 entries
 /// let mut map = create_hash_map_with_capacity::<String, i32>(100);
 /// ```
-pub fn create_hash_map_with_capacity<K, V>(capacity: usize) -> HashMap<K, V, RandomState> {
+#[must_use] pub fn create_hash_map_with_capacity<K, V>(capacity: usize) -> HashMap<K, V, RandomState> {
     HashMap::with_capacity_and_hasher(capacity, RandomState::new())
 }
 
 /// Create a hasher instance for manual hashing operations
 ///
-/// Returns an ahash hasher with random seed for DoS resistance.
-/// Use this when you need to hash individual values outside of HashMap.
+/// Returns an ahash hasher with random seed for `DoS` resistance.
+/// Use this when you need to hash individual values outside of `HashMap`.
 ///
 /// # Example
 ///
@@ -67,7 +67,7 @@ pub fn create_hash_map_with_capacity<K, V>(capacity: usize) -> HashMap<K, V, Ran
 /// "some string".hash(&mut hasher);
 /// let hash_value = hasher.finish();
 /// ```
-pub fn create_hasher() -> AHasher {
+#[must_use] pub fn create_hasher() -> AHasher {
     RandomState::new().build_hasher()
 }
 
@@ -131,7 +131,7 @@ pub struct HashConfig {
     /// Whether to use deterministic hashing (testing only)
     pub deterministic: bool,
 
-    /// Initial capacity hint for HashMaps
+    /// Initial capacity hint for `HashMaps`
     pub default_capacity: usize,
 
     /// Load factor before rehashing (0.0 to 1.0)
@@ -159,8 +159,8 @@ impl HashConfig {
         }
     }
 
-    /// Create HashMap using this configuration
-    pub fn create_map<K, V>(&self) -> HashMap<K, V, RandomState> {
+    /// Create `HashMap` using this configuration
+    #[must_use] pub fn create_map<K, V>(&self) -> HashMap<K, V, RandomState> {
         if self.deterministic {
             #[cfg(test)]
             return create_deterministic_hash_map();

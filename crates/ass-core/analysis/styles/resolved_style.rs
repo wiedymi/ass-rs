@@ -1,6 +1,6 @@
 //! Resolved style representation with computed values and metrics
 //!
-//! Provides the ResolvedStyle struct containing fully computed style properties
+//! Provides the `ResolvedStyle` struct containing fully computed style properties
 //! after applying inheritance, overrides, and default fallbacks. Includes
 //! performance analysis and rendering complexity assessment.
 //!
@@ -54,7 +54,7 @@ pub struct ResolvedStyle<'a> {
     spacing: f32,
     /// Text rotation angle
     angle: f32,
-    /// Border style (0=outline+drop_shadow, 1=opaque_box)
+    /// Border style (`0=outline+drop_shadow`, `1=opaque_box`)
     border_style: u8,
     /// Outline thickness
     outline: f32,
@@ -73,7 +73,7 @@ pub struct ResolvedStyle<'a> {
 }
 
 impl<'a> ResolvedStyle<'a> {
-    /// Create ResolvedStyle from base Style definition
+    /// Create `ResolvedStyle` from base Style definition
     ///
     /// Resolves all style properties, validates values, and computes
     /// performance metrics. Invalid values are replaced with defaults.
@@ -165,27 +165,27 @@ impl<'a> ResolvedStyle<'a> {
     }
 
     /// Get font family name
-    pub fn font_name(&self) -> &str {
+    #[must_use] pub fn font_name(&self) -> &str {
         &self.font_name
     }
 
     /// Get font size in points
-    pub fn font_size(&self) -> f32 {
+    #[must_use] pub const fn font_size(&self) -> f32 {
         self.font_size
     }
 
     /// Get primary color as RGBA bytes
-    pub fn primary_color(&self) -> [u8; 4] {
+    #[must_use] pub const fn primary_color(&self) -> [u8; 4] {
         self.primary_color
     }
 
     /// Get rendering complexity score (0-100)
-    pub fn complexity_score(&self) -> u8 {
+    #[must_use] pub const fn complexity_score(&self) -> u8 {
         self.complexity_score
     }
 
     /// Check if style has performance concerns
-    pub fn has_performance_issues(&self) -> bool {
+    #[must_use] pub const fn has_performance_issues(&self) -> bool {
         self.complexity_score > 70
     }
 
@@ -265,10 +265,10 @@ fn parse_bool_flag(flag_str: &str) -> Result<bool> {
 /// Parse percentage value
 fn parse_percentage(percent_str: &str) -> Result<f32> {
     let value = parse_float(percent_str)?;
-    if !(0.0..=1000.0).contains(&value) {
-        Err(CoreError::parse("Invalid percentage"))
-    } else {
+    if (0.0..=1000.0).contains(&value) {
         Ok(value)
+    } else {
+        Err(CoreError::parse("Invalid percentage"))
     }
 }
 

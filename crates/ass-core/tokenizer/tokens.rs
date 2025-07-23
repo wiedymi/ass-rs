@@ -48,7 +48,7 @@ pub struct Token<'a> {
 
 impl<'a> Token<'a> {
     /// Create new token with full location information
-    pub fn new(token_type: TokenType, span: &'a str, line: usize, column: usize) -> Self {
+    #[must_use] pub const fn new(token_type: TokenType, span: &'a str, line: usize, column: usize) -> Self {
         Self {
             token_type,
             span,
@@ -58,27 +58,27 @@ impl<'a> Token<'a> {
     }
 
     /// Get token length in characters
-    pub fn len(&self) -> usize {
+    #[must_use] pub fn len(&self) -> usize {
         self.span.chars().count()
     }
 
     /// Check if token is empty (should not happen in normal tokenization)
-    pub fn is_empty(&self) -> bool {
+    #[must_use] pub const fn is_empty(&self) -> bool {
         self.span.is_empty()
     }
 
     /// Get end column position
-    pub fn end_column(&self) -> usize {
+    #[must_use] pub fn end_column(&self) -> usize {
         self.column + self.len()
     }
 
     /// Check if this token represents whitespace
-    pub fn is_whitespace(&self) -> bool {
+    #[must_use] pub const fn is_whitespace(&self) -> bool {
         matches!(self.token_type, TokenType::Whitespace)
     }
 
     /// Check if this token represents a delimiter
-    pub fn is_delimiter(&self) -> bool {
+    #[must_use] pub const fn is_delimiter(&self) -> bool {
         matches!(
             self.token_type,
             TokenType::Comma
@@ -91,7 +91,7 @@ impl<'a> Token<'a> {
     }
 
     /// Check if this token represents content (text, numbers, etc.)
-    pub fn is_content(&self) -> bool {
+    #[must_use] pub const fn is_content(&self) -> bool {
         matches!(
             self.token_type,
             TokenType::Text
@@ -103,7 +103,7 @@ impl<'a> Token<'a> {
     }
 
     /// Validate that span references valid UTF-8
-    pub fn validate_utf8(&self) -> bool {
+    #[must_use] pub const fn validate_utf8(&self) -> bool {
         true
     }
 }
@@ -208,7 +208,7 @@ pub enum TokenType {
 
 impl TokenType {
     /// Check if token type represents a delimiter
-    pub fn is_delimiter(self) -> bool {
+    #[must_use] pub const fn is_delimiter(self) -> bool {
         matches!(
             self,
             Self::Colon
@@ -221,7 +221,7 @@ impl TokenType {
     }
 
     /// Check if token type represents structural elements
-    pub fn is_structural(self) -> bool {
+    #[must_use] pub const fn is_structural(self) -> bool {
         matches!(
             self,
             Self::SectionHeader
@@ -233,7 +233,7 @@ impl TokenType {
     }
 
     /// Check if token type represents data content
-    pub fn is_content(self) -> bool {
+    #[must_use] pub const fn is_content(self) -> bool {
         matches!(
             self,
             Self::Text
@@ -247,12 +247,12 @@ impl TokenType {
     }
 
     /// Check if token type can be skipped during parsing
-    pub fn is_skippable(self) -> bool {
+    #[must_use] pub const fn is_skippable(self) -> bool {
         matches!(self, Self::Whitespace | Self::Comment)
     }
 
     /// Get human-readable name for error messages
-    pub fn name(self) -> &'static str {
+    #[must_use] pub const fn name(self) -> &'static str {
         match self {
             Self::Text => "text",
             Self::Number => "number",
@@ -327,7 +327,7 @@ pub enum DelimiterType {
 
 impl DelimiterType {
     /// Get expected character(s) for this delimiter type
-    pub fn chars(self) -> &'static [char] {
+    #[must_use] pub const fn chars(self) -> &'static [char] {
         match self {
             Self::FieldSeparator => &[':'],
             Self::ValueSeparator => &[','],
@@ -342,7 +342,7 @@ impl DelimiterType {
     }
 
     /// Check if character matches this delimiter type
-    pub fn matches(self, ch: char) -> bool {
+    #[must_use] pub fn matches(self, ch: char) -> bool {
         self.chars().contains(&ch)
     }
 }
@@ -362,7 +362,7 @@ pub struct TokenPosition {
 
 impl TokenPosition {
     /// Create new position
-    pub fn new(offset: usize, line: usize, column: usize) -> Self {
+    #[must_use] pub const fn new(offset: usize, line: usize, column: usize) -> Self {
         Self {
             offset,
             line,
@@ -371,13 +371,13 @@ impl TokenPosition {
     }
 
     /// Create position at start of input
-    pub fn start() -> Self {
+    #[must_use] pub const fn start() -> Self {
         Self::new(0, 1, 1)
     }
 
     /// Advance position by one character
     #[must_use]
-    pub fn advance(mut self, ch: char) -> Self {
+    pub const fn advance(mut self, ch: char) -> Self {
         self.offset += ch.len_utf8();
         if ch == '\n' {
             self.line += 1;

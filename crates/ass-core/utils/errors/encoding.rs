@@ -10,7 +10,7 @@ use core::fmt;
 
 /// Create UTF-8 encoding error with position information
 ///
-/// Generates a CoreError::Utf8Error with detailed position and context
+/// Generates a `CoreError::Utf8Error` with detailed position and context
 /// information about the encoding failure.
 ///
 /// # Arguments
@@ -26,20 +26,20 @@ use core::fmt;
 /// let error = utf8_error(42, "Invalid UTF-8 sequence".to_string());
 /// assert!(matches!(error, CoreError::Utf8Error { .. }));
 /// ```
-pub fn utf8_error(position: usize, message: String) -> CoreError {
+#[must_use] pub const fn utf8_error(position: usize, message: String) -> CoreError {
     CoreError::Utf8Error { position, message }
 }
 
 /// Create validation error for text content
 ///
-/// Generates a CoreError::Validation for content that fails ASS-specific
+/// Generates a `CoreError::Validation` for content that fails ASS-specific
 /// text validation rules (e.g., contains invalid control characters).
 ///
 /// # Arguments
 ///
 /// * `message` - Description of the validation failure
 pub fn validation_error<T: fmt::Display>(message: T) -> CoreError {
-    CoreError::Validation(format!("{}", message))
+    CoreError::Validation(format!("{message}"))
 }
 
 /// Validate UTF-8 with detailed error reporting
@@ -61,11 +61,10 @@ pub fn validate_utf8_detailed(bytes: &[u8]) -> Result<(), CoreError> {
             let position = err.valid_up_to();
             let message = if let Some(len) = err.error_len() {
                 format!(
-                    "Invalid UTF-8 sequence of {} bytes at position {}",
-                    len, position
+                    "Invalid UTF-8 sequence of {len} bytes at position {position}"
                 )
             } else {
-                format!("Incomplete UTF-8 sequence at position {}", position)
+                format!("Incomplete UTF-8 sequence at position {position}")
             };
 
             Err(utf8_error(position, message))

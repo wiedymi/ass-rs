@@ -146,37 +146,37 @@ impl<'a> TextAnalysis<'a> {
     }
 
     /// Get plain text without override tags
-    pub fn plain_text(&self) -> &str {
+    #[must_use] pub fn plain_text(&self) -> &str {
         &self.plain_text
     }
 
     /// Get Unicode character count
-    pub fn char_count(&self) -> usize {
+    #[must_use] pub const fn char_count(&self) -> usize {
         self.char_count
     }
 
     /// Get line count after processing linebreaks
-    pub fn line_count(&self) -> usize {
+    #[must_use] pub const fn line_count(&self) -> usize {
         self.line_count
     }
 
     /// Check if text contains bidirectional content
-    pub fn has_bidi_text(&self) -> bool {
+    #[must_use] pub const fn has_bidi_text(&self) -> bool {
         self.has_bidi_text
     }
 
     /// Check if text contains complex Unicode beyond basic Latin
-    pub fn has_complex_unicode(&self) -> bool {
+    #[must_use] pub const fn has_complex_unicode(&self) -> bool {
         self.has_complex_unicode
     }
 
     /// Get parsed override tags
-    pub fn override_tags(&self) -> &[OverrideTag<'a>] {
+    #[must_use] pub fn override_tags(&self) -> &[OverrideTag<'a>] {
         &self.override_tags
     }
 
     /// Get parse diagnostics collected during analysis
-    pub fn diagnostics(&self) -> &[TagDiagnostic<'a>] {
+    #[must_use] pub fn diagnostics(&self) -> &[TagDiagnostic<'a>] {
         &self.parse_diagnostics
     }
 

@@ -61,17 +61,17 @@ impl CoreError {
     }
 
     /// Create UTF-8 error with position
-    pub fn utf8_error(position: usize, message: alloc::string::String) -> Self {
+    #[must_use] pub const fn utf8_error(position: usize, message: alloc::string::String) -> Self {
         encoding::utf8_error(position, message)
     }
 
     /// Create feature not supported error
-    pub fn feature_not_supported(feature: &str, required_feature: &str) -> Self {
+    #[must_use] pub fn feature_not_supported(feature: &str, required_feature: &str) -> Self {
         resource::feature_not_supported(feature, required_feature)
     }
 
     /// Create resource limit error
-    pub fn resource_limit_exceeded(resource: &str, current: usize, limit: usize) -> Self {
+    #[must_use] pub fn resource_limit_exceeded(resource: &str, current: usize, limit: usize) -> Self {
         resource::resource_limit_exceeded(resource, current, limit)
     }
 }
@@ -87,16 +87,16 @@ impl From<crate::parser::ParseError> for CoreError {
 #[cfg(feature = "std")]
 impl From<std::io::Error> for CoreError {
     fn from(err: std::io::Error) -> Self {
-        Self::Io(format!("{}", err))
+        Self::Io(format!("{err}"))
     }
 }
 
-/// Convert from core::str::Utf8Error
+/// Convert from `core::str::Utf8Error`
 impl From<::core::str::Utf8Error> for CoreError {
     fn from(err: ::core::str::Utf8Error) -> Self {
         Self::Utf8Error {
             position: 0, // Position not available from Utf8Error
-            message: format!("{}", err),
+            message: format!("{err}"),
         }
     }
 }

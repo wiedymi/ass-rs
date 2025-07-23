@@ -77,37 +77,34 @@ impl LintRule for TimingOverlapRule {
             .iter()
             .find(|s| matches!(s, Section::Events(_)))
         {
-            match find_overlapping_events(events) {
-                Ok(overlaps) => {
-                    for (i, j) in overlaps {
-                        let event1 = &events[i];
-                        let event2 = &events[j];
+            if let Ok(overlaps) = find_overlapping_events(events) {
+                for (i, j) in overlaps {
+                    let event1 = &events[i];
+                    let event2 = &events[j];
 
-                        let issue = LintIssue::new(
-                            self.default_severity(),
-                            IssueCategory::Timing,
-                            self.id(),
-                            format!(
-                                "Event overlaps: {} to {} overlaps with {} to {}",
-                                event1.start, event1.end, event2.start, event2.end
-                            ),
-                        )
-                        .with_description(
-                            "Overlapping events may cause rendering conflicts".to_string(),
-                        );
-
-                        issues.push(issue);
-                    }
-                }
-                Err(_) => {
                     let issue = LintIssue::new(
-                        IssueSeverity::Warning,
+                        self.default_severity(),
                         IssueCategory::Timing,
                         self.id(),
-                        "Could not analyze event overlaps due to timing parse errors".to_string(),
+                        format!(
+                            "Event overlaps: {} to {} overlaps with {} to {}",
+                            event1.start, event1.end, event2.start, event2.end
+                        ),
+                    )
+                    .with_description(
+                        "Overlapping events may cause rendering conflicts".to_string(),
                     );
+
                     issues.push(issue);
                 }
+            } else {
+                let issue = LintIssue::new(
+                    IssueSeverity::Warning,
+                    IssueCategory::Timing,
+                    self.id(),
+                    "Could not analyze event overlaps due to timing parse errors".to_string(),
+                );
+                issues.push(issue);
             }
         }
 

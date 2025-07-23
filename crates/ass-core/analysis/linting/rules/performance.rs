@@ -86,7 +86,7 @@ impl PerformanceRule {
                 self.default_severity(),
                 IssueCategory::Performance,
                 self.id(),
-                format!("Script has {} events, consider optimization", event_count),
+                format!("Script has {event_count} events, consider optimization"),
             )
             .with_description("Large number of events may impact rendering performance".to_string())
             .with_suggested_fix(
@@ -112,7 +112,7 @@ impl PerformanceRule {
                     self.default_severity(),
                     IssueCategory::Performance,
                     self.id(),
-                    format!("Event has very long text ({} characters)", text_length),
+                    format!("Event has very long text ({text_length} characters)"),
                 )
                 .with_description(
                     "Very long event text may impact rendering performance".to_string(),
@@ -130,7 +130,7 @@ impl PerformanceRule {
                     self.default_severity(),
                     IssueCategory::Performance,
                     self.id(),
-                    format!("Event has many override tags ({} blocks)", override_count),
+                    format!("Event has many override tags ({override_count} blocks)"),
                 )
                 .with_description(
                     "Excessive override tags may impact rendering performance".to_string(),

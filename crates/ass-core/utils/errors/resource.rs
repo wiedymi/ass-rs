@@ -10,7 +10,7 @@ use core::fmt;
 
 /// Create memory allocation error
 ///
-/// Generates a CoreError::OutOfMemory with descriptive context about
+/// Generates a `CoreError::OutOfMemory` with descriptive context about
 /// the failed memory allocation attempt.
 ///
 /// # Arguments
@@ -26,12 +26,12 @@ use core::fmt;
 /// assert!(matches!(error, CoreError::OutOfMemory(_)));
 /// ```
 pub fn out_of_memory<T: fmt::Display>(context: T) -> CoreError {
-    CoreError::OutOfMemory(format!("{}", context))
+    CoreError::OutOfMemory(format!("{context}"))
 }
 
 /// Create resource limit exceeded error
 ///
-/// Generates a CoreError::ResourceLimitExceeded with detailed information
+/// Generates a `CoreError::ResourceLimitExceeded` with detailed information
 /// about which resource was exceeded and by how much.
 ///
 /// # Arguments
@@ -39,7 +39,7 @@ pub fn out_of_memory<T: fmt::Display>(context: T) -> CoreError {
 /// * `resource` - Name of the resource that was exceeded
 /// * `current` - Current usage that triggered the limit
 /// * `limit` - Maximum allowed usage
-pub fn resource_limit_exceeded(resource: &str, current: usize, limit: usize) -> CoreError {
+#[must_use] pub fn resource_limit_exceeded(resource: &str, current: usize, limit: usize) -> CoreError {
     CoreError::ResourceLimitExceeded {
         resource: resource.to_string(),
         current,
@@ -49,14 +49,14 @@ pub fn resource_limit_exceeded(resource: &str, current: usize, limit: usize) -> 
 
 /// Create feature not supported error
 ///
-/// Generates a CoreError::FeatureNotSupported when functionality requires
+/// Generates a `CoreError::FeatureNotSupported` when functionality requires
 /// a feature that is not enabled in the current build configuration.
 ///
 /// # Arguments
 ///
 /// * `feature` - The feature that was requested
 /// * `required_feature` - The Cargo feature flag needed to enable it
-pub fn feature_not_supported(feature: &str, required_feature: &str) -> CoreError {
+#[must_use] pub fn feature_not_supported(feature: &str, required_feature: &str) -> CoreError {
     CoreError::FeatureNotSupported {
         feature: feature.to_string(),
         required_feature: required_feature.to_string(),

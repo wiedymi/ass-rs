@@ -115,7 +115,7 @@ impl InvalidColorRule {
                 self.default_severity(),
                 IssueCategory::Styling,
                 self.id(),
-                format!("Invalid {} color: {}", field_name, color_value),
+                format!("Invalid {field_name} color: {color_value}"),
             );
             issues.push(issue);
         }
@@ -129,14 +129,13 @@ impl InvalidColorRule {
             }
 
             if let Some((tag_name, color_value)) = self.parse_color_tag(tag_part) {
-                if parse_bgr_color(&format!("&H{}&", color_value)).is_err() {
+                if parse_bgr_color(&format!("&H{color_value}&")).is_err() {
                     let issue = LintIssue::new(
                         self.default_severity(),
                         IssueCategory::Styling,
                         self.id(),
                         format!(
-                            "Invalid color override tag: \\{}&H{}&",
-                            tag_name, color_value
+                            "Invalid color override tag: \\{tag_name}&H{color_value}&"
                         ),
                     );
                     issues.push(issue);
@@ -145,7 +144,7 @@ impl InvalidColorRule {
         }
     }
 
-    /// Parse a color tag and return (tag_name, color_value) if valid
+    /// Parse a color tag and return (`tag_name`, `color_value`) if valid
     fn parse_color_tag(&self, tag_part: &str) -> Option<(String, String)> {
         if tag_part.starts_with("c&H") || tag_part.starts_with("c&h") {
             let color_part = tag_part
@@ -162,7 +161,7 @@ impl InvalidColorRule {
                 let color_part = tag_part[1..].strip_prefix("c&H")?;
                 let color_end = color_part.find('&')?;
                 let color_value = &color_part[..color_end];
-                return Some((format!("{}c", first_char), color_value.to_string()));
+                return Some((format!("{first_char}c"), color_value.to_string()));
             }
         }
 

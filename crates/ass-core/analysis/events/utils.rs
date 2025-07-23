@@ -29,7 +29,7 @@ use core::cmp::Ordering;
 ///
 /// # Arguments
 ///
-/// * `events` - Slice of DialogueInfo to analyze for overlaps
+/// * `events` - Slice of `DialogueInfo` to analyze for overlaps
 ///
 /// # Returns
 ///
@@ -52,8 +52,8 @@ use core::cmp::Ordering;
 /// assert_eq!(overlaps.len(), 1);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub fn find_overlapping_dialogue_events(events: &[DialogueInfo<'_>]) -> Vec<(usize, usize)> {
-    let event_refs: Vec<&Event> = events.iter().map(|info| info.event()).collect();
+#[must_use] pub fn find_overlapping_dialogue_events(events: &[DialogueInfo<'_>]) -> Vec<(usize, usize)> {
+    let event_refs: Vec<&Event> = events.iter().map(super::dialogue_info::DialogueInfo::event).collect();
     find_overlapping_event_refs(&event_refs).unwrap_or_else(|_| Vec::new())
 }
 
@@ -64,12 +64,12 @@ pub fn find_overlapping_dialogue_events(events: &[DialogueInfo<'_>]) -> Vec<(usi
 ///
 /// # Arguments
 ///
-/// * `events` - Slice of DialogueInfo to check for overlaps
+/// * `events` - Slice of `DialogueInfo` to check for overlaps
 ///
 /// # Returns
 ///
 /// Number of overlapping event pairs found.
-pub fn count_overlapping_dialogue_events(events: &[DialogueInfo<'_>]) -> usize {
+#[must_use] pub fn count_overlapping_dialogue_events(events: &[DialogueInfo<'_>]) -> usize {
     find_overlapping_dialogue_events(events).len()
 }
 
@@ -81,7 +81,7 @@ pub fn count_overlapping_dialogue_events(events: &[DialogueInfo<'_>]) -> usize {
 ///
 /// # Arguments
 ///
-/// * `events` - Mutable slice of DialogueInfo to sort in-place
+/// * `events` - Mutable slice of `DialogueInfo` to sort in-place
 ///
 /// # Performance
 ///
@@ -125,7 +125,7 @@ pub fn sort_events_by_time(events: &mut [DialogueInfo<'_>]) {
 ///
 /// # Arguments
 ///
-/// * `events` - Slice of DialogueInfo to analyze
+/// * `events` - Slice of `DialogueInfo` to analyze
 ///
 /// # Returns
 ///
@@ -159,13 +159,13 @@ pub fn sort_events_by_time(events: &mut [DialogueInfo<'_>]) {
 /// }
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub fn calculate_total_duration(events: &[DialogueInfo<'_>]) -> Option<u32> {
+#[must_use] pub fn calculate_total_duration(events: &[DialogueInfo<'_>]) -> Option<u32> {
     if events.is_empty() {
         return None;
     }
 
-    let start = events.iter().map(|e| e.start_time_cs()).min()?;
-    let end = events.iter().map(|e| e.end_time_cs()).max()?;
+    let start = events.iter().map(super::dialogue_info::DialogueInfo::start_time_cs).min()?;
+    let end = events.iter().map(super::dialogue_info::DialogueInfo::end_time_cs).max()?;
 
     Some(end - start)
 }
@@ -177,17 +177,17 @@ pub fn calculate_total_duration(events: &[DialogueInfo<'_>]) -> Option<u32> {
 ///
 /// # Arguments
 ///
-/// * `events` - Slice of DialogueInfo to analyze
+/// * `events` - Slice of `DialogueInfo` to analyze
 ///
 /// # Returns
 ///
 /// Average duration in centiseconds, or None if no events.
-pub fn calculate_average_duration(events: &[DialogueInfo<'_>]) -> Option<u32> {
+#[must_use] pub fn calculate_average_duration(events: &[DialogueInfo<'_>]) -> Option<u32> {
     if events.is_empty() {
         return None;
     }
 
-    let total_duration: u32 = events.iter().map(|e| e.duration_cs()).sum();
+    let total_duration: u32 = events.iter().map(super::dialogue_info::DialogueInfo::duration_cs).sum();
     Some(total_duration / events.len() as u32)
 }
 
@@ -198,14 +198,14 @@ pub fn calculate_average_duration(events: &[DialogueInfo<'_>]) -> Option<u32> {
 ///
 /// # Arguments
 ///
-/// * `events` - Slice of DialogueInfo to search
+/// * `events` - Slice of `DialogueInfo` to search
 /// * `start_cs` - Range start time in centiseconds
 /// * `end_cs` - Range end time in centiseconds
 ///
 /// # Returns
 ///
 /// Vector of indices for events overlapping the time range.
-pub fn find_events_in_range(events: &[DialogueInfo<'_>], start_cs: u32, end_cs: u32) -> Vec<usize> {
+#[must_use] pub fn find_events_in_range(events: &[DialogueInfo<'_>], start_cs: u32, end_cs: u32) -> Vec<usize> {
     events
         .iter()
         .enumerate()

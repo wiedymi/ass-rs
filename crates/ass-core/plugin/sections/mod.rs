@@ -1,6 +1,6 @@
 //! ASS section processors for the plugin system
 //!
-//! Provides implementations of the SectionProcessor trait for handling
+//! Provides implementations of the `SectionProcessor` trait for handling
 //! non-standard ASS sections. Processors validate section content and
 //! handle extended functionality beyond the core ASS specification.
 //!

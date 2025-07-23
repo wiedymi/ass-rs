@@ -1,6 +1,6 @@
 //! ASS override tag handlers for the plugin system
 //!
-//! Provides implementations of the TagHandler trait for all standard ASS
+//! Provides implementations of the `TagHandler` trait for all standard ASS
 //! override tags. Handlers validate tag arguments and process tag operations
 //! according to ASS specification compliance.
 //!

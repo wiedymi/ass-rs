@@ -44,7 +44,7 @@ impl EncodingInfo {
     ///
     /// * `encoding` - Name of the detected encoding
     /// * `confidence` - Confidence level (0.0 to 1.0)
-    pub fn new(encoding: String, confidence: f32) -> Self {
+    #[must_use] pub const fn new(encoding: String, confidence: f32) -> Self {
         Self {
             encoding,
             confidence,
@@ -61,7 +61,7 @@ impl EncodingInfo {
     /// * `encoding` - Name of the detected encoding
     /// * `confidence` - Confidence level (0.0 to 1.0)
     /// * `bom_type` - Type of BOM detected
-    pub fn with_bom(encoding: String, confidence: f32, bom_type: BomType) -> Self {
+    #[must_use] pub const fn with_bom(encoding: String, confidence: f32, bom_type: BomType) -> Self {
         Self {
             encoding,
             confidence,
@@ -84,7 +84,7 @@ impl EncodingInfo {
 ///
 /// # Returns
 ///
-/// EncodingInfo with detected encoding and confidence level
+/// `EncodingInfo` with detected encoding and confidence level
 ///
 /// # Examples
 ///
@@ -95,7 +95,7 @@ impl EncodingInfo {
 /// assert_eq!(encoding.encoding, "UTF-8");
 /// assert!(encoding.confidence > 0.8);
 /// ```
-pub fn detect_encoding(bytes: &[u8]) -> EncodingInfo {
+#[must_use] pub fn detect_encoding(bytes: &[u8]) -> EncodingInfo {
     // Check for BOM first - gives us certainty about encoding
     if let Some((bom_type, _)) = detect_bom(bytes) {
         return EncodingInfo::with_bom(
@@ -132,7 +132,7 @@ pub fn detect_encoding(bytes: &[u8]) -> EncodingInfo {
 /// # Returns
 ///
 /// `true` if content appears to be ASS subtitle format
-pub fn is_likely_ass_content(text: &str) -> bool {
+#[must_use] pub fn is_likely_ass_content(text: &str) -> bool {
     // Check for ASS section headers
     if text.contains("[Script Info]")
         || text.contains("[V4+ Styles]")
@@ -167,7 +167,7 @@ pub fn is_likely_ass_content(text: &str) -> bool {
 ///
 /// # Returns
 ///
-/// EncodingInfo with best guess for the encoding
+/// `EncodingInfo` with best guess for the encoding
 fn detect_non_utf8_encoding(bytes: &[u8]) -> EncodingInfo {
     let has_extended_ascii = bytes.iter().any(|&b| b >= 0x80);
 

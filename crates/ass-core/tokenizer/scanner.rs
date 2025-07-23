@@ -27,7 +27,7 @@ pub struct CharNavigator<'a> {
 
 impl<'a> CharNavigator<'a> {
     /// Create new character navigator
-    pub fn new(source: &'a str, position: usize, line: usize, column: usize) -> Self {
+    #[must_use] pub fn new(source: &'a str, position: usize, line: usize, column: usize) -> Self {
         Self {
             source,
             position,
@@ -39,17 +39,17 @@ impl<'a> CharNavigator<'a> {
     }
 
     /// Get current position
-    pub fn position(&self) -> usize {
+    #[must_use] pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Get current line
-    pub fn line(&self) -> usize {
+    #[must_use] pub const fn line(&self) -> usize {
         self.line
     }
 
     /// Get current column
-    pub fn column(&self) -> usize {
+    #[must_use] pub const fn column(&self) -> usize {
         self.column
     }
 
@@ -111,7 +111,7 @@ impl<'a> CharNavigator<'a> {
     }
 
     /// Check if at end of source
-    pub fn is_at_end(&self) -> bool {
+    #[must_use] pub const fn is_at_end(&self) -> bool {
         self.position >= self.source.len()
     }
 }
@@ -125,7 +125,7 @@ pub struct TokenScanner<'a> {
 
 impl<'a> TokenScanner<'a> {
     /// Create new token scanner
-    pub fn new(source: &'a str, position: usize, line: usize, column: usize) -> Self {
+    #[must_use] pub fn new(source: &'a str, position: usize, line: usize, column: usize) -> Self {
         Self {
             navigator: CharNavigator::new(source, position, line, column),
             source,
@@ -138,7 +138,7 @@ impl<'a> TokenScanner<'a> {
     }
 
     /// Get current navigator state (immutable)
-    pub fn navigator(&self) -> &CharNavigator<'a> {
+    #[must_use] pub const fn navigator(&self) -> &CharNavigator<'a> {
         &self.navigator
     }
 

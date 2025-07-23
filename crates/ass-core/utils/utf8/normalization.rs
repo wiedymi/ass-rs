@@ -38,7 +38,7 @@ use alloc::string::String;
 /// let normalized = normalize_line_endings(input);
 /// assert_eq!(normalized, "Line 1\nLine 2\nLine 3\n");
 /// ```
-pub fn normalize_line_endings(text: &str) -> String {
+#[must_use] pub fn normalize_line_endings(text: &str) -> String {
     text.replace("\r\n", "\n").replace('\r', "\n")
 }
 
@@ -55,7 +55,7 @@ pub fn normalize_line_endings(text: &str) -> String {
 /// # Returns
 ///
 /// String with normalized whitespace
-pub fn normalize_whitespace(text: &str, collapse_multiple: bool) -> String {
+#[must_use] pub fn normalize_whitespace(text: &str, collapse_multiple: bool) -> String {
     let mut result = text
         .chars()
         .map(|c| {
@@ -87,7 +87,7 @@ pub fn normalize_whitespace(text: &str, collapse_multiple: bool) -> String {
 /// # Returns
 ///
 /// String with control characters removed or normalized
-pub fn remove_control_chars(text: &str) -> String {
+#[must_use] pub fn remove_control_chars(text: &str) -> String {
     text.chars()
         .filter(|&c| {
             // Keep printable characters, newlines, tabs, and carriage returns
@@ -109,9 +109,9 @@ pub fn remove_control_chars(text: &str) -> String {
 /// # Returns
 ///
 /// String with trimmed lines
-pub fn trim_lines(text: &str) -> String {
+#[must_use] pub fn trim_lines(text: &str) -> String {
     text.lines()
-        .map(|line| line.trim())
+        .map(str::trim)
         .collect::<Vec<&str>>()
         .join("\n")
 }

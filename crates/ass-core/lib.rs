@@ -100,12 +100,12 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ScriptVersion {
-    /// SSA v4.00 (SubStation Alpha legacy format).
+    /// SSA v4.00 (`SubStation` Alpha legacy format).
     ///
     /// Provides compatibility with legacy SSA files. Limited feature set
     /// compared to modern ASS versions.
     SsaV4,
-    /// ASS v4.00+ (Advanced SubStation Alpha standard).
+    /// ASS v4.00+ (Advanced `SubStation` Alpha standard).
     ///
     /// The most common format used by modern subtitle tools. Supports
     /// all standard ASS features and tags.
@@ -143,7 +143,7 @@ impl ScriptVersion {
     /// assert_eq!(ScriptVersion::from_header("v4.00++"), Some(ScriptVersion::AssV4Plus));
     /// assert_eq!(ScriptVersion::from_header("invalid"), None);
     /// ```
-    pub fn from_header(header: &str) -> Option<Self> {
+    #[must_use] pub fn from_header(header: &str) -> Option<Self> {
         match header.trim() {
             "v4.00" => Some(Self::SsaV4),
             "v4.00+" => Some(Self::AssV4),
@@ -176,7 +176,7 @@ impl ScriptVersion {
     /// assert!(!ScriptVersion::AssV4.supports_extensions());
     /// assert!(ScriptVersion::AssV4Plus.supports_extensions());
     /// ```
-    pub fn supports_extensions(self) -> bool {
+    #[must_use] pub const fn supports_extensions(self) -> bool {
         matches!(self, Self::AssV4Plus)
     }
 }

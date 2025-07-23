@@ -105,7 +105,7 @@ impl AccessibilityRule {
                         self.default_severity(),
                         IssueCategory::Accessibility,
                         self.id(),
-                        format!("Very short event duration: {}ms", duration_ms),
+                        format!("Very short event duration: {duration_ms}ms"),
                     )
                     .with_description("Short durations may be difficult to read".to_string())
                     .with_suggested_fix(
@@ -129,7 +129,7 @@ impl AccessibilityRule {
 
                     if clean_text_length > 0 && duration_centiseconds > 0 {
                         // Convert centiseconds to seconds: 1 second = 100 centiseconds
-                        let duration_seconds = duration_centiseconds as f64 / 100.0;
+                        let duration_seconds = f64::from(duration_centiseconds) / 100.0;
                         let chars_per_second = clean_text_length as f64 / duration_seconds;
 
                         if chars_per_second > 20.0 {
@@ -138,8 +138,7 @@ impl AccessibilityRule {
                                 IssueCategory::Accessibility,
                                 self.id(),
                                 format!(
-                                    "Fast reading speed: {:.1} characters/second",
-                                    chars_per_second
+                                    "Fast reading speed: {chars_per_second:.1} characters/second"
                                 ),
                             )
                             .with_description(
@@ -167,7 +166,7 @@ impl AccessibilityRule {
                     self.default_severity(),
                     IssueCategory::Accessibility,
                     self.id(),
-                    format!("Very long text: {} characters", clean_text_length),
+                    format!("Very long text: {clean_text_length} characters"),
                 )
                 .with_description("Long text blocks may be overwhelming for some users".to_string())
                 .with_suggested_fix("Consider splitting into multiple shorter events".to_string());

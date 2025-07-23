@@ -22,7 +22,7 @@ use thiserror::Error;
 /// Wraps all error types from different modules to provide a unified
 /// error handling interface. Can be converted from module-specific errors.
 #[cfg_attr(feature = "std", derive(Error))]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CoreError {
     /// Parsing errors from parser module
     Parse(crate::parser::ParseError),
@@ -97,7 +97,7 @@ impl CoreError {
     }
 
     /// Check if error is recoverable
-    pub fn is_recoverable(&self) -> bool {
+    #[must_use] pub const fn is_recoverable(&self) -> bool {
         match self {
             Self::Parse(parse_err) => !matches!(
                 parse_err,
@@ -127,12 +127,12 @@ impl CoreError {
     }
 
     /// Check if error indicates a bug in the library
-    pub fn is_internal_bug(&self) -> bool {
+    #[must_use] pub const fn is_internal_bug(&self) -> bool {
         matches!(self, Self::Internal(_))
     }
 
     /// Get the underlying parse error if this is a parse error
-    pub fn as_parse_error(&self) -> Option<&crate::parser::ParseError> {
+    #[must_use] pub const fn as_parse_error(&self) -> Option<&crate::parser::ParseError> {
         match self {
             Self::Parse(parse_err) => Some(parse_err),
             _ => None,
@@ -140,7 +140,7 @@ impl CoreError {
     }
 
     /// Get line number for errors that have location information
-    pub fn line_number(&self) -> Option<usize> {
+    #[must_use] pub const fn line_number(&self) -> Option<usize> {
         match self {
             Self::Parse(parse_err) => match parse_err {
                 crate::parser::ParseError::ExpectedSectionHeader { line } => Some(*line),

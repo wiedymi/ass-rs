@@ -10,7 +10,7 @@ use core::fmt;
 
 /// Create color format error with detailed context
 ///
-/// Generates a CoreError::InvalidColor with descriptive message about
+/// Generates a `CoreError::InvalidColor` with descriptive message about
 /// the invalid color format encountered.
 ///
 /// # Arguments
@@ -31,7 +31,7 @@ pub fn invalid_color<T: fmt::Display>(format: T) -> CoreError {
 
 /// Create numeric parsing error with value and reason
 ///
-/// Generates a CoreError::InvalidNumeric with both the invalid value
+/// Generates a `CoreError::InvalidNumeric` with both the invalid value
 /// and the reason parsing failed for better debugging.
 ///
 /// # Arguments
@@ -44,7 +44,7 @@ pub fn invalid_numeric<T: fmt::Display>(value: T, reason: &str) -> CoreError {
 
 /// Create time format error with time and reason
 ///
-/// Generates a CoreError::InvalidTime with the invalid time string
+/// Generates a `CoreError::InvalidTime` with the invalid time string
 /// and explanation of the format issue.
 ///
 /// # Arguments

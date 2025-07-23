@@ -6,9 +6,9 @@
 //!
 //! ## Architecture
 //!
-//! - **TagHandler**: Process custom override tags (e.g., `{\custom}`)
-//! - **SectionProcessor**: Handle non-standard sections (e.g., `[Aegisub Project]`)
-//! - **ExtensionRegistry**: Central registry for all extensions
+//! - **`TagHandler`**: Process custom override tags (e.g., `{\custom}`)
+//! - **`SectionProcessor`**: Handle non-standard sections (e.g., `[Aegisub Project]`)
+//! - **`ExtensionRegistry`**: Central registry for all extensions
 //!
 //! ## Example
 //!
@@ -132,16 +132,16 @@ impl fmt::Display for PluginError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::DuplicateHandler(name) => {
-                write!(f, "Handler '{}' already registered", name)
+                write!(f, "Handler '{name}' already registered")
             }
             Self::HandlerNotFound(name) => {
-                write!(f, "Handler '{}' not found", name)
+                write!(f, "Handler '{name}' not found")
             }
             Self::ProcessingFailed(msg) => {
-                write!(f, "Plugin processing failed: {}", msg)
+                write!(f, "Plugin processing failed: {msg}")
             }
             Self::InvalidConfig(msg) => {
-                write!(f, "Invalid plugin configuration: {}", msg)
+                write!(f, "Invalid plugin configuration: {msg}")
             }
         }
     }
@@ -161,7 +161,7 @@ pub struct ExtensionRegistry {
 
 impl ExtensionRegistry {
     /// Create a new empty extension registry
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             tag_handlers: HashMap::new(),
             section_processors: HashMap::new(),
@@ -216,7 +216,7 @@ impl ExtensionRegistry {
     /// # Returns
     /// * `Some(TagResult)` - If a handler was found and executed
     /// * `None` - If no handler was registered for this tag
-    pub fn process_tag(&self, tag_name: &str, args: &str) -> Option<TagResult> {
+    #[must_use] pub fn process_tag(&self, tag_name: &str, args: &str) -> Option<TagResult> {
         self.tag_handlers
             .get(tag_name)
             .map(|handler| handler.process(args))
@@ -232,7 +232,7 @@ impl ExtensionRegistry {
     /// # Returns
     /// * `Some(SectionResult)` - If a processor was found and executed
     /// * `None` - If no processor was registered for this section
-    pub fn process_section(
+    #[must_use] pub fn process_section(
         &self,
         section_name: &str,
         header: &str,
@@ -244,22 +244,22 @@ impl ExtensionRegistry {
     }
 
     /// Get list of registered tag handler names
-    pub fn tag_handler_names(&self) -> Vec<&str> {
-        self.tag_handlers.keys().map(|s| s.as_str()).collect()
+    #[must_use] pub fn tag_handler_names(&self) -> Vec<&str> {
+        self.tag_handlers.keys().map(std::string::String::as_str).collect()
     }
 
     /// Get list of registered section processor names
-    pub fn section_processor_names(&self) -> Vec<&str> {
-        self.section_processors.keys().map(|s| s.as_str()).collect()
+    #[must_use] pub fn section_processor_names(&self) -> Vec<&str> {
+        self.section_processors.keys().map(std::string::String::as_str).collect()
     }
 
     /// Check if a tag handler is registered
-    pub fn has_tag_handler(&self, name: &str) -> bool {
+    #[must_use] pub fn has_tag_handler(&self, name: &str) -> bool {
         self.tag_handlers.contains_key(name)
     }
 
     /// Check if a section processor is registered
-    pub fn has_section_processor(&self, name: &str) -> bool {
+    #[must_use] pub fn has_section_processor(&self, name: &str) -> bool {
         self.section_processors.contains_key(name)
     }
 
@@ -288,7 +288,7 @@ impl ExtensionRegistry {
     }
 
     /// Get total number of registered extensions
-    pub fn extension_count(&self) -> usize {
+    #[must_use] pub fn extension_count(&self) -> usize {
         self.tag_handlers.len() + self.section_processors.len()
     }
 }

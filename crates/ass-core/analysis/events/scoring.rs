@@ -112,12 +112,12 @@ pub fn calculate_animation_score(tags: &[OverrideTag<'_>]) -> u8 {
 /// let score = calculate_complexity_score(3, 100, 5);
 /// assert!(score > 0 && score <= 100);
 /// ```
-pub fn calculate_complexity_score(
+#[must_use] pub fn calculate_complexity_score(
     animation_score: u8,
     char_count: usize,
     override_count: usize,
 ) -> u8 {
-    let mut score = animation_score as u32 * 5;
+    let mut score = u32::from(animation_score) * 5;
 
     score += match char_count {
         0..=50 => 0,
@@ -158,7 +158,7 @@ pub fn calculate_complexity_score(
 /// let impact = get_performance_impact(75);
 /// assert_eq!(impact, PerformanceImpact::High);
 /// ```
-pub fn get_performance_impact(complexity_score: u8) -> PerformanceImpact {
+#[must_use] pub const fn get_performance_impact(complexity_score: u8) -> PerformanceImpact {
     match complexity_score {
         0..=20 => PerformanceImpact::Minimal,
         21..=40 => PerformanceImpact::Low,

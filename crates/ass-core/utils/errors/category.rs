@@ -100,18 +100,18 @@ pub enum ErrorCategory {
 impl fmt::Display for ErrorCategory {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ErrorCategory::Parsing => write!(f, "parsing"),
-            ErrorCategory::Analysis => write!(f, "analysis"),
-            ErrorCategory::Plugin => write!(f, "plugin"),
-            ErrorCategory::Format => write!(f, "format"),
-            ErrorCategory::Encoding => write!(f, "encoding"),
-            ErrorCategory::Io => write!(f, "io"),
-            ErrorCategory::Resource => write!(f, "resource"),
-            ErrorCategory::Configuration => write!(f, "configuration"),
-            ErrorCategory::Validation => write!(f, "validation"),
-            ErrorCategory::Compatibility => write!(f, "compatibility"),
-            ErrorCategory::Security => write!(f, "security"),
-            ErrorCategory::Internal => write!(f, "internal"),
+            Self::Parsing => write!(f, "parsing"),
+            Self::Analysis => write!(f, "analysis"),
+            Self::Plugin => write!(f, "plugin"),
+            Self::Format => write!(f, "format"),
+            Self::Encoding => write!(f, "encoding"),
+            Self::Io => write!(f, "io"),
+            Self::Resource => write!(f, "resource"),
+            Self::Configuration => write!(f, "configuration"),
+            Self::Validation => write!(f, "validation"),
+            Self::Compatibility => write!(f, "compatibility"),
+            Self::Security => write!(f, "security"),
+            Self::Internal => write!(f, "internal"),
         }
     }
 }
@@ -121,20 +121,20 @@ impl ErrorCategory {
     ///
     /// Returns a descriptive name for the category suitable for display
     /// in user interfaces or error reports.
-    pub fn name(self) -> &'static str {
+    #[must_use] pub const fn name(self) -> &'static str {
         match self {
-            ErrorCategory::Parsing => "Parsing",
-            ErrorCategory::Analysis => "Analysis",
-            ErrorCategory::Plugin => "Plugin",
-            ErrorCategory::Format => "Format",
-            ErrorCategory::Encoding => "Encoding",
-            ErrorCategory::Io => "I/O",
-            ErrorCategory::Resource => "Resource",
-            ErrorCategory::Configuration => "Configuration",
-            ErrorCategory::Validation => "Validation",
-            ErrorCategory::Compatibility => "Compatibility",
-            ErrorCategory::Security => "Security",
-            ErrorCategory::Internal => "Internal",
+            Self::Parsing => "Parsing",
+            Self::Analysis => "Analysis",
+            Self::Plugin => "Plugin",
+            Self::Format => "Format",
+            Self::Encoding => "Encoding",
+            Self::Io => "I/O",
+            Self::Resource => "Resource",
+            Self::Configuration => "Configuration",
+            Self::Validation => "Validation",
+            Self::Compatibility => "Compatibility",
+            Self::Security => "Security",
+            Self::Internal => "Internal",
         }
     }
 
@@ -142,21 +142,21 @@ impl ErrorCategory {
     ///
     /// Returns `true` for categories where the user can typically resolve
     /// the issue by modifying their input or configuration.
-    pub fn is_user_fixable(self) -> bool {
+    #[must_use] pub const fn is_user_fixable(self) -> bool {
         match self {
-            ErrorCategory::Parsing
-            | ErrorCategory::Format
-            | ErrorCategory::Encoding
-            | ErrorCategory::Configuration
-            | ErrorCategory::Validation => true,
+            Self::Parsing
+            | Self::Format
+            | Self::Encoding
+            | Self::Configuration
+            | Self::Validation => true,
 
-            ErrorCategory::Analysis | ErrorCategory::Compatibility => true,
+            Self::Analysis | Self::Compatibility => true,
 
-            ErrorCategory::Plugin
-            | ErrorCategory::Io
-            | ErrorCategory::Resource
-            | ErrorCategory::Security
-            | ErrorCategory::Internal => false,
+            Self::Plugin
+            | Self::Io
+            | Self::Resource
+            | Self::Security
+            | Self::Internal => false,
         }
     }
 
@@ -164,14 +164,14 @@ impl ErrorCategory {
     ///
     /// Returns a relative severity level where higher numbers indicate
     /// more severe issues that require immediate attention.
-    pub fn severity_level(self) -> u8 {
+    #[must_use] pub const fn severity_level(self) -> u8 {
         match self {
-            ErrorCategory::Internal | ErrorCategory::Security => 5,
-            ErrorCategory::Resource | ErrorCategory::Io => 4,
-            ErrorCategory::Plugin | ErrorCategory::Compatibility => 3,
-            ErrorCategory::Parsing | ErrorCategory::Validation => 2,
-            ErrorCategory::Analysis | ErrorCategory::Configuration => 1,
-            ErrorCategory::Format | ErrorCategory::Encoding => 1,
+            Self::Internal | Self::Security => 5,
+            Self::Resource | Self::Io => 4,
+            Self::Plugin | Self::Compatibility => 3,
+            Self::Parsing | Self::Validation => 2,
+            Self::Analysis | Self::Configuration => 1,
+            Self::Format | Self::Encoding => 1,
         }
     }
 }
@@ -181,7 +181,7 @@ impl CoreError {
     ///
     /// Returns the category that best describes the type of error,
     /// useful for organizing errors in user interfaces or logs.
-    pub fn category(&self) -> ErrorCategory {
+    #[must_use] pub const fn category(&self) -> ErrorCategory {
         match self {
             Self::Parse(_) | Self::Tokenization(_) => ErrorCategory::Parsing,
             Self::Analysis(_) => ErrorCategory::Analysis,
@@ -206,7 +206,7 @@ impl CoreError {
     ///
     /// Provides actionable advice for resolving common error scenarios.
     /// Returns `None` for errors that don't have standard solutions.
-    pub fn suggestion(&self) -> Option<&'static str> {
+    #[must_use] pub const fn suggestion(&self) -> Option<&'static str> {
         match self {
             Self::InvalidColor(_) => Some("Use format like '&H00FF00FF&' for colors"),
             Self::InvalidTime(_) => Some("Use format like '0:01:30.50' for times"),

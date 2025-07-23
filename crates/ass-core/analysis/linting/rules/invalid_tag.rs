@@ -93,7 +93,7 @@ impl LintRule for InvalidTagRule {
                         DiagnosticKind::EmptyOverride => "Empty override tag found".to_string(),
                         DiagnosticKind::MalformedTag => "Malformed override tag syntax".to_string(),
                         DiagnosticKind::UnknownTag(ref tag_name) => {
-                            format!("Unknown tag: {}", tag_name)
+                            format!("Unknown tag: {tag_name}")
                         }
                     };
 

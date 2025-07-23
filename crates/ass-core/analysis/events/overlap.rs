@@ -143,7 +143,7 @@ where
 /// Find overlapping events using sweep-line algorithm
 ///
 /// Efficiently detects all pairs of events with overlapping time ranges.
-/// Returns vector of (event1_index, event2_index) pairs where events overlap.
+/// Returns vector of (`event1_index`, `event2_index`) pairs where events overlap.
 ///
 /// # Arguments
 ///
