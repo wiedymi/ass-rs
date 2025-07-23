@@ -77,8 +77,8 @@ pub mod linting;
 pub mod styles;
 
 pub use events::{
-    count_overlapping_dialogue_events, count_overlapping_events, find_overlapping_events,
-    DialogueInfo,
+    count_overlapping_dialogue_events, count_overlapping_events, find_overlapping_dialogue_events,
+    find_overlapping_events, DialogueInfo,
 };
 pub use linting::{lint_script, LintConfig, LintIssue, LintRule};
 pub use styles::{ResolvedStyle, StyleAnalyzer};

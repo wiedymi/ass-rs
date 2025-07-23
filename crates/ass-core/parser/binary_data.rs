@@ -85,6 +85,12 @@ impl<'a> FontsParser<'a> {
                 break;
             }
 
+            // Skip comment lines
+            if trimmed.starts_with(';') || trimmed.starts_with('!') {
+                self.skip_line();
+                continue;
+            }
+
             data_lines.push(data_line);
             self.skip_line();
         }
@@ -208,6 +214,12 @@ impl<'a> GraphicsParser<'a> {
                 break;
             }
 
+            // Skip comment lines
+            if trimmed.starts_with(';') || trimmed.starts_with('!') {
+                self.skip_line();
+                continue;
+            }
+
             data_lines.push(data_line);
             self.skip_line();
         }
@@ -250,6 +262,299 @@ impl<'a> GraphicsParser<'a> {
             } else {
                 break;
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fonts_parser_empty_section() {
+        let source = "";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert!(fonts.is_empty());
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_single_font() {
+        let source = "fontname: arial.ttf\ndata1\ndata2\n";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert_eq!(fonts.len(), 1);
+            assert_eq!(fonts[0].filename, "arial.ttf");
+            assert_eq!(fonts[0].data_lines.len(), 2);
+            assert_eq!(fonts[0].data_lines[0], "data1");
+            assert_eq!(fonts[0].data_lines[1], "data2");
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_multiple_fonts() {
+        let source = "fontname: font1.ttf\ndata1\ndata2\n\nfontname: font2.ttf\ndata3\ndata4\n";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert_eq!(fonts.len(), 2);
+
+            assert_eq!(fonts[0].filename, "font1.ttf");
+            assert_eq!(fonts[0].data_lines.len(), 2);
+            assert_eq!(fonts[0].data_lines[0], "data1");
+            assert_eq!(fonts[0].data_lines[1], "data2");
+
+            assert_eq!(fonts[1].filename, "font2.ttf");
+            assert_eq!(fonts[1].data_lines.len(), 2);
+            assert_eq!(fonts[1].data_lines[0], "data3");
+            assert_eq!(fonts[1].data_lines[1], "data4");
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_with_comments() {
+        let source = "; This is a comment\nfontname: test.ttf\n!: Another comment\ndata1\ndata2\n";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert_eq!(fonts.len(), 1);
+            assert_eq!(fonts[0].filename, "test.ttf");
+            assert_eq!(fonts[0].data_lines.len(), 2);
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_with_whitespace() {
+        let source = "  fontname:  arial.ttf  \n  data1  \n  data2  \n";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert_eq!(fonts.len(), 1);
+            assert_eq!(fonts[0].filename, "arial.ttf");
+            assert_eq!(fonts[0].data_lines.len(), 2);
+            assert_eq!(fonts[0].data_lines[0], "  data1  ");
+            assert_eq!(fonts[0].data_lines[1], "  data2  ");
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_stops_at_next_section() {
+        let source = "fontname: test.ttf\ndata1\ndata2\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert_eq!(fonts.len(), 1);
+            assert_eq!(fonts[0].filename, "test.ttf");
+            assert_eq!(fonts[0].data_lines.len(), 2);
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_malformed_entry() {
+        let source = "invalid_line\nfontname: valid.ttf\ndata1\n";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert_eq!(fonts.len(), 1);
+            assert_eq!(fonts[0].filename, "valid.ttf");
+            assert_eq!(fonts[0].data_lines.len(), 1);
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_no_data_lines() {
+        let source = "fontname: empty.ttf\n[Events]\n";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert_eq!(fonts.len(), 1);
+            assert_eq!(fonts[0].filename, "empty.ttf");
+            assert!(fonts[0].data_lines.is_empty());
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_empty_section() {
+        let source = "";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert!(graphics.is_empty());
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_single_graphic() {
+        let source = "filename: logo.png\nimage_data1\nimage_data2\n";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert_eq!(graphics.len(), 1);
+            assert_eq!(graphics[0].filename, "logo.png");
+            assert_eq!(graphics[0].data_lines.len(), 2);
+            assert_eq!(graphics[0].data_lines[0], "image_data1");
+            assert_eq!(graphics[0].data_lines[1], "image_data2");
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_multiple_graphics() {
+        let source = "filename: img1.png\ndata1\ndata2\n\nfilename: img2.jpg\ndata3\ndata4\n";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert_eq!(graphics.len(), 2);
+
+            assert_eq!(graphics[0].filename, "img1.png");
+            assert_eq!(graphics[0].data_lines.len(), 2);
+            assert_eq!(graphics[0].data_lines[0], "data1");
+            assert_eq!(graphics[0].data_lines[1], "data2");
+
+            assert_eq!(graphics[1].filename, "img2.jpg");
+            assert_eq!(graphics[1].data_lines.len(), 2);
+            assert_eq!(graphics[1].data_lines[0], "data3");
+            assert_eq!(graphics[1].data_lines[1], "data4");
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_with_comments() {
+        let source = "; Image section comment\nfilename: test.png\n!: Another comment\nimg_data1\nimg_data2\n";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert_eq!(graphics.len(), 1);
+            assert_eq!(graphics[0].filename, "test.png");
+            assert_eq!(graphics[0].data_lines.len(), 2);
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_with_whitespace() {
+        let source = "  filename:  logo.png  \n  img_data1  \n  img_data2  \n";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert_eq!(graphics.len(), 1);
+            assert_eq!(graphics[0].filename, "logo.png");
+            assert_eq!(graphics[0].data_lines.len(), 2);
+            assert_eq!(graphics[0].data_lines[0], "  img_data1  ");
+            assert_eq!(graphics[0].data_lines[1], "  img_data2  ");
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_stops_at_next_section() {
+        let source = "filename: test.png\nimg_data1\nimg_data2\n[Styles]\nFormat: Name, Fontname, Fontsize\n";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert_eq!(graphics.len(), 1);
+            assert_eq!(graphics[0].filename, "test.png");
+            assert_eq!(graphics[0].data_lines.len(), 2);
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_malformed_entry() {
+        let source = "invalid_line_without_colon\nfilename: valid.png\nimg_data1\n";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert_eq!(graphics.len(), 1);
+            assert_eq!(graphics[0].filename, "valid.png");
+            assert_eq!(graphics[0].data_lines.len(), 1);
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_no_data_lines() {
+        let source = "filename: empty.png\n[Fonts]\n";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert_eq!(graphics.len(), 1);
+            assert_eq!(graphics[0].filename, "empty.png");
+            assert!(graphics[0].data_lines.is_empty());
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_colon_in_filename() {
+        let source = "fontname: C:\\Fonts\\arial.ttf\ndata1\n";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert_eq!(fonts.len(), 1);
+            assert_eq!(fonts[0].filename, "C:\\Fonts\\arial.ttf");
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_colon_in_filename() {
+        let source = "filename: D:\\Images\\logo.png\nimg_data1\n";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert_eq!(graphics.len(), 1);
+            assert_eq!(graphics[0].filename, "D:\\Images\\logo.png");
+        } else {
+            panic!("Expected Graphics section");
         }
     }
 }

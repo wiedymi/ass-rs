@@ -208,3 +208,375 @@ impl<'a> DialogueInfo<'a> {
         self.event
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::ast::{Event, EventType};
+
+    #[test]
+    fn dialogue_info_analyze_valid() {
+        let event = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:00.00",
+            end: "0:00:05.00",
+            text: "Hello world!",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let info = DialogueInfo::analyze(&event).unwrap();
+        assert_eq!(info.duration_ms(), 5000);
+        assert_eq!(info.duration_cs(), 500);
+        assert_eq!(info.start_time_cs(), 0);
+        assert_eq!(info.end_time_cs(), 500);
+    }
+
+    #[test]
+    fn dialogue_info_analyze_with_override_tags() {
+        let event = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:01.50",
+            end: "0:00:03.75",
+            text: "Hello {\\b1}bold{\\b0} world!",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let info = DialogueInfo::analyze(&event).unwrap();
+        assert_eq!(info.duration_ms(), 2250);
+        assert_eq!(info.duration_cs(), 225);
+        assert_eq!(info.start_time_cs(), 150);
+        assert_eq!(info.end_time_cs(), 375);
+        assert!(!info.text_analysis().override_tags().is_empty());
+    }
+
+    #[test]
+    fn dialogue_info_analyze_invalid_timing_start_after_end() {
+        let event = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:05.00",
+            end: "0:00:02.00",
+            text: "Invalid timing",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        assert!(DialogueInfo::analyze(&event).is_err());
+    }
+
+    #[test]
+    fn dialogue_info_analyze_invalid_timing_equal() {
+        let event = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:03.00",
+            end: "0:00:03.00",
+            text: "Zero duration",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        assert!(DialogueInfo::analyze(&event).is_err());
+    }
+
+    #[test]
+    fn dialogue_info_timing_relation_no_overlap() {
+        let event1 = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:00.00",
+            end: "0:00:02.00",
+            text: "First",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let event2 = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:03.00",
+            end: "0:00:05.00",
+            text: "Second",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let info1 = DialogueInfo::analyze(&event1).unwrap();
+        let info2 = DialogueInfo::analyze(&event2).unwrap();
+
+        assert_eq!(info1.timing_relation(&info2), TimingRelation::NoOverlap);
+        assert_eq!(info2.timing_relation(&info1), TimingRelation::NoOverlap);
+    }
+
+    #[test]
+    fn dialogue_info_timing_relation_partial_overlap() {
+        let event1 = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:00.00",
+            end: "0:00:03.00",
+            text: "First",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let event2 = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:02.00",
+            end: "0:00:05.00",
+            text: "Second",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let info1 = DialogueInfo::analyze(&event1).unwrap();
+        let info2 = DialogueInfo::analyze(&event2).unwrap();
+
+        assert_eq!(
+            info1.timing_relation(&info2),
+            TimingRelation::PartialOverlap
+        );
+        assert_eq!(
+            info2.timing_relation(&info1),
+            TimingRelation::PartialOverlap
+        );
+    }
+
+    #[test]
+    fn dialogue_info_timing_relation_full_overlap() {
+        let event1 = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:00.00",
+            end: "0:00:05.00",
+            text: "Container",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let event2 = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:01.00",
+            end: "0:00:03.00",
+            text: "Contained",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let info1 = DialogueInfo::analyze(&event1).unwrap();
+        let info2 = DialogueInfo::analyze(&event2).unwrap();
+
+        assert_eq!(info1.timing_relation(&info2), TimingRelation::FullOverlap);
+        assert_eq!(info2.timing_relation(&info1), TimingRelation::FullOverlap);
+    }
+
+    #[test]
+    fn dialogue_info_timing_relation_identical() {
+        let event1 = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:01.00",
+            end: "0:00:03.00",
+            text: "First",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let event2 = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:01.00",
+            end: "0:00:03.00",
+            text: "Second",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let info1 = DialogueInfo::analyze(&event1).unwrap();
+        let info2 = DialogueInfo::analyze(&event2).unwrap();
+
+        assert_eq!(info1.timing_relation(&info2), TimingRelation::Identical);
+        assert_eq!(info2.timing_relation(&info1), TimingRelation::Identical);
+    }
+
+    #[test]
+    fn dialogue_info_overlaps_time_range() {
+        let event = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:02.00",
+            end: "0:00:05.00",
+            text: "Test",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let info = DialogueInfo::analyze(&event).unwrap();
+
+        // Event is 200-500 cs
+        assert!(info.overlaps_time_range(100, 300)); // Overlaps start
+        assert!(info.overlaps_time_range(400, 600)); // Overlaps end
+        assert!(info.overlaps_time_range(300, 400)); // Contained within
+        assert!(info.overlaps_time_range(100, 600)); // Contains event
+        assert!(!info.overlaps_time_range(0, 200)); // Before event
+        assert!(!info.overlaps_time_range(500, 600)); // After event
+    }
+
+    #[test]
+    fn dialogue_info_animation_and_complexity_scoring() {
+        let simple_event = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:00.00",
+            end: "0:00:01.00",
+            text: "Simple text",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let complex_event = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:00.00",
+            end: "0:00:01.00",
+            text: "{\\move(0,0,100,100)}{\\t(0,1000,\\fscx120)}{\\fade(255,0,0,0,800,900,1000)}Complex animation",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let simple_info = DialogueInfo::analyze(&simple_event).unwrap();
+        let complex_info = DialogueInfo::analyze(&complex_event).unwrap();
+
+        assert!(simple_info.animation_score() < complex_info.animation_score());
+        assert!(simple_info.complexity_score() < complex_info.complexity_score());
+    }
+
+    #[test]
+    fn dialogue_info_override_count() {
+        let event = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:00.00",
+            end: "0:00:01.00",
+            text: "{\\b1}{\\i1}{\\u1}Triple style{\\b0}{\\i0}{\\u0}",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let info = DialogueInfo::analyze(&event).unwrap();
+        assert_eq!(info.override_count(), 6);
+    }
+
+    #[test]
+    fn dialogue_info_performance_impact() {
+        let low_impact_event = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:00.00",
+            end: "0:00:01.00",
+            text: "Simple",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let info = DialogueInfo::analyze(&low_impact_event).unwrap();
+        // Performance impact depends on complexity score
+        let _impact = info.performance_impact();
+    }
+
+    #[test]
+    fn dialogue_info_event_reference() {
+        let event = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:00.00",
+            end: "0:00:01.00",
+            text: "Test",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        let info = DialogueInfo::analyze(&event).unwrap();
+        assert_eq!(info.event().text, "Test");
+        assert_eq!(info.event().start, "0:00:00.00");
+        assert_eq!(info.event().end, "0:00:01.00");
+    }
+}

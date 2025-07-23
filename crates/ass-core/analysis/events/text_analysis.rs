@@ -79,6 +79,7 @@ impl<'a> TextAnalysis<'a> {
         let mut parse_diagnostics = Vec::new();
         let mut plain_text = String::new();
         let mut position = 0;
+        let mut drawing_mode = false;
 
         let mut chars = text.chars();
         while let Some(ch) = chars.next() {
@@ -107,6 +108,9 @@ impl<'a> TextAnalysis<'a> {
                         &mut override_tags,
                         &mut parse_diagnostics,
                     );
+
+                    // Check for drawing mode changes in this tag block
+                    drawing_mode = Self::update_drawing_mode(tag_content, drawing_mode);
                 } else {
                     parse_diagnostics.push(TagDiagnostic {
                         span: &text[tag_start..position.max(tag_start + 1)],
@@ -118,15 +122,25 @@ impl<'a> TextAnalysis<'a> {
                 if let Some(next_ch) = chars.next() {
                     position += next_ch.len_utf8();
                     match next_ch {
-                        'n' | 'N' => plain_text.push('\n'),
-                        'h' => plain_text.push('\u{00A0}'),
+                        'n' | 'N' => {
+                            if !drawing_mode {
+                                plain_text.push('\n');
+                            }
+                        }
+                        'h' => {
+                            if !drawing_mode {
+                                plain_text.push('\u{00A0}');
+                            }
+                        }
                         _ => {
-                            plain_text.push(ch);
-                            plain_text.push(next_ch);
+                            if !drawing_mode {
+                                plain_text.push(ch);
+                                plain_text.push(next_ch);
+                            }
                         }
                     }
                 }
-            } else {
+            } else if !drawing_mode {
                 plain_text.push(ch);
             }
 
@@ -134,7 +148,7 @@ impl<'a> TextAnalysis<'a> {
         }
 
         let char_count = plain_text.chars().count();
-        let line_count = plain_text.lines().count().max(1);
+        let line_count = Self::count_lines(&plain_text);
         let has_bidi_text = Self::detect_bidi_text(&plain_text);
         let has_complex_unicode = Self::detect_complex_unicode(&plain_text);
 
@@ -191,6 +205,55 @@ impl<'a> TextAnalysis<'a> {
         &self.parse_diagnostics
     }
 
+    /// Update drawing mode state based on override tag content
+    fn update_drawing_mode(tag_content: &str, current_mode: bool) -> bool {
+        let mut pos = 0;
+        let chars: Vec<char> = tag_content.chars().collect();
+        let mut drawing_mode = current_mode;
+
+        while pos < chars.len() {
+            if chars[pos] == '\\' && pos + 1 < chars.len() && chars[pos + 1] == 'p' {
+                pos += 2;
+                let mut number_str = String::new();
+
+                while pos < chars.len() && (chars[pos].is_ascii_digit() || chars[pos] == '-') {
+                    number_str.push(chars[pos]);
+                    pos += 1;
+                }
+
+                if let Ok(p_value) = number_str.parse::<i32>() {
+                    drawing_mode = p_value > 0;
+                }
+            } else {
+                pos += 1;
+            }
+        }
+
+        drawing_mode
+    }
+
+    /// Count lines correctly, handling empty lines and trailing newlines
+    fn count_lines(text: &str) -> usize {
+        if text.is_empty() {
+            return 1;
+        }
+
+        // For ASS subtitles, count newlines and add 1, but handle special cases
+        let newline_count = text.chars().filter(|&ch| ch == '\n').count();
+
+        if newline_count == 0 {
+            // No newlines means 1 line
+            1
+        } else if text.trim_end_matches('\n').is_empty() {
+            // Text is only newlines - each newline creates a line boundary
+            newline_count + 1
+        } else {
+            // Text has content - trailing newlines don't create additional lines
+            // Use lines() count which handles this correctly
+            text.lines().count().max(1)
+        }
+    }
+
     /// Detect bidirectional text (RTL scripts)
     fn detect_bidi_text(text: &str) -> bool {
         text.chars().any(|ch| matches!(ch as u32, 0x0590..=0x05FF | 0x0600..=0x06FF | 0x0750..=0x077F | 0x08A0..=0x08FF))
@@ -202,5 +265,282 @@ impl<'a> TextAnalysis<'a> {
             let code = ch as u32;
             code > 0x00FF || matches!(code, 0x0000..=0x001F | 0x007F..=0x009F | 0x200C..=0x200D | 0x2060..=0x206F)
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn text_analysis_simple_text() {
+        let text = "Hello world!";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "Hello world!");
+        assert_eq!(analysis.char_count(), 12);
+        assert_eq!(analysis.line_count(), 1);
+        assert!(!analysis.has_bidi_text());
+        assert!(!analysis.has_complex_unicode());
+        assert!(analysis.override_tags().is_empty());
+        assert!(analysis.diagnostics().is_empty());
+    }
+
+    #[test]
+    fn text_analysis_with_override_tags() {
+        let text = "Hello {\\b1}bold{\\b0} world!";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "Hello bold world!");
+        assert_eq!(analysis.char_count(), 17);
+        assert_eq!(analysis.line_count(), 1);
+        assert!(!analysis.override_tags().is_empty());
+    }
+
+    #[test]
+    fn text_analysis_nested_braces() {
+        let text = "Text {\\pos(100,{\\some}200)} more text";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "Text  more text");
+        assert!(!analysis.override_tags().is_empty());
+    }
+
+    #[test]
+    fn text_analysis_line_breaks() {
+        let text = "First line\\NSecond line\\nThird line";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "First line\nSecond line\nThird line");
+        assert_eq!(analysis.line_count(), 3);
+    }
+
+    #[test]
+    fn text_analysis_hard_spaces() {
+        let text = "Text\\hwith\\hhard\\hspaces";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(
+            analysis.plain_text(),
+            "Text\u{00A0}with\u{00A0}hard\u{00A0}spaces"
+        );
+    }
+
+    #[test]
+    fn text_analysis_mixed_escapes() {
+        let text = "Line 1\\NLine 2\\hspace\\nLine 3";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "Line 1\nLine 2\u{00A0}space\nLine 3");
+        assert_eq!(analysis.line_count(), 3);
+    }
+
+    #[test]
+    fn text_analysis_bidi_text_arabic() {
+        let text = "Hello مرحبا world";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert!(analysis.has_bidi_text());
+        assert!(analysis.has_complex_unicode());
+    }
+
+    #[test]
+    fn text_analysis_bidi_text_hebrew() {
+        let text = "Hello שלום world";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert!(analysis.has_bidi_text());
+        assert!(analysis.has_complex_unicode());
+    }
+
+    #[test]
+    fn text_analysis_complex_unicode_emoji() {
+        let text = "Hello 🌍 world";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert!(!analysis.has_bidi_text());
+        assert!(analysis.has_complex_unicode());
+    }
+
+    #[test]
+    fn text_analysis_complex_unicode_control_chars() {
+        let text = "Text\u{200C}with\u{200D}controls";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert!(analysis.has_complex_unicode());
+    }
+
+    #[test]
+    fn text_analysis_basic_latin_only() {
+        let text = "Basic ASCII text 123!@#";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert!(!analysis.has_bidi_text());
+        assert!(!analysis.has_complex_unicode());
+    }
+
+    #[test]
+    fn text_analysis_extended_latin() {
+        let text = "Café naïve résumé";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert!(!analysis.has_bidi_text());
+        assert!(!analysis.has_complex_unicode()); // These are still in Latin-1 range
+    }
+
+    #[test]
+    fn text_analysis_empty_override_blocks() {
+        let text = "Text {} more text";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "Text  more text");
+        // Should have diagnostic for empty override
+        assert!(!analysis.diagnostics().is_empty());
+    }
+
+    #[test]
+    fn text_analysis_unmatched_braces() {
+        let text = "Text {\\b1 unmatched";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "Text ");
+        // Should handle unmatched braces gracefully
+    }
+
+    #[test]
+    fn text_analysis_multiple_override_blocks() {
+        let text = "{\\b1}Bold{\\b0} and {\\i1}italic{\\i0} text";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "Bold and italic text");
+        assert_eq!(analysis.override_tags().len(), 4);
+    }
+
+    #[test]
+    fn text_analysis_complex_tags() {
+        let text = "{\\move(0,0,100,100)}{\\t(0,1000,\\fscx120)}{\\fade(255,0,0,0,800,900,1000)}Animated text";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "Animated text");
+        assert!(!analysis.override_tags().is_empty());
+    }
+
+    #[test]
+    fn text_analysis_drawing_commands() {
+        let text = "{\\p1}m 0 0 l 100 0 100 100 0 100{\\p0}Square";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "Square");
+        assert!(!analysis.override_tags().is_empty());
+    }
+
+    #[test]
+    fn text_analysis_color_tags() {
+        let text = "{\\c&H0000FF&}Red text{\\c} and {\\1c&H00FF00&}green text";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "Red text and green text");
+        assert!(!analysis.override_tags().is_empty());
+    }
+
+    #[test]
+    fn text_analysis_mixed_content() {
+        let text = "Start {\\b1}bold\\N{\\i1}italic{\\i0}{\\b0}\\hnormal end";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(
+            analysis.plain_text(),
+            "Start bold\nitalic\u{00A0}normal end"
+        );
+        assert_eq!(analysis.line_count(), 2);
+        assert!(!analysis.override_tags().is_empty());
+    }
+
+    #[test]
+    fn text_analysis_whitespace_only() {
+        let text = "   \t\n  ";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "   \t\n  ");
+        assert_eq!(analysis.char_count(), 7);
+        assert_eq!(analysis.line_count(), 2);
+    }
+
+    #[test]
+    fn text_analysis_empty_text() {
+        let text = "";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "");
+        assert_eq!(analysis.char_count(), 0);
+        assert_eq!(analysis.line_count(), 1); // Minimum 1 line
+        assert!(analysis.override_tags().is_empty());
+    }
+
+    #[test]
+    fn text_analysis_only_override_tags() {
+        let text = "{\\b1}{\\i1}{\\u1}";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "");
+        assert_eq!(analysis.char_count(), 0);
+        assert!(!analysis.override_tags().is_empty());
+    }
+
+    #[test]
+    fn text_analysis_escape_sequences() {
+        let text = "Test\\\\backslash and \\{brace and \\}close";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        // These should be treated as literal characters, not escape sequences
+        assert_eq!(
+            analysis.plain_text(),
+            "Test\\\\backslash and \\{brace and \\}close"
+        );
+    }
+
+    #[test]
+    fn text_analysis_karaoke_tags() {
+        let text = "{\\k50}Ka{\\k30}ra{\\k70}o{\\k40}ke";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "Karaoke");
+        assert!(!analysis.override_tags().is_empty());
+    }
+
+    #[test]
+    fn text_analysis_position_and_rotation() {
+        let text = "{\\pos(320,240)}{\\frz45}Rotated positioned text";
+        let analysis = TextAnalysis::analyze(text).unwrap();
+
+        assert_eq!(analysis.plain_text(), "Rotated positioned text");
+        assert!(!analysis.override_tags().is_empty());
+    }
+
+    #[test]
+    fn text_analysis_very_long_text() {
+        let text = "A".repeat(1000);
+        let analysis = TextAnalysis::analyze(&text).unwrap();
+
+        assert_eq!(analysis.char_count(), 1000);
+        assert_eq!(analysis.plain_text().len(), 1000);
+    }
+
+    #[test]
+    fn text_analysis_line_count_edge_cases() {
+        // Text ending with newline
+        let text1 = "Line 1\\nLine 2\\n";
+        let analysis1 = TextAnalysis::analyze(text1).unwrap();
+        assert_eq!(analysis1.line_count(), 2);
+
+        // Multiple consecutive newlines
+        let text2 = "Line 1\\n\\n\\nLine 2";
+        let analysis2 = TextAnalysis::analyze(text2).unwrap();
+        assert_eq!(analysis2.line_count(), 4);
+
+        // Only newlines
+        let text3 = "\\n\\N\\n";
+        let analysis3 = TextAnalysis::analyze(text3).unwrap();
+        assert_eq!(analysis3.line_count(), 4);
     }
 }
