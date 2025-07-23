@@ -225,6 +225,8 @@ mod tests {
     use crate::parser::Event;
 
     fn create_test_dialogue_info(start: &'static str, end: &'static str) -> DialogueInfo<'static> {
+        // Create a static event for the lifetime requirement
+        // Using Box::leak is acceptable in tests for simplicity
         let event = Box::leak(Box::new(Event {
             event_type: crate::parser::ast::EventType::Dialogue,
             start,

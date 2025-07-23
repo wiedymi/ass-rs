@@ -22,10 +22,15 @@ use alloc::vec::Vec;
 /// - Memory: Zero allocations via lifetime-generic spans
 /// - Target: <2ms for typical event sections with 1000 events
 pub struct EventsParser<'a> {
+    /// Source text being parsed
     source: &'a str,
+    /// Current byte position in source
     position: usize,
+    /// Current line number for error reporting
     line: usize,
+    /// Parse issues and warnings collected during parsing
     issues: Vec<ParseIssue>,
+    /// Format fields for the events section
     format: Option<Vec<&'a str>>,
 }
 
@@ -37,7 +42,8 @@ impl<'a> EventsParser<'a> {
     /// * `source` - Source text to parse
     /// * `start_position` - Starting byte position in source
     /// * `start_line` - Starting line number for error reporting
-    pub fn new(source: &'a str, start_position: usize, start_line: usize) -> Self {
+    #[must_use]
+    pub const fn new(source: &'a str, start_position: usize, start_line: usize) -> Self {
         Self {
             source,
             position: start_position,
@@ -54,7 +60,12 @@ impl<'a> EventsParser<'a> {
     ///
     /// # Returns
     ///
-    /// Tuple of (parsed_section, format_fields, parse_issues, final_position, final_line)
+    /// Tuple of (`parsed_section`, `format_fields`, `parse_issues`, `final_position`, `final_line`)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the events section contains malformed format lines or
+    /// other unrecoverable syntax errors.
     pub fn parse(mut self) -> ParseResult<SectionParseResult<'a>> {
         let mut events = Vec::new();
 
@@ -92,7 +103,7 @@ impl<'a> EventsParser<'a> {
     /// Parse format specification line
     fn parse_format_line(&mut self, line: &'a str) {
         if let Some(format_data) = line.strip_prefix("Format:") {
-            let fields: Vec<&'a str> = format_data.split(',').map(|s| s.trim()).collect();
+            let fields: Vec<&'a str> = format_data.split(',').map(str::trim).collect();
             self.format = Some(fields);
         }
     }
@@ -146,8 +157,7 @@ impl<'a> EventsParser<'a> {
                 .iter()
                 .position(|&field| field.eq_ignore_ascii_case(name))
                 .and_then(|idx| parts.get(idx))
-                .map(|s| s.trim())
-                .unwrap_or("")
+                .map_or("", |s| s.trim())
         };
 
         let text = get_field("Text");
@@ -172,13 +182,13 @@ impl<'a> EventsParser<'a> {
         let start = self.position;
         let end = self.source[self.position..]
             .find('\n')
-            .map(|pos| self.position + pos)
-            .unwrap_or(self.source.len());
+            .map_or(self.source.len(), |pos| self.position + pos);
 
         &self.source[start..end]
     }
 
     /// Check if at start of next section
+    #[must_use]
     fn at_next_section(&self) -> bool {
         let remaining = &self.source[self.position..];
         remaining.trim_start().starts_with('[')
@@ -222,12 +232,14 @@ impl<'a> EventsParser<'a> {
     }
 
     /// Get accumulated parse issues
+    #[must_use]
     pub fn issues(self) -> Vec<ParseIssue> {
         self.issues
     }
 
     /// Get format specification
-    pub fn format(&self) -> Option<&Vec<&'a str>> {
+    #[must_use]
+    pub const fn format(&self) -> Option<&Vec<&'a str>> {
         self.format.as_ref()
     }
 }

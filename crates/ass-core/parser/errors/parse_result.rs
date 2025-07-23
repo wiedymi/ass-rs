@@ -13,8 +13,8 @@ use super::{
 
 /// Result type for operations that can produce parse issues
 ///
-/// Standard Result type using ParseError for the error case.
-/// Use ParseResultWithIssues for operations that need to collect
+/// Standard Result type using `ParseError` for the error case.
+/// Use `ParseResultWithIssues` for operations that need to collect
 /// warnings and recoverable errors alongside the main result.
 pub type ParseResult<T> = Result<T, ParseError>;
 
@@ -42,7 +42,7 @@ impl<T> ParseResultWithIssues<T> {
     /// # Returns
     ///
     /// Result containing the value with empty issues list
-    pub fn ok(value: T) -> Self {
+    pub const fn ok(value: T) -> Self {
         Self {
             result: Ok(value),
             issues: Vec::new(),
@@ -58,7 +58,8 @@ impl<T> ParseResultWithIssues<T> {
     /// # Returns
     ///
     /// Result containing the error with empty issues list
-    pub fn err(error: ParseError) -> Self {
+    #[must_use]
+    pub const fn err(error: ParseError) -> Self {
         Self {
             result: Err(error),
             issues: Vec::new(),
@@ -75,7 +76,7 @@ impl<T> ParseResultWithIssues<T> {
     /// # Returns
     ///
     /// Result with the provided issues attached
-    pub fn with_issues(result: ParseResult<T>, issues: Vec<ParseIssue>) -> Self {
+    pub const fn with_issues(result: ParseResult<T>, issues: Vec<ParseIssue>) -> Self {
         Self { result, issues }
     }
 
@@ -88,6 +89,7 @@ impl<T> ParseResultWithIssues<T> {
     /// # Returns
     ///
     /// Self with the issue added to the issues list
+    #[must_use]
     pub fn add_issue(mut self, issue: ParseIssue) -> Self {
         self.issues.push(issue);
         self
@@ -117,7 +119,7 @@ impl<T> ParseResultWithIssues<T> {
     ///
     /// True if any issue is marked as blocking
     pub fn has_blocking_issues(&self) -> bool {
-        self.issues.iter().any(|issue| issue.is_blocking())
+        self.issues.iter().any(ParseIssue::is_blocking)
     }
 
     /// Get issue count by severity level
@@ -141,7 +143,7 @@ impl<T> ParseResultWithIssues<T> {
     /// # Returns
     ///
     /// True if the main result is Ok, regardless of issues
-    pub fn is_ok(&self) -> bool {
+    pub const fn is_ok(&self) -> bool {
         self.result.is_ok()
     }
 
@@ -150,13 +152,13 @@ impl<T> ParseResultWithIssues<T> {
     /// # Returns
     ///
     /// True if the main result is Err
-    pub fn is_err(&self) -> bool {
+    pub const fn is_err(&self) -> bool {
         self.result.is_err()
     }
 }
 
 impl<T> From<ParseResult<T>> for ParseResultWithIssues<T> {
-    /// Convert a simple ParseResult into a ParseResultWithIssues
+    /// Convert a simple `ParseResult` into a `ParseResultWithIssues`
     ///
     /// Creates a result with no accumulated issues.
     fn from(result: ParseResult<T>) -> Self {
@@ -168,7 +170,7 @@ impl<T> From<ParseResult<T>> for ParseResultWithIssues<T> {
 }
 
 impl<T> From<T> for ParseResultWithIssues<T> {
-    /// Convert a value into a successful ParseResultWithIssues
+    /// Convert a value into a successful `ParseResultWithIssues`
     ///
     /// Creates an Ok result with no accumulated issues.
     fn from(value: T) -> Self {

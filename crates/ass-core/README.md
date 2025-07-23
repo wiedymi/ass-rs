@@ -87,7 +87,7 @@ let result = parser.finalize()?;
 ## Feature Flags
 
 - `std` (default): Standard library support
-- `nostd`: no_std compatibility
+- `no_std`: no_std compatibility
 - `analysis`: Enable script analysis and linting
 - `plugins`: Extension registry support
 - `simd`: SIMD-accelerated parsing

@@ -104,14 +104,14 @@ impl From<::core::str::Utf8Error> for CoreError {
 /// Convert from integer parse errors
 impl From<::core::num::ParseIntError> for CoreError {
     fn from(err: ::core::num::ParseIntError) -> Self {
-        Self::InvalidNumeric(format!("Integer parse error: {}", err))
+        Self::InvalidNumeric(format!("Integer parse error: {err}"))
     }
 }
 
 /// Convert from float parse errors
 impl From<::core::num::ParseFloatError> for CoreError {
     fn from(err: ::core::num::ParseFloatError) -> Self {
-        Self::InvalidNumeric(format!("Float parse error: {}", err))
+        Self::InvalidNumeric(format!("Float parse error: {err}"))
     }
 }
 

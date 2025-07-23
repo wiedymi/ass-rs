@@ -17,7 +17,7 @@ use alloc::vec::Vec;
 /// Parser for [Script Info] section content
 ///
 /// Parses key-value pairs from the script info section and handles
-/// special fields like ScriptType that affect parsing behavior.
+/// special fields like `ScriptType` that affect parsing behavior.
 ///
 /// # Performance
 ///
@@ -25,9 +25,13 @@ use alloc::vec::Vec;
 /// - Memory: Zero allocations via lifetime-generic spans
 /// - Target: <0.5ms for typical script info sections
 pub struct ScriptInfoParser<'a> {
+    /// Source text being parsed
     source: &'a str,
+    /// Current byte position in source
     position: usize,
+    /// Current line number for error reporting
     line: usize,
+    /// Parse issues and warnings collected during parsing
     issues: Vec<ParseIssue>,
 }
 
@@ -39,7 +43,8 @@ impl<'a> ScriptInfoParser<'a> {
     /// * `source` - Source text to parse
     /// * `start_position` - Starting byte position in source
     /// * `start_line` - Starting line number for error reporting
-    pub fn new(source: &'a str, start_position: usize, start_line: usize) -> Self {
+    #[must_use]
+    pub const fn new(source: &'a str, start_position: usize, start_line: usize) -> Self {
         Self {
             source,
             position: start_position,
@@ -51,11 +56,16 @@ impl<'a> ScriptInfoParser<'a> {
     /// Parse script info section content
     ///
     /// Returns the parsed section and any issues encountered during parsing.
-    /// Handles ScriptType field detection and version updating.
+    /// Handles `ScriptType` field detection and version updating.
     ///
     /// # Returns
     ///
-    /// Tuple of (parsed_section, detected_version, parse_issues, final_position, final_line)
+    /// Tuple of (`parsed_section`, `detected_version`, `parse_issues`, `final_position`, `final_line`)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the script info section contains malformed key-value pairs or
+    /// other unrecoverable syntax errors.
     pub fn parse(mut self) -> ParseResult<ScriptInfoParseResult<'a>> {
         let mut fields = Vec::new();
         let mut detected_version = None;
@@ -111,8 +121,7 @@ impl<'a> ScriptInfoParser<'a> {
         let start = self.position;
         let end = self.source[self.position..]
             .find('\n')
-            .map(|pos| self.position + pos)
-            .unwrap_or(self.source.len());
+            .map_or(self.source.len(), |pos| self.position + pos);
 
         &self.source[start..end]
     }
@@ -161,6 +170,7 @@ impl<'a> ScriptInfoParser<'a> {
     }
 
     /// Get accumulated parse issues
+    #[must_use]
     pub fn issues(self) -> Vec<ParseIssue> {
         self.issues
     }

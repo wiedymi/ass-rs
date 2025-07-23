@@ -161,6 +161,12 @@ impl<'a> StyleAnalyzer<'a> {
         for section in self.script.sections() {
             if let Section::Styles(styles) = section {
                 for style in styles {
+                    // TODO: Implement style inheritance resolution
+                    // Currently creates ResolvedStyle directly without considering parent styles
+                    // Need to:
+                    // 1. Build inheritance hierarchy from style relationships
+                    // 2. Resolve parent properties before creating ResolvedStyle
+                    // 3. Apply inheritance chain with proper property precedence
                     if let Ok(resolved) = ResolvedStyle::from_style(style) {
                         self.resolved_styles.insert(style.name, resolved);
                     }

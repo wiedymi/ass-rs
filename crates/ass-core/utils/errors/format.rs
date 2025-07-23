@@ -26,7 +26,7 @@ use core::fmt;
 /// assert!(matches!(error, CoreError::InvalidColor(_)));
 /// ```
 pub fn invalid_color<T: fmt::Display>(format: T) -> CoreError {
-    CoreError::InvalidColor(format!("{}", format))
+    CoreError::InvalidColor(format!("{format}"))
 }
 
 /// Create numeric parsing error with value and reason
@@ -39,7 +39,7 @@ pub fn invalid_color<T: fmt::Display>(format: T) -> CoreError {
 /// * `value` - The value that failed to parse
 /// * `reason` - Description of why parsing failed
 pub fn invalid_numeric<T: fmt::Display>(value: T, reason: &str) -> CoreError {
-    CoreError::InvalidNumeric(format!("'{}': {}", value, reason))
+    CoreError::InvalidNumeric(format!("'{value}': {reason}"))
 }
 
 /// Create time format error with time and reason
@@ -52,7 +52,7 @@ pub fn invalid_numeric<T: fmt::Display>(value: T, reason: &str) -> CoreError {
 /// * `time` - The invalid time format string
 /// * `reason` - Description of the format issue
 pub fn invalid_time<T: fmt::Display>(time: T, reason: &str) -> CoreError {
-    CoreError::InvalidTime(format!("'{}': {}", time, reason))
+    CoreError::InvalidTime(format!("'{time}': {reason}"))
 }
 
 /// Validate ASS color format
@@ -82,23 +82,20 @@ pub fn validate_color_format(color: &str) -> Result<(), CoreError> {
 
         if hex_part.len() != 6 && hex_part.len() != 8 {
             return Err(invalid_color(format!(
-                "Hex color '{}' must be 6 or 8 characters after &H",
-                trimmed
+                "Hex color '{trimmed}' must be 6 or 8 characters after &H"
             )));
         }
 
         if !hex_part.chars().all(|c| c.is_ascii_hexdigit()) {
             return Err(invalid_color(format!(
-                "Invalid hex digits in color '{}'",
-                trimmed
+                "Invalid hex digits in color '{trimmed}'"
             )));
         }
     } else {
         // Try parsing as decimal
         if trimmed.parse::<u32>().is_err() {
             return Err(invalid_color(format!(
-                "Color '{}' is neither valid hex (&HBBGGRR) nor decimal",
-                trimmed
+                "Color '{trimmed}' is neither valid hex (&HBBGGRR) nor decimal"
             )));
         }
     }
@@ -118,19 +115,19 @@ where
 {
     let parsed = value
         .parse::<T>()
-        .map_err(|e| invalid_numeric(value, &format!("Parse error: {}", e)))?;
+        .map_err(|e| invalid_numeric(value, &format!("Parse error: {e}")))?;
 
     if parsed < min {
         return Err(invalid_numeric(
             value,
-            &format!("Value {} below minimum {}", parsed, min),
+            &format!("Value {parsed} below minimum {min}"),
         ));
     }
 
     if parsed > max {
         return Err(invalid_numeric(
             value,
-            &format!("Value {} above maximum {}", parsed, max),
+            &format!("Value {parsed} above maximum {max}"),
         ));
     }
 

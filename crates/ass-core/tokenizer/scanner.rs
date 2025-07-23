@@ -200,13 +200,11 @@ impl<'a> TokenScanner<'a> {
         {
             if let Some(delimiter_pos) = self.scan_delimiters_simd(start) {
                 self.navigator.position = delimiter_pos;
-                self.navigator.chars = self.source[self.navigator.position..].chars();
-                self.navigator.peek_char = None;
             } else {
                 self.navigator.position = self.source.len();
-                self.navigator.chars = self.source[self.navigator.position..].chars();
-                self.navigator.peek_char = None;
             }
+            self.navigator.chars = self.source[self.navigator.position..].chars();
+            self.navigator.peek_char = None;
         }
 
         // Fallback to scalar scanning
@@ -249,19 +247,15 @@ impl<'a> TokenScanner<'a> {
                 && span.len() % 2 == 0
                 && !span.is_empty()
             {
-                return self.parse_hex_simd(span).is_some();
+                return Self::parse_hex_simd(span).is_some();
             }
 
             if let Some(after_prefix) = span.strip_prefix("&H") {
-                let hex_part = if let Some(stripped) = after_prefix.strip_suffix('&') {
-                    stripped
-                } else {
-                    after_prefix
-                };
+                let hex_part = after_prefix.strip_suffix('&').map_or(after_prefix, |stripped| stripped);
 
                 return !hex_part.is_empty()
                     && hex_part.len() % 2 == 0
-                    && self.parse_hex_simd(hex_part).is_some();
+                    && Self::parse_hex_simd(hex_part).is_some();
             }
         }
 
@@ -298,7 +292,7 @@ impl<'a> TokenScanner<'a> {
 
     /// Fast hex parsing using SIMD when available
     #[cfg(feature = "simd")]
-    fn parse_hex_simd(&self, hex_str: &str) -> Option<u32> {
+    fn parse_hex_simd(hex_str: &str) -> Option<u32> {
         simd::parse_hex_u32(hex_str)
     }
 }

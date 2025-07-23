@@ -47,6 +47,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(clippy::all)]
+#![allow(clippy::negative_feature_names)]
 #![deny(unsafe_code)]
 
 extern crate alloc;

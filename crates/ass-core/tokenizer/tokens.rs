@@ -376,6 +376,7 @@ impl TokenPosition {
     }
 
     /// Advance position by one character
+    #[must_use]
     pub fn advance(mut self, ch: char) -> Self {
         self.offset += ch.len_utf8();
         if ch == '\n' {
@@ -387,7 +388,8 @@ impl TokenPosition {
         self
     }
 
-    /// Advance position by string slice
+    /// Advance position by string length
+    #[must_use]
     pub fn advance_by_str(mut self, s: &str) -> Self {
         for ch in s.chars() {
             self = self.advance(ch);

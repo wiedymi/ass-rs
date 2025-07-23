@@ -4,21 +4,24 @@
 //! Both sections use similar structure: filename declaration followed by
 //! base64/UU-encoded data lines.
 
-use crate::Result;
+
 use alloc::vec::Vec;
 
 use super::ast::{Font, Graphic, Section};
 
 /// Parser for [Fonts] section with embedded font data
 pub(super) struct FontsParser<'a> {
+    /// Source text being parsed
     source: &'a str,
+    /// Current byte position in source
     position: usize,
+    /// Current line number for error reporting
     line: usize,
 }
 
 impl<'a> FontsParser<'a> {
     /// Create new fonts parser
-    pub fn new(source: &'a str, position: usize, line: usize) -> Self {
+    pub const fn new(source: &'a str, position: usize, line: usize) -> Self {
         Self {
             source,
             position,
@@ -27,7 +30,7 @@ impl<'a> FontsParser<'a> {
     }
 
     /// Parse complete [Fonts] section
-    pub fn parse(mut self) -> Result<Section<'a>> {
+    pub fn parse(mut self) -> Section<'a> {
         let mut fonts = Vec::new();
 
         while self.position < self.source.len() && !self.at_next_section() {
@@ -37,16 +40,16 @@ impl<'a> FontsParser<'a> {
                 break;
             }
 
-            if let Some(font) = self.parse_font_entry()? {
+            if let Some(font) = self.parse_font_entry() {
                 fonts.push(font);
             }
         }
 
-        Ok(Section::Fonts(fonts))
+        Section::Fonts(fonts)
     }
 
     /// Parse single font entry (fontname: + data lines)
-    fn parse_font_entry(&mut self) -> Result<Option<Font<'a>>> {
+    fn parse_font_entry(&mut self) -> Option<Font<'a>> {
         let line_start = self.position;
         let line_end = self.find_line_end();
         let line = &self.source[line_start..line_end];
@@ -58,15 +61,15 @@ impl<'a> FontsParser<'a> {
                 self.skip_line();
 
                 let data_lines = self.collect_data_lines();
-                return Ok(Some(Font {
+                return Some(Font {
                     filename,
                     data_lines,
-                }));
+                });
             }
         }
 
         self.skip_line();
-        Ok(None)
+        None
     }
 
     /// Collect UU-encoded data lines until next section or empty line
@@ -99,8 +102,7 @@ impl<'a> FontsParser<'a> {
     fn find_line_end(&self) -> usize {
         self.source[self.position..]
             .find('\n')
-            .map(|pos| self.position + pos)
-            .unwrap_or(self.source.len())
+            .map_or(self.source.len(), |pos| self.position + pos)
     }
 
     /// Skip to next line
@@ -132,14 +134,17 @@ impl<'a> FontsParser<'a> {
 
 /// Parser for [Graphics] section with embedded graphic data
 pub(super) struct GraphicsParser<'a> {
+    /// Source text being parsed
     source: &'a str,
+    /// Current byte position in source
     position: usize,
+    /// Current line number for error reporting
     line: usize,
 }
 
 impl<'a> GraphicsParser<'a> {
     /// Create new graphics parser
-    pub fn new(source: &'a str, position: usize, line: usize) -> Self {
+    pub const fn new(source: &'a str, position: usize, line: usize) -> Self {
         Self {
             source,
             position,
@@ -148,7 +153,7 @@ impl<'a> GraphicsParser<'a> {
     }
 
     /// Parse complete [Graphics] section
-    pub fn parse(mut self) -> Result<Section<'a>> {
+    pub fn parse(mut self) -> Section<'a> {
         let mut graphics = Vec::new();
 
         while self.position < self.source.len() && !self.at_next_section() {
@@ -158,16 +163,16 @@ impl<'a> GraphicsParser<'a> {
                 break;
             }
 
-            if let Some(graphic) = self.parse_graphic_entry()? {
+            if let Some(graphic) = self.parse_graphic_entry() {
                 graphics.push(graphic);
             }
         }
 
-        Ok(Section::Graphics(graphics))
+        Section::Graphics(graphics)
     }
 
     /// Parse single graphic entry (filename: + data lines)
-    fn parse_graphic_entry(&mut self) -> Result<Option<Graphic<'a>>> {
+    fn parse_graphic_entry(&mut self) -> Option<Graphic<'a>> {
         let line_start = self.position;
         let line_end = self.find_line_end();
         let line = &self.source[line_start..line_end];
@@ -179,15 +184,15 @@ impl<'a> GraphicsParser<'a> {
                 self.skip_line();
 
                 let data_lines = self.collect_data_lines();
-                return Ok(Some(Graphic {
+                return Some(Graphic {
                     filename,
                     data_lines,
-                }));
+                });
             }
         }
 
         self.skip_line();
-        Ok(None)
+        None
     }
 
     /// Collect UU-encoded data lines until next section or empty line
@@ -220,8 +225,7 @@ impl<'a> GraphicsParser<'a> {
     fn find_line_end(&self) -> usize {
         self.source[self.position..]
             .find('\n')
-            .map(|pos| self.position + pos)
-            .unwrap_or(self.source.len())
+            .map_or(self.source.len(), |pos| self.position + pos)
     }
 
     /// Skip to next line

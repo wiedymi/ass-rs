@@ -5,7 +5,6 @@
 
 use crate::Result;
 
-
 use super::{
     delta::DeltaBatch,
     state::{ParserState, SectionKind, StreamingContext},
@@ -25,6 +24,7 @@ pub struct LineProcessor {
 
 impl LineProcessor {
     /// Create new line processor
+    #[must_use]
     pub fn new() -> Self {
         Self {
             state: ParserState::ExpectingSection,
@@ -36,6 +36,11 @@ impl LineProcessor {
     ///
     /// Dispatches line processing based on current state and line content.
     /// Updates internal state and returns any generated deltas.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the line contains malformed section headers or
+    /// other unrecoverable syntax errors during processing.
     pub fn process_line(&mut self, line: &str) -> Result<DeltaBatch<'static>> {
         self.context.next_line();
         let trimmed = line.trim();
@@ -47,7 +52,7 @@ impl LineProcessor {
 
         // Handle section headers
         if trimmed.starts_with('[') && trimmed.ends_with(']') {
-            return self.process_section_header(trimmed);
+            return Ok(self.process_section_header(trimmed));
         }
 
         // Handle section content based on current state
@@ -57,17 +62,17 @@ impl LineProcessor {
                 Ok(DeltaBatch::new())
             }
             ParserState::InSection(section_kind) => {
-                self.process_section_content(line, *section_kind)
+                Ok(self.process_section_content(line, *section_kind))
             }
             ParserState::InEvent {
                 section,
                 fields_seen,
-            } => self.process_event_continuation(line, *section, *fields_seen),
+            } => Ok(self.process_event_continuation(line, *section, *fields_seen)),
         }
     }
 
     /// Process section header line
-    fn process_section_header(&mut self, line: &str) -> Result<DeltaBatch<'static>> {
+    fn process_section_header(&mut self, line: &str) -> DeltaBatch<'static> {
         let section_name = &line[1..line.len() - 1]; // Remove [ ]
         let section_kind = SectionKind::from_header(section_name);
 
@@ -84,7 +89,7 @@ impl LineProcessor {
             }
         }
 
-        Ok(DeltaBatch::new())
+        DeltaBatch::new()
     }
 
     /// Process content within a section
@@ -92,54 +97,54 @@ impl LineProcessor {
         &mut self,
         line: &str,
         section_kind: SectionKind,
-    ) -> Result<DeltaBatch<'static>> {
+    ) -> DeltaBatch<'static> {
         match section_kind {
-            SectionKind::ScriptInfo => self.process_script_info_line(line),
+            SectionKind::ScriptInfo => Self::process_script_info_line(line),
             SectionKind::Styles => self.process_styles_line(line),
             SectionKind::Events => self.process_events_line(line),
-            SectionKind::Fonts | SectionKind::Graphics => self.process_binary_line(line),
+            SectionKind::Fonts | SectionKind::Graphics => Self::process_binary_line(line),
             SectionKind::Unknown => {
                 // Log unknown section content but continue parsing
-                Ok(DeltaBatch::new())
+                DeltaBatch::new()
             }
         }
     }
 
     /// Process line in Script Info section
-    fn process_script_info_line(&mut self, line: &str) -> Result<DeltaBatch<'static>> {
+    fn process_script_info_line(line: &str) -> DeltaBatch<'static> {
         let trimmed = line.trim();
 
         if let Some(colon_pos) = trimmed.find(':') {
             let _key = trimmed[..colon_pos].trim();
             let _value = trimmed[colon_pos + 1..].trim();
-            // In streaming mode, we track but don't store the actual values
+            // TODO: Handle script info fields
         }
 
-        Ok(DeltaBatch::new())
+        DeltaBatch::new()
     }
 
     /// Process line in Styles section
-    fn process_styles_line(&mut self, line: &str) -> Result<DeltaBatch<'static>> {
+    fn process_styles_line(&mut self, line: &str) -> DeltaBatch<'static> {
         let trimmed = line.trim();
 
-        if trimmed.starts_with("Format:") {
-            let format_str = trimmed[7..].trim().to_string();
+        if let Some(format_str) = trimmed.strip_prefix("Format:") {
+            let format_str = format_str.trim().to_string();
             self.context.set_styles_format(format_str);
         } else if trimmed.starts_with("Style:") {
             // Style definition detected - in full parser this would create AST node
         }
 
-        Ok(DeltaBatch::new())
+        DeltaBatch::new()
     }
 
     /// Process line in Events section
-    fn process_events_line(&mut self, line: &str) -> Result<DeltaBatch<'static>> {
+    fn process_events_line(&mut self, line: &str) -> DeltaBatch<'static> {
         let trimmed = line.trim();
 
-        if trimmed.starts_with("Format:") {
-            let format_str = trimmed[7..].trim().to_string();
+        if let Some(format_str) = trimmed.strip_prefix("Format:") {
+            let format_str = format_str.trim().to_string();
             self.context.set_events_format(format_str);
-            return Ok(DeltaBatch::new());
+            return DeltaBatch::new();
         }
 
         if trimmed.starts_with("Dialogue:") || trimmed.starts_with("Comment:") {
@@ -148,20 +153,20 @@ impl LineProcessor {
             // In full parser, this would parse the event fields
         }
 
-        Ok(DeltaBatch::new())
+        DeltaBatch::new()
     }
 
-    /// Process line in binary data sections (Fonts/Graphics)
-    fn process_binary_line(&mut self, line: &str) -> Result<DeltaBatch<'static>> {
+    /// Process line in binary sections (Fonts/Graphics)
+    fn process_binary_line(line: &str) -> DeltaBatch<'static> {
         let trimmed = line.trim();
 
         if trimmed.contains(':') {
-            // Filename declaration
-        } else if !trimmed.is_empty() {
+            // Font/graphic filename declaration
+        } else {
             // UU-encoded data line
         }
 
-        Ok(DeltaBatch::new())
+        DeltaBatch::new()
     }
 
     /// Process continuation of an event
@@ -170,7 +175,7 @@ impl LineProcessor {
         line: &str,
         section: SectionKind,
         _fields_seen: usize,
-    ) -> Result<DeltaBatch<'static>> {
+    ) -> DeltaBatch<'static> {
         let trimmed = line.trim();
 
         if !trimmed.is_empty() {
@@ -179,7 +184,7 @@ impl LineProcessor {
 
         // Return to section state
         self.state = ParserState::InSection(section);
-        Ok(DeltaBatch::new())
+        DeltaBatch::new()
     }
 
     /// Reset processor state for new parsing session

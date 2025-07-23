@@ -174,25 +174,25 @@ impl ParseIssue {
 
     /// Create info-level issue
     #[must_use]
-    pub fn info(category: IssueCategory, message: String, line: usize) -> Self {
+    pub const fn info(category: IssueCategory, message: String, line: usize) -> Self {
         Self::new(IssueSeverity::Info, category, message, line)
     }
 
     /// Create warning-level issue
     #[must_use]
-    pub fn warning(category: IssueCategory, message: String, line: usize) -> Self {
+    pub const fn warning(category: IssueCategory, message: String, line: usize) -> Self {
         Self::new(IssueSeverity::Warning, category, message, line)
     }
 
     /// Create error-level issue
     #[must_use]
-    pub fn error(category: IssueCategory, message: String, line: usize) -> Self {
+    pub const fn error(category: IssueCategory, message: String, line: usize) -> Self {
         Self::new(IssueSeverity::Error, category, message, line)
     }
 
     /// Create critical-level issue
     #[must_use]
-    pub fn critical(category: IssueCategory, message: String, line: usize) -> Self {
+    pub const fn critical(category: IssueCategory, message: String, line: usize) -> Self {
         Self::new(IssueSeverity::Critical, category, message, line)
     }
 
@@ -210,7 +210,8 @@ impl ParseIssue {
         );
 
         if let Some(suggestion) = &self.suggestion {
-            result.push_str(&format!("\n  Suggestion: {suggestion}"));
+            result.push_str("\n  Suggestion: ");
+            result.push_str(suggestion);
         }
 
         result

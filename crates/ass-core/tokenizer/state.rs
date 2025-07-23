@@ -68,6 +68,7 @@ impl TokenContext {
     }
 
     /// Transition to field value context after colon
+    #[must_use]
     pub fn enter_field_value(self) -> Self {
         match self {
             Self::Document => Self::FieldValue,
@@ -76,6 +77,7 @@ impl TokenContext {
     }
 
     /// Reset to document context (typically after newline)
+    #[must_use]
     pub fn reset_to_document(self) -> Self {
         Self::Document
     }
@@ -137,7 +139,7 @@ impl IssueLevel {
 ///
 /// Represents a problem encountered during tokenization with location
 /// information and severity level for appropriate handling.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TokenIssue<'a> {
     /// Issue severity level
     pub level: IssueLevel,
@@ -265,7 +267,7 @@ impl<'a> IssueCollector<'a> {
 
     /// Check if any error-level issues were collected
     pub fn has_errors(&self) -> bool {
-        self.issues.iter().any(|issue| issue.is_error())
+        self.issues.iter().any(TokenIssue::is_error)
     }
 
     /// Get count of issues

@@ -122,12 +122,12 @@ impl StreamingParser {
         }
 
         let chunk_str = core::str::from_utf8(chunk)
-            .map_err(|e| CoreError::parse(format!("Invalid UTF-8: {}", e)))?;
+            .map_err(|e| CoreError::parse(format!("Invalid UTF-8: {e}")))?;
 
         self.buffer.push_str(chunk_str);
 
         let mut all_deltas = Vec::new();
-        let lines: Vec<String> = self.buffer.lines().map(|s| s.to_string()).collect();
+        let lines: Vec<String> = self.buffer.lines().map(str::to_string).collect();
         let ends_with_newline = self.buffer.ends_with('\n') || self.buffer.ends_with('\r');
 
         let complete_lines = if ends_with_newline {
@@ -144,7 +144,7 @@ impl StreamingParser {
 
         // Update buffer with incomplete line
         if complete_lines < lines.len() {
-            self.buffer = lines[complete_lines].clone();
+            self.buffer.clone_from(&lines[complete_lines]);
         } else {
             self.buffer.clear();
         }

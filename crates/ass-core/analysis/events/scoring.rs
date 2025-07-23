@@ -64,6 +64,7 @@ pub enum PerformanceImpact {
 /// let score = calculate_animation_score(&tags);
 /// assert_eq!(score, 0);
 /// ```
+#[must_use]
 pub fn calculate_animation_score(tags: &[OverrideTag<'_>]) -> u8 {
     tags.iter()
         .map(|tag| match tag.name() {
@@ -74,8 +75,7 @@ pub fn calculate_animation_score(tags: &[OverrideTag<'_>]) -> u8 {
                 3
             }
             "move" => 4,
-            "t" => 5,
-            "pbo" => 5,
+            "t" | "pbo" => 5,
             "p" => 8,
             _ => 2,
         })

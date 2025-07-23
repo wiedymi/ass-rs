@@ -427,16 +427,14 @@ fn bench_memory_usage(c: &mut Criterion) {
                     let parsed = Script::parse(black_box(script)).unwrap();
 
                     // Analyze all events
-                    if let Some(events_section) = parsed
+                    if let Some(Section::Events(events)) = parsed
                         .sections()
                         .iter()
                         .find(|s| matches!(s, Section::Events(_)))
                     {
-                        if let Section::Events(events) = events_section {
-                            for event in events {
-                                let dialogue_info = DialogueInfo::analyze(event);
-                                let _ = std_black_box(dialogue_info);
-                            }
+                        for event in events {
+                            let dialogue_info = DialogueInfo::analyze(event);
+                            let _ = std_black_box(dialogue_info);
                         }
                     }
 
@@ -454,16 +452,14 @@ fn bench_memory_usage(c: &mut Criterion) {
                     let parsed = Script::parse(black_box(script)).unwrap();
 
                     // Analyze all events
-                    if let Some(events_section) = parsed
+                    if let Some(Section::Events(events)) = parsed
                         .sections()
                         .iter()
                         .find(|s| matches!(s, Section::Events(_)))
                     {
-                        if let Section::Events(events) = events_section {
-                            for event in events {
-                                let dialogue_info = DialogueInfo::analyze(event);
-                                let _ = std_black_box(dialogue_info);
-                            }
+                        for event in events {
+                            let dialogue_info = DialogueInfo::analyze(event);
+                            let _ = std_black_box(dialogue_info);
                         }
                     }
 

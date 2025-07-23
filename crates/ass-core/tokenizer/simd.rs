@@ -152,9 +152,9 @@ pub fn parse_hex_u32(hex_str: &str) -> Option<u32> {
 fn parse_hex_simd_impl(hex_str: &str) -> Option<u32> {
     let bytes = hex_str.as_bytes();
 
-    // For hex strings <= 8 chars, we can process them directly with SIMD
+    // For hex strings <= 8 chars, we can process them directly with scalar
     if bytes.len() <= 8 {
-        return parse_hex_simd_direct(bytes);
+        return parse_hex_scalar_direct(bytes);
     }
 
     // For longer strings, validate with SIMD then fall back to scalar
@@ -202,9 +202,9 @@ fn validate_hex_chars_simd(simd_chunk: u8x16) -> bool {
     valid_mask.move_mask() == 0xFFFF
 }
 
-/// Direct SIMD hex parsing for strings <= 8 characters
+/// Direct scalar hex parsing for strings <= 8 characters
 #[cfg(feature = "simd")]
-fn parse_hex_simd_direct(bytes: &[u8]) -> Option<u32> {
+fn parse_hex_scalar_direct(bytes: &[u8]) -> Option<u32> {
     if bytes.is_empty() || bytes.len() > 8 {
         return None;
     }
@@ -219,7 +219,7 @@ fn parse_hex_simd_direct(bytes: &[u8]) -> Option<u32> {
             _ => return None,
         };
 
-        result = result.checked_mul(16)?.checked_add(digit_value as u32)?;
+        result = result.checked_mul(16)?.checked_add(u32::from(digit_value))?;
     }
 
     Some(result)
@@ -269,7 +269,7 @@ fn validate_utf8_simd_impl(bytes: &[u8]) -> Result<(), CoreError> {
 fn validate_utf8_scalar(bytes: &[u8]) -> Result<(), CoreError> {
     core::str::from_utf8(bytes)
         .map(|_| ())
-        .map_err(|e| CoreError::utf8_error(e.valid_up_to(), format!("{}", e)))
+        .map_err(|e| CoreError::utf8_error(e.valid_up_to(), format!("{e}")))
 }
 
 #[cfg(test)]
@@ -302,7 +302,7 @@ mod tests {
 
     #[test]
     fn scan_delimiters_long_text() {
-        let text = "a".repeat(50) + ":value";
+        let text = format!("{}:value", "a".repeat(50));
         assert_eq!(scan_delimiters(&text), Some(50));
     }
 

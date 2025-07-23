@@ -211,11 +211,12 @@ impl<'a> ResolvedStyle<'a> {
             score += 5;
         }
 
-        if style.scale_x != 100.0 || style.scale_y != 100.0 {
+        const EPSILON: f32 = 0.001;
+        if (style.scale_x - 100.0).abs() > EPSILON || (style.scale_y - 100.0).abs() > EPSILON {
             score += 10;
         }
 
-        if style.angle != 0.0 {
+        if style.angle.abs() > EPSILON {
             score += 15;
         }
 

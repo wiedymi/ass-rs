@@ -33,10 +33,10 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::fmt;
 
-#[cfg(feature = "std")]
+#[cfg(not(feature = "no_std"))]
 use std::collections::HashMap;
 
-#[cfg(not(feature = "std"))]
+#[cfg(feature = "no_std")]
 use hashbrown::HashMap;
 
 pub mod sections;
@@ -154,7 +154,6 @@ impl std::error::Error for PluginError {}
 ///
 /// Manages registration and lookup of tag handlers and section processors.
 /// Optimized for fast lookup during parsing with minimal memory overhead.
-#[derive(Default)]
 pub struct ExtensionRegistry {
     tag_handlers: HashMap<String, Box<dyn TagHandler>>,
     section_processors: HashMap<String, Box<dyn SectionProcessor>>,
@@ -164,8 +163,8 @@ impl ExtensionRegistry {
     /// Create a new empty extension registry
     pub fn new() -> Self {
         Self {
-            tag_handlers: HashMap::default(),
-            section_processors: HashMap::default(),
+            tag_handlers: HashMap::new(),
+            section_processors: HashMap::new(),
         }
     }
 
@@ -291,6 +290,12 @@ impl ExtensionRegistry {
     /// Get total number of registered extensions
     pub fn extension_count(&self) -> usize {
         self.tag_handlers.len() + self.section_processors.len()
+    }
+}
+
+impl Default for ExtensionRegistry {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

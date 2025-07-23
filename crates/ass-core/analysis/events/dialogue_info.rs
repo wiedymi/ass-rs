@@ -29,7 +29,6 @@ use crate::{
     utils::{parse_ass_time, CoreError},
     Result,
 };
-use alloc::format;
 
 /// Timing relationship between two dialogue events
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -96,11 +95,9 @@ impl<'a> DialogueInfo<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn analyze(event: &'a Event<'a>) -> Result<Self> {
-        let start_cs = parse_ass_time(event.start)
-            .map_err(|e| CoreError::parse(format!("Invalid start time: {}", e)))?;
+        let start_cs = parse_ass_time(event.start)?;
 
-        let end_cs = parse_ass_time(event.end)
-            .map_err(|e| CoreError::parse(format!("Invalid end time: {}", e)))?;
+        let end_cs = parse_ass_time(event.end)?;
 
         if start_cs >= end_cs {
             return Err(CoreError::parse("Start time must be before end time"));

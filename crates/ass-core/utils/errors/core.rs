@@ -87,13 +87,13 @@ impl CoreError {
     /// Create parse error from message
     pub fn parse<T: fmt::Display>(message: T) -> Self {
         Self::Parse(crate::parser::ParseError::IoError {
-            message: format!("{}", message),
+            message: format!("{message}"),
         })
     }
 
     /// Create internal error (indicates a bug)
     pub fn internal<T: fmt::Display>(message: T) -> Self {
-        Self::Internal(format!("{}", message))
+        Self::Internal(format!("{message}"))
     }
 
     /// Check if error is recoverable
@@ -165,21 +165,34 @@ impl CoreError {
     }
 
     /// Check if this is a specific type of parse error
+    #[must_use]
     pub fn is_parse_error_type(&self, error_type: &str) -> bool {
         match self {
-            Self::Parse(parse_err) => match (error_type, parse_err) {
-                ("section_header", crate::parser::ParseError::ExpectedSectionHeader { .. }) => true,
-                ("unclosed_header", crate::parser::ParseError::UnclosedSectionHeader { .. }) => {
-                    true
-                }
-                ("unknown_section", crate::parser::ParseError::UnknownSection { .. }) => true,
-                ("field_format", crate::parser::ParseError::InvalidFieldFormat { .. }) => true,
-                ("time_format", crate::parser::ParseError::InvalidTimeFormat { .. }) => true,
-                ("color_format", crate::parser::ParseError::InvalidColorFormat { .. }) => true,
-                ("numeric_value", crate::parser::ParseError::InvalidNumericValue { .. }) => true,
-                ("utf8", crate::parser::ParseError::Utf8Error { .. }) => true,
-                _ => false,
-            },
+            Self::Parse(parse_err) => matches!(
+                (error_type, parse_err),
+                (
+                    "section_header",
+                    crate::parser::ParseError::ExpectedSectionHeader { .. }
+                ) | (
+                    "unclosed_header",
+                    crate::parser::ParseError::UnclosedSectionHeader { .. }
+                ) | (
+                    "unknown_section",
+                    crate::parser::ParseError::UnknownSection { .. }
+                ) | (
+                    "field_format",
+                    crate::parser::ParseError::InvalidFieldFormat { .. }
+                ) | (
+                    "time_format",
+                    crate::parser::ParseError::InvalidTimeFormat { .. }
+                ) | (
+                    "color_format",
+                    crate::parser::ParseError::InvalidColorFormat { .. }
+                ) | (
+                    "numeric_value",
+                    crate::parser::ParseError::InvalidNumericValue { .. }
+                ) | ("utf8", crate::parser::ParseError::Utf8Error { .. })
+            ),
             _ => false,
         }
     }
@@ -193,51 +206,42 @@ pub type Result<T> = core::result::Result<T, CoreError>;
 impl fmt::Display for CoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CoreError::Parse(parse_err) => write!(f, "Parse error: {}", parse_err),
-            CoreError::Tokenization(msg) => write!(f, "Tokenization error: {}", msg),
-            CoreError::Analysis(msg) => write!(f, "Analysis error: {}", msg),
-            CoreError::Plugin(msg) => write!(f, "Plugin error: {}", msg),
-            CoreError::InvalidColor(msg) => write!(f, "Invalid color format: {}", msg),
-            CoreError::InvalidNumeric(msg) => write!(f, "Invalid numeric value: {}", msg),
-            CoreError::InvalidTime(msg) => write!(f, "Invalid time format: {}", msg),
-            CoreError::Utf8Error { position, message } => {
-                write!(
-                    f,
-                    "UTF-8 encoding error at position {}: {}",
-                    position, message
-                )
+            Self::Parse(parse_err) => write!(f, "Parse error: {parse_err}"),
+            Self::Tokenization(msg) => write!(f, "Tokenization error: {msg}"),
+            Self::Analysis(msg) => write!(f, "Analysis error: {msg}"),
+            Self::Plugin(msg) => write!(f, "Plugin error: {msg}"),
+            Self::InvalidColor(msg) => write!(f, "Invalid color format: {msg}"),
+            Self::InvalidNumeric(msg) => write!(f, "Invalid numeric value: {msg}"),
+            Self::InvalidTime(msg) => write!(f, "Invalid time format: {msg}"),
+            Self::Utf8Error { position, message } => {
+                write!(f, "UTF-8 encoding error at position {position}: {message}")
             }
-            CoreError::Io(msg) => write!(f, "I/O error: {}", msg),
-            CoreError::OutOfMemory(msg) => write!(f, "Memory allocation failed: {}", msg),
-            CoreError::Config(msg) => write!(f, "Configuration error: {}", msg),
-            CoreError::Validation(msg) => write!(f, "Validation error: {}", msg),
-            CoreError::FeatureNotSupported {
+            Self::Io(msg) => write!(f, "I/O error: {msg}"),
+            Self::OutOfMemory(msg) => write!(f, "Memory allocation failed: {msg}"),
+            Self::Config(msg) => write!(f, "Configuration error: {msg}"),
+            Self::Validation(msg) => write!(f, "Validation error: {msg}"),
+            Self::FeatureNotSupported {
                 feature,
                 required_feature,
             } => {
                 write!(
                     f,
-                    "Feature not supported: {} (requires feature '{}')",
-                    feature, required_feature
+                    "Feature not supported: {feature} (requires feature '{required_feature}')"
                 )
             }
-            CoreError::VersionIncompatible { message } => {
-                write!(f, "Version incompatibility: {}", message)
+            Self::VersionIncompatible { message } => {
+                write!(f, "Version incompatibility: {message}")
             }
-            CoreError::ResourceLimitExceeded {
+            Self::ResourceLimitExceeded {
                 resource,
                 current,
                 limit,
             } => {
-                write!(
-                    f,
-                    "Resource limit exceeded: {} ({}/{})",
-                    resource, current, limit
-                )
+                write!(f, "Resource limit exceeded: {resource} ({current}/{limit})")
             }
-            CoreError::SecurityViolation(msg) => write!(f, "Security policy violation: {}", msg),
-            CoreError::Internal(msg) => {
-                write!(f, "Internal error: {} (this is a bug, please report)", msg)
+            Self::SecurityViolation(msg) => write!(f, "Security policy violation: {msg}"),
+            Self::Internal(msg) => {
+                write!(f, "Internal error: {msg} (this is a bug, please report)")
             }
         }
     }
@@ -252,51 +256,42 @@ impl core::error::Error for CoreError {}
 impl fmt::Display for CoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CoreError::Parse(parse_err) => write!(f, "Parse error: {}", parse_err),
-            CoreError::Tokenization(msg) => write!(f, "Tokenization error: {}", msg),
-            CoreError::Analysis(msg) => write!(f, "Analysis error: {}", msg),
-            CoreError::Plugin(msg) => write!(f, "Plugin error: {}", msg),
-            CoreError::InvalidColor(msg) => write!(f, "Invalid color format: {}", msg),
-            CoreError::InvalidNumeric(msg) => write!(f, "Invalid numeric value: {}", msg),
-            CoreError::InvalidTime(msg) => write!(f, "Invalid time format: {}", msg),
-            CoreError::Utf8Error { position, message } => {
-                write!(
-                    f,
-                    "UTF-8 encoding error at position {}: {}",
-                    position, message
-                )
+            Self::Parse(parse_err) => write!(f, "Parse error: {parse_err}"),
+            Self::Tokenization(msg) => write!(f, "Tokenization error: {msg}"),
+            Self::Analysis(msg) => write!(f, "Analysis error: {msg}"),
+            Self::Plugin(msg) => write!(f, "Plugin error: {msg}"),
+            Self::InvalidColor(msg) => write!(f, "Invalid color format: {msg}"),
+            Self::InvalidNumeric(msg) => write!(f, "Invalid numeric value: {msg}"),
+            Self::InvalidTime(msg) => write!(f, "Invalid time format: {msg}"),
+            Self::Utf8Error { position, message } => {
+                write!(f, "UTF-8 encoding error at position {position}: {message}")
             }
-            CoreError::Io(msg) => write!(f, "I/O error: {}", msg),
-            CoreError::OutOfMemory(msg) => write!(f, "Memory allocation failed: {}", msg),
-            CoreError::Config(msg) => write!(f, "Configuration error: {}", msg),
-            CoreError::Validation(msg) => write!(f, "Validation error: {}", msg),
-            CoreError::FeatureNotSupported {
+            Self::Io(msg) => write!(f, "I/O error: {msg}"),
+            Self::OutOfMemory(msg) => write!(f, "Memory allocation failed: {msg}"),
+            Self::Config(msg) => write!(f, "Configuration error: {msg}"),
+            Self::Validation(msg) => write!(f, "Validation error: {msg}"),
+            Self::FeatureNotSupported {
                 feature,
                 required_feature,
             } => {
                 write!(
                     f,
-                    "Feature not supported: {} (requires feature '{}')",
-                    feature, required_feature
+                    "Feature not supported: {feature} (requires feature '{required_feature}')"
                 )
             }
-            CoreError::VersionIncompatible { message } => {
-                write!(f, "Version incompatibility: {}", message)
+            Self::VersionIncompatible { message } => {
+                write!(f, "Version incompatibility: {message}")
             }
-            CoreError::ResourceLimitExceeded {
+            Self::ResourceLimitExceeded {
                 resource,
                 current,
                 limit,
             } => {
-                write!(
-                    f,
-                    "Resource limit exceeded: {} ({}/{})",
-                    resource, current, limit
-                )
+                write!(f, "Resource limit exceeded: {resource} ({current}/{limit})")
             }
-            CoreError::SecurityViolation(msg) => write!(f, "Security policy violation: {}", msg),
-            CoreError::Internal(msg) => {
-                write!(f, "Internal error: {} (this is a bug, please report)", msg)
+            Self::SecurityViolation(msg) => write!(f, "Security policy violation: {msg}"),
+            Self::Internal(msg) => {
+                write!(f, "Internal error: {msg} (this is a bug, please report)")
             }
         }
     }

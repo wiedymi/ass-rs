@@ -44,7 +44,7 @@ In `Cargo.toml`, default to minimal set:
 - `"plugins"` (default): Includes registry and trait impls for extensibility.
 - `"unicode-wrap"`: Unicode linebreak support for libass 0.17.4 Unicode wrapping (dep: libunibreak if enabled).
 - `"serde"`: Adds `Serialize`/`Deserialize` derives on AST (e.g., for JSON export).
-- `"simd"`: Enables `portable-simd` for optimizations (e.g., `scan_delimiters_simd` in `tokenizer/mod.rs`). Fallback to scalar code.
+- `"simd"`: Enables `wide` crate for SIMD optimizations (e.g., `scan_delimiters_simd` in `tokenizer/mod.rs`). Fallback to scalar code.
 - `"arena"`: Uses `bumpalo` for allocation pooling during parse (drop after for zero overhead).
 - `"no_std"` (aggressive): Disables `std`, requires `alloc` (use `hashbrown` for `HashMap`, `arrayvec` for fixed `Vec`s). Analysis remains enabled via no_std-compatible crates. Defaults to `std` for simplicity; `no_std` for embedded/WASM efficiency (e.g., ~100KB binary savings, no `std` overhead).
 - `"stream"`: Enables `parse_stream` for chunked inputs (network streams, large files).

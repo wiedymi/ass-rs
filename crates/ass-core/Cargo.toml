@@ -28,13 +28,13 @@ criterion = { version = "0.5", optional = true, features = ["html_reports"] }
 [features]
 default = ["std", "analysis", "plugins"]
 
-# Platform support
-std = []                      # Standard library support (default)
-no_std = ["dep:hashbrown"]     # no_std compatibility (mutually exclusive with std)
+# Platform support (mutually exclusive)
+std = []                   # Standard library support (default)
+no_std = ["dep:hashbrown"] # no_std compatibility (mutually exclusive with std)
 
 # Core functionality
-analysis = [] # Enable linting and deep analysis
-plugins = []  # Extension registry support
+analysis = []     # Enable linting and deep analysis
+plugins = []      # Extension registry support
 unicode-wrap = [] # Unicode linebreak support for libass 0.17.4+ compatibility
 
 # Performance optimizations
@@ -61,6 +61,8 @@ all = "deny"
 pedantic = "warn"
 nursery = "warn"
 cargo = "warn"
+# Allow some cargo lints that conflict with project design
+negative_feature_names = "allow"
 # Allow some pedantic lints that conflict with project style
 module_name_repetitions = "allow"
 similar_names = "allow"

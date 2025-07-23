@@ -22,10 +22,15 @@ use alloc::vec::Vec;
 /// - Memory: Zero allocations via lifetime-generic spans
 /// - Target: <1ms for typical style sections with 50 styles
 pub struct StylesParser<'a> {
+    /// Source text being parsed
     source: &'a str,
+    /// Current byte position in source
     position: usize,
+    /// Current line number for error reporting
     line: usize,
+    /// Parse issues and warnings collected during parsing
     issues: Vec<ParseIssue>,
+    /// Format fields for the styles section
     format: Option<Vec<&'a str>>,
 }
 
@@ -37,7 +42,8 @@ impl<'a> StylesParser<'a> {
     /// * `source` - Source text to parse
     /// * `start_position` - Starting byte position in source
     /// * `start_line` - Starting line number for error reporting
-    pub fn new(source: &'a str, start_position: usize, start_line: usize) -> Self {
+    #[must_use]
+    pub const fn new(source: &'a str, start_position: usize, start_line: usize) -> Self {
         Self {
             source,
             position: start_position,
@@ -54,7 +60,12 @@ impl<'a> StylesParser<'a> {
     ///
     /// # Returns
     ///
-    /// Tuple of (parsed_section, format_fields, parse_issues, final_position, final_line)
+    /// Tuple of (`parsed_section`, `format_fields`, `parse_issues`, `final_position`, `final_line`)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the styles section contains malformed format lines or
+    /// other unrecoverable syntax errors.
     pub fn parse(mut self) -> ParseResult<SectionParseResult<'a>> {
         let mut styles = Vec::new();
 
@@ -96,7 +107,7 @@ impl<'a> StylesParser<'a> {
     /// Parse format specification line
     fn parse_format_line(&mut self, line: &'a str) {
         if let Some(format_data) = line.strip_prefix("Format:") {
-            let fields: Vec<&'a str> = format_data.split(',').map(|s| s.trim()).collect();
+            let fields: Vec<&'a str> = format_data.split(',').map(str::trim).collect();
             self.format = Some(fields);
         }
     }
@@ -152,8 +163,7 @@ impl<'a> StylesParser<'a> {
                 .iter()
                 .position(|&field| field.eq_ignore_ascii_case(name))
                 .and_then(|idx| parts.get(idx))
-                .map(|s| s.trim())
-                .unwrap_or("")
+                .map_or("", |s| s.trim())
         };
 
         Some(Style {
@@ -188,8 +198,7 @@ impl<'a> StylesParser<'a> {
         let start = self.position;
         let end = self.source[self.position..]
             .find('\n')
-            .map(|pos| self.position + pos)
-            .unwrap_or(self.source.len());
+            .map_or(self.source.len(), |pos| self.position + pos);
 
         &self.source[start..end]
     }
@@ -238,12 +247,14 @@ impl<'a> StylesParser<'a> {
     }
 
     /// Get accumulated parse issues
+    #[must_use]
     pub fn issues(self) -> Vec<ParseIssue> {
         self.issues
     }
 
     /// Get format specification
-    pub fn format(&self) -> Option<&Vec<&'a str>> {
+    #[must_use]
+    pub const fn format(&self) -> Option<&Vec<&'a str>> {
         self.format.as_ref()
     }
 }

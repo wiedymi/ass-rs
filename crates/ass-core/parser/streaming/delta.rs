@@ -52,9 +52,9 @@ pub enum ParseDelta<'a> {
 
     /// Section was modified during incremental parsing
     ///
-    /// Contains the updated section data. Consumers should replace
-    /// the existing section with this new data.
-    UpdateSection(Section<'a>),
+    /// Contains the section index and updated section data. Consumers should replace
+    /// the existing section at the specified index with this new data.
+    UpdateSection(usize, Section<'a>),
 
     /// Section was removed by index
     ///
@@ -71,42 +71,49 @@ pub enum ParseDelta<'a> {
 
 impl<'a> ParseDelta<'a> {
     /// Create delta for adding a section
-    pub fn add_section(section: Section<'a>) -> Self {
+    #[must_use]
+    pub const fn add_section(section: Section<'a>) -> Self {
         Self::AddSection(section)
     }
 
     /// Create delta for updating a section
-    pub fn update_section(section: Section<'a>) -> Self {
-        Self::UpdateSection(section)
+    #[must_use]
+    pub const fn update_section(index: usize, section: Section<'a>) -> Self {
+        Self::UpdateSection(index, section)
     }
 
     /// Create delta for removing a section by index
-    pub fn remove_section(index: usize) -> Self {
+    #[must_use]
+    pub const fn remove_section(index: usize) -> Self {
         Self::RemoveSection(index)
     }
 
     /// Create delta for parsing issue
-    pub fn parse_issue(message: String) -> Self {
+    #[must_use]
+    pub const fn parse_issue(message: String) -> Self {
         Self::ParseIssue(message)
     }
 
     /// Check if delta represents an error condition
-    pub fn is_error(&self) -> bool {
+    #[must_use]
+    pub const fn is_error(&self) -> bool {
         matches!(self, Self::ParseIssue(_))
     }
 
     /// Check if delta modifies document structure
-    pub fn is_structural(&self) -> bool {
+    #[must_use]
+    pub const fn is_structural(&self) -> bool {
         matches!(
             self,
-            Self::AddSection(_) | Self::UpdateSection(_) | Self::RemoveSection(_)
+            Self::AddSection(_) | Self::UpdateSection(_, _) | Self::RemoveSection(_)
         )
     }
 
     /// Get section reference if delta contains one
-    pub fn section(&self) -> Option<&Section<'a>> {
+    #[must_use]
+    pub const fn section(&self) -> Option<&Section<'a>> {
         match self {
-            Self::AddSection(section) | Self::UpdateSection(section) => Some(section),
+            Self::AddSection(section) | Self::UpdateSection(_, section) => Some(section),
             _ => None,
         }
     }
@@ -118,17 +125,20 @@ impl<'a> ParseDelta<'a> {
 /// including filtering, merging, and validation.
 #[derive(Debug, Clone)]
 pub struct DeltaBatch<'a> {
+    /// Collection of deltas representing changes to the script
     deltas: Vec<ParseDelta<'a>>,
 }
 
 impl<'a> DeltaBatch<'a> {
     /// Create new empty delta batch
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self { deltas: Vec::new() }
     }
 
     /// Create batch from existing deltas
-    pub fn from_deltas(deltas: Vec<ParseDelta<'a>>) -> Self {
+    #[must_use]
+    pub const fn from_deltas(deltas: Vec<ParseDelta<'a>>) -> Self {
         Self { deltas }
     }
 
@@ -143,27 +153,33 @@ impl<'a> DeltaBatch<'a> {
     }
 
     /// Get all deltas
+    #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn deltas(&self) -> &[ParseDelta<'a>] {
         &self.deltas
     }
 
     /// Convert to vector of deltas
+    #[must_use]
     pub fn into_deltas(self) -> Vec<ParseDelta<'a>> {
         self.deltas
     }
 
     /// Check if batch is empty
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.deltas.is_empty()
     }
 
     /// Get number of deltas in batch
+    #[must_use]
     pub fn len(&self) -> usize {
         self.deltas.len()
     }
 
     /// Filter deltas by predicate
-    pub fn filter<F>(&self, predicate: F) -> DeltaBatch<'a>
+    #[must_use]
+    pub fn filter<F>(&self, predicate: F) -> Self
     where
         F: Fn(&ParseDelta<'a>) -> bool,
     {
@@ -177,22 +193,24 @@ impl<'a> DeltaBatch<'a> {
     }
 
     /// Get only structural deltas (add/update/remove)
-    pub fn structural_only(&self) -> DeltaBatch<'a> {
-        self.filter(|d| d.is_structural())
+    #[must_use]
+    pub fn structural_only(&self) -> Self {
+        self.filter(ParseDelta::is_structural)
     }
 
     /// Get only error deltas
-    pub fn errors_only(&self) -> DeltaBatch<'a> {
-        self.filter(|d| d.is_error())
+    #[must_use]
+    pub fn errors_only(&self) -> Self {
+        self.filter(ParseDelta::is_error)
     }
 
     /// Check if batch contains any errors
     pub fn has_errors(&self) -> bool {
-        self.deltas.iter().any(|d| d.is_error())
+        self.deltas.iter().any(ParseDelta::is_error)
     }
 }
 
-impl<'a> Default for DeltaBatch<'a> {
+impl Default for DeltaBatch<'_> {
     fn default() -> Self {
         Self::new()
     }

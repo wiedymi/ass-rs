@@ -16,19 +16,27 @@ use super::{
 
 /// Internal parser state for coordinating section parsing
 pub(super) struct Parser<'a> {
+    /// Source text being parsed
     source: &'a str,
+    /// Current byte position in source
     position: usize,
+    /// Current line number for error reporting
     line: usize,
+    /// Detected script version
     version: ScriptVersion,
+    /// Parsed sections accumulated so far
     sections: Vec<Section<'a>>,
+    /// Parse issues and warnings
     issues: Vec<ParseIssue>,
+    /// Format fields for [V4+ Styles] section
     styles_format: Option<Vec<&'a str>>,
+    /// Format fields for [Events] section
     events_format: Option<Vec<&'a str>>,
 }
 
 impl<'a> Parser<'a> {
     /// Create new parser for source text
-    pub fn new(source: &'a str) -> Self {
+    pub const fn new(source: &'a str) -> Self {
         Self {
             source,
             position: 0,
@@ -42,7 +50,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse complete script
-    pub fn parse(mut self) -> Result<Script<'a>> {
+    pub fn parse(mut self) -> Script<'a> {
         if self.source.starts_with('\u{FEFF}') {
             self.position = 3;
         }
@@ -62,7 +70,7 @@ impl<'a> Parser<'a> {
                     } else {
                         (
                             IssueSeverity::Error,
-                            format!("Failed to parse section: {}", e),
+                            format!("Failed to parse section: {e}"),
                         )
                     };
 
@@ -78,12 +86,12 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(Script::from_parts(
+        Script::from_parts(
             self.source,
             self.version,
             self.sections,
             self.issues,
-        ))
+        )
     }
 
     /// Parse a single section (e.g., [Script Info])
@@ -96,7 +104,7 @@ impl<'a> Parser<'a> {
 
         let header_end = self.source[self.position..]
             .find(']')
-            .ok_or(CoreError::from(ParseError::UnclosedSectionHeader {
+            .ok_or_else(|| CoreError::from(ParseError::UnclosedSectionHeader {
                 line: self.line,
             }))?
             + self.position;
@@ -151,7 +159,7 @@ impl<'a> Parser<'a> {
             }
             "Fonts" => {
                 let parser = FontsParser::new(self.source, self.position, start_line);
-                let section = parser.parse().map_err(CoreError::from)?;
+                let section = parser.parse();
 
                 // Update position to end of fonts section
                 self.position = self.find_section_end();
@@ -160,7 +168,7 @@ impl<'a> Parser<'a> {
             }
             "Graphics" => {
                 let parser = GraphicsParser::new(self.source, self.position, start_line);
-                let section = parser.parse().map_err(CoreError::from)?;
+                let section = parser.parse();
 
                 // Update position to end of graphics section
                 self.position = self.find_section_end();
@@ -248,8 +256,7 @@ impl<'a> Parser<'a> {
             let line_start = self.position;
             let line_end = self.source[self.position..]
                 .find('\n')
-                .map(|i| self.position + i)
-                .unwrap_or(self.source.len());
+                .map_or(self.source.len(), |i| self.position + i);
 
             if line_end > line_start {
                 let line = &self.source[line_start..line_end];
