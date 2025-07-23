@@ -27,6 +27,23 @@ use crate::{
 };
 use alloc::{collections::BTreeMap, vec::Vec};
 
+bitflags::bitflags! {
+    /// Analysis options for style analyzer
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct AnalysisOptions: u8 {
+        /// Enable inheritance analysis
+        const INHERITANCE = 1 << 0;
+        /// Enable conflict detection
+        const CONFLICTS = 1 << 1;
+        /// Enable performance analysis
+        const PERFORMANCE = 1 << 2;
+        /// Enable value validation
+        const VALIDATION = 1 << 3;
+        /// Use strict validation rules
+        const STRICT_VALIDATION = 1 << 4;
+    }
+}
+
 /// Comprehensive style analyzer for ASS scripts
 ///
 /// Orchestrates style analysis including resolution, validation, and conflict
@@ -48,16 +65,8 @@ pub struct StyleAnalyzer<'a> {
 /// Configuration for style analysis behavior
 #[derive(Debug, Clone)]
 pub struct StyleAnalysisConfig {
-    /// Enable inheritance analysis
-    pub analyze_inheritance: bool,
-    /// Enable conflict detection
-    pub detect_conflicts: bool,
-    /// Enable performance analysis
-    pub analyze_performance: bool,
-    /// Enable value validation
-    pub validate_values: bool,
-    /// Use strict validation rules
-    pub strict_validation: bool,
+    /// Analysis options flags
+    pub options: AnalysisOptions,
     /// Performance analysis thresholds
     pub performance_thresholds: PerformanceThresholds,
 }
@@ -78,11 +87,10 @@ pub struct PerformanceThresholds {
 impl Default for StyleAnalysisConfig {
     fn default() -> Self {
         Self {
-            analyze_inheritance: true,
-            detect_conflicts: true,
-            analyze_performance: true,
-            validate_values: true,
-            strict_validation: false,
+            options: AnalysisOptions::INHERITANCE
+                | AnalysisOptions::CONFLICTS
+                | AnalysisOptions::PERFORMANCE
+                | AnalysisOptions::VALIDATION,
             performance_thresholds: PerformanceThresholds::default(),
         }
     }
@@ -151,11 +159,11 @@ impl<'a> StyleAnalyzer<'a> {
         let mut issues = Vec::new();
 
         for resolved in self.resolved_styles.values() {
-            if self.config.validate_values {
+            if self.config.options.contains(AnalysisOptions::VALIDATION) {
                 issues.extend(self.validate_style_properties(resolved));
             }
 
-            if self.config.analyze_performance {
+            if self.config.options.contains(AnalysisOptions::PERFORMANCE) {
                 issues.extend(self.analyze_style_performance(resolved));
             }
         }
@@ -178,13 +186,13 @@ impl<'a> StyleAnalyzer<'a> {
                         self.resolved_styles.insert(style.name, resolved);
                     }
 
-                    if self.config.analyze_inheritance {
+                    if self.config.options.contains(AnalysisOptions::INHERITANCE) {
                         let inheritance = StyleInheritance::new(style.name);
                         self.inheritance_info.insert(style.name, inheritance);
                     }
                 }
 
-                if self.config.detect_conflicts {
+                if self.config.options.contains(AnalysisOptions::CONFLICTS) {
                     self.detect_style_conflicts_from_section(styles);
                 }
                 break;
@@ -230,7 +238,7 @@ impl<'a> StyleAnalyzer<'a> {
             ));
         }
 
-        if self.config.strict_validation && style.font_size() > 200.0 {
+        if self.config.options.contains(AnalysisOptions::STRICT_VALIDATION) && style.font_size() > 200.0 {
             issues.push(StyleValidationIssue::warning(
                 "font_size",
                 "Very large font size may cause performance issues",
@@ -286,16 +294,16 @@ Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,
     #[test]
     fn config_defaults() {
         let config = StyleAnalysisConfig::default();
-        assert!(config.analyze_inheritance);
-        assert!(config.detect_conflicts);
-        assert!(config.validate_values);
-        assert!(!config.strict_validation);
+        assert!(config.options.contains(AnalysisOptions::INHERITANCE));
+        assert!(config.options.contains(AnalysisOptions::CONFLICTS));
+        assert!(config.options.contains(AnalysisOptions::VALIDATION));
+        assert!(!config.options.contains(AnalysisOptions::STRICT_VALIDATION));
     }
 
     #[test]
     fn performance_thresholds() {
         let thresholds = PerformanceThresholds::default();
-        assert_eq!(thresholds.large_font_threshold, 50.0);
-        assert_eq!(thresholds.large_outline_threshold, 4.0);
+        assert!((thresholds.large_font_threshold - 50.0).abs() < f32::EPSILON);
+        assert!((thresholds.large_outline_threshold - 4.0).abs() < f32::EPSILON);
     }
 }

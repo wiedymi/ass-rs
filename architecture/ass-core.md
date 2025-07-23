@@ -46,7 +46,7 @@ In `Cargo.toml`, default to minimal set:
 - `"serde"`: Adds `Serialize`/`Deserialize` derives on AST (e.g., for JSON export).
 - `"simd"`: Enables `wide` crate for SIMD optimizations (e.g., `scan_delimiters_simd` in `tokenizer/mod.rs`). Fallback to scalar code.
 - `"arena"`: Uses `bumpalo` for allocation pooling during parse (drop after for zero overhead).
-- `"no_std"` (aggressive): Disables `std`, requires `alloc` (use `hashbrown` for `HashMap`, `arrayvec` for fixed `Vec`s). Analysis remains enabled via no_std-compatible crates. Defaults to `std` for simplicity; `no_std` for embedded/WASM efficiency (e.g., ~100KB binary savings, no `std` overhead).
+- `"nostd"` (aggressive): Disables `std`, requires `alloc` (use `hashbrown` for `HashMap`, `arrayvec` for fixed `Vec`s). Analysis remains enabled via nostd-compatible crates. Defaults to `std` for simplicity; `nostd` for embedded/WASM efficiency (e.g., ~100KB binary savings, no `std` overhead).
 - `"stream"`: Enables `parse_stream` for chunked inputs (network streams, large files).
 - `"simd-full"`: Extends SIMD to UUencode decoding and hex parsing (20-40% faster on large embedded fonts).
 - `"benches"`: Criterion integration for benchmarks (e.g., parse large karaoke scripts).
@@ -56,7 +56,7 @@ In `Cargo.toml`, default to minimal set:
 - Features keep crate lean (~40KB binary without extras after anyhow removal).
 - Benchmark each (e.g., `simd`: 20-30% faster parse, `simd-full`: up to 40% on UUencode).
 - CI thresholds: <10% regression tolerance, fail if parse >5ms/1KB script.
-- For WASM: `no_std` recommended for <100KB savings and better heap control.
+- For WASM: `nostd` recommended for <100KB savings and better heap control.
 
 ## Architecture
 
@@ -131,7 +131,7 @@ crates/ass-core/
 └── utils/         # Shared helpers
     ├── mod.rs     # Spans utils, color parsers (BGR to RGBA), math (bezier eval, no deps)
     ├── errors.rs  # CoreError enum (wraps all sub-errors, no anyhow dependency)
-    ├── hashers.rs # ahash for deterministic HashMap performance (WASM/no_std compatible)
+    ├── hashers.rs # ahash for deterministic HashMap performance (WASM/nostd compatible)
     ├── utf8.rs    # Strict UTF-8 enforcement with BOM handling and encoding detection
     └── streaming.rs # Chunked processing utilities for large scripts
 ```
@@ -146,7 +146,7 @@ crates/ass-core/
 
 - **Performance**: <5ms full parse (1KB script), <2ms incremental. SIMD: +20-30% base, +40% with simd-full on UUencode. CI fails if >10% regression. Stream parsing: <10ms/MB for chunked inputs.
 - **Memory**: ~1.1x input size (spans + AST structs). Arena resets prevent leaks. Lazy features (e.g., font decode) avoid spikes.
-- **WASM Compatibility**: Aggressive `no_std` support saves ~100KB. Test: Parse in browser via `ass-wasm` with <200µs init.
+- **WASM Compatibility**: Aggressive `nostd` support saves ~100KB. Test: Parse in browser via `ass-wasm` with <200µs init.
 - **Testing**: Unit per file (e.g., `tags/alpha.rs::tests`), integration (full scripts from specs). Fuzz tokenizer (`cargo-fuzz`) and UUencode parsing.
 - **Edge Cases**: Strict UTF-8 with mixed encoding detection. Handle BOM, invalid recovery (warnings), RTL (`Encoding: -1` flip in analysis).
 - **CI Integration**: Benchmark thresholds enforced. Coverage >90%. Cross-crate integration tests via workspace.

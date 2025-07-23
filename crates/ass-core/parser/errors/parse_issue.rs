@@ -408,7 +408,7 @@ mod tests {
     #[test]
     fn parse_issue_debug() {
         let issue = ParseIssue::error(IssueCategory::Drawing, "Invalid command".to_string(), 60);
-        let debug_str = format!("{:?}", issue);
+        let debug_str = format!("{issue:?}");
         assert!(debug_str.contains("ParseIssue"));
         assert!(debug_str.contains("Error"));
         assert!(debug_str.contains("Drawing"));

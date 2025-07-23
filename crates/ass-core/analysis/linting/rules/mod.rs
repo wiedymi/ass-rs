@@ -191,7 +191,7 @@ mod tests {
 
         for rule in rules {
             let id = rule.id();
-            assert!(!ids.contains(&id), "Duplicate rule ID: {}", id);
+            assert!(!ids.contains(&id), "Duplicate rule ID: {id}");
             ids.push(id);
         }
     }
@@ -223,8 +223,7 @@ mod tests {
         for expected_id in expected_ids {
             assert!(
                 ids.contains(&expected_id),
-                "Missing rule ID: {}",
-                expected_id
+                "Missing rule ID: {expected_id}"
             );
         }
     }

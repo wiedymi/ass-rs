@@ -109,8 +109,9 @@ pub fn detect_encoding(bytes: &[u8]) -> EncodingInfo {
     }
 
     // Try UTF-8 validation
-    match str::from_utf8(bytes) {
-        Ok(text) => {
+    str::from_utf8(bytes).map_or_else(
+        |_| detect_non_utf8_encoding(bytes),
+        |text| {
             let confidence = if is_likely_ass_content(text) {
                 0.95 // High confidence for ASS-like content
             } else {
@@ -118,8 +119,7 @@ pub fn detect_encoding(bytes: &[u8]) -> EncodingInfo {
             };
             EncodingInfo::new("UTF-8".to_string(), confidence)
         }
-        Err(_) => detect_non_utf8_encoding(bytes),
-    }
+    )
 }
 
 /// Check if text content contains patterns typical of ASS subtitle files
@@ -192,11 +192,12 @@ mod tests {
     fn encoding_info_creation() {
         let info = EncodingInfo::new("UTF-8".to_string(), 0.95);
         assert_eq!(info.encoding, "UTF-8");
-        assert_eq!(info.confidence, 0.95);
+        assert!((info.confidence - 0.95).abs() < f32::EPSILON);
         assert!(!info.has_bom);
         assert!(info.is_valid);
 
         let info_with_bom = EncodingInfo::with_bom("UTF-8".to_string(), 1.0, BomType::Utf8);
+        assert!((info_with_bom.confidence - 1.0).abs() < f32::EPSILON);
         assert!(info_with_bom.has_bom);
         assert_eq!(info_with_bom.bom_type, Some(BomType::Utf8));
     }
@@ -215,7 +216,7 @@ mod tests {
         let text = "\u{FEFF}[Script Info]";
         let encoding = detect_encoding(text.as_bytes());
         assert_eq!(encoding.encoding, "UTF-8");
-        assert_eq!(encoding.confidence, 1.0);
+        assert!((encoding.confidence - 1.0).abs() < f32::EPSILON);
         assert!(encoding.has_bom);
         assert_eq!(encoding.bom_type, Some(BomType::Utf8));
     }
@@ -259,7 +260,7 @@ mod tests {
     #[test]
     fn encoding_info_debug() {
         let info = EncodingInfo::new("UTF-8".to_string(), 0.95);
-        let debug_str = format!("{:?}", info);
+        let debug_str = format!("{info:?}");
         assert!(debug_str.contains("EncodingInfo"));
         assert!(debug_str.contains("UTF-8"));
     }

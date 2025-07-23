@@ -238,7 +238,7 @@ mod tests {
     #[test]
     fn parse_error_display_expected_section_header() {
         let error = ParseError::ExpectedSectionHeader { line: 5 };
-        let message = format!("{}", error);
+        let message = error.to_string();
         assert!(message.contains("line 5"));
         assert!(message.contains("Expected section header"));
         assert!(message.contains("[Script Info]"));
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn parse_error_display_unclosed_section_header() {
         let error = ParseError::UnclosedSectionHeader { line: 10 };
-        let message = format!("{}", error);
+        let message = error.to_string();
         assert!(message.contains("line 10"));
         assert!(message.contains("Unclosed section header"));
         assert!(message.contains("missing ']'"));
@@ -259,7 +259,7 @@ mod tests {
             section: "BadSection".to_string(),
             line: 15,
         };
-        let message = format!("{}", error);
+        let message = error.to_string();
         assert!(message.contains("line 15"));
         assert!(message.contains("Unknown section"));
         assert!(message.contains("BadSection"));
@@ -272,7 +272,7 @@ mod tests {
             expected: 5,
             found: 3,
         };
-        let message = format!("{}", error);
+        let message = error.to_string();
         assert!(message.contains("line 20"));
         assert!(message.contains("expected 5"));
         assert!(message.contains("found 3"));
@@ -286,7 +286,7 @@ mod tests {
             line: 25,
             reason: "bad format".to_string(),
         };
-        let message = format!("{}", error);
+        let message = error.to_string();
         assert!(message.contains("line 25"));
         assert!(message.contains("invalid:time"));
         assert!(message.contains("bad format"));
@@ -300,7 +300,7 @@ mod tests {
             line: 30,
             reason: "not hex".to_string(),
         };
-        let message = format!("{}", error);
+        let message = error.to_string();
         assert!(message.contains("line 30"));
         assert!(message.contains("&HINVALID&"));
         assert!(message.contains("not hex"));
@@ -313,7 +313,7 @@ mod tests {
             position: 100,
             reason: "invalid byte sequence".to_string(),
         };
-        let message = format!("{}", error);
+        let message = error.to_string();
         assert!(message.contains("byte 100"));
         assert!(message.contains("invalid byte sequence"));
         assert!(message.contains("UTF-8 encoding error"));
@@ -324,7 +324,7 @@ mod tests {
         let error = ParseError::UnsupportedVersion {
             version: "v3.00".to_string(),
         };
-        let message = format!("{}", error);
+        let message = error.to_string();
         assert!(message.contains("v3.00"));
         assert!(message.contains("Unsupported script version"));
         assert!(message.contains("v4.00+"));
@@ -335,7 +335,7 @@ mod tests {
         let error = ParseError::CircularStyleReference {
             chain: "StyleA -> StyleB -> StyleA".to_string(),
         };
-        let message = format!("{}", error);
+        let message = error.to_string();
         assert!(message.contains("StyleA -> StyleB -> StyleA"));
         assert!(message.contains("Circular style reference"));
     }
@@ -346,7 +346,7 @@ mod tests {
             size: 1_000_000,
             limit: 500_000,
         };
-        let message = format!("{}", error);
+        let message = error.to_string();
         assert!(message.contains("1000000"));
         assert!(message.contains("500000"));
         assert!(message.contains("Input size"));
@@ -366,7 +366,7 @@ mod tests {
     #[test]
     fn parse_error_debug() {
         let error = ParseError::InvalidFieldFormat { line: 99 };
-        let debug_str = format!("{:?}", error);
+        let debug_str = format!("{error:?}");
         assert!(debug_str.contains("InvalidFieldFormat"));
         assert!(debug_str.contains("99"));
     }

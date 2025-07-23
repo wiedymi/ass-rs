@@ -77,6 +77,10 @@ impl<'a> AssTokenizer<'a> {
     ///
     /// Returns `None` when end of input reached. Maintains zero-copy
     /// semantics by returning spans into source text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tokenization fails due to invalid input or scanner errors.
     pub fn next_token(&mut self) -> Result<Option<Token<'a>>> {
         if self.context.allows_whitespace_skipping() {
             self.scanner.navigator_mut().skip_whitespace();
@@ -151,6 +155,10 @@ impl<'a> AssTokenizer<'a> {
     }
 
     /// Get all tokens as vector for batch processing
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tokenization fails for any token in the input.
     pub fn tokenize_all(&mut self) -> Result<Vec<Token<'a>>> {
         let mut tokens = Vec::new();
         while let Some(token) = self.next_token()? {

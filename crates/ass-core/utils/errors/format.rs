@@ -65,6 +65,10 @@ pub fn invalid_time<T: fmt::Display>(time: T, reason: &str) -> CoreError {
 /// # Returns
 ///
 /// `Ok(())` if valid, error with suggestion if invalid
+///
+/// # Errors
+///
+/// Returns an error if the color format is invalid or cannot be parsed.
 pub fn validate_color_format(color: &str) -> Result<(), CoreError> {
     let trimmed = color.trim();
 

@@ -239,6 +239,7 @@ impl<'a> TokenIssue<'a> {
 /// issues during lexical analysis.
 #[derive(Debug, Clone, Default)]
 pub struct IssueCollector<'a> {
+    /// Collection of tokenization issues found during parsing
     issues: Vec<TokenIssue<'a>>,
 }
 

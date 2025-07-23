@@ -42,15 +42,20 @@ use core::cmp::Ordering;
 /// Event type discriminant for sweep-line algorithm
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SweepEventType {
+    /// Event represents dialogue start time
     Start,
+    /// Event represents dialogue end time
     End,
 }
 
 /// Sweep-line event for overlap detection algorithm
 #[derive(Debug, Clone)]
 struct SweepEvent {
+    /// Time of this sweep event in centiseconds
     time: u32,
+    /// Type of event (start or end)
     event_type: SweepEventType,
+    /// Index of the original event in the input vector
     event_index: usize,
 }
 
@@ -169,6 +174,10 @@ where
 /// assert_eq!(overlaps, vec![(0, 1)]);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+///
+/// # Errors
+///
+/// Returns an error if any event has invalid time format that cannot be parsed.
 pub fn find_overlapping_events(events: &[Event]) -> Result<Vec<(usize, usize)>> {
     find_overlaps_generic(events.iter(), |_index, event| {
         let start_time = parse_ass_time(event.start)
@@ -191,6 +200,10 @@ pub fn find_overlapping_events(events: &[Event]) -> Result<Vec<(usize, usize)>> 
 /// # Returns
 ///
 /// Vector of index pairs for overlapping events, or parsing error.
+///
+/// # Errors
+///
+/// Returns an error if any event has invalid time format that cannot be parsed.
 pub fn find_overlapping_event_refs(events: &[&Event]) -> Result<Vec<(usize, usize)>> {
     find_overlaps_generic(events.iter(), |_index, event| {
         let start_time = parse_ass_time(event.start)
@@ -213,6 +226,10 @@ pub fn find_overlapping_event_refs(events: &[&Event]) -> Result<Vec<(usize, usiz
 /// # Returns
 ///
 /// Number of overlapping event pairs found.
+///
+/// # Errors
+///
+/// Returns an error if any event has invalid time format that cannot be parsed.
 pub fn count_overlapping_events(events: &[Event]) -> Result<usize> {
     Ok(find_overlapping_events(events)?.len())
 }

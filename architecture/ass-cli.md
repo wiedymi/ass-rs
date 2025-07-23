@@ -42,7 +42,7 @@
 - `pretty`: Styled outputs, respects `--no-color`.
 - `batch`: Enhanced batch processing with progress reporting.
 - `mem-profile`: For --mem-peak flag (rusage or similar, no heavy deps).
-- `no_std`: Alloc-only for core commands (parse/validate).
+- `nostd`: Alloc-only for core commands (parse/validate).
 - `benches`: Criterion for perf tests.
 
 **Expectations**: Binary <400KB (manual clap builders reduce compile bloat), parallel linting +50% speed on 4-core, batch processing +200% on file sets, styled output <0.5ms overhead.
@@ -109,7 +109,7 @@ crates/ass-cli/
     └── progress.rs  # Optional tqdm-like via feature if batch >10% regression; else simple loop
 ```
 
-**Expectations**: Files <150 LOC, 90% test coverage, WASM-compatible (core commands with no_std).
+**Expectations**: Files <150 LOC, 90% test coverage, WASM-compatible (core commands with nostd).
 
 ## Expectations
 

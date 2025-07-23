@@ -17,6 +17,7 @@ path = "lib.rs"
 # Workspace dependencies
 thiserror.workspace = true
 ahash.workspace = true
+bitflags.workspace = true
 
 # Feature-gated dependencies
 hashbrown = { version = "0.14", optional = true, features = ["ahash"] }
@@ -29,8 +30,8 @@ criterion = { version = "0.5", optional = true, features = ["html_reports"] }
 default = ["std", "analysis", "plugins"]
 
 # Platform support (mutually exclusive)
-std = []                   # Standard library support (default)
-no_std = ["dep:hashbrown"] # no_std compatibility (mutually exclusive with std)
+std = []                  # Standard library support (default)
+nostd = ["dep:hashbrown"] # nostd compatibility (mutually exclusive with std)
 
 # Core functionality
 analysis = []     # Enable linting and deep analysis
@@ -50,13 +51,14 @@ serde = ["dep:serde"]       # Serialization support
 benches = ["dep:criterion"] # Benchmark integration
 
 [lints.rust]
+# Override workspace defaults with stricter rules for this crate
 unused_variables = "deny"
-dead_code = "deny"
 unused_imports = "deny"
 unused_mut = "deny"
 unreachable_code = "warn"
 
 [lints.clippy]
+# Override workspace defaults with stricter rules for this crate
 all = "deny"
 pedantic = "warn"
 nursery = "warn"

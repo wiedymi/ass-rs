@@ -70,7 +70,6 @@ pub fn calculate_animation_score(tags: &[OverrideTag<'_>]) -> u8 {
         .map(|tag| match tag.name() {
             "b" | "i" | "u" | "s" | "c" | "1c" | "2c" | "3c" | "4c" | "alpha" | "1a" | "2a"
             | "3a" | "4a" => 1,
-            "pos" | "an" | "a" | "org" => 2,
             "frx" | "fry" | "frz" | "fscx" | "fscy" | "fsp" | "fad" | "fade" | "clip" | "iclip" => {
                 3
             }
@@ -136,7 +135,7 @@ pub fn calculate_complexity_score(
         _ => 35,
     };
 
-    (score as u8).min(100)
+    (score.min(255) as u8).min(100)
 }
 
 /// Determine performance impact category from complexity score

@@ -15,7 +15,7 @@ A modular, high-performance Rust implementation of the ASS (Advanced SubStation 
 - **Thread Safety**: Immutable `Script` design with `Send + Sync`
 - **Extensibility**: Runtime plugin registry for custom tags/sections
 - **Modern Standards**: Full libass 0.17.4+ compatibility with Unicode wrapping
-- **Cross-Platform**: Native WASM support, no_std compatibility
+- **Cross-Platform**: Native WASM support, nostd compatibility
 
 ## 📖 Specifications
 
@@ -54,7 +54,7 @@ The ASS-RS ecosystem consists of modular, interoperable crates:
 ## ⚡ Performance Targets
 
 - **Parsing**: <5ms for typical scripts (1KB-10KB)
-- **Incremental Updates**: <2ms for single-event modifications  
+- **Incremental Updates**: <2ms for single-event modifications
 - **Memory Usage**: ~1.1x input size via zero-copy spans
 - **SIMD Acceleration**: 20-30% faster with portable SIMD
 - **Streaming**: <10ms/MB for chunked inputs
@@ -120,10 +120,10 @@ ass-core = { version = "0.1", features = ["simd", "arena", "serde"] }
 ```
 
 - **`analysis`** (default): Deep analysis and linting capabilities
-- **`plugins`** (default): Extension registry for custom handlers  
+- **`plugins`** (default): Extension registry for custom handlers
 - **`simd`**: SIMD-accelerated parsing and processing
 - **`arena`**: Arena allocation for reduced memory overhead
-- **`no_std`**: Embedded and WASM-optimized builds
+- **`nostd`**: Embedded and WASM-optimized builds
 - **`stream`**: Chunked processing for large files
 - **`serde`**: JSON serialization support
 
@@ -138,7 +138,7 @@ cargo test --all-features
 # Performance benchmarks vs libass
 cargo bench --features="benches"
 
-# WASM compatibility  
+# WASM compatibility
 wasm-pack test --chrome
 
 # Fuzzing (requires nightly)

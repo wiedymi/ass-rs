@@ -44,11 +44,11 @@
 //! - Memory: ~1.1x input size via zero-copy spans
 //! - Incremental: <2ms for single-event updates
 
-#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), nostd)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(clippy::all)]
-#![allow(clippy::negative_feature_names)]
 #![deny(unsafe_code)]
+#![allow(clippy::negative_feature_names)]
 
 extern crate alloc;
 

@@ -94,6 +94,10 @@ impl<'a> DialogueInfo<'a> {
     /// assert_eq!(info.duration_ms(), 5000);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the event times are invalid or cannot be parsed.
     pub fn analyze(event: &'a Event<'a>) -> Result<Self> {
         let start_cs = parse_ass_time(event.start)?;
 

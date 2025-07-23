@@ -62,16 +62,19 @@ pub struct StreamingResult {
 
 impl StreamingResult {
     /// Get parsed sections (simplified)
+    #[must_use]
     pub fn sections(&self) -> &[String] {
         &self.sections
     }
 
     /// Get detected script version
-    pub fn version(&self) -> ScriptVersion {
+    #[must_use]
+    pub const fn version(&self) -> ScriptVersion {
         self.version
     }
 
     /// Get parsing issues
+    #[must_use]
     pub fn issues(&self) -> &[crate::parser::ParseIssue] {
         &self.issues
     }
@@ -82,17 +85,22 @@ impl StreamingResult {
 /// Processes input chunks incrementally using a state machine approach.
 /// Supports partial lines, incomplete sections, and memory-efficient parsing.
 pub struct StreamingParser {
+    /// Line processor for parsing individual lines
     processor: LineProcessor,
+    /// Buffer for incomplete lines
     buffer: String,
+    /// Parsed sections in document order
     sections: Vec<String>,
 
     #[cfg(feature = "benches")]
+    /// Peak memory usage for benchmarking
     peak_memory: usize,
 }
 
 impl StreamingParser {
     /// Create new streaming parser
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             processor: LineProcessor::new(),
             buffer: String::new(),
@@ -104,6 +112,7 @@ impl StreamingParser {
     }
 
     /// Create parser with custom capacity
+    #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             processor: LineProcessor::new(),
@@ -116,6 +125,10 @@ impl StreamingParser {
     }
 
     /// Feed chunk of data to parser
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the chunk contains invalid UTF-8 or parsing fails.
     pub fn feed_chunk(&mut self, chunk: &[u8]) -> Result<Vec<ParseDelta<'static>>> {
         if chunk.is_empty() {
             return Ok(Vec::new());
@@ -161,6 +174,10 @@ impl StreamingParser {
     }
 
     /// Finish parsing and return final result
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the final line processing fails.
     pub fn finish(mut self) -> Result<StreamingResult> {
         if !self.buffer.trim().is_empty() {
             let _deltas = self.processor.process_line(&self.buffer.clone())?;
@@ -187,11 +204,13 @@ impl StreamingParser {
 
     /// Get peak memory usage (benchmarks only)
     #[cfg(feature = "benches")]
-    pub fn peak_memory(&self) -> usize {
+    #[must_use]
+    pub const fn peak_memory(&self) -> usize {
         self.peak_memory
     }
 
     #[cfg(feature = "benches")]
+    /// Calculate current memory usage for benchmarking
     fn calculate_memory_usage(&self) -> usize {
         core::mem::size_of::<Self>()
             + self.buffer.capacity()
@@ -206,7 +225,12 @@ impl Default for StreamingParser {
 }
 
 /// Parse incremental changes to an existing script
-pub fn parse_incremental<'a>(
+/// Parse incremental changes to an existing script
+///
+/// # Errors
+///
+/// Returns an error if parsing the incremental changes fails.
+pub const fn parse_incremental<'a>(
     _script: &crate::parser::Script<'a>,
     _new_text: &str,
     _range: Range<usize>,
@@ -216,7 +240,8 @@ pub fn parse_incremental<'a>(
 }
 
 /// Build modified source with range replacement
-pub fn build_modified_source(_original: &str, _range: Range<usize>, _replacement: &str) -> String {
+#[must_use]
+pub const fn build_modified_source(_original: &str, _range: Range<usize>, _replacement: &str) -> String {
     // Simplified implementation for now
     String::new()
 }

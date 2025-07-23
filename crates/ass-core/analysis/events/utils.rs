@@ -204,7 +204,7 @@ pub fn calculate_average_duration(events: &[DialogueInfo<'_>]) -> Option<u32> {
         .iter()
         .map(super::dialogue_info::DialogueInfo::duration_cs)
         .sum();
-    Some(total_duration / events.len() as u32)
+    Some(total_duration / u32::try_from(events.len()).unwrap_or(u32::MAX))
 }
 
 /// Find events within a specific time range

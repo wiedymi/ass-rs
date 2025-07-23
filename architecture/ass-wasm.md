@@ -51,7 +51,7 @@ Modularity shines: No flat `src/`; traits like `WasmModule` for per-crate bindin
 - `node-webgpu-experimental`: warn: blocks loop, recommend workers
 - `gc-batching`: JS GC optimization for frequent calls.
 - `simd`: WASM SIMD passthrough from core.
-- `no_std`: Alloc-only (core compat).
+- `nostd`: Alloc-only (core compat).
 - `benches`: Criterion-wasm for perf (browser/node).
 
 Expectations: <250KB core (wasm-bindgen 0.2.92 optimizations); full +200KB (web-sys bloat—gate features). CI thresholds: <10% regression, warn on >1GB heap usage.

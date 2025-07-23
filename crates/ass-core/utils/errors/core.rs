@@ -110,20 +110,19 @@ impl CoreError {
             | Self::InvalidColor(_)
             | Self::InvalidNumeric(_)
             | Self::InvalidTime(_)
-            | Self::Validation(_) => true,
-
-            Self::OutOfMemory(_)
-            | Self::ResourceLimitExceeded { .. }
-            | Self::SecurityViolation(_)
-            | Self::Internal(_) => false,
-
-            Self::Analysis(_)
+            | Self::Validation(_)
+            | Self::Analysis(_)
             | Self::Plugin(_)
             | Self::Utf8Error { .. }
             | Self::Io(_)
             | Self::Config(_)
             | Self::FeatureNotSupported { .. }
             | Self::VersionIncompatible { .. } => true,
+
+            Self::OutOfMemory(_)
+            | Self::ResourceLimitExceeded { .. }
+            | Self::SecurityViolation(_)
+            | Self::Internal(_) => false,
         }
     }
 
@@ -146,23 +145,20 @@ impl CoreError {
     #[must_use]
     pub const fn line_number(&self) -> Option<usize> {
         match self {
-            Self::Parse(parse_err) => match parse_err {
-                crate::parser::ParseError::ExpectedSectionHeader { line } => Some(*line),
-                crate::parser::ParseError::UnclosedSectionHeader { line } => Some(*line),
-                crate::parser::ParseError::UnknownSection { line, .. } => Some(*line),
-                crate::parser::ParseError::InvalidFieldFormat { line } => Some(*line),
-                crate::parser::ParseError::InvalidFormatLine { line, .. } => Some(*line),
-                crate::parser::ParseError::FieldCountMismatch { line, .. } => Some(*line),
-                crate::parser::ParseError::InvalidTimeFormat { line, .. } => Some(*line),
-                crate::parser::ParseError::InvalidColorFormat { line, .. } => Some(*line),
-                crate::parser::ParseError::InvalidNumericValue { line, .. } => Some(*line),
-                crate::parser::ParseError::InvalidStyleOverride { line, .. } => Some(*line),
-                crate::parser::ParseError::InvalidDrawingCommand { line, .. } => Some(*line),
-                crate::parser::ParseError::UuDecodeError { line, .. } => Some(*line),
-                crate::parser::ParseError::MaxNestingDepth { line, .. } => Some(*line),
-                crate::parser::ParseError::InternalError { line, .. } => Some(*line),
-                _ => None,
-            },
+            Self::Parse(crate::parser::ParseError::ExpectedSectionHeader { line }
+            | crate::parser::ParseError::UnclosedSectionHeader { line }
+            | crate::parser::ParseError::UnknownSection { line, .. }
+            | crate::parser::ParseError::InvalidFieldFormat { line }
+            | crate::parser::ParseError::InvalidFormatLine { line, .. }
+            | crate::parser::ParseError::FieldCountMismatch { line, .. }
+            | crate::parser::ParseError::InvalidTimeFormat { line, .. }
+            | crate::parser::ParseError::InvalidColorFormat { line, .. }
+            | crate::parser::ParseError::InvalidNumericValue { line, .. }
+            | crate::parser::ParseError::InvalidStyleOverride { line, .. }
+            | crate::parser::ParseError::InvalidDrawingCommand { line, .. }
+            | crate::parser::ParseError::UuDecodeError { line, .. }
+            | crate::parser::ParseError::MaxNestingDepth { line, .. }
+            | crate::parser::ParseError::InternalError { line, .. }) => Some(*line),
             Self::Utf8Error { position, .. } => Some(*position),
             _ => None,
         }
@@ -205,7 +201,7 @@ impl CoreError {
 /// Result type alias for convenience
 pub type Result<T> = core::result::Result<T, CoreError>;
 
-/// no_std compatible Display implementation
+/// nostd compatible Display implementation
 #[cfg(not(feature = "std"))]
 impl fmt::Display for CoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -251,7 +247,7 @@ impl fmt::Display for CoreError {
     }
 }
 
-/// no_std compatible Error implementation
+/// nostd compatible Error implementation
 #[cfg(not(feature = "std"))]
 impl core::error::Error for CoreError {}
 

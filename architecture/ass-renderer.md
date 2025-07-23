@@ -68,7 +68,7 @@ For WASM, we've prioritized fallbacks (WebGPU → WebGL → software) for reliab
 - `wasm`: WASM opts (async, WebGPU priority; no native GPU)
 - `serde`
 - `arena`
-- `no_std`: Software/WebGPU (`wgpu` no_std, ash/metal need wrappers)
+- `nostd`: Software/WebGPU (`wgpu` nostd, ash/metal need wrappers)
 - `benches`
 
 ### Expectations
@@ -159,7 +159,7 @@ As of July 21, 2025, WebGPU browser support: Chrome/Edge since 2023, Safari 26 (
 ### Backend-Specific Optimizations
 
 - **WebGPU**: Compute shaders for effects, staging buffers for zero-copy uploads
-- **WebGL**: Fragment-based effects (slower), explicit 20-50% blur degradation warnings  
+- **WebGL**: Fragment-based effects (slower), explicit 20-50% blur degradation warnings
 - **Vulkan**: Queue family optimization, VRAM usage monitoring for integrated GPUs
 - **Software**: SIMD acceleration via `tiny-skia`, CPU-bound but reliable fallback
 - **Async opt-in for web uploads** (feature-gated to avoid futures bloat); batch XOR shapes with thresholds

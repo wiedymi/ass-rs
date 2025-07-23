@@ -75,6 +75,10 @@ pub fn feature_not_supported(feature: &str, required_feature: &str) -> CoreError
 /// * `current_bytes` - Current memory usage in bytes
 /// * `additional_bytes` - Additional bytes that would be allocated
 /// * `limit_bytes` - Maximum allowed memory usage
+///
+/// # Errors
+///
+/// Returns an error if the memory limit would be exceeded.
 pub fn check_memory_limit(
     current_bytes: usize,
     additional_bytes: usize,
@@ -105,8 +109,8 @@ pub fn check_time_limit(elapsed_ms: u64, limit_ms: u64) -> Result<(), CoreError>
     if elapsed_ms > limit_ms {
         return Err(resource_limit_exceeded(
             "processing_time",
-            elapsed_ms as usize,
-            limit_ms as usize,
+            usize::try_from(elapsed_ms).unwrap_or(usize::MAX),
+            usize::try_from(limit_ms).unwrap_or(usize::MAX),
         ));
     }
     Ok(())

@@ -54,7 +54,7 @@
 - `parallel` (default): Rayon groups.
 - `simd`: Enable in dependents.
 - `thresholds`: Environment variable threshold configuration.
-- `no_std`: Minimal (alloc-only for core micros).
+- `nostd`: Minimal (alloc-only for core micros).
 
 Expectations: Suite <200KB; features gate heavy deps (e.g., libass +1MB). CI thresholds configurable via env vars.
 

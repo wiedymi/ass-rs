@@ -30,8 +30,7 @@ impl TagHandler for BoldTagHandler {
 
     fn process(&self, args: &str) -> TagResult {
         match args.trim() {
-            "0" | "1" => TagResult::Processed,
-            "" => TagResult::Processed, // Empty args defaults to toggle
+            "0" | "1" | "" => TagResult::Processed, // Empty args defaults to toggle
             _ => TagResult::Failed(String::from("Bold tag accepts only 0, 1, or empty")),
         }
     }
@@ -52,8 +51,7 @@ impl TagHandler for ItalicTagHandler {
 
     fn process(&self, args: &str) -> TagResult {
         match args.trim() {
-            "0" | "1" => TagResult::Processed,
-            "" => TagResult::Processed,
+            "0" | "1" | "" => TagResult::Processed,
             _ => TagResult::Failed(String::from("Italic tag accepts only 0, 1, or empty")),
         }
     }
@@ -74,8 +72,7 @@ impl TagHandler for UnderlineTagHandler {
 
     fn process(&self, args: &str) -> TagResult {
         match args.trim() {
-            "0" | "1" => TagResult::Processed,
-            "" => TagResult::Processed,
+            "0" | "1" | "" => TagResult::Processed,
             _ => TagResult::Failed(String::from("Underline tag accepts only 0, 1, or empty")),
         }
     }
@@ -96,8 +93,7 @@ impl TagHandler for StrikeoutTagHandler {
 
     fn process(&self, args: &str) -> TagResult {
         match args.trim() {
-            "0" | "1" => TagResult::Processed,
-            "" => TagResult::Processed,
+            "0" | "1" | "" => TagResult::Processed,
             _ => TagResult::Failed(String::from("Strikeout tag accepts only 0, 1, or empty")),
         }
     }

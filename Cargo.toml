@@ -6,12 +6,23 @@ resolver = "2"
 # Shared dependencies with pinned versions for security and reproducibility
 thiserror = "1.0.63"
 ahash = "0.8.11"
+bitflags = "2.4.1"
 
 [workspace.package]
 edition = "2021"
 rust-version = "1.75"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/your-org/ass-rs"
+
+[workspace.lints.clippy]
+# Allow negative feature names as they are required for nostd compatibility
+# This lint conflicts with the project's architectural requirement for nostd support
+negative_feature_names = "allow"
+
+[workspace.lints.rust]
+# Standard Rust lints
+unused_variables = "warn"
+dead_code = "warn"
 
 [profile.release]
 lto = true

@@ -18,13 +18,18 @@ use ass_core::{
     parser::{ast::EventType, streaming::StreamingParser, Event, Script, Section},
 };
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use std::fmt::Write;
 use std::hint::black_box as std_black_box;
 
 /// Synthetic ASS script generator for benchmarking
 struct ScriptGenerator {
+    /// Script title for metadata
     title: String,
+    /// Number of styles to generate
     styles_count: usize,
+    /// Number of events to generate
     events_count: usize,
+    /// Complexity level for generated content
     complexity_level: ComplexityLevel,
 }
 
@@ -104,14 +109,13 @@ impl ScriptGenerator {
     /// Generate Script Info section
     fn generate_script_info(&self) -> String {
         format!(
-            r#"[Script Info]
+            r"[Script Info]
 Title: {}
 ScriptType: v4.00+
 WrapStyle: 0
 ScaledBorderAndShadow: yes
-YCbCr Matrix: TV.709
 PlayResX: 1920
-PlayResY: 1080"#,
+PlayResY: 1080",
             self.title
         )
     }
@@ -127,15 +131,15 @@ PlayResY: 1080"#,
             let style_name = if i == 0 {
                 "Default"
             } else {
-                &format!("Style{}", i)
+                &format!("Style{i}")
             };
             let fontsize = 20 + (i * 2);
-            let color = format!("&H00{:06X}&", i * 0x111111);
+            let color = format!("&H00{:06X}&", i * 0x0011_1111);
 
-            styles.push_str(&format!(
-                "Style: {},Arial,{},{},{},{},&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1\n",
-                style_name, fontsize, color, color, color
-            ));
+            writeln!(
+                styles,
+                "Style: {style_name},Arial,{fontsize},{color},{color},{color},&H00000000&,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1"
+            ).unwrap();
         }
 
         styles
@@ -149,8 +153,10 @@ PlayResY: 1080"#,
         );
 
         for i in 0..self.events_count {
-            let start_time = self.format_time((i * 3000) as u32); // 3 seconds apart
-            let end_time = self.format_time((i * 3000 + 2500) as u32); // 2.5 second duration
+            let start_cs = u32::try_from(i * 3000).unwrap_or(u32::MAX);
+            let end_cs = u32::try_from(i * 3000 + 2500).unwrap_or(u32::MAX);
+            let start_time = Self::format_time(start_cs); // 3 seconds apart
+            let end_time = Self::format_time(end_cs); // 2.5 second duration
             let style = if self.styles_count > 1 {
                 format!("Style{}", i % self.styles_count)
             } else {
@@ -158,22 +164,22 @@ PlayResY: 1080"#,
             };
             let text = self.generate_dialogue_text(i);
 
-            events.push_str(&format!(
-                "Dialogue: 0,{},{},{},Speaker,0,0,0,,{}\n",
-                start_time, end_time, style, text
-            ));
+            writeln!(
+                events,
+                "Dialogue: 0,{start_time},{end_time},{style},Speaker,0,0,0,,{text}"
+            ).unwrap();
         }
 
         events
     }
 
     /// Format time in ASS format (H:MM:SS.cc)
-    fn format_time(&self, centiseconds: u32) -> String {
-        let hours = centiseconds / 360000;
-        let minutes = (centiseconds % 360000) / 6000;
+    fn format_time(centiseconds: u32) -> String {
+        let hours = centiseconds / 360_000;
+        let minutes = (centiseconds % 360_000) / 6_000;
         let seconds = (centiseconds % 6000) / 100;
         let cs = centiseconds % 100;
-        format!("{}:{:02}:{:02}.{:02}", hours, minutes, seconds, cs)
+        format!("{hours}:{minutes:02}:{seconds:02}.{cs:02}")
     }
 
     /// Generate dialogue text based on complexity level
@@ -184,20 +190,17 @@ PlayResY: 1080"#,
             ComplexityLevel::Simple => base_text,
             ComplexityLevel::Moderate => {
                 format!(
-                    r#"{{\\b1}}{}{{\\b0}} with {{\\i1}}some{{\\i0}} formatting"#,
-                    base_text
+                    r"{{\b1}}{base_text}{{\b0}} with {{\i1}}some{{\i0}} formatting"
                 )
             }
             ComplexityLevel::Complex => {
                 format!(
-                    r#"{{\\pos(100,200)\\fad(500,500)\\b1\\i1\\c&H00FF00&}}{}{{\\b0\\i0\\c&HFFFFFF&}} with {{\\t(0,1000,\\frz360)}}animation{{\\t(1000,2000,\\frz0)}}"#,
-                    base_text
+                    r"{{\pos(100,200)\fad(500,500)\b1\i1\c&H00FF00&}}{base_text}{{\b0\i0\c&HFFFFFF&}} with {{\t(0,1000,\frz360)}}animation{{\t(1000,2000,\frz0)}}"
                 )
             }
             ComplexityLevel::Extreme => {
                 format!(
-                    r#"{{\\pos(100,200)\\move(100,200,500,400)\\fad(300,300)\\t(0,500,\\fscx120\\fscy120)\\t(500,1000,\\fscx100\\fscy100)\\b1\\i1\\u1\\s1\\bord2\\shad2\\c&H00FF00&\\3c&H0000FF&\\4c&H000000&\\alpha&H00\\3a&H80}}{}{{\\b0\\i0\\u0\\s0\\r}} {{\\k50}}with {{\\k30}}karaoke {{\\k40}}timing {{\\k60}}and {{\\k45}}complex {{\\k35}}animations"#,
-                    base_text
+                    r"{{\pos(100,200)\move(100,200,500,400)\fad(300,300)\t(0,500,\fscx120\fscy120)\t(500,1000,\fscx100\fscy100)\b1\i1\u1\s1\bord2\shad2\c&H00FF00&\3c&H0000FF&\4c&H000000&\alpha&H00\3a&H80}}{base_text}{{\b0\i0\u0\s0\r}} {{\k50}}with {{\k30}}karaoke {{\k40}}timing {{\k60}}and {{\k45}}complex {{\k35}}animations"
                 )
             }
         }
@@ -225,7 +228,7 @@ fn bench_parsing(c: &mut Criterion) {
                 b.iter(|| {
                     let result = Script::parse(black_box(script));
                     std_black_box(result)
-                })
+                });
             },
         );
 
@@ -237,7 +240,7 @@ fn bench_parsing(c: &mut Criterion) {
                 b.iter(|| {
                     let result = Script::parse(black_box(script));
                     std_black_box(result)
-                })
+                });
             },
         );
 
@@ -249,7 +252,7 @@ fn bench_parsing(c: &mut Criterion) {
                 b.iter(|| {
                     let parsed = Script::parse(black_box(script));
                     black_box(parsed)
-                })
+                });
             },
         );
 
@@ -260,7 +263,7 @@ fn bench_parsing(c: &mut Criterion) {
                 b.iter(|| {
                     let parsed = Script::parse(black_box(script));
                     black_box(parsed)
-                })
+                });
             },
         );
     }
@@ -281,7 +284,7 @@ fn bench_streaming(c: &mut Criterion) {
         for &chunk_size in &chunk_sizes {
             group.throughput(Throughput::Bytes(script.len() as u64));
             group.bench_with_input(
-                BenchmarkId::new(format!("size_{}_chunk_{}", size, chunk_size), ""),
+                BenchmarkId::new(format!("size_{size}_chunk_{chunk_size}"), ""),
                 &(script.as_str(), chunk_size),
                 |b, (script, chunk_size)| {
                     b.iter(|| {
@@ -292,7 +295,7 @@ fn bench_streaming(c: &mut Criterion) {
                             let result = parser.feed_chunk(black_box(chunk));
                             let _ = std_black_box(result);
                         }
-                    })
+                    });
                 },
             );
         }
@@ -307,9 +310,9 @@ fn bench_text_analysis(c: &mut Criterion) {
 
     // Generate different text complexities
     let simple_text = "Simple dialogue text";
-    let moderate_text = r#"Text with {\b1}bold{\b0} and {\i1}italic{\i0} formatting"#;
-    let complex_text = r#"{\pos(100,200)\fad(500,500)\b1\i1\c&H00FF00&}Complex text{\b0\i0\c&HFFFFFF&} with {\t(0,1000,\frz360)}animation{\t(1000,2000,\frz0)}"#;
-    let extreme_text = r#"{\pos(100,200)\move(100,200,500,400)\fad(300,300)\t(0,500,\fscx120\fscy120)\t(500,1000,\fscx100\fscy100)\b1\i1\u1\s1\bord2\shad2\c&H00FF00&\3c&H0000FF&\4c&H000000&\alpha&H00\3a&H80}Extreme complexity{\b0\i0\u0\s0\r} {\k50}with {\k30}karaoke {\k40}timing"#;
+    let moderate_text = r"Text with {\b1}bold{\b0} and {\i1}italic{\i0} formatting";
+    let complex_text = r"{\pos(100,200)\fad(500,500)\b1\i1\c&H00FF00&}Complex text{\b0\i0\c&HFFFFFF&} with {\t(0,1000,\frz360)}animation{\t(1000,2000,\frz0)}";
+    let extreme_text = r"{\pos(100,200)\move(100,200,500,400)\fad(300,300)\t(0,500,\fscx120\fscy120)\t(500,1000,\fscx100\fscy100)\b1\i1\u1\s1\bord2\shad2\c&H00FF00&\3c&H0000FF&\4c&H000000&\alpha&H00\3a&H80}Extreme complexity{\b0\i0\u0\s0\r} {\k50}with {\k30}karaoke {\k40}timing";
 
     let texts = [
         ("simple", simple_text),
@@ -323,7 +326,7 @@ fn bench_text_analysis(c: &mut Criterion) {
             b.iter(|| {
                 let result = TextAnalysis::analyze(black_box(text));
                 std_black_box(result)
-            })
+            });
         });
     }
 
@@ -339,12 +342,12 @@ fn bench_dialogue_analysis(c: &mut Criterion) {
     let moderate_event = create_test_event(
         "0:00:05.00",
         "0:00:10.00",
-        r#"Text with {\b1}formatting{\b0}"#,
+        r"Text with {\b1}formatting{\b0}",
     );
     let complex_event = create_test_event(
         "0:00:10.00",
         "0:00:15.00",
-        r#"{\pos(100,200)\t(0,1000,\frz360)}Complex animation{\r}"#,
+        r"{\pos(100,200)\t(0,1000,\frz360)}Complex animation{\r}",
     );
 
     let events = [
@@ -358,7 +361,7 @@ fn bench_dialogue_analysis(c: &mut Criterion) {
             b.iter(|| {
                 let result = DialogueInfo::analyze(black_box(event));
                 std_black_box(result)
-            })
+            });
         });
     }
 
@@ -386,7 +389,7 @@ fn bench_linting(c: &mut Criterion) {
                 b.iter(|| {
                     let result = invalid_tag_rule.check_script(black_box(analysis));
                     std_black_box(result)
-                })
+                });
             },
         );
 
@@ -400,7 +403,7 @@ fn bench_linting(c: &mut Criterion) {
                 b.iter(|| {
                     let result = performance_rule.check_script(black_box(analysis));
                     std_black_box(result)
-                })
+                });
             },
         );
     }
@@ -439,7 +442,7 @@ fn bench_memory_usage(c: &mut Criterion) {
                     }
 
                     std_black_box(parsed)
-                })
+                });
             },
         );
 
@@ -464,7 +467,7 @@ fn bench_memory_usage(c: &mut Criterion) {
                     }
 
                     std_black_box(parsed)
-                })
+                });
             },
         );
     }
@@ -473,7 +476,7 @@ fn bench_memory_usage(c: &mut Criterion) {
 }
 
 /// Helper function to create test events
-fn create_test_event<'a>(start: &'a str, end: &'a str, text: &'a str) -> Event<'a> {
+const fn create_test_event<'a>(start: &'a str, end: &'a str, text: &'a str) -> Event<'a> {
     Event {
         event_type: EventType::Dialogue,
         layer: "0",
@@ -507,18 +510,19 @@ fn generate_script_with_issues(event_count: usize) -> String {
 
         // Add some problematic content every 10th event
         let text = if i % 10 == 0 {
-            r#"Text with {\} empty tag and {\invalidtag} unknown tag"#
+            r"Text with {\} empty tag and {\invalidtag} unknown tag"
         } else if i % 7 == 0 {
             // Very complex animation that might cause performance issues
-            r#"{\pos(100,200)\move(100,200,500,400,0,5000)\t(0,1000,\frz360)\t(1000,2000,\fscx200\fscy200)\t(2000,3000,\alpha&HFF&)\t(3000,4000,\alpha&H00&)\t(4000,5000,\c&HFF0000&)}Performance heavy animation"#
+            r"{\pos(100,200)\move(100,200,500,400,0,5000)\t(0,1000,\frz360)\t(1000,2000,\fscx200\fscy200)\t(2000,3000,\alpha&HFF&)\t(3000,4000,\alpha&H00&)\t(4000,5000,\c&HFF0000&)}Performance heavy animation"
         } else {
-            &format!("Normal dialogue line {}", i + 1)
+            let line_num = i + 1;
+            &format!("Normal dialogue line {line_num}")
         };
 
-        script.push_str(&format!(
-            "Dialogue: 0,{},{},Default,Speaker,0,0,0,,{}\n",
-            start_time, end_time, text
-        ));
+        writeln!(
+            script,
+            "Dialogue: 0,{start_time},{end_time},Default,Speaker,0,0,0,,{text}"
+        ).unwrap();
     }
 
     script

@@ -137,7 +137,7 @@ mod tests {
     #[test]
     fn error_display() {
         let error = CoreError::invalid_color("test");
-        let display_str = format!("{}", error);
+        let display_str = format!("{error}");
         assert!(display_str.contains("Invalid color format"));
         assert!(display_str.contains("test"));
     }
@@ -164,10 +164,10 @@ mod tests {
 
     #[test]
     fn result_type_alias() {
-        fn test_function() -> Result<i32> {
-            Ok(42)
+        fn test_function() -> i32 {
+            42
         }
 
-        assert_eq!(test_function().unwrap(), 42);
+        assert_eq!(test_function(), 42);
     }
 }

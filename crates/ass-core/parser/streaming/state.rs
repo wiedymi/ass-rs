@@ -26,12 +26,14 @@ pub enum ParserState {
 
 impl ParserState {
     /// Check if currently inside a section
-    pub fn is_in_section(&self) -> bool {
+    #[must_use]
+    pub const fn is_in_section(&self) -> bool {
         matches!(self, Self::InSection(_) | Self::InEvent { .. })
     }
 
     /// Get current section kind if in a section
-    pub fn current_section(&self) -> Option<SectionKind> {
+    #[must_use]
+    pub const fn current_section(&self) -> Option<SectionKind> {
         match self {
             Self::ExpectingSection => None,
             Self::InSection(kind) => Some(*kind),
@@ -81,7 +83,7 @@ pub enum SectionKind {
 impl SectionKind {
     /// Parse section kind from header text
     ///
-    /// Returns appropriate SectionKind for known section headers,
+    /// Returns appropriate `SectionKind` for known section headers,
     /// Unknown for unrecognized sections.
     ///
     /// # Example
@@ -92,6 +94,7 @@ impl SectionKind {
     /// assert_eq!(SectionKind::from_header("V4+ Styles"), SectionKind::Styles);
     /// assert_eq!(SectionKind::from_header("Unknown"), SectionKind::Unknown);
     /// ```
+    #[must_use]
     pub fn from_header(header: &str) -> Self {
         match header.trim() {
             "Script Info" => Self::ScriptInfo,
@@ -104,17 +107,20 @@ impl SectionKind {
     }
 
     /// Check if section expects format line
-    pub fn expects_format(&self) -> bool {
+    #[must_use]
+    pub const fn expects_format(&self) -> bool {
         matches!(self, Self::Styles | Self::Events)
     }
 
     /// Check if section contains timed content
-    pub fn is_timed(&self) -> bool {
+    #[must_use]
+    pub const fn is_timed(&self) -> bool {
         matches!(self, Self::Events)
     }
 
     /// Check if section contains binary data
-    pub fn is_binary(&self) -> bool {
+    #[must_use]
+    pub const fn is_binary(&self) -> bool {
         matches!(self, Self::Fonts | Self::Graphics)
     }
 }
@@ -137,7 +143,8 @@ pub struct StreamingContext {
 
 impl StreamingContext {
     /// Create new context with default values
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             line_number: 0,
             current_section: None,

@@ -211,7 +211,7 @@ mod tests {
             data_lines: vec!["test"],
         };
 
-        let debug_str = format!("{:?}", font);
+        let debug_str = format!("{font:?}");
         assert!(debug_str.contains("Font"));
         assert!(debug_str.contains("debug.ttf"));
     }
@@ -223,7 +223,7 @@ mod tests {
             data_lines: vec!["test"],
         };
 
-        let debug_str = format!("{:?}", graphic);
+        let debug_str = format!("{graphic:?}");
         assert!(debug_str.contains("Graphic"));
         assert!(debug_str.contains("debug.png"));
     }

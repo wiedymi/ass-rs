@@ -17,11 +17,17 @@ use super::{state::TokenContext, tokens::TokenType};
 /// lookahead capabilities for efficient tokenization.
 #[derive(Debug, Clone)]
 pub struct CharNavigator<'a> {
+    /// Source text being scanned
     source: &'a str,
+    /// Current byte position in source
     position: usize,
+    /// Current line number (1-based)
     line: usize,
+    /// Current column number (1-based)
     column: usize,
+    /// Character iterator for the source
     chars: Chars<'a>,
+    /// Lookahead character for peeking
     peek_char: Option<char>,
 }
 
@@ -58,6 +64,10 @@ impl<'a> CharNavigator<'a> {
     }
 
     /// Peek at current character without advancing
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the current position contains invalid UTF-8 or is at end of input.
     pub fn peek_char(&mut self) -> Result<char> {
         if let Some(ch) = self.peek_char {
             Ok(ch)
@@ -73,6 +83,10 @@ impl<'a> CharNavigator<'a> {
     }
 
     /// Peek at next character without advancing
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the next position is at end of input.
     pub fn peek_next(&self) -> Result<char> {
         let mut chars = self.source[self.position..].chars();
         chars.next(); // Skip current
@@ -82,6 +96,10 @@ impl<'a> CharNavigator<'a> {
     }
 
     /// Advance by one character
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if unable to peek at the current character.
     pub fn advance_char(&mut self) -> Result<char> {
         let ch = self.peek_char()?;
         self.peek_char = None;
@@ -124,7 +142,9 @@ impl<'a> CharNavigator<'a> {
 /// Scanner for different token types
 #[derive(Debug, Clone)]
 pub struct TokenScanner<'a> {
+    /// Character navigator for position tracking
     navigator: CharNavigator<'a>,
+    /// Source text reference
     source: &'a str,
 }
 
@@ -150,6 +170,10 @@ impl<'a> TokenScanner<'a> {
     }
 
     /// Scan section header like [Script Info]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if character navigation fails.
     pub fn scan_section_header(&mut self) -> Result<TokenType> {
         self.navigator.advance_char()?; // Skip '['
 
@@ -165,6 +189,10 @@ impl<'a> TokenScanner<'a> {
     }
 
     /// Scan style override block like {\b1\i1}
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if character navigation fails.
     pub fn scan_style_override(&mut self) -> Result<TokenType> {
         self.navigator.advance_char()?; // Skip '{'
 
@@ -186,6 +214,10 @@ impl<'a> TokenScanner<'a> {
     }
 
     /// Scan comment line starting with ; or !:
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if character navigation fails.
     pub fn scan_comment(&mut self) -> Result<TokenType> {
         while !self.navigator.is_at_end() {
             let ch = self.navigator.peek_char()?;
@@ -199,6 +231,10 @@ impl<'a> TokenScanner<'a> {
     }
 
     /// Scan general text content
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if character navigation fails.
     pub fn scan_text(&mut self, context: TokenContext) -> Result<TokenType> {
         let start = self.navigator.position();
 
@@ -234,7 +270,7 @@ impl<'a> TokenScanner<'a> {
 
         if context == TokenContext::SectionHeader {
             Ok(TokenType::SectionName)
-        } else if self.is_hex_value(span) {
+        } else if Self::is_hex_value(span) {
             Ok(TokenType::HexValue)
         } else if span
             .chars()
@@ -247,14 +283,14 @@ impl<'a> TokenScanner<'a> {
     }
 
     /// Check if a span represents a hex value
-    fn is_hex_value(&self, span: &str) -> bool {
+    fn is_hex_value(span: &str) -> bool {
         #[cfg(feature = "simd")]
         {
             if span.chars().all(|c| c.is_ascii_hexdigit())
                 && span.len() % 2 == 0
                 && !span.is_empty()
             {
-                return Self::parse_hex_simd(span).is_some();
+                return TokenScanner::parse_hex_simd(span).is_some();
             }
 
             if let Some(after_prefix) = span.strip_prefix("&H") {
@@ -264,7 +300,7 @@ impl<'a> TokenScanner<'a> {
 
                 return !hex_part.is_empty()
                     && hex_part.len() % 2 == 0
-                    && Self::parse_hex_simd(hex_part).is_some();
+                    && TokenScanner::parse_hex_simd(hex_part).is_some();
             }
         }
 

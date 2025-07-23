@@ -150,9 +150,11 @@ impl ErrorCategory {
             | Self::Format
             | Self::Encoding
             | Self::Configuration
-            | Self::Validation => true,
+            | Self::Validation
+            | Self::Analysis
+            | Self::Compatibility => true,
 
-            Self::Analysis | Self::Compatibility => true,
+
 
             Self::Plugin | Self::Io | Self::Resource | Self::Security | Self::Internal => false,
         }
@@ -169,8 +171,7 @@ impl ErrorCategory {
             Self::Resource | Self::Io => 4,
             Self::Plugin | Self::Compatibility => 3,
             Self::Parsing | Self::Validation => 2,
-            Self::Analysis | Self::Configuration => 1,
-            Self::Format | Self::Encoding => 1,
+            Self::Analysis | Self::Configuration | Self::Format | Self::Encoding => 1,
         }
     }
 }

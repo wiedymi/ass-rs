@@ -8,7 +8,7 @@
 //! - BOM detection and stripping for common encodings
 //! - UTF-8 validation with detailed error reporting
 //! - Encoding detection for legacy ASS files
-//! - `no_std` compatible implementation
+//! - `nostd` compatible implementation
 //! - Zero-copy operations where possible
 //!
 //! # Examples

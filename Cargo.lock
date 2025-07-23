@@ -47,6 +47,7 @@ name = "ass-core"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "bitflags",
  "bumpalo",
  "criterion",
  "hashbrown",

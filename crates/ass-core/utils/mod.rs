@@ -121,6 +121,10 @@ impl<'a> Spans<'a> {
 /// assert_eq!(rgba, [255, 0, 0, 0]);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+///
+/// # Errors
+///
+/// Returns an error if the color string format is invalid or cannot be parsed.
 pub fn parse_bgr_color(color_str: &str) -> Result<[u8; 4], CoreError> {
     let trimmed = color_str.trim();
 
@@ -144,19 +148,19 @@ pub fn parse_bgr_color(color_str: &str) -> Result<[u8; 4], CoreError> {
     let hex_value = u32::from_str_radix(hex_part, 16)
         .map_err(|_| CoreError::InvalidColor(format!("Invalid hex value: {hex_part}")))?;
 
-    let (blue, green, red, alpha) = match hex_part.len() {
+    let color_array = match hex_part.len() {
         6 => {
             let blue = ((hex_value >> 16) & 0xFF) as u8;
             let green = ((hex_value >> 8) & 0xFF) as u8;
             let red = (hex_value & 0xFF) as u8;
-            (blue, green, red, 0)
+            [red, green, blue, 0]
         }
         8 => {
             let alpha = ((hex_value >> 24) & 0xFF) as u8;
             let blue = ((hex_value >> 16) & 0xFF) as u8;
             let green = ((hex_value >> 8) & 0xFF) as u8;
             let red = (hex_value & 0xFF) as u8;
-            (blue, green, red, alpha)
+            [red, green, blue, alpha]
         }
         _ => {
             return Err(CoreError::InvalidColor(format!(
@@ -166,13 +170,17 @@ pub fn parse_bgr_color(color_str: &str) -> Result<[u8; 4], CoreError> {
         }
     };
 
-    Ok([red, green, blue, alpha])
+    Ok(color_array)
 }
 
 /// Parse numeric value from ASS field with validation
 ///
 /// Handles integer and floating-point parsing with ASS-specific validation.
 /// Provides better error messages than standard parsing.
+///
+/// # Errors
+///
+/// Returns an error if the string cannot be parsed as the target numeric type.
 pub fn parse_numeric<T>(value_str: &str) -> Result<T, CoreError>
 where
     T: core::str::FromStr,
@@ -235,6 +243,10 @@ pub fn eval_cubic_bezier(
 /// assert_eq!(parse_ass_time("0:01:30.50")?, 9050); // 1:30.5 = 9050 centiseconds
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+///
+/// # Errors
+///
+/// Returns an error if the time format is invalid or cannot be parsed.
 pub fn parse_ass_time(time_str: &str) -> Result<u32, CoreError> {
     let parts: Vec<&str> = time_str.split(':').collect();
     if parts.len() != 3 {
@@ -354,6 +366,10 @@ pub fn validate_ass_name(name: &str) -> bool {
 /// assert!(decoded.len() >= 0);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+///
+/// # Errors
+///
+/// Returns an error if the UU-encoded data is malformed or cannot be decoded.
 #[allow(clippy::similar_names)]
 pub fn decode_uu_data<'a, I>(lines: I) -> Result<Vec<u8>, CoreError>
 where
@@ -546,7 +562,7 @@ mod tests {
     #[test]
     fn numeric_parsing() {
         assert_eq!(parse_numeric::<i32>("42").unwrap(), 42);
-        assert_eq!(parse_numeric::<f32>("3.15").unwrap(), 3.15);
+        assert!((parse_numeric::<f32>("3.15").unwrap() - 3.15).abs() < f32::EPSILON);
         assert!(parse_numeric::<i32>("invalid").is_err());
     }
 

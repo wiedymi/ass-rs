@@ -92,10 +92,7 @@ impl LintRule for InvalidColorRule {
             .find(|s| matches!(s, Section::Events(_)))
         {
             for event in events {
-                let text_analysis = match TextAnalysis::analyze(event.text) {
-                    Ok(analysis) => analysis,
-                    Err(_) => continue, // Skip analysis if text parsing fails
-                };
+                let Ok(text_analysis) = TextAnalysis::analyze(event.text) else { continue };
                 for tag in text_analysis.override_tags() {
                     let tag_content = format!("\\{}{}", tag.name(), tag.args());
                     self.check_color_override_tags(&mut issues, &tag_content);
@@ -128,7 +125,7 @@ impl InvalidColorRule {
                 continue;
             }
 
-            if let Some((tag_name, color_value)) = self.parse_color_tag(tag_part) {
+            if let Some((tag_name, color_value)) = Self::parse_color_tag(tag_part) {
                 if parse_bgr_color(&format!("&H{color_value}&")).is_err() {
                     let issue = LintIssue::new(
                         self.default_severity(),
@@ -143,7 +140,7 @@ impl InvalidColorRule {
     }
 
     /// Parse a color tag and return (`tag_name`, `color_value`) if valid
-    fn parse_color_tag(&self, tag_part: &str) -> Option<(String, String)> {
+    fn parse_color_tag(tag_part: &str) -> Option<(String, String)> {
         if tag_part.starts_with("c&H") || tag_part.starts_with("c&h") {
             let color_part = tag_part
                 .strip_prefix("c&H")
@@ -193,18 +190,16 @@ mod tests {
 
     #[test]
     fn parse_color_tag_formats() {
-        let rule = InvalidColorRule;
-
         assert_eq!(
-            rule.parse_color_tag("c&H00FF00&"),
+            InvalidColorRule::parse_color_tag("c&H00FF00&"),
             Some(("c".to_string(), "00FF00".to_string()))
         );
 
         assert_eq!(
-            rule.parse_color_tag("1c&H00FF00&"),
+            InvalidColorRule::parse_color_tag("1c&H00FF00&"),
             Some(("1c".to_string(), "00FF00".to_string()))
         );
 
-        assert!(rule.parse_color_tag("invalid").is_none());
+        assert!(InvalidColorRule::parse_color_tag("invalid").is_none());
     }
 }

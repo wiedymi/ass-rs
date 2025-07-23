@@ -55,16 +55,19 @@ pub fn validation_error<T: fmt::Display>(message: T) -> CoreError {
 /// # Returns
 ///
 /// `Ok(())` if valid UTF-8, detailed error if invalid
+///
+/// # Errors
+///
+/// Returns an error if the byte slice contains invalid UTF-8 sequences.
 pub fn validate_utf8_detailed(bytes: &[u8]) -> Result<(), CoreError> {
     match core::str::from_utf8(bytes) {
         Ok(_) => Ok(()),
         Err(err) => {
             let position = err.valid_up_to();
-            let message = if let Some(len) = err.error_len() {
-                format!("Invalid UTF-8 sequence of {len} bytes at position {position}")
-            } else {
-                format!("Incomplete UTF-8 sequence at position {position}")
-            };
+            let message = err.error_len().map_or_else(
+                || format!("Incomplete UTF-8 sequence at position {position}"),
+                |len| format!("Invalid UTF-8 sequence of {len} bytes at position {position}")
+            );
 
             Err(utf8_error(position, message))
         }
@@ -83,6 +86,10 @@ pub fn validate_utf8_detailed(bytes: &[u8]) -> Result<(), CoreError> {
 /// # Returns
 ///
 /// `Ok(())` if valid, validation error if invalid characters found
+///
+/// # Errors
+///
+/// Returns an error if the text contains invalid characters for ASS format.
 pub fn validate_ass_text_content(text: &str) -> Result<(), CoreError> {
     for (pos, ch) in text.char_indices() {
         if !is_valid_ass_char(ch) {

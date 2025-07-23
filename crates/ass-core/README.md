@@ -12,7 +12,7 @@ High-performance ASS (Advanced SubStation Alpha) subtitle format parser and anal
 - **Full ASS v4+ support**: Complete compatibility with libass and Aegisub
 - **Advanced analysis**: Script linting, style resolution, and performance optimization
 - **SIMD acceleration**: Optional SIMD-optimized parsing for maximum performance
-- **no_std compatible**: Works in embedded and WASM environments
+- **nostd compatible**: Works in embedded and WASM environments
 - **Streaming support**: Parse large files incrementally with bounded memory
 
 ## Performance Targets
@@ -87,7 +87,7 @@ let result = parser.finalize()?;
 ## Feature Flags
 
 - `std` (default): Standard library support
-- `no_std`: no_std compatibility
+- `nostd`: nostd compatibility
 - `analysis`: Enable script analysis and linting
 - `plugins`: Extension registry support
 - `simd`: SIMD-accelerated parsing

@@ -70,6 +70,10 @@ impl<'a> TextAnalysis<'a> {
     /// assert_eq!(analysis.override_tags().len(), 2);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if text parsing fails or contains invalid override tags.
     pub fn analyze(text: &'a str) -> Result<Self> {
         let mut override_tags = Vec::new();
         let mut parse_diagnostics = Vec::new();

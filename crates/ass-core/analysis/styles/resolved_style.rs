@@ -21,6 +21,21 @@
 use crate::{parser::Style, utils::CoreError, Result};
 use alloc::string::String;
 
+bitflags::bitflags! {
+    /// Text formatting options for resolved styles
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct TextFormatting: u8 {
+        /// Bold text formatting
+        const BOLD = 1 << 0;
+        /// Italic text formatting
+        const ITALIC = 1 << 1;
+        /// Underline text formatting
+        const UNDERLINE = 1 << 2;
+        /// Strike-through text formatting
+        const STRIKE_OUT = 1 << 3;
+    }
+}
+
 /// Fully resolved style with computed values and performance metrics
 ///
 /// Contains effective style values after applying inheritance, overrides,
@@ -43,12 +58,11 @@ pub struct ResolvedStyle<'a> {
     /// Background color (RGBA)
     back_color: [u8; 4],
     /// Text formatting flags
-    bold: bool,
-    italic: bool,
-    underline: bool,
-    strike_out: bool,
+    formatting: TextFormatting,
     /// Scaling factors (percentage)
+    /// Horizontal scaling factor
     scale_x: f32,
+    /// Vertical scaling factor
     scale_y: f32,
     /// Character spacing
     spacing: f32,
@@ -63,8 +77,11 @@ pub struct ResolvedStyle<'a> {
     /// Text alignment (1-9, numpad layout)
     alignment: u8,
     /// Margins in pixels
+    /// Left margin in pixels
     margin_l: u16,
+    /// Right margin in pixels
     margin_r: u16,
+    /// Vertical margin in pixels
     margin_v: u16,
     /// Text encoding
     encoding: u8,
@@ -97,6 +114,10 @@ impl<'a> ResolvedStyle<'a> {
     /// assert_eq!(resolved.font_size(), 20.0);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if style parsing fails or contains invalid values.
     pub fn from_style(style: &'a Style<'a>) -> Result<Self> {
         let font_name = if style.fontname.is_empty() {
             "Arial".to_string()
@@ -110,10 +131,19 @@ impl<'a> ResolvedStyle<'a> {
         let outline_color = parse_color_with_default(style.outline_colour)?;
         let back_color = parse_color_with_default(style.back_colour)?;
 
-        let bold = parse_bool_flag(style.bold)?;
-        let italic = parse_bool_flag(style.italic)?;
-        let underline = parse_bool_flag(style.underline)?;
-        let strike_out = parse_bool_flag(style.strikeout)?;
+        let mut formatting = TextFormatting::empty();
+        if parse_bool_flag(style.bold)? {
+            formatting |= TextFormatting::BOLD;
+        }
+        if parse_bool_flag(style.italic)? {
+            formatting |= TextFormatting::ITALIC;
+        }
+        if parse_bool_flag(style.underline)? {
+            formatting |= TextFormatting::UNDERLINE;
+        }
+        if parse_bool_flag(style.strikeout)? {
+            formatting |= TextFormatting::STRIKE_OUT;
+        }
 
         let scale_x = parse_percentage(style.scale_x)?;
         let scale_y = parse_percentage(style.scale_y)?;
@@ -139,10 +169,7 @@ impl<'a> ResolvedStyle<'a> {
             secondary_color,
             outline_color,
             back_color,
-            bold,
-            italic,
-            underline,
-            strike_out,
+            formatting,
             scale_x,
             scale_y,
             spacing,
@@ -194,8 +221,39 @@ impl<'a> ResolvedStyle<'a> {
         self.complexity_score > 70
     }
 
+    /// Get text formatting flags
+    #[must_use]
+    pub const fn formatting(&self) -> TextFormatting {
+        self.formatting
+    }
+
+    /// Check if text is bold
+    #[must_use]
+    pub const fn is_bold(&self) -> bool {
+        self.formatting.contains(TextFormatting::BOLD)
+    }
+
+    /// Check if text is italic
+    #[must_use]
+    pub const fn is_italic(&self) -> bool {
+        self.formatting.contains(TextFormatting::ITALIC)
+    }
+
+    /// Check if text is underlined
+    #[must_use]
+    pub const fn is_underline(&self) -> bool {
+        self.formatting.contains(TextFormatting::UNDERLINE)
+    }
+
+    /// Check if text has strike-through
+    #[must_use]
+    pub const fn is_strike_out(&self) -> bool {
+        self.formatting.contains(TextFormatting::STRIKE_OUT)
+    }
+
     /// Calculate rendering complexity score
     fn calculate_complexity(style: &Self) -> u8 {
+        const EPSILON: f32 = 0.001;
         let mut score = 0u8;
 
         if style.font_size > 72.0 {
@@ -216,7 +274,6 @@ impl<'a> ResolvedStyle<'a> {
             score += 5;
         }
 
-        const EPSILON: f32 = 0.001;
         if (style.scale_x - 100.0).abs() > EPSILON || (style.scale_y - 100.0).abs() > EPSILON {
             score += 10;
         }
@@ -225,13 +282,13 @@ impl<'a> ResolvedStyle<'a> {
             score += 15;
         }
 
-        if style.bold {
+        if style.formatting.contains(TextFormatting::BOLD) {
             score += 2;
         }
-        if style.italic {
+        if style.formatting.contains(TextFormatting::ITALIC) {
             score += 2;
         }
-        if style.underline || style.strike_out {
+        if style.formatting.intersects(TextFormatting::UNDERLINE | TextFormatting::STRIKE_OUT) {
             score += 5;
         }
 
@@ -337,7 +394,7 @@ mod tests {
 
         assert_eq!(resolved.name, "Test");
         assert_eq!(resolved.font_name(), "Arial");
-        assert_eq!(resolved.font_size(), 20.0);
+        assert!((resolved.font_size() - 20.0).abs() < f32::EPSILON);
         assert_eq!(resolved.primary_color(), [255, 255, 255, 0]);
     }
 

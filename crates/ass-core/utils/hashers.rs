@@ -7,21 +7,21 @@
 //!
 //! - DoS-resistant hashing via ahash with random seeds
 //! - WASM-compatible implementation
-//! - `no_std` support when needed
+//! - `nostd` support when needed
 //! - Deterministic hashing for testing when enabled
 
 use ahash::{AHasher, RandomState};
 use core::hash::{BuildHasher, Hasher};
 
-#[cfg(feature = "no_std")]
+#[cfg(feature = "nostd")]
 use hashbrown::HashMap;
-#[cfg(not(feature = "no_std"))]
+#[cfg(not(feature = "nostd"))]
 use std::collections::HashMap;
 
 /// Create a new `HashMap` with optimized hasher for ASS-RS use cases
 ///
 /// Uses ahash for consistent performance across platforms with `DoS` resistance.
-/// Automatically handles `no_std` vs std `HashMap` selection.
+/// Automatically handles `nostd` vs std `HashMap` selection.
 ///
 /// # Example
 ///
@@ -89,17 +89,20 @@ pub fn create_hasher() -> AHasher {
 /// let mut hasher = create_deterministic_hasher();
 /// ```
 #[cfg(test)]
+#[must_use]
 pub fn create_deterministic_hasher() -> AHasher {
     use ahash::RandomState;
     RandomState::with_seeds(0x1234_5678_9abc_def0, 0xfedc_ba98_7654_3210, 0, 0).build_hasher()
 }
 
-/// Create a deterministic HashMap for testing
+/// Create a deterministic `HashMap` for testing
 ///
 /// Uses fixed seeds to ensure consistent ordering and hashing in tests.
 /// Should only be used in testing scenarios where reproducibility is needed.
+/// Returns a `HashMap` with deterministic hashing for testing.
 #[cfg(test)]
-pub fn create_deterministic_hash_map<K, V>() -> HashMap<K, V, RandomState> {
+#[must_use]
+pub const fn create_deterministic_hash_map<K, V>() -> HashMap<K, V, RandomState> {
     use ahash::RandomState;
     HashMap::with_hasher(RandomState::with_seeds(
         0x1234_5678_9abc_def0,
@@ -154,7 +157,8 @@ impl Default for HashConfig {
 impl HashConfig {
     /// Create configuration for testing with deterministic behavior
     #[cfg(test)]
-    pub fn for_testing() -> Self {
+    #[must_use]
+    pub const fn for_testing() -> Self {
         Self {
             deterministic: true,
             default_capacity: 8,
@@ -253,7 +257,7 @@ mod tests {
         let config = HashConfig::default();
         assert!(!config.deterministic);
         assert_eq!(config.default_capacity, 16);
-        assert_eq!(config.load_factor, 0.75);
+        assert!((config.load_factor - 0.75).abs() < f32::EPSILON);
     }
 
     #[test]

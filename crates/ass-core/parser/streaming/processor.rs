@@ -25,7 +25,7 @@ pub struct LineProcessor {
 impl LineProcessor {
     /// Create new line processor
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             state: ParserState::ExpectingSection,
             context: StreamingContext::new(),

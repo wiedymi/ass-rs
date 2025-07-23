@@ -207,8 +207,7 @@ Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,
         let script_text = format!(
             r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{}",
-            long_text
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{long_text}"
         );
 
         let script = crate::parser::Script::parse(&script_text).unwrap();
@@ -226,14 +225,14 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{}",
     fn many_override_tags_detected() {
         let mut text_with_tags = String::new();
         for i in 0..25 {
-            text_with_tags.push_str(&format!("{{\\i{}}}text", i % 2));
+            use std::fmt::Write;
+            write!(text_with_tags, "{{\\i{}}}text", i % 2).unwrap();
         }
 
         let script_text = format!(
             r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{}",
-            text_with_tags
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{text_with_tags}"
         );
 
         let script = crate::parser::Script::parse(&script_text).unwrap();

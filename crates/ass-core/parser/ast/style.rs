@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn style_debug() {
         let style = Style::default();
-        let debug_str = format!("{:?}", style);
+        let debug_str = format!("{style:?}");
         assert!(debug_str.contains("Style"));
         assert!(debug_str.contains("Default"));
     }

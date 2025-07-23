@@ -33,10 +33,10 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::fmt;
 
-#[cfg(not(feature = "no_std"))]
+#[cfg(not(feature = "nostd"))]
 use std::collections::HashMap;
 
-#[cfg(feature = "no_std")]
+#[cfg(feature = "nostd")]
 use hashbrown::HashMap;
 
 pub mod sections;
@@ -155,7 +155,9 @@ impl std::error::Error for PluginError {}
 /// Manages registration and lookup of tag handlers and section processors.
 /// Optimized for fast lookup during parsing with minimal memory overhead.
 pub struct ExtensionRegistry {
+    /// Registered tag handlers indexed by tag name
     tag_handlers: HashMap<String, Box<dyn TagHandler>>,
+    /// Registered section processors indexed by section name
     section_processors: HashMap<String, Box<dyn SectionProcessor>>,
 }
 

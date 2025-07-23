@@ -292,8 +292,7 @@ Style: Default,Arial,20,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,0,0,0,0,
         let script_text = format!(
             r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{}",
-            heavy_unicode
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{heavy_unicode}"
         );
 
         let script = crate::parser::Script::parse(&script_text).unwrap();

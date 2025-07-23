@@ -301,6 +301,11 @@ pub trait LintRule: Send + Sync {
 ///
 /// Runs all enabled rules against the provided analysis and returns found issues,
 /// respecting the configuration limits and filters.
+/// Lint script using existing analysis
+///
+/// # Errors
+///
+/// Returns an error if linting rule execution fails.
 pub fn lint_script_with_analysis(
     analysis: &ScriptAnalysis,
     config: &LintConfig,
@@ -332,6 +337,10 @@ pub fn lint_script_with_analysis(
 /// Creates a minimal analysis without linting, then runs all enabled rules
 /// against the script and returns found issues, respecting the configuration
 /// limits and filters.
+///
+/// # Errors
+///
+/// Returns an error if script analysis or linting rule execution fails.
 pub fn lint_script(script: &Script, config: &LintConfig) -> Result<Vec<LintIssue>> {
     // Create analysis without linting to avoid circular dependency
     let mut analysis = ScriptAnalysis {
@@ -343,8 +352,8 @@ pub fn lint_script(script: &Script, config: &LintConfig) -> Result<Vec<LintIssue
     };
 
     // Run only style resolution and event analysis (no linting)
-    analysis.resolve_all_styles()?;
-    analysis.analyze_events()?;
+    analysis.resolve_all_styles();
+    analysis.analyze_events();
 
     // Now run linting with the prepared analysis
     lint_script_with_analysis(&analysis, config)

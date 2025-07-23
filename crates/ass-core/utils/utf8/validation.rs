@@ -46,16 +46,19 @@ use core::str;
 /// let invalid_bytes = &[0xFF, 0xFE, 0x80];
 /// assert!(validate_utf8(invalid_bytes).is_err());
 /// ```
+///
+/// # Errors
+///
+/// Returns an error if the byte slice contains invalid UTF-8 sequences.
 pub fn validate_utf8(bytes: &[u8]) -> Result<(), CoreError> {
     match str::from_utf8(bytes) {
         Ok(_) => Ok(()),
         Err(err) => {
             let position = err.valid_up_to();
-            let message = if let Some(len) = err.error_len() {
-                format!("Invalid UTF-8 sequence of {len} bytes at position {position}")
-            } else {
-                format!("Incomplete UTF-8 sequence at position {position}")
-            };
+            let message = err.error_len().map_or_else(
+                || format!("Incomplete UTF-8 sequence at position {position}"),
+                |len| format!("Invalid UTF-8 sequence of {len} bytes at position {position}")
+            );
 
             Err(CoreError::utf8_error(position, message))
         }
@@ -92,13 +95,14 @@ pub fn validate_utf8(bytes: &[u8]) -> Result<(), CoreError> {
 /// ```
 #[must_use]
 pub fn recover_utf8(bytes: &[u8]) -> (String, usize) {
-    if let Ok(s) = str::from_utf8(bytes) {
-        (s.to_string(), 0)
-    } else {
-        let recovered = String::from_utf8_lossy(bytes);
-        let replacements = recovered.matches('\u{FFFD}').count();
-        (recovered.into_owned(), replacements)
-    }
+    str::from_utf8(bytes).map_or_else(
+        |_| {
+            let recovered = String::from_utf8_lossy(bytes);
+            let replacements = recovered.matches('\u{FFFD}').count();
+            (recovered.into_owned(), replacements)
+        },
+        |s| (s.to_string(), 0)
+    )
 }
 
 /// Check if text contains only valid ASS characters

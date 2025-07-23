@@ -42,10 +42,10 @@ Targets: Edits <1ms, session switches <100µs; memory ~input + minimal overhead.
   - `"async"` (careful): Async commands for UIs only when needed (avoid bloat).
   - `"multi-thread"`: Arc/Mutex for sessions.
   - `"search-index"`: Trie-based indexing for fast regex/fuzzy search.
-  - `"no_std"`: Alloc-only (hashbrown for maps, core spans for <100KB savings).
+  - `"nostd"`: Alloc-only (hashbrown for maps, core spans for <100KB savings).
   - `"benches"`: Criterion for perf tests.
 
-Expectations: Lean crate (~80KB with ropey vs 150KB with xi-rope); aggressive no_std saves ~100KB for WASM editors.
+Expectations: Lean crate (~80KB with ropey vs 150KB with xi-rope); aggressive nostd saves ~100KB for WASM editors.
 
 ## Architecture
 

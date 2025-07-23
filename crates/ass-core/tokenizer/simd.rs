@@ -42,6 +42,7 @@ use wide::u8x16;
 /// let offset = scan_delimiters(text).unwrap();
 /// assert_eq!(offset, 4); // Position of ':'
 /// ```
+#[must_use]
 pub fn scan_delimiters(text: &str) -> Option<usize> {
     let bytes = text.as_bytes();
 
@@ -132,6 +133,7 @@ fn scan_delimiters_scalar(bytes: &[u8]) -> Option<usize> {
 /// let value = parse_hex_u32("00FF00FF").unwrap();
 /// assert_eq!(value, 0x00FF00FF);
 /// ```
+#[must_use]
 pub fn parse_hex_u32(hex_str: &str) -> Option<u32> {
     if hex_str.is_empty() || hex_str.len() > 8 {
         return None;
@@ -236,6 +238,11 @@ fn parse_hex_scalar(hex_str: &str) -> Option<u32> {
 ///
 /// Validates multiple bytes at once for UTF-8 compliance.
 /// Provides faster validation for large text blocks.
+/// Validate UTF-8 encoding of byte slice using batch processing
+///
+/// # Errors
+///
+/// Returns an error if the byte slice contains invalid UTF-8 sequences.
 pub fn validate_utf8_batch(bytes: &[u8]) -> Result<(), CoreError> {
     #[cfg(feature = "simd")]
     {

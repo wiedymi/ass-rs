@@ -203,8 +203,7 @@ pub fn calculate_tag_complexity(tag_name: &str) -> u8 {
     match tag_name {
         "b" | "i" | "u" | "s" | "c" | "1c" | "2c" | "3c" | "4c" | "alpha" | "1a" | "2a" | "3a"
         | "4a" | "fn" | "fs" => 1,
-        "pos" | "an" | "a" | "org" | "be" | "blur" | "bord" | "shad" | "xbord" | "ybord"
-        | "xshad" | "yshad" => 2,
+
         "move" | "fad" | "fade" | "frx" | "fry" | "frz" | "fscx" | "fscy" | "fsp" | "clip"
         | "iclip" => 3,
         "t" | "pbo" => 4,

@@ -130,7 +130,8 @@ impl AccessibilityRule {
                     if clean_text_length > 0 && duration_centiseconds > 0 {
                         // Convert centiseconds to seconds: 1 second = 100 centiseconds
                         let duration_seconds = f64::from(duration_centiseconds) / 100.0;
-                        let chars_per_second = clean_text_length as f64 / duration_seconds;
+                        let safe_length = u32::try_from(clean_text_length).unwrap_or(10_000).min(10_000);
+                        let chars_per_second = f64::from(safe_length) / duration_seconds;
 
                         if chars_per_second > 20.0 {
                             let issue = LintIssue::new(
@@ -238,8 +239,7 @@ Dialogue: 0,0:00:00.00,0:00:00.30,Default,,0,0,0,,Too fast!";
         let script_text = format!(
             r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{}",
-            long_text
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{long_text}"
         );
 
         let script = crate::parser::Script::parse(&script_text).unwrap();
@@ -277,8 +277,7 @@ Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{}",
         let script_text = format!(
             r"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{}",
-            long_text
+Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{long_text}"
         );
 
         let script = crate::parser::Script::parse(&script_text).unwrap();

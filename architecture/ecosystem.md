@@ -12,7 +12,7 @@ The `ass-rs` ecosystem is designed as a cohesive workspace of interrelated crate
 [workspace]
 members = [
     "crates/ass-core",
-    "crates/ass-renderer", 
+    "crates/ass-renderer",
     "crates/ass-editor",
     "crates/ass-cli",
     "crates/ass-wasm",
@@ -58,7 +58,7 @@ strip = false
 - **Shared Dependencies**: All common deps (thiserror, rayon, ahash) managed at workspace level
 - **Version Consistency**: Pin versions to avoid supply chain attacks and ensure reproducible builds
 - **Quarterly Audit**: Run `cargo update --dry-run` and manual crates.io checks; bump if no breaks, test WASM/atomics gains
-- **Feature Alignment**: Features like `simd`, `no_std`, `serde` consistent across crates
+- **Feature Alignment**: Features like `simd`, `nostd`, `serde` consistent across crates
 - **Heavy Deps**: Gate behind features (wgpu, clap derive → manual builders)
 
 ## Cross-Crate Integration Patterns
@@ -70,17 +70,17 @@ graph TD
     A[ass-core: Parse + Analysis] --> B[ass-renderer: Rendering Pipeline]
     A --> C[ass-editor: Interactive Editing]
     A --> D[ass-cli: Command Interface]
-    
+
     B --> E[ass-wasm: Web Bindings]
     C --> E
     D --> E
-    
+
     F[ass-benchmarks] --> A
     F --> B
     F --> C
     F --> D
     F --> E
-    
+
     G[Integration Tests] --> A
     G --> B
     G --> C
@@ -125,7 +125,7 @@ pub trait ExtensionRegistry<T> {
 // Core tags
 ass_core::registry().register("custom_tag", CustomTagHandler);
 
-// Renderer effects  
+// Renderer effects
 ass_renderer::registry().register("custom_effect", CustomEffect);
 
 // Editor commands
@@ -140,7 +140,7 @@ ass_editor::registry().register("custom_command", CustomCommand);
 tests/
 ├── integration/
 │   ├── core_renderer.rs    # Core → Renderer pipeline
-│   ├── core_editor.rs      # Core → Editor workflows  
+│   ├── core_editor.rs      # Core → Editor workflows
 │   ├── cli_full_stack.rs   # CLI → Core → Renderer
 │   ├── wasm_bindings.rs    # WASM → Core/Renderer
 │   └── benchmarks_all.rs   # Benchmarks across ecosystem
@@ -163,7 +163,7 @@ tests/
 
 **Integration Tests**: Cross-crate workflows
 - Core → Renderer: Parse → Render pipeline
-- Core → Editor: Parse → Edit → Re-parse  
+- Core → Editor: Parse → Edit → Re-parse
 - CLI → Core: Command → Parse → Output
 - WASM: JS → Rust → JS roundtrip
 
@@ -188,16 +188,16 @@ Cross-crate performance requirements:
 #[test]
 fn parse_to_render_pipeline() {
     let script = include_str!("../fixtures/karaoke_heavy.ass");
-    
+
     let start = Instant::now();
     let parsed = ass_core::Script::parse(script)?;
     let parse_time = start.elapsed();
     assert!(parse_time < Duration::from_millis(5)); // Core target
-    
+
     let analyzed = parsed.analyze()?;
     let analysis_time = start.elapsed() - parse_time;
     assert!(analysis_time < Duration::from_millis(2)); // Analysis target
-    
+
     let renderer = ass_renderer::Renderer::new_software();
     let frame = renderer.render_frame(&parsed, &analyzed, 0.0)?;
     let total_time = start.elapsed();
@@ -215,13 +215,13 @@ strategy:
   matrix:
     os: [ubuntu-latest, windows-latest, macos-latest]
     rust: [stable, beta, nightly]
-    target: 
+    target:
       - x86_64-unknown-linux-gnu
       - wasm32-unknown-unknown
       - aarch64-apple-darwin
     features:
       - default
-      - no_std
+      - nostd
       - full  # All features enabled
       - webgpu-experimental  # For Node.js testing
 ```
@@ -233,7 +233,7 @@ Environment variables for CI thresholds:
 ```bash
 # Regression thresholds
 export BENCH_FAIL_IF_SLOWER=10%        # 10% regression fails CI
-export BENCH_MAX_MEMORY_GROWTH=20%     # Memory growth limit  
+export BENCH_MAX_MEMORY_GROWTH=20%     # Memory growth limit
 export BENCH_MIN_ITERATIONS=100        # Stability requirement
 
 # Cross-crate performance
@@ -255,7 +255,7 @@ export MAX_BINARY_GROWTH=10%           # Growth tolerance
 ### Coverage Requirements
 
 - **Per-Crate**: >90% line coverage
-- **Integration**: >85% cross-crate workflow coverage  
+- **Integration**: >85% cross-crate workflow coverage
 - **WASM**: >80% (browser testing challenges)
 - **Benchmarks**: >85% (mock Criterion for unit tests)
 
@@ -284,8 +284,8 @@ plugins = []           # Extension registry support
 simd = []              # SIMD optimizations
 parallel = ["rayon"]   # Multi-threading
 
-# Platform support  
-no_std = ["hashbrown", "arrayvec"]
+# Platform support
+nostd = ["hashbrown", "arrayvec"]
 wasm = ["wasm-bindgen"]
 
 # Development
@@ -300,7 +300,7 @@ benches = ["criterion"]
 | analysis | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | plugins | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | simd | ✓ | ✓ | passthrough | - | ✓ | ✓ |
-| no_std | ✓ | partial | ✓ | partial | ✓ | ✓ |
+| nostd | ✓ | partial | ✓ | partial | ✓ | ✓ |
 | wasm | ✓ | web-only | ✓ | - | ✓ | ✓ |
 | hardware-vulkan | partial | ✓ | - | - | - | - |
 
@@ -352,7 +352,7 @@ impl Drop for ProcessingSession {
 cargo bench --features="libass-compare" -- --save-baseline daily
 cargo bench --features="libass-compare" -- --baseline daily
 
-# Cross-crate pipeline benchmarks  
+# Cross-crate pipeline benchmarks
 cargo test --release pipeline_benchmarks
 ```
 
@@ -376,11 +376,11 @@ Automated performance regression detection:
 fn check_performance_regression() {
     let baseline = load_benchmark_baseline()?;
     let current = run_benchmarks()?;
-    
+
     for (name, current_time) in current {
         if let Some(baseline_time) = baseline.get(name) {
             let regression = (current_time - baseline_time) / baseline_time;
-            assert!(regression < 0.10, 
+            assert!(regression < 0.10,
                 "Benchmark {} regressed by {:.1}%", name, regression * 100.0);
         }
     }
@@ -397,7 +397,7 @@ All crates maintain cross-references:
 ## Integration with Other Crates
 
 - **ass-core**: Uses `Script::parse()` for zero-copy parsing
-- **ass-renderer**: Implements `RenderBackend` trait for pipeline integration  
+- **ass-renderer**: Implements `RenderBackend` trait for pipeline integration
 - **ass-benchmarks**: Provides benchmarks in `benchmarks/renderer/` module
 ```
 
@@ -429,7 +429,7 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{\k50}Ka{\k50}ra{\k100}oke
 Semantic versioning with ecosystem coordination:
 
 - **Major**: Breaking changes across any crate
-- **Minor**: New features maintaining compatibility  
+- **Minor**: New features maintaining compatibility
 - **Patch**: Bug fixes and performance improvements
 
 ### Release Process

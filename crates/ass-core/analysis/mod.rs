@@ -57,6 +57,21 @@ use crate::{
 };
 use alloc::vec::Vec;
 
+bitflags::bitflags! {
+    /// Script analysis options
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct ScriptAnalysisOptions: u8 {
+        /// Enable Unicode linebreak analysis (libass 0.17.4+)
+        const UNICODE_LINEBREAKS = 1 << 0;
+        /// Enable performance warnings
+        const PERFORMANCE_HINTS = 1 << 1;
+        /// Enable strict spec compliance checking
+        const STRICT_COMPLIANCE = 1 << 2;
+        /// Enable bidirectional text analysis
+        const BIDI_ANALYSIS = 1 << 3;
+    }
+}
+
 pub mod events;
 pub mod linting;
 pub mod styles;
@@ -94,30 +109,20 @@ pub struct ScriptAnalysis<'a> {
 /// Configuration for script analysis
 #[derive(Debug, Clone)]
 pub struct AnalysisConfig {
-    /// Enable Unicode linebreak analysis (libass 0.17.4+)
-    pub unicode_linebreaks: bool,
-
-    /// Enable performance warnings
-    pub performance_hints: bool,
-
-    /// Enable strict spec compliance checking
-    pub strict_compliance: bool,
+    /// Analysis options flags
+    pub options: ScriptAnalysisOptions,
 
     /// Maximum allowed events for performance warnings
     pub max_events_threshold: usize,
-
-    /// Enable bidirectional text analysis
-    pub bidi_analysis: bool,
 }
 
 impl Default for AnalysisConfig {
     fn default() -> Self {
         Self {
-            unicode_linebreaks: true,
-            performance_hints: true,
-            strict_compliance: false,
+            options: ScriptAnalysisOptions::UNICODE_LINEBREAKS
+                | ScriptAnalysisOptions::PERFORMANCE_HINTS
+                | ScriptAnalysisOptions::BIDI_ANALYSIS,
             max_events_threshold: 1000,
-            bidi_analysis: true,
         }
     }
 }
@@ -127,11 +132,16 @@ impl<'a> ScriptAnalysis<'a> {
     ///
     /// Performs comprehensive analysis including linting, style resolution,
     /// and event analysis. Results are cached for efficient access.
+    /// Analyze ASS script for issues, styles, and content
     ///
     /// # Performance
     ///
     /// Target <2ms for typical scripts. Uses lazy evaluation for expensive
     /// operations like Unicode analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if script analysis fails or contains invalid data.
     pub fn analyze(script: &'a Script<'a>) -> Result<Self> {
         Self::analyze_with_config(script, AnalysisConfig::default())
     }
@@ -139,6 +149,10 @@ impl<'a> ScriptAnalysis<'a> {
     /// Analyze script with custom configuration
     ///
     /// Allows fine-tuning analysis behavior for specific use cases.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if script analysis fails or contains invalid data.
     pub fn analyze_with_config(script: &'a Script<'a>, config: AnalysisConfig) -> Result<Self> {
         let mut analysis = Self {
             script,
@@ -148,9 +162,9 @@ impl<'a> ScriptAnalysis<'a> {
             config,
         };
 
-        analysis.resolve_all_styles()?;
-        analysis.analyze_events()?;
-        analysis.run_linting()?;
+        analysis.resolve_all_styles();
+        analysis.analyze_events();
+        analysis.run_linting();
 
         Ok(analysis)
     }
@@ -206,9 +220,9 @@ impl<'a> ScriptAnalysis<'a> {
     }
 
     /// Run linting analysis
-    fn run_linting(&mut self) -> Result<()> {
+    fn run_linting(&mut self) {
         let lint_config =
-            LintConfig::default().with_strict_compliance(self.config.strict_compliance);
+            LintConfig::default().with_strict_compliance(self.config.options.contains(ScriptAnalysisOptions::STRICT_COMPLIANCE));
 
         let mut issues = Vec::new();
         let rules = linting::rules::BuiltinRules::all_rules();
@@ -230,18 +244,16 @@ impl<'a> ScriptAnalysis<'a> {
         }
 
         self.lint_issues = issues;
-        Ok(())
     }
 
     /// Resolve all styles with inheritance and overrides
-    fn resolve_all_styles(&mut self) -> Result<()> {
+    fn resolve_all_styles(&mut self) {
         let analyzer = StyleAnalyzer::new(self.script);
         self.resolved_styles = analyzer.resolved_styles().values().cloned().collect();
-        Ok(())
     }
 
     /// Analyze events for timing, overlaps, and performance
-    fn analyze_events(&mut self) -> Result<()> {
+    fn analyze_events(&mut self) {
         if let Some(Section::Events(events)) = self
             .script
             .sections()
@@ -249,13 +261,11 @@ impl<'a> ScriptAnalysis<'a> {
             .find(|s| matches!(s, Section::Events(_)))
         {
             for event in events {
-                match DialogueInfo::analyze(event) {
-                    Ok(info) => self.dialogue_info.push(info),
-                    Err(_) => {} // Skip invalid events
+                if let Ok(info) = DialogueInfo::analyze(event) {
+                    self.dialogue_info.push(info);
                 }
             }
         }
-        Ok(())
     }
 
     /// Count overlapping events using efficient O(n log n) algorithm
@@ -362,9 +372,9 @@ mod tests {
     #[test]
     fn analysis_config_default() {
         let config = AnalysisConfig::default();
-        assert!(config.unicode_linebreaks);
-        assert!(config.performance_hints);
-        assert!(!config.strict_compliance);
+        assert!(config.options.contains(ScriptAnalysisOptions::UNICODE_LINEBREAKS));
+        assert!(config.options.contains(ScriptAnalysisOptions::PERFORMANCE_HINTS));
+        assert!(!config.options.contains(ScriptAnalysisOptions::STRICT_COMPLIANCE));
         assert_eq!(config.max_events_threshold, 1000);
     }
 

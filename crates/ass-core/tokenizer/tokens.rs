@@ -523,7 +523,7 @@ mod tests {
     #[test]
     fn token_display() {
         let token = Token::new(TokenType::Text, "hello", 2, 5);
-        let display = format!("{}", token);
+        let display = format!("{token}");
         assert!(display.contains("Text"));
         assert!(display.contains("2:5"));
         assert!(display.contains("hello"));
