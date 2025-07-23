@@ -143,17 +143,6 @@ M2&5A2&5A2&5A2&5A2&5A2&5A2&5A2&5A2&5A2&5A2&5A2&5A2&5A2&5A2&5A
 end
 ";
 
-/// Basic script with minimal content for performance baseline
-#[allow(dead_code)]
-const MINIMAL_SCRIPT: &str = r"[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Simple text.
-";
-
 #[test]
 #[allow(clippy::cognitive_complexity)]
 fn test_comprehensive_spec_coverage() {

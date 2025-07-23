@@ -20,6 +20,7 @@
 
 use crate::{
     analysis::events::tags::{parse_override_block, DiagnosticKind, OverrideTag, TagDiagnostic},
+    utils::{errors::resource::check_depth_limit, CoreError},
     Result,
 };
 use alloc::{string::String, vec::Vec};
@@ -75,8 +76,11 @@ impl<'a> TextAnalysis<'a> {
     ///
     /// Returns an error if text parsing fails or contains invalid override tags.
     pub fn analyze(text: &'a str) -> Result<Self> {
+        const MAX_BRACE_DEPTH: usize = 100; // Prevent DoS with deeply nested braces
+
         let mut override_tags = Vec::new();
         let mut parse_diagnostics = Vec::new();
+
         let mut plain_text = String::new();
         let mut position = 0;
         let mut drawing_mode = false;
@@ -92,6 +96,10 @@ impl<'a> TextAnalysis<'a> {
 
                     if inner_ch == '{' {
                         brace_count += 1;
+                        // Check for excessive nesting depth to prevent DoS
+                        if check_depth_limit(brace_count, MAX_BRACE_DEPTH).is_err() {
+                            return Err(CoreError::parse("Maximum brace nesting depth exceeded"));
+                        }
                     } else if inner_ch == '}' {
                         brace_count -= 1;
                         if brace_count == 0 {

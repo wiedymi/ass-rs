@@ -88,7 +88,6 @@ pub use styles::{ResolvedStyle, StyleAnalyzer};
 /// Provides linting, style resolution, and performance analysis.
 /// Results are cached for efficient repeated access.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ScriptAnalysis<'a> {
     /// Reference to analyzed script
     pub script: &'a Script<'a>,

@@ -3,7 +3,13 @@
 //! Contains the core `Parser` struct that orchestrates parsing of different
 //! ASS script sections and handles error recovery.
 
-use crate::{utils::CoreError, Result, ScriptVersion};
+use crate::{
+    utils::{
+        errors::{encoding::validate_bom_handling, resource::check_input_size_limit},
+        CoreError,
+    },
+    Result, ScriptVersion,
+};
 use alloc::{format, string::ToString, vec::Vec};
 
 use super::{
@@ -51,6 +57,30 @@ impl<'a> Parser<'a> {
 
     /// Parse complete script
     pub fn parse(mut self) -> Script<'a> {
+        // Check input size limit to prevent DoS attacks (50MB limit)
+        const MAX_INPUT_SIZE: usize = 50 * 1024 * 1024; // 50MB
+        if let Err(e) = check_input_size_limit(self.source.len(), MAX_INPUT_SIZE) {
+            self.issues.push(ParseIssue::new(
+                IssueSeverity::Error,
+                IssueCategory::Security,
+                format!("Input size limit exceeded: {e}"),
+                self.line,
+            ));
+            // Return early with empty script for security
+            return Script::from_parts(self.source, self.version, Vec::new(), self.issues);
+        }
+
+        // Validate and handle BOM if present
+        if let Err(e) = validate_bom_handling(self.source.as_bytes()) {
+            self.issues.push(ParseIssue::new(
+                IssueSeverity::Warning,
+                IssueCategory::Format,
+                format!("BOM validation warning: {e}"),
+                self.line,
+            ));
+        }
+
+        // Skip UTF-8 BOM if present
         if self.source.starts_with('\u{FEFF}') {
             self.position = 3;
         }

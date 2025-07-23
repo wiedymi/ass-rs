@@ -378,9 +378,7 @@ where
     let mut result = Vec::new();
 
     for line in lines {
-        let line = line
-            .trim_start()
-            .trim_end_matches(['\n', '\r']);
+        let line = line.trim_start().trim_end_matches(['\n', '\r']);
         if line.is_empty() {
             continue;
         }

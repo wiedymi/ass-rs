@@ -133,7 +133,10 @@ fn is_valid_ass_char(ch: char) -> bool {
 /// # Returns
 ///
 /// `Ok(())` if BOM handling is appropriate, warning if issues found
-#[allow(dead_code)]
+///
+/// # Errors
+///
+/// Returns an error if UTF-16 BOM is detected or other BOM issues are found
 pub fn validate_bom_handling(bytes: &[u8]) -> Result<(), CoreError> {
     if bytes.len() >= 3 && bytes[0..3] == [0xEF, 0xBB, 0xBF] {
         // UTF-8 BOM found - this is acceptable but not ideal
@@ -165,34 +168,6 @@ pub fn validate_bom_handling(bytes: &[u8]) -> Result<(), CoreError> {
 /// # Arguments
 ///
 /// * `text` - Text content to analyze
-///
-/// # Returns
-///
-/// `Ok(())` if no issues detected, validation error with suggestions if problems found
-#[allow(dead_code)]
-pub fn detect_encoding_issues(text: &str) -> Result<(), CoreError> {
-    // Check for common mojibake patterns that indicate encoding issues
-    if text.contains('\u{FFFD}') {
-        return Err(validation_error(
-            "Replacement characters (�) detected - possible encoding corruption",
-        ));
-    }
-
-    // Check for suspicious character patterns
-    let suspicious_count = text.chars().filter(|&c| {
-        // Characters often seen in encoding mishaps
-        matches!(c, '\u{00C0}'..='\u{00FF}' if text.chars().filter(|&x| x == c).count() > text.len() / 20)
-    }).count();
-
-    if suspicious_count > text.len() / 10 {
-        return Err(validation_error(
-            "Suspicious character patterns detected - possible encoding mismatch",
-        ));
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260,17 +235,5 @@ mod tests {
     fn bom_validation_no_bom() {
         let no_bom = b"Hello World";
         assert!(validate_bom_handling(no_bom).is_ok());
-    }
-
-    #[test]
-    fn encoding_issues_replacement_chars() {
-        let text_with_replacement = "Hello � World";
-        assert!(detect_encoding_issues(text_with_replacement).is_err());
-    }
-
-    #[test]
-    fn encoding_issues_clean_text() {
-        let clean_text = "Hello World";
-        assert!(detect_encoding_issues(clean_text).is_ok());
     }
 }

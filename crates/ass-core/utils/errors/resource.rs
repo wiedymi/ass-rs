@@ -95,27 +95,6 @@ pub fn check_memory_limit(
     Ok(())
 }
 
-/// Check processing time limit
-///
-/// Validates processing duration against a configured time limit to prevent
-/// infinite loops or excessive processing time attacks.
-///
-/// # Arguments
-///
-/// * `elapsed_ms` - Time elapsed so far in milliseconds
-/// * `limit_ms` - Maximum allowed processing time
-#[allow(dead_code)]
-pub fn check_time_limit(elapsed_ms: u64, limit_ms: u64) -> Result<(), CoreError> {
-    if elapsed_ms > limit_ms {
-        return Err(resource_limit_exceeded(
-            "processing_time",
-            usize::try_from(elapsed_ms).unwrap_or(usize::MAX),
-            usize::try_from(limit_ms).unwrap_or(usize::MAX),
-        ));
-    }
-    Ok(())
-}
-
 /// Check input size limit
 ///
 /// Validates input size against configured limits to prevent processing
@@ -125,7 +104,10 @@ pub fn check_time_limit(elapsed_ms: u64, limit_ms: u64) -> Result<(), CoreError>
 ///
 /// * `input_size` - Size of input data in bytes
 /// * `max_size` - Maximum allowed input size
-#[allow(dead_code)]
+///
+/// # Errors
+///
+/// Returns an error if input size exceeds the maximum allowed size
 pub fn check_input_size_limit(input_size: usize, max_size: usize) -> Result<(), CoreError> {
     if input_size > max_size {
         return Err(resource_limit_exceeded("input_size", input_size, max_size));
@@ -142,7 +124,10 @@ pub fn check_input_size_limit(input_size: usize, max_size: usize) -> Result<(), 
 ///
 /// * `current_depth` - Current nesting depth
 /// * `max_depth` - Maximum allowed nesting depth
-#[allow(dead_code)]
+///
+/// # Errors
+///
+/// Returns an error if current depth exceeds the maximum allowed depth
 pub fn check_depth_limit(current_depth: usize, max_depth: usize) -> Result<(), CoreError> {
     if current_depth > max_depth {
         return Err(resource_limit_exceeded(
@@ -193,12 +178,6 @@ mod tests {
         let result = check_memory_limit(usize::MAX, 1, usize::MAX);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), CoreError::OutOfMemory(_)));
-    }
-
-    #[test]
-    fn time_limit_check() {
-        assert!(check_time_limit(50, 100).is_ok());
-        assert!(check_time_limit(150, 100).is_err());
     }
 
     #[test]

@@ -27,9 +27,9 @@
 
 mod category;
 mod core;
-mod encoding;
+pub mod encoding;
 mod format;
-mod resource;
+pub mod resource;
 
 // Re-export all public types to maintain API compatibility
 pub use category::ErrorCategory;
