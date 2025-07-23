@@ -52,8 +52,12 @@ use core::cmp::Ordering;
 /// assert_eq!(overlaps.len(), 1);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[must_use] pub fn find_overlapping_dialogue_events(events: &[DialogueInfo<'_>]) -> Vec<(usize, usize)> {
-    let event_refs: Vec<&Event> = events.iter().map(super::dialogue_info::DialogueInfo::event).collect();
+#[must_use]
+pub fn find_overlapping_dialogue_events(events: &[DialogueInfo<'_>]) -> Vec<(usize, usize)> {
+    let event_refs: Vec<&Event> = events
+        .iter()
+        .map(super::dialogue_info::DialogueInfo::event)
+        .collect();
     find_overlapping_event_refs(&event_refs).unwrap_or_else(|_| Vec::new())
 }
 
@@ -69,7 +73,8 @@ use core::cmp::Ordering;
 /// # Returns
 ///
 /// Number of overlapping event pairs found.
-#[must_use] pub fn count_overlapping_dialogue_events(events: &[DialogueInfo<'_>]) -> usize {
+#[must_use]
+pub fn count_overlapping_dialogue_events(events: &[DialogueInfo<'_>]) -> usize {
     find_overlapping_dialogue_events(events).len()
 }
 
@@ -159,13 +164,20 @@ pub fn sort_events_by_time(events: &mut [DialogueInfo<'_>]) {
 /// }
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[must_use] pub fn calculate_total_duration(events: &[DialogueInfo<'_>]) -> Option<u32> {
+#[must_use]
+pub fn calculate_total_duration(events: &[DialogueInfo<'_>]) -> Option<u32> {
     if events.is_empty() {
         return None;
     }
 
-    let start = events.iter().map(super::dialogue_info::DialogueInfo::start_time_cs).min()?;
-    let end = events.iter().map(super::dialogue_info::DialogueInfo::end_time_cs).max()?;
+    let start = events
+        .iter()
+        .map(super::dialogue_info::DialogueInfo::start_time_cs)
+        .min()?;
+    let end = events
+        .iter()
+        .map(super::dialogue_info::DialogueInfo::end_time_cs)
+        .max()?;
 
     Some(end - start)
 }
@@ -182,12 +194,16 @@ pub fn sort_events_by_time(events: &mut [DialogueInfo<'_>]) {
 /// # Returns
 ///
 /// Average duration in centiseconds, or None if no events.
-#[must_use] pub fn calculate_average_duration(events: &[DialogueInfo<'_>]) -> Option<u32> {
+#[must_use]
+pub fn calculate_average_duration(events: &[DialogueInfo<'_>]) -> Option<u32> {
     if events.is_empty() {
         return None;
     }
 
-    let total_duration: u32 = events.iter().map(super::dialogue_info::DialogueInfo::duration_cs).sum();
+    let total_duration: u32 = events
+        .iter()
+        .map(super::dialogue_info::DialogueInfo::duration_cs)
+        .sum();
     Some(total_duration / events.len() as u32)
 }
 
@@ -205,7 +221,8 @@ pub fn sort_events_by_time(events: &mut [DialogueInfo<'_>]) {
 /// # Returns
 ///
 /// Vector of indices for events overlapping the time range.
-#[must_use] pub fn find_events_in_range(events: &[DialogueInfo<'_>], start_cs: u32, end_cs: u32) -> Vec<usize> {
+#[must_use]
+pub fn find_events_in_range(events: &[DialogueInfo<'_>], start_cs: u32, end_cs: u32) -> Vec<usize> {
     events
         .iter()
         .enumerate()

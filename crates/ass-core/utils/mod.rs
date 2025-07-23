@@ -43,7 +43,8 @@ pub struct Spans<'a> {
 
 impl<'a> Spans<'a> {
     /// Create new span utilities for source text
-    #[must_use] pub const fn new(source: &'a str) -> Self {
+    #[must_use]
+    pub const fn new(source: &'a str) -> Self {
         Self { source }
     }
 
@@ -51,7 +52,8 @@ impl<'a> Spans<'a> {
     ///
     /// Returns `true` if the span is a valid substring of the source.
     /// Used for debug assertions to ensure zero-copy invariants.
-    #[must_use] pub fn validate_span(&self, span: &str) -> bool {
+    #[must_use]
+    pub fn validate_span(&self, span: &str) -> bool {
         let source_start = self.source.as_ptr() as usize;
         let source_end = source_start + self.source.len();
 
@@ -62,7 +64,8 @@ impl<'a> Spans<'a> {
     }
 
     /// Get byte offset of span within source
-    #[must_use] pub fn span_offset(&self, span: &str) -> Option<usize> {
+    #[must_use]
+    pub fn span_offset(&self, span: &str) -> Option<usize> {
         let source_start = self.source.as_ptr() as usize;
         let span_start = span.as_ptr() as usize;
 
@@ -74,23 +77,24 @@ impl<'a> Spans<'a> {
     }
 
     /// Get line number (1-based) for a span
-    #[must_use] pub fn span_line(&self, span: &str) -> Option<usize> {
+    #[must_use]
+    pub fn span_line(&self, span: &str) -> Option<usize> {
         let offset = self.span_offset(span)?;
         Some(self.source[..offset].chars().filter(|&c| c == '\n').count() + 1)
     }
 
     /// Get column number (1-based) for a span
-    #[must_use] pub fn span_column(&self, span: &str) -> Option<usize> {
+    #[must_use]
+    pub fn span_column(&self, span: &str) -> Option<usize> {
         let offset = self.span_offset(span)?;
-        let line_start = self.source[..offset]
-            .rfind('\n')
-            .map_or(0, |pos| pos + 1);
+        let line_start = self.source[..offset].rfind('\n').map_or(0, |pos| pos + 1);
 
         Some(self.source[line_start..offset].chars().count() + 1)
     }
 
     /// Extract substring by byte range
-    #[must_use] pub fn substring(&self, range: Range<usize>) -> Option<&'a str> {
+    #[must_use]
+    pub fn substring(&self, range: Range<usize>) -> Option<&'a str> {
         self.source.get(range)
     }
 }
@@ -193,7 +197,8 @@ where
 /// # Returns
 ///
 /// Point on curve as (x, y) tuple
-#[must_use] pub fn eval_cubic_bezier(
+#[must_use]
+pub fn eval_cubic_bezier(
     p0: (f32, f32),
     p1: (f32, f32),
     p2: (f32, f32),
@@ -206,8 +211,14 @@ where
     let mt2 = mt * mt;
     let mt3 = mt2 * mt;
 
-    let x = t3.mul_add(p3.0, (3.0 * mt * t2).mul_add(p2.0, mt3.mul_add(p0.0, 3.0 * mt2 * t * p1.0)));
-    let y = t3.mul_add(p3.1, (3.0 * mt * t2).mul_add(p2.1, mt3.mul_add(p0.1, 3.0 * mt2 * t * p1.1)));
+    let x = t3.mul_add(
+        p3.0,
+        (3.0 * mt * t2).mul_add(p2.0, mt3.mul_add(p0.0, 3.0 * mt2 * t * p1.0)),
+    );
+    let y = t3.mul_add(
+        p3.1,
+        (3.0 * mt * t2).mul_add(p2.1, mt3.mul_add(p0.1, 3.0 * mt2 * t * p1.1)),
+    );
 
     (x, y)
 }
@@ -286,7 +297,8 @@ pub fn parse_ass_time(time_str: &str) -> Result<u32, CoreError> {
 /// Format centiseconds back to ASS time format
 ///
 /// Converts internal centisecond representation back to H:MM:SS.CC format.
-#[must_use] pub fn format_ass_time(centiseconds: u32) -> String {
+#[must_use]
+pub fn format_ass_time(centiseconds: u32) -> String {
     let hours = centiseconds / 360_000;
     let remainder = centiseconds % 360_000;
     let minutes = remainder / 6000;
@@ -301,14 +313,16 @@ pub fn parse_ass_time(time_str: &str) -> Result<u32, CoreError> {
 ///
 /// ASS fields may have inconsistent whitespace that should be normalized
 /// while preserving intentional spacing in text content.
-#[must_use] pub fn normalize_field_value(value: &str) -> &str {
+#[must_use]
+pub fn normalize_field_value(value: &str) -> &str {
     value.trim()
 }
 
 /// Check if string contains only valid ASS characters
 ///
 /// ASS has restrictions on certain characters in names and style definitions.
-#[must_use] pub fn validate_ass_name(name: &str) -> bool {
+#[must_use]
+pub fn validate_ass_name(name: &str) -> bool {
     !name.is_empty()
         && !name.contains(',') // Comma is field separator
         && !name.contains(':') // Colon is key-value separator

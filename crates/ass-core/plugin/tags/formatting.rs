@@ -123,7 +123,8 @@ impl TagHandler for StrikeoutTagHandler {
 ///     registry.register_tag_handler(handler).unwrap();
 /// }
 /// ```
-#[must_use] pub fn create_formatting_handlers() -> alloc::vec::Vec<alloc::boxed::Box<dyn TagHandler>> {
+#[must_use]
+pub fn create_formatting_handlers() -> alloc::vec::Vec<alloc::boxed::Box<dyn TagHandler>> {
     alloc::vec![
         alloc::boxed::Box::new(BoldTagHandler),
         alloc::boxed::Box::new(ItalicTagHandler),

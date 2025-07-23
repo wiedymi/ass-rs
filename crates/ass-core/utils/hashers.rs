@@ -31,7 +31,8 @@ use std::collections::HashMap;
 /// let mut map = create_hash_map::<String, i32>();
 /// map.insert("key".to_string(), 42);
 /// ```
-#[must_use] pub fn create_hash_map<K, V>() -> HashMap<K, V, RandomState> {
+#[must_use]
+pub fn create_hash_map<K, V>() -> HashMap<K, V, RandomState> {
     HashMap::with_hasher(RandomState::new())
 }
 
@@ -48,7 +49,8 @@ use std::collections::HashMap;
 /// // Pre-allocate for expected 100 entries
 /// let mut map = create_hash_map_with_capacity::<String, i32>(100);
 /// ```
-#[must_use] pub fn create_hash_map_with_capacity<K, V>(capacity: usize) -> HashMap<K, V, RandomState> {
+#[must_use]
+pub fn create_hash_map_with_capacity<K, V>(capacity: usize) -> HashMap<K, V, RandomState> {
     HashMap::with_capacity_and_hasher(capacity, RandomState::new())
 }
 
@@ -67,7 +69,8 @@ use std::collections::HashMap;
 /// "some string".hash(&mut hasher);
 /// let hash_value = hasher.finish();
 /// ```
-#[must_use] pub fn create_hasher() -> AHasher {
+#[must_use]
+pub fn create_hasher() -> AHasher {
     RandomState::new().build_hasher()
 }
 
@@ -160,7 +163,8 @@ impl HashConfig {
     }
 
     /// Create `HashMap` using this configuration
-    #[must_use] pub fn create_map<K, V>(&self) -> HashMap<K, V, RandomState> {
+    #[must_use]
+    pub fn create_map<K, V>(&self) -> HashMap<K, V, RandomState> {
         if self.deterministic {
             #[cfg(test)]
             return create_deterministic_hash_map();

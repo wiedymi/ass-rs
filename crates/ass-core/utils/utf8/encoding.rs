@@ -44,7 +44,8 @@ impl EncodingInfo {
     ///
     /// * `encoding` - Name of the detected encoding
     /// * `confidence` - Confidence level (0.0 to 1.0)
-    #[must_use] pub const fn new(encoding: String, confidence: f32) -> Self {
+    #[must_use]
+    pub const fn new(encoding: String, confidence: f32) -> Self {
         Self {
             encoding,
             confidence,
@@ -61,7 +62,8 @@ impl EncodingInfo {
     /// * `encoding` - Name of the detected encoding
     /// * `confidence` - Confidence level (0.0 to 1.0)
     /// * `bom_type` - Type of BOM detected
-    #[must_use] pub const fn with_bom(encoding: String, confidence: f32, bom_type: BomType) -> Self {
+    #[must_use]
+    pub const fn with_bom(encoding: String, confidence: f32, bom_type: BomType) -> Self {
         Self {
             encoding,
             confidence,
@@ -95,7 +97,8 @@ impl EncodingInfo {
 /// assert_eq!(encoding.encoding, "UTF-8");
 /// assert!(encoding.confidence > 0.8);
 /// ```
-#[must_use] pub fn detect_encoding(bytes: &[u8]) -> EncodingInfo {
+#[must_use]
+pub fn detect_encoding(bytes: &[u8]) -> EncodingInfo {
     // Check for BOM first - gives us certainty about encoding
     if let Some((bom_type, _)) = detect_bom(bytes) {
         return EncodingInfo::with_bom(
@@ -132,7 +135,8 @@ impl EncodingInfo {
 /// # Returns
 ///
 /// `true` if content appears to be ASS subtitle format
-#[must_use] pub fn is_likely_ass_content(text: &str) -> bool {
+#[must_use]
+pub fn is_likely_ass_content(text: &str) -> bool {
     // Check for ASS section headers
     if text.contains("[Script Info]")
         || text.contains("[V4+ Styles]")

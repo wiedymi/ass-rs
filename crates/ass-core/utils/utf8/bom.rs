@@ -38,7 +38,8 @@ impl BomType {
     ///
     /// Returns the exact byte sequence that identifies this BOM type
     /// at the beginning of a file or text stream.
-    #[must_use] pub const fn signature(self) -> &'static [u8] {
+    #[must_use]
+    pub const fn signature(self) -> &'static [u8] {
         match self {
             Self::Utf8 => &[0xEF, 0xBB, 0xBF],
             Self::Utf16Le => &[0xFF, 0xFE],
@@ -52,7 +53,8 @@ impl BomType {
     ///
     /// Returns the number of bytes occupied by this BOM type.
     /// Useful for skipping the BOM when processing text.
-    #[must_use] pub const fn len(self) -> usize {
+    #[must_use]
+    pub const fn len(self) -> usize {
         self.signature().len()
     }
 
@@ -60,7 +62,8 @@ impl BomType {
     ///
     /// Provided for completeness with Rust conventions.
     /// Always returns `false` since all BOMs have non-zero length.
-    #[must_use] pub const fn is_empty(self) -> bool {
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
         false
     }
 
@@ -68,7 +71,8 @@ impl BomType {
     ///
     /// Returns the canonical name of the text encoding associated
     /// with this BOM type.
-    #[must_use] pub const fn encoding_name(self) -> &'static str {
+    #[must_use]
+    pub const fn encoding_name(self) -> &'static str {
         match self {
             Self::Utf8 => "UTF-8",
             Self::Utf16Le => "UTF-16LE",
@@ -101,7 +105,8 @@ impl BomType {
 /// assert_eq!(stripped, "Hello World");
 /// assert!(had_bom);
 /// ```
-#[must_use] pub fn strip_bom(text: &str) -> (&str, bool) {
+#[must_use]
+pub fn strip_bom(text: &str) -> (&str, bool) {
     let bytes = text.as_bytes();
 
     // Check for UTF-8 BOM first (most common for ASS files)
@@ -146,7 +151,8 @@ impl BomType {
 /// # Returns
 ///
 /// Option containing (`BomType`, `bytes_to_skip`) if BOM found
-#[must_use] pub fn detect_bom(bytes: &[u8]) -> Option<(BomType, usize)> {
+#[must_use]
+pub fn detect_bom(bytes: &[u8]) -> Option<(BomType, usize)> {
     // Check longer BOMs first to avoid false matches
     if bytes.starts_with(&[0xFF, 0xFE, 0x00, 0x00]) {
         Some((BomType::Utf32Le, 4))

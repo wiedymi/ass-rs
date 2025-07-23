@@ -39,7 +39,8 @@ pub fn out_of_memory<T: fmt::Display>(context: T) -> CoreError {
 /// * `resource` - Name of the resource that was exceeded
 /// * `current` - Current usage that triggered the limit
 /// * `limit` - Maximum allowed usage
-#[must_use] pub fn resource_limit_exceeded(resource: &str, current: usize, limit: usize) -> CoreError {
+#[must_use]
+pub fn resource_limit_exceeded(resource: &str, current: usize, limit: usize) -> CoreError {
     CoreError::ResourceLimitExceeded {
         resource: resource.to_string(),
         current,
@@ -56,7 +57,8 @@ pub fn out_of_memory<T: fmt::Display>(context: T) -> CoreError {
 ///
 /// * `feature` - The feature that was requested
 /// * `required_feature` - The Cargo feature flag needed to enable it
-#[must_use] pub fn feature_not_supported(feature: &str, required_feature: &str) -> CoreError {
+#[must_use]
+pub fn feature_not_supported(feature: &str, required_feature: &str) -> CoreError {
     CoreError::FeatureNotSupported {
         feature: feature.to_string(),
         required_feature: required_feature.to_string(),

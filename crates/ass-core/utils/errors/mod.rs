@@ -61,17 +61,20 @@ impl CoreError {
     }
 
     /// Create UTF-8 error with position
-    #[must_use] pub const fn utf8_error(position: usize, message: alloc::string::String) -> Self {
+    #[must_use]
+    pub const fn utf8_error(position: usize, message: alloc::string::String) -> Self {
         encoding::utf8_error(position, message)
     }
 
     /// Create feature not supported error
-    #[must_use] pub fn feature_not_supported(feature: &str, required_feature: &str) -> Self {
+    #[must_use]
+    pub fn feature_not_supported(feature: &str, required_feature: &str) -> Self {
         resource::feature_not_supported(feature, required_feature)
     }
 
     /// Create resource limit error
-    #[must_use] pub fn resource_limit_exceeded(resource: &str, current: usize, limit: usize) -> Self {
+    #[must_use]
+    pub fn resource_limit_exceeded(resource: &str, current: usize, limit: usize) -> Self {
         resource::resource_limit_exceeded(resource, current, limit)
     }
 }

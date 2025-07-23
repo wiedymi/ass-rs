@@ -4,7 +4,6 @@
 //! Both sections use similar structure: filename declaration followed by
 //! base64/UU-encoded data lines.
 
-
 use alloc::vec::Vec;
 
 use super::ast::{Font, Graphic, Section};

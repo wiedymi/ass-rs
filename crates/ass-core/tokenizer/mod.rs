@@ -57,7 +57,8 @@ impl<'a> AssTokenizer<'a> {
     /// Create new tokenizer for source text
     ///
     /// Handles BOM detection and UTF-8 validation upfront.
-    #[must_use] pub fn new(source: &'a str) -> Self {
+    #[must_use]
+    pub fn new(source: &'a str) -> Self {
         let initial_position = if source.starts_with('\u{FEFF}') {
             3 // BOM is 3 bytes
         } else {
@@ -159,22 +160,26 @@ impl<'a> AssTokenizer<'a> {
     }
 
     /// Get accumulated tokenization issues
-    #[must_use] pub fn issues(&self) -> &[TokenIssue<'a>] {
+    #[must_use]
+    pub fn issues(&self) -> &[TokenIssue<'a>] {
         self.issues.issues()
     }
 
     /// Get current position in source
-    #[must_use] pub const fn position(&self) -> usize {
+    #[must_use]
+    pub const fn position(&self) -> usize {
         self.scanner.navigator().position()
     }
 
     /// Get current line number (1-based)
-    #[must_use] pub const fn line(&self) -> usize {
+    #[must_use]
+    pub const fn line(&self) -> usize {
         self.scanner.navigator().line()
     }
 
     /// Get current column number (1-based)
-    #[must_use] pub const fn column(&self) -> usize {
+    #[must_use]
+    pub const fn column(&self) -> usize {
         self.scanner.navigator().column()
     }
 

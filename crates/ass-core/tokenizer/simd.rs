@@ -219,7 +219,9 @@ fn parse_hex_scalar_direct(bytes: &[u8]) -> Option<u32> {
             _ => return None,
         };
 
-        result = result.checked_mul(16)?.checked_add(u32::from(digit_value))?;
+        result = result
+            .checked_mul(16)?
+            .checked_add(u32::from(digit_value))?;
     }
 
     Some(result)

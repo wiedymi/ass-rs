@@ -128,7 +128,8 @@ pub struct LintIssue {
 
 impl LintIssue {
     /// Create a new lint issue.
-    #[must_use] pub const fn new(
+    #[must_use]
+    pub const fn new(
         severity: IssueSeverity,
         category: IssueCategory,
         rule_id: &'static str,
@@ -146,55 +147,65 @@ impl LintIssue {
     }
 
     /// Add detailed description.
-    #[must_use] pub fn with_description(mut self, description: String) -> Self {
+    #[must_use]
+    pub fn with_description(mut self, description: String) -> Self {
         self.description = Some(description);
         self
     }
 
     /// Add location information.
-    #[must_use] pub fn with_location(mut self, location: IssueLocation) -> Self {
+    #[must_use]
+    pub fn with_location(mut self, location: IssueLocation) -> Self {
         self.location = Some(location);
         self
     }
 
     /// Add suggested fix.
-    #[must_use] pub fn with_suggested_fix(mut self, fix: String) -> Self {
+    #[must_use]
+    pub fn with_suggested_fix(mut self, fix: String) -> Self {
         self.suggested_fix = Some(fix);
         self
     }
 
     /// Get severity level.
-    #[must_use] pub const fn severity(&self) -> IssueSeverity {
+    #[must_use]
+    pub const fn severity(&self) -> IssueSeverity {
         self.severity
     }
 
     /// Get issue category.
-    #[must_use] pub const fn category(&self) -> IssueCategory {
+    #[must_use]
+    pub const fn category(&self) -> IssueCategory {
         self.category
     }
 
     /// Get issue message.
-    #[must_use] pub fn message(&self) -> &str {
+    #[must_use]
+    pub fn message(&self) -> &str {
         &self.message
     }
 
     /// Get detailed description.
-    #[must_use] pub fn description(&self) -> Option<&str> {
+    #[must_use]
+    pub fn description(&self) -> Option<&str> {
         self.description.as_deref()
     }
 
     /// Get location information.
-    #[must_use] pub const fn location(&self) -> Option<&IssueLocation> {
+    #[must_use]
+    pub const fn location(&self) -> Option<&IssueLocation> {
         self.location.as_ref()
     }
 
     /// Get rule ID.
-    #[must_use] pub const fn rule_id(&self) -> &'static str {
+    #[must_use]
+    pub const fn rule_id(&self) -> &'static str {
         self.rule_id
     }
 
     /// Get suggested fix.
-    #[must_use] pub fn suggested_fix(&self) -> Option<&str> {
+    #[must_use]
+    pub fn suggested_fix(&self) -> Option<&str> {
         self.suggested_fix.as_deref()
     }
 }
@@ -228,25 +239,29 @@ impl Default for LintConfig {
 
 impl LintConfig {
     /// Set minimum severity level.
-    #[must_use] pub const fn with_min_severity(mut self, severity: IssueSeverity) -> Self {
+    #[must_use]
+    pub const fn with_min_severity(mut self, severity: IssueSeverity) -> Self {
         self.min_severity = severity;
         self
     }
 
     /// Set maximum number of issues.
-    #[must_use] pub const fn with_max_issues(mut self, max: usize) -> Self {
+    #[must_use]
+    pub const fn with_max_issues(mut self, max: usize) -> Self {
         self.max_issues = max;
         self
     }
 
     /// Enable strict compliance checking.
-    #[must_use] pub const fn with_strict_compliance(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub const fn with_strict_compliance(mut self, enabled: bool) -> Self {
         self.strict_mode = enabled;
         self
     }
 
     /// Check if a rule is enabled.
-    #[must_use] pub fn is_rule_enabled(&self, rule_id: &str) -> bool {
+    #[must_use]
+    pub fn is_rule_enabled(&self, rule_id: &str) -> bool {
         if self.disabled_rules.contains(&rule_id) {
             return false;
         }
@@ -254,7 +269,8 @@ impl LintConfig {
     }
 
     /// Check if severity should be reported.
-    #[must_use] pub fn should_report_severity(&self, severity: IssueSeverity) -> bool {
+    #[must_use]
+    pub fn should_report_severity(&self, severity: IssueSeverity) -> bool {
         severity >= self.min_severity
     }
 }

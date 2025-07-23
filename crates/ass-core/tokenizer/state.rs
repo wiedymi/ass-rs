@@ -49,17 +49,20 @@ pub enum TokenContext {
 
 impl TokenContext {
     /// Check if context allows whitespace skipping
-    #[must_use] pub const fn allows_whitespace_skipping(self) -> bool {
+    #[must_use]
+    pub const fn allows_whitespace_skipping(self) -> bool {
         !matches!(self, Self::FieldValue | Self::UuEncodedData)
     }
 
     /// Check if context is inside a delimited block
-    #[must_use] pub const fn is_delimited_block(self) -> bool {
+    #[must_use]
+    pub const fn is_delimited_block(self) -> bool {
         matches!(self, Self::SectionHeader | Self::StyleOverride)
     }
 
     /// Get expected closing delimiter for context
-    #[must_use] pub const fn closing_delimiter(self) -> Option<char> {
+    #[must_use]
+    pub const fn closing_delimiter(self) -> Option<char> {
         match self {
             Self::SectionHeader => Some(']'),
             Self::StyleOverride => Some('}'),
@@ -116,17 +119,20 @@ pub enum IssueLevel {
 
 impl IssueLevel {
     /// Check if issue level indicates an error condition
-    #[must_use] pub const fn is_error(self) -> bool {
+    #[must_use]
+    pub const fn is_error(self) -> bool {
         matches!(self, Self::Error | Self::Critical)
     }
 
     /// Check if issue level should stop tokenization
-    #[must_use] pub const fn should_abort(self) -> bool {
+    #[must_use]
+    pub const fn should_abort(self) -> bool {
         matches!(self, Self::Critical)
     }
 
     /// Get string representation for display
-    #[must_use] pub const fn as_str(self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Warning => "warning",
             Self::Error => "error",
@@ -167,7 +173,8 @@ impl<'a> TokenIssue<'a> {
     /// * `span` - Source text span where issue occurred
     /// * `line` - Line number (1-based)
     /// * `column` - Column number (1-based)
-    #[must_use] pub const fn new(
+    #[must_use]
+    pub const fn new(
         level: IssueLevel,
         message: String,
         span: &'a str,
@@ -184,32 +191,38 @@ impl<'a> TokenIssue<'a> {
     }
 
     /// Create warning issue
-    #[must_use] pub const fn warning(message: String, span: &'a str, line: usize, column: usize) -> Self {
+    #[must_use]
+    pub const fn warning(message: String, span: &'a str, line: usize, column: usize) -> Self {
         Self::new(IssueLevel::Warning, message, span, line, column)
     }
 
     /// Create error issue
-    #[must_use] pub const fn error(message: String, span: &'a str, line: usize, column: usize) -> Self {
+    #[must_use]
+    pub const fn error(message: String, span: &'a str, line: usize, column: usize) -> Self {
         Self::new(IssueLevel::Error, message, span, line, column)
     }
 
     /// Create critical issue
-    #[must_use] pub const fn critical(message: String, span: &'a str, line: usize, column: usize) -> Self {
+    #[must_use]
+    pub const fn critical(message: String, span: &'a str, line: usize, column: usize) -> Self {
         Self::new(IssueLevel::Critical, message, span, line, column)
     }
 
     /// Check if this is an error-level issue
-    #[must_use] pub const fn is_error(&self) -> bool {
+    #[must_use]
+    pub const fn is_error(&self) -> bool {
         self.level.is_error()
     }
 
     /// Get formatted location string
-    #[must_use] pub fn location_string(&self) -> String {
+    #[must_use]
+    pub fn location_string(&self) -> String {
         format!("{}:{}", self.line, self.column)
     }
 
     /// Get formatted issue string for display
-    #[must_use] pub fn format_issue(&self) -> String {
+    #[must_use]
+    pub fn format_issue(&self) -> String {
         format!(
             "{}: {} at {}:{}",
             self.level.as_str(),
@@ -231,7 +244,8 @@ pub struct IssueCollector<'a> {
 
 impl<'a> IssueCollector<'a> {
     /// Create new empty issue collector
-    #[must_use] pub const fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self { issues: Vec::new() }
     }
 
@@ -256,12 +270,14 @@ impl<'a> IssueCollector<'a> {
     }
 
     /// Get all collected issues
-    #[must_use] pub fn issues(&self) -> &[TokenIssue<'a>] {
+    #[must_use]
+    pub fn issues(&self) -> &[TokenIssue<'a>] {
         &self.issues
     }
 
     /// Check if any issues were collected
-    #[must_use] pub fn has_issues(&self) -> bool {
+    #[must_use]
+    pub fn has_issues(&self) -> bool {
         !self.issues.is_empty()
     }
 
@@ -271,7 +287,8 @@ impl<'a> IssueCollector<'a> {
     }
 
     /// Get count of issues
-    #[must_use] pub fn issue_count(&self) -> usize {
+    #[must_use]
+    pub fn issue_count(&self) -> usize {
         self.issues.len()
     }
 

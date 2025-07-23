@@ -165,27 +165,32 @@ impl<'a> ResolvedStyle<'a> {
     }
 
     /// Get font family name
-    #[must_use] pub fn font_name(&self) -> &str {
+    #[must_use]
+    pub fn font_name(&self) -> &str {
         &self.font_name
     }
 
     /// Get font size in points
-    #[must_use] pub const fn font_size(&self) -> f32 {
+    #[must_use]
+    pub const fn font_size(&self) -> f32 {
         self.font_size
     }
 
     /// Get primary color as RGBA bytes
-    #[must_use] pub const fn primary_color(&self) -> [u8; 4] {
+    #[must_use]
+    pub const fn primary_color(&self) -> [u8; 4] {
         self.primary_color
     }
 
     /// Get rendering complexity score (0-100)
-    #[must_use] pub const fn complexity_score(&self) -> u8 {
+    #[must_use]
+    pub const fn complexity_score(&self) -> u8 {
         self.complexity_score
     }
 
     /// Check if style has performance concerns
-    #[must_use] pub const fn has_performance_issues(&self) -> bool {
+    #[must_use]
+    pub const fn has_performance_issues(&self) -> bool {
         self.complexity_score > 70
     }
 

@@ -156,39 +156,46 @@ impl<'a> ScriptAnalysis<'a> {
     }
 
     /// Get all lint issues found during analysis
-    #[must_use] pub fn lint_issues(&self) -> &[LintIssue] {
+    #[must_use]
+    pub fn lint_issues(&self) -> &[LintIssue] {
         &self.lint_issues
     }
 
     /// Get resolved styles
-    #[must_use] pub fn resolved_styles(&self) -> &[ResolvedStyle<'a>] {
+    #[must_use]
+    pub fn resolved_styles(&self) -> &[ResolvedStyle<'a>] {
         &self.resolved_styles
     }
 
     /// Get dialogue analysis results
-    #[must_use] pub fn dialogue_info(&self) -> &[DialogueInfo<'a>] {
+    #[must_use]
+    pub fn dialogue_info(&self) -> &[DialogueInfo<'a>] {
         &self.dialogue_info
     }
 
     /// Get reference to the analyzed script
-    #[must_use] pub const fn script(&self) -> &'a Script<'a> {
+    #[must_use]
+    pub const fn script(&self) -> &'a Script<'a> {
         self.script
     }
 
     /// Find resolved style by name
-    #[must_use] pub fn resolve_style(&self, name: &str) -> Option<&ResolvedStyle<'a>> {
+    #[must_use]
+    pub fn resolve_style(&self, name: &str) -> Option<&ResolvedStyle<'a>> {
         self.resolved_styles.iter().find(|style| style.name == name)
     }
 
     /// Check if script has any critical issues
-    #[must_use] pub fn has_critical_issues(&self) -> bool {
+    #[must_use]
+    pub fn has_critical_issues(&self) -> bool {
         self.lint_issues
             .iter()
             .any(|issue| issue.severity() == linting::IssueSeverity::Critical)
     }
 
     /// Get performance summary
-    #[must_use] pub fn performance_summary(&self) -> PerformanceSummary {
+    #[must_use]
+    pub fn performance_summary(&self) -> PerformanceSummary {
         PerformanceSummary {
             total_events: self.dialogue_info.len(),
             overlapping_events: self.count_overlapping_events(),
@@ -326,12 +333,14 @@ pub struct PerformanceSummary {
 
 impl PerformanceSummary {
     /// Check if script has performance concerns
-    #[must_use] pub const fn has_performance_issues(&self) -> bool {
+    #[must_use]
+    pub const fn has_performance_issues(&self) -> bool {
         self.performance_score < 80
     }
 
     /// Get performance recommendation
-    #[must_use] pub const fn recommendation(&self) -> Option<&'static str> {
+    #[must_use]
+    pub const fn recommendation(&self) -> Option<&'static str> {
         if self.overlapping_events > 10 {
             Some("Consider reducing overlapping events for better performance")
         } else if self.complex_animations > 20 {

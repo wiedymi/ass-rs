@@ -86,12 +86,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Script::from_parts(
-            self.source,
-            self.version,
-            self.sections,
-            self.issues,
-        )
+        Script::from_parts(self.source, self.version, self.sections, self.issues)
     }
 
     /// Parse a single section (e.g., [Script Info])
@@ -102,12 +97,9 @@ impl<'a> Parser<'a> {
             }));
         }
 
-        let header_end = self.source[self.position..]
-            .find(']')
-            .ok_or_else(|| CoreError::from(ParseError::UnclosedSectionHeader {
-                line: self.line,
-            }))?
-            + self.position;
+        let header_end = self.source[self.position..].find(']').ok_or_else(|| {
+            CoreError::from(ParseError::UnclosedSectionHeader { line: self.line })
+        })? + self.position;
 
         let section_name = &self.source[self.position + 1..header_end];
         self.position = header_end + 1;

@@ -121,7 +121,8 @@ impl ErrorCategory {
     ///
     /// Returns a descriptive name for the category suitable for display
     /// in user interfaces or error reports.
-    #[must_use] pub const fn name(self) -> &'static str {
+    #[must_use]
+    pub const fn name(self) -> &'static str {
         match self {
             Self::Parsing => "Parsing",
             Self::Analysis => "Analysis",
@@ -142,7 +143,8 @@ impl ErrorCategory {
     ///
     /// Returns `true` for categories where the user can typically resolve
     /// the issue by modifying their input or configuration.
-    #[must_use] pub const fn is_user_fixable(self) -> bool {
+    #[must_use]
+    pub const fn is_user_fixable(self) -> bool {
         match self {
             Self::Parsing
             | Self::Format
@@ -152,11 +154,7 @@ impl ErrorCategory {
 
             Self::Analysis | Self::Compatibility => true,
 
-            Self::Plugin
-            | Self::Io
-            | Self::Resource
-            | Self::Security
-            | Self::Internal => false,
+            Self::Plugin | Self::Io | Self::Resource | Self::Security | Self::Internal => false,
         }
     }
 
@@ -164,7 +162,8 @@ impl ErrorCategory {
     ///
     /// Returns a relative severity level where higher numbers indicate
     /// more severe issues that require immediate attention.
-    #[must_use] pub const fn severity_level(self) -> u8 {
+    #[must_use]
+    pub const fn severity_level(self) -> u8 {
         match self {
             Self::Internal | Self::Security => 5,
             Self::Resource | Self::Io => 4,
@@ -181,7 +180,8 @@ impl CoreError {
     ///
     /// Returns the category that best describes the type of error,
     /// useful for organizing errors in user interfaces or logs.
-    #[must_use] pub const fn category(&self) -> ErrorCategory {
+    #[must_use]
+    pub const fn category(&self) -> ErrorCategory {
         match self {
             Self::Parse(_) | Self::Tokenization(_) => ErrorCategory::Parsing,
             Self::Analysis(_) => ErrorCategory::Analysis,
@@ -206,7 +206,8 @@ impl CoreError {
     ///
     /// Provides actionable advice for resolving common error scenarios.
     /// Returns `None` for errors that don't have standard solutions.
-    #[must_use] pub const fn suggestion(&self) -> Option<&'static str> {
+    #[must_use]
+    pub const fn suggestion(&self) -> Option<&'static str> {
         match self {
             Self::InvalidColor(_) => Some("Use format like '&H00FF00FF&' for colors"),
             Self::InvalidTime(_) => Some("Use format like '0:01:30.50' for times"),

@@ -143,7 +143,8 @@ impl ScriptVersion {
     /// assert_eq!(ScriptVersion::from_header("v4.00++"), Some(ScriptVersion::AssV4Plus));
     /// assert_eq!(ScriptVersion::from_header("invalid"), None);
     /// ```
-    #[must_use] pub fn from_header(header: &str) -> Option<Self> {
+    #[must_use]
+    pub fn from_header(header: &str) -> Option<Self> {
         match header.trim() {
             "v4.00" => Some(Self::SsaV4),
             "v4.00+" => Some(Self::AssV4),
@@ -176,7 +177,8 @@ impl ScriptVersion {
     /// assert!(!ScriptVersion::AssV4.supports_extensions());
     /// assert!(ScriptVersion::AssV4Plus.supports_extensions());
     /// ```
-    #[must_use] pub const fn supports_extensions(self) -> bool {
+    #[must_use]
+    pub const fn supports_extensions(self) -> bool {
         matches!(self, Self::AssV4Plus)
     }
 }

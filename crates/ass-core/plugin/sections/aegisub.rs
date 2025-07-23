@@ -112,7 +112,8 @@ impl SectionProcessor for AegisubExtradataProcessor {
 ///     registry.register_section_processor(processor).unwrap();
 /// }
 /// ```
-#[must_use] pub fn create_aegisub_processors() -> alloc::vec::Vec<alloc::boxed::Box<dyn SectionProcessor>> {
+#[must_use]
+pub fn create_aegisub_processors() -> alloc::vec::Vec<alloc::boxed::Box<dyn SectionProcessor>> {
     alloc::vec![
         alloc::boxed::Box::new(AegisubProjectProcessor),
         alloc::boxed::Box::new(AegisubExtradataProcessor),

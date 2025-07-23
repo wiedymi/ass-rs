@@ -134,9 +134,7 @@ impl InvalidColorRule {
                         self.default_severity(),
                         IssueCategory::Styling,
                         self.id(),
-                        format!(
-                            "Invalid color override tag: \\{tag_name}&H{color_value}&"
-                        ),
+                        format!("Invalid color override tag: \\{tag_name}&H{color_value}&"),
                     );
                     issues.push(issue);
                 }

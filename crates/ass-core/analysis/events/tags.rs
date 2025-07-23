@@ -60,22 +60,26 @@ pub struct OverrideTag<'a> {
 
 impl<'a> OverrideTag<'a> {
     /// Get tag name
-    #[must_use] pub const fn name(&self) -> &'a str {
+    #[must_use]
+    pub const fn name(&self) -> &'a str {
         self.name
     }
 
     /// Get tag arguments
-    #[must_use] pub const fn args(&self) -> &'a str {
+    #[must_use]
+    pub const fn args(&self) -> &'a str {
         self.args
     }
 
     /// Get complexity score
-    #[must_use] pub const fn complexity(&self) -> u8 {
+    #[must_use]
+    pub const fn complexity(&self) -> u8 {
         self.complexity
     }
 
     /// Get position in original text
-    #[must_use] pub const fn position(&self) -> usize {
+    #[must_use]
+    pub const fn position(&self) -> usize {
         self.position
     }
 }
@@ -194,7 +198,8 @@ pub fn parse_override_block<'a>(
 /// assert_eq!(calculate_tag_complexity("t"), 4);
 /// assert_eq!(calculate_tag_complexity("p"), 5);
 /// ```
-#[must_use] pub fn calculate_tag_complexity(tag_name: &str) -> u8 {
+#[must_use]
+pub fn calculate_tag_complexity(tag_name: &str) -> u8 {
     match tag_name {
         "b" | "i" | "u" | "s" | "c" | "1c" | "2c" | "3c" | "4c" | "alpha" | "1a" | "2a" | "3a"
         | "4a" | "fn" | "fs" => 1,

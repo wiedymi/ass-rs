@@ -101,12 +101,14 @@ impl Default for PerformanceThresholds {
 
 impl<'a> StyleAnalyzer<'a> {
     /// Create analyzer with default configuration
-    #[must_use] pub fn new(script: &'a Script<'a>) -> Self {
+    #[must_use]
+    pub fn new(script: &'a Script<'a>) -> Self {
         Self::new_with_config(script, StyleAnalysisConfig::default())
     }
 
     /// Create analyzer with custom configuration
-    #[must_use] pub fn new_with_config(script: &'a Script<'a>, config: StyleAnalysisConfig) -> Self {
+    #[must_use]
+    pub fn new_with_config(script: &'a Script<'a>, config: StyleAnalysisConfig) -> Self {
         let mut analyzer = Self {
             script,
             resolved_styles: BTreeMap::new(),
@@ -120,27 +122,32 @@ impl<'a> StyleAnalyzer<'a> {
     }
 
     /// Get resolved style by name
-    #[must_use] pub fn resolve_style(&self, name: &str) -> Option<&ResolvedStyle<'a>> {
+    #[must_use]
+    pub fn resolve_style(&self, name: &str) -> Option<&ResolvedStyle<'a>> {
         self.resolved_styles.get(name)
     }
 
     /// Get all resolved styles
-    #[must_use] pub const fn resolved_styles(&self) -> &BTreeMap<&'a str, ResolvedStyle<'a>> {
+    #[must_use]
+    pub const fn resolved_styles(&self) -> &BTreeMap<&'a str, ResolvedStyle<'a>> {
         &self.resolved_styles
     }
 
     /// Get detected conflicts
-    #[must_use] pub fn conflicts(&self) -> &[StyleConflict<'a>] {
+    #[must_use]
+    pub fn conflicts(&self) -> &[StyleConflict<'a>] {
         &self.conflicts
     }
 
     /// Get inheritance information
-    #[must_use] pub const fn inheritance_info(&self) -> &BTreeMap<&'a str, StyleInheritance<'a>> {
+    #[must_use]
+    pub const fn inheritance_info(&self) -> &BTreeMap<&'a str, StyleInheritance<'a>> {
         &self.inheritance_info
     }
 
     /// Validate all styles and return issues
-    #[must_use] pub fn validate_styles(&self) -> Vec<StyleValidationIssue> {
+    #[must_use]
+    pub fn validate_styles(&self) -> Vec<StyleValidationIssue> {
         let mut issues = Vec::new();
 
         for resolved in self.resolved_styles.values() {
@@ -186,7 +193,8 @@ impl<'a> StyleAnalyzer<'a> {
     }
 
     /// Extract styles from script sections
-    #[must_use] pub fn extract_styles(&self) -> Option<&[Style<'a>]> {
+    #[must_use]
+    pub fn extract_styles(&self) -> Option<&[Style<'a>]> {
         for section in self.script.sections() {
             if let Section::Styles(styles) = section {
                 return Some(styles);

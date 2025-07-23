@@ -52,9 +52,7 @@ pub fn validate_utf8(bytes: &[u8]) -> Result<(), CoreError> {
         Err(err) => {
             let position = err.valid_up_to();
             let message = if let Some(len) = err.error_len() {
-                format!(
-                    "Invalid UTF-8 sequence of {len} bytes at position {position}"
-                )
+                format!("Invalid UTF-8 sequence of {len} bytes at position {position}")
             } else {
                 format!("Incomplete UTF-8 sequence at position {position}")
             };
@@ -92,8 +90,11 @@ pub fn validate_utf8(bytes: &[u8]) -> Result<(), CoreError> {
 /// assert_eq!(recovered, "Hi�!");
 /// assert_eq!(replacements, 1);
 /// ```
-#[must_use] pub fn recover_utf8(bytes: &[u8]) -> (String, usize) {
-    if let Ok(s) = str::from_utf8(bytes) { (s.to_string(), 0) } else {
+#[must_use]
+pub fn recover_utf8(bytes: &[u8]) -> (String, usize) {
+    if let Ok(s) = str::from_utf8(bytes) {
+        (s.to_string(), 0)
+    } else {
         let recovered = String::from_utf8_lossy(bytes);
         let replacements = recovered.matches('\u{FFFD}').count();
         (recovered.into_owned(), replacements)
@@ -113,7 +114,8 @@ pub fn validate_utf8(bytes: &[u8]) -> Result<(), CoreError> {
 /// # Returns
 ///
 /// `true` if all characters are valid for ASS content
-#[must_use] pub fn is_valid_ass_text(text: &str) -> bool {
+#[must_use]
+pub fn is_valid_ass_text(text: &str) -> bool {
     text.chars().all(|c| {
         c.is_ascii_graphic()  // Printable ASCII
             || c == ' '       // Space
@@ -153,7 +155,8 @@ pub fn validate_utf8(bytes: &[u8]) -> Result<(), CoreError> {
 /// assert_eq!(truncated, "Hello "); // Stops before the Unicode character
 /// assert!(was_truncated);
 /// ```
-#[must_use] pub fn truncate_at_char_boundary(text: &str, max_bytes: usize) -> (&str, bool) {
+#[must_use]
+pub fn truncate_at_char_boundary(text: &str, max_bytes: usize) -> (&str, bool) {
     if text.len() <= max_bytes {
         return (text, false);
     }
@@ -179,7 +182,8 @@ pub fn validate_utf8(bytes: &[u8]) -> Result<(), CoreError> {
 /// # Returns
 ///
 /// Number of replacement characters found
-#[must_use] pub fn count_replacement_chars(text: &str) -> usize {
+#[must_use]
+pub fn count_replacement_chars(text: &str) -> usize {
     text.matches('\u{FFFD}').count()
 }
 

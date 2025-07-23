@@ -98,7 +98,8 @@ pub enum ConflictType {
 
 impl StyleValidationIssue {
     /// Create new validation issue
-    #[must_use] pub fn new(
+    #[must_use]
+    pub fn new(
         severity: ValidationSeverity,
         field: &str,
         message: &str,
@@ -113,24 +114,28 @@ impl StyleValidationIssue {
     }
 
     /// Create error-level issue
-    #[must_use] pub fn error(field: &str, message: &str) -> Self {
+    #[must_use]
+    pub fn error(field: &str, message: &str) -> Self {
         Self::new(ValidationSeverity::Error, field, message, None)
     }
 
     /// Create warning-level issue
-    #[must_use] pub fn warning(field: &str, message: &str) -> Self {
+    #[must_use]
+    pub fn warning(field: &str, message: &str) -> Self {
         Self::new(ValidationSeverity::Warning, field, message, None)
     }
 
     /// Create info-level issue with suggestion
-    #[must_use] pub fn info_with_suggestion(field: &str, message: &str, suggestion: &str) -> Self {
+    #[must_use]
+    pub fn info_with_suggestion(field: &str, message: &str, suggestion: &str) -> Self {
         Self::new(ValidationSeverity::Info, field, message, Some(suggestion))
     }
 }
 
 impl<'a> StyleInheritance<'a> {
     /// Create new inheritance tracker for style
-    #[must_use] pub const fn new(name: &'a str) -> Self {
+    #[must_use]
+    pub const fn new(name: &'a str) -> Self {
         Self {
             name,
             parents: Vec::new(),
@@ -155,24 +160,28 @@ impl<'a> StyleInheritance<'a> {
     }
 
     /// Check if style has inheritance relationships
-    #[must_use] pub fn has_inheritance(&self) -> bool {
+    #[must_use]
+    pub fn has_inheritance(&self) -> bool {
         !self.parents.is_empty() || !self.children.is_empty()
     }
 
     /// Check if style is root (no parents)
-    #[must_use] pub fn is_root(&self) -> bool {
+    #[must_use]
+    pub fn is_root(&self) -> bool {
         self.parents.is_empty()
     }
 
     /// Check if style is leaf (no children)
-    #[must_use] pub fn is_leaf(&self) -> bool {
+    #[must_use]
+    pub fn is_leaf(&self) -> bool {
         self.children.is_empty()
     }
 }
 
 impl<'a> StyleConflict<'a> {
     /// Create new style conflict
-    #[must_use] pub fn new(
+    #[must_use]
+    pub fn new(
         conflict_type: ConflictType,
         styles: Vec<&'a str>,
         description: &str,
@@ -187,7 +196,8 @@ impl<'a> StyleConflict<'a> {
     }
 
     /// Create duplicate name conflict
-    #[must_use] pub fn duplicate_name(style_names: Vec<&'a str>) -> Self {
+    #[must_use]
+    pub fn duplicate_name(style_names: Vec<&'a str>) -> Self {
         let description = format!("Duplicate style names found: {style_names:?}");
         Self::new(
             ConflictType::DuplicateName,
@@ -198,7 +208,8 @@ impl<'a> StyleConflict<'a> {
     }
 
     /// Create circular inheritance conflict
-    #[must_use] pub fn circular_inheritance(cycle_styles: Vec<&'a str>) -> Self {
+    #[must_use]
+    pub fn circular_inheritance(cycle_styles: Vec<&'a str>) -> Self {
         let description = format!("Circular inheritance detected: {cycle_styles:?}");
         Self::new(
             ConflictType::CircularInheritance,
@@ -209,10 +220,10 @@ impl<'a> StyleConflict<'a> {
     }
 
     /// Create missing reference conflict
-    #[must_use] pub fn missing_reference(referencing_style: &'a str, missing_style: &'a str) -> Self {
-        let description = format!(
-            "Style '{referencing_style}' references non-existent style '{missing_style}'"
-        );
+    #[must_use]
+    pub fn missing_reference(referencing_style: &'a str, missing_style: &'a str) -> Self {
+        let description =
+            format!("Style '{referencing_style}' references non-existent style '{missing_style}'");
         Self::new(
             ConflictType::MissingReference,
             vec![referencing_style],

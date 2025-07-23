@@ -26,7 +26,8 @@ use core::fmt;
 /// let error = utf8_error(42, "Invalid UTF-8 sequence".to_string());
 /// assert!(matches!(error, CoreError::Utf8Error { .. }));
 /// ```
-#[must_use] pub const fn utf8_error(position: usize, message: String) -> CoreError {
+#[must_use]
+pub const fn utf8_error(position: usize, message: String) -> CoreError {
     CoreError::Utf8Error { position, message }
 }
 
@@ -60,9 +61,7 @@ pub fn validate_utf8_detailed(bytes: &[u8]) -> Result<(), CoreError> {
         Err(err) => {
             let position = err.valid_up_to();
             let message = if let Some(len) = err.error_len() {
-                format!(
-                    "Invalid UTF-8 sequence of {len} bytes at position {position}"
-                )
+                format!("Invalid UTF-8 sequence of {len} bytes at position {position}")
             } else {
                 format!("Incomplete UTF-8 sequence at position {position}")
             };
