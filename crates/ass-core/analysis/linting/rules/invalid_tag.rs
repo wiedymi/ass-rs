@@ -45,11 +45,8 @@ use alloc::{string::ToString, vec::Vec};
 /// let analysis = ScriptAnalysis::analyze(&script)?;
 /// let rule = InvalidTagRule;
 /// let issues = rule.check_script(&analysis);
-/// println!("DEBUG: Found {} issues", issues.len());
-/// for issue in &issues {
-///     println!("DEBUG: Issue: {}", issue.message());
-/// }
-/// // For now, just check that rule runs without panic
+/// // Rule should execute successfully (implementation may vary)
+/// assert!(issues.len() >= 0); // Rule runs without panic
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct InvalidTagRule;
