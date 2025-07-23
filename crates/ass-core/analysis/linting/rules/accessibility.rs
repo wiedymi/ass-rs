@@ -130,7 +130,9 @@ impl AccessibilityRule {
                     if clean_text_length > 0 && duration_centiseconds > 0 {
                         // Convert centiseconds to seconds: 1 second = 100 centiseconds
                         let duration_seconds = f64::from(duration_centiseconds) / 100.0;
-                        let safe_length = u32::try_from(clean_text_length).unwrap_or(10_000).min(10_000);
+                        let safe_length = u32::try_from(clean_text_length)
+                            .unwrap_or(10_000)
+                            .min(10_000);
                         let chars_per_second = f64::from(safe_length) / duration_seconds;
 
                         if chars_per_second > 20.0 {

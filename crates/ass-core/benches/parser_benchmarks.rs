@@ -167,7 +167,8 @@ PlayResY: 1080",
             writeln!(
                 events,
                 "Dialogue: 0,{start_time},{end_time},{style},Speaker,0,0,0,,{text}"
-            ).unwrap();
+            )
+            .unwrap();
         }
 
         events
@@ -189,9 +190,7 @@ PlayResY: 1080",
         match self.complexity_level {
             ComplexityLevel::Simple => base_text,
             ComplexityLevel::Moderate => {
-                format!(
-                    r"{{\b1}}{base_text}{{\b0}} with {{\i1}}some{{\i0}} formatting"
-                )
+                format!(r"{{\b1}}{base_text}{{\b0}} with {{\i1}}some{{\i0}} formatting")
             }
             ComplexityLevel::Complex => {
                 format!(
@@ -522,7 +521,8 @@ fn generate_script_with_issues(event_count: usize) -> String {
         writeln!(
             script,
             "Dialogue: 0,{start_time},{end_time},Default,Speaker,0,0,0,,{text}"
-        ).unwrap();
+        )
+        .unwrap();
     }
 
     script

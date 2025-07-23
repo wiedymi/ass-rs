@@ -118,7 +118,7 @@ pub fn detect_encoding(bytes: &[u8]) -> EncodingInfo {
                 0.8 // Still likely UTF-8 but less certain
             };
             EncodingInfo::new("UTF-8".to_string(), confidence)
-        }
+        },
     )
 }
 

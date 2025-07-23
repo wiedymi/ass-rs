@@ -238,7 +238,12 @@ impl<'a> StyleAnalyzer<'a> {
             ));
         }
 
-        if self.config.options.contains(AnalysisOptions::STRICT_VALIDATION) && style.font_size() > 200.0 {
+        if self
+            .config
+            .options
+            .contains(AnalysisOptions::STRICT_VALIDATION)
+            && style.font_size() > 200.0
+        {
             issues.push(StyleValidationIssue::warning(
                 "font_size",
                 "Very large font size may cause performance issues",

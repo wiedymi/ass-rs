@@ -221,10 +221,7 @@ mod tests {
         ];
 
         for expected_id in expected_ids {
-            assert!(
-                ids.contains(&expected_id),
-                "Missing rule ID: {expected_id}"
-            );
+            assert!(ids.contains(&expected_id), "Missing rule ID: {expected_id}");
         }
     }
 }

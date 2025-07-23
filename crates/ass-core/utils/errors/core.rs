@@ -145,20 +145,22 @@ impl CoreError {
     #[must_use]
     pub const fn line_number(&self) -> Option<usize> {
         match self {
-            Self::Parse(crate::parser::ParseError::ExpectedSectionHeader { line }
-            | crate::parser::ParseError::UnclosedSectionHeader { line }
-            | crate::parser::ParseError::UnknownSection { line, .. }
-            | crate::parser::ParseError::InvalidFieldFormat { line }
-            | crate::parser::ParseError::InvalidFormatLine { line, .. }
-            | crate::parser::ParseError::FieldCountMismatch { line, .. }
-            | crate::parser::ParseError::InvalidTimeFormat { line, .. }
-            | crate::parser::ParseError::InvalidColorFormat { line, .. }
-            | crate::parser::ParseError::InvalidNumericValue { line, .. }
-            | crate::parser::ParseError::InvalidStyleOverride { line, .. }
-            | crate::parser::ParseError::InvalidDrawingCommand { line, .. }
-            | crate::parser::ParseError::UuDecodeError { line, .. }
-            | crate::parser::ParseError::MaxNestingDepth { line, .. }
-            | crate::parser::ParseError::InternalError { line, .. }) => Some(*line),
+            Self::Parse(
+                crate::parser::ParseError::ExpectedSectionHeader { line }
+                | crate::parser::ParseError::UnclosedSectionHeader { line }
+                | crate::parser::ParseError::UnknownSection { line, .. }
+                | crate::parser::ParseError::InvalidFieldFormat { line }
+                | crate::parser::ParseError::InvalidFormatLine { line, .. }
+                | crate::parser::ParseError::FieldCountMismatch { line, .. }
+                | crate::parser::ParseError::InvalidTimeFormat { line, .. }
+                | crate::parser::ParseError::InvalidColorFormat { line, .. }
+                | crate::parser::ParseError::InvalidNumericValue { line, .. }
+                | crate::parser::ParseError::InvalidStyleOverride { line, .. }
+                | crate::parser::ParseError::InvalidDrawingCommand { line, .. }
+                | crate::parser::ParseError::UuDecodeError { line, .. }
+                | crate::parser::ParseError::MaxNestingDepth { line, .. }
+                | crate::parser::ParseError::InternalError { line, .. },
+            ) => Some(*line),
             Self::Utf8Error { position, .. } => Some(*position),
             _ => None,
         }

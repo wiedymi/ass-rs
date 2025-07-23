@@ -82,7 +82,9 @@ impl LintRule for InvalidTagRule {
             .find(|s| matches!(s, Section::Events(_)))
         {
             for event in events {
-                let Ok(text_analysis) = TextAnalysis::analyze(event.text) else { continue };
+                let Ok(text_analysis) = TextAnalysis::analyze(event.text) else {
+                    continue;
+                };
 
                 // Use diagnostics collected during text analysis
                 for diagnostic in text_analysis.diagnostics() {

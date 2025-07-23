@@ -241,7 +241,11 @@ pub const fn parse_incremental<'a>(
 
 /// Build modified source with range replacement
 #[must_use]
-pub const fn build_modified_source(_original: &str, _range: Range<usize>, _replacement: &str) -> String {
+pub const fn build_modified_source(
+    _original: &str,
+    _range: Range<usize>,
+    _replacement: &str,
+) -> String {
     // Simplified implementation for now
     String::new()
 }

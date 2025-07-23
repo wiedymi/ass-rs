@@ -57,7 +57,7 @@ pub fn validate_utf8(bytes: &[u8]) -> Result<(), CoreError> {
             let position = err.valid_up_to();
             let message = err.error_len().map_or_else(
                 || format!("Incomplete UTF-8 sequence at position {position}"),
-                |len| format!("Invalid UTF-8 sequence of {len} bytes at position {position}")
+                |len| format!("Invalid UTF-8 sequence of {len} bytes at position {position}"),
             );
 
             Err(CoreError::utf8_error(position, message))
@@ -101,7 +101,7 @@ pub fn recover_utf8(bytes: &[u8]) -> (String, usize) {
             let replacements = recovered.matches('\u{FFFD}').count();
             (recovered.into_owned(), replacements)
         },
-        |s| (s.to_string(), 0)
+        |s| (s.to_string(), 0),
     )
 }
 

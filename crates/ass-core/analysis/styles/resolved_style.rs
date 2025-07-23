@@ -288,7 +288,10 @@ impl<'a> ResolvedStyle<'a> {
         if style.formatting.contains(TextFormatting::ITALIC) {
             score += 2;
         }
-        if style.formatting.intersects(TextFormatting::UNDERLINE | TextFormatting::STRIKE_OUT) {
+        if style
+            .formatting
+            .intersects(TextFormatting::UNDERLINE | TextFormatting::STRIKE_OUT)
+        {
             score += 5;
         }
 

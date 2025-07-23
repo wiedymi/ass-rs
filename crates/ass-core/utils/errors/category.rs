@@ -154,8 +154,6 @@ impl ErrorCategory {
             | Self::Analysis
             | Self::Compatibility => true,
 
-
-
             Self::Plugin | Self::Io | Self::Resource | Self::Security | Self::Internal => false,
         }
     }

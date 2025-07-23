@@ -66,7 +66,7 @@ pub fn validate_utf8_detailed(bytes: &[u8]) -> Result<(), CoreError> {
             let position = err.valid_up_to();
             let message = err.error_len().map_or_else(
                 || format!("Incomplete UTF-8 sequence at position {position}"),
-                |len| format!("Invalid UTF-8 sequence of {len} bytes at position {position}")
+                |len| format!("Invalid UTF-8 sequence of {len} bytes at position {position}"),
             );
 
             Err(utf8_error(position, message))

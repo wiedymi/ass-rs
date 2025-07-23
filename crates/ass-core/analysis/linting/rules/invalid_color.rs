@@ -92,7 +92,9 @@ impl LintRule for InvalidColorRule {
             .find(|s| matches!(s, Section::Events(_)))
         {
             for event in events {
-                let Ok(text_analysis) = TextAnalysis::analyze(event.text) else { continue };
+                let Ok(text_analysis) = TextAnalysis::analyze(event.text) else {
+                    continue;
+                };
                 for tag in text_analysis.override_tags() {
                     let tag_content = format!("\\{}{}", tag.name(), tag.args());
                     self.check_color_override_tags(&mut issues, &tag_content);

@@ -29,7 +29,7 @@ use alloc::{string::String, vec::Vec};
 ///             ParseDelta::AddSection(section) => {
 ///                 // Add new section to document
 ///             }
-///             ParseDelta::UpdateSection(section) => {
+///             ParseDelta::UpdateSection(index, section) => {
 ///                 // Update existing section
 ///             }
 ///             ParseDelta::RemoveSection(index) => {

@@ -221,8 +221,11 @@ impl<'a> ScriptAnalysis<'a> {
 
     /// Run linting analysis
     fn run_linting(&mut self) {
-        let lint_config =
-            LintConfig::default().with_strict_compliance(self.config.options.contains(ScriptAnalysisOptions::STRICT_COMPLIANCE));
+        let lint_config = LintConfig::default().with_strict_compliance(
+            self.config
+                .options
+                .contains(ScriptAnalysisOptions::STRICT_COMPLIANCE),
+        );
 
         let mut issues = Vec::new();
         let rules = linting::rules::BuiltinRules::all_rules();
@@ -372,9 +375,15 @@ mod tests {
     #[test]
     fn analysis_config_default() {
         let config = AnalysisConfig::default();
-        assert!(config.options.contains(ScriptAnalysisOptions::UNICODE_LINEBREAKS));
-        assert!(config.options.contains(ScriptAnalysisOptions::PERFORMANCE_HINTS));
-        assert!(!config.options.contains(ScriptAnalysisOptions::STRICT_COMPLIANCE));
+        assert!(config
+            .options
+            .contains(ScriptAnalysisOptions::UNICODE_LINEBREAKS));
+        assert!(config
+            .options
+            .contains(ScriptAnalysisOptions::PERFORMANCE_HINTS));
+        assert!(!config
+            .options
+            .contains(ScriptAnalysisOptions::STRICT_COMPLIANCE));
         assert_eq!(config.max_events_threshold, 1000);
     }
 
