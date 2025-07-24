@@ -558,3 +558,282 @@ fn mixed_line_endings_handling() {
     navigator.advance_char().unwrap(); // \r
     assert_eq!(navigator.line(), 4);
 }
+
+#[test]
+fn is_hex_value_plain_hex() {
+    assert!(TokenScanner::is_hex_value("FF00FF"));
+    assert!(TokenScanner::is_hex_value("0000FF"));
+    assert!(TokenScanner::is_hex_value("AABBCC"));
+    assert!(TokenScanner::is_hex_value("123456"));
+}
+
+#[test]
+fn is_hex_value_with_prefix_suffix() {
+    assert!(TokenScanner::is_hex_value("&HFF0000&"));
+    assert!(TokenScanner::is_hex_value("&H00FF00&"));
+    assert!(TokenScanner::is_hex_value("&H0000FF&"));
+}
+
+#[test]
+fn is_hex_value_with_prefix_no_suffix() {
+    assert!(TokenScanner::is_hex_value("&HFF0000"));
+    assert!(TokenScanner::is_hex_value("&H00FF00"));
+    assert!(TokenScanner::is_hex_value("&H0000FF"));
+}
+
+#[test]
+fn is_hex_value_invalid_cases() {
+    assert!(!TokenScanner::is_hex_value(""));
+    assert!(!TokenScanner::is_hex_value("G00000"));
+    assert!(!TokenScanner::is_hex_value("FF00F")); // Odd length
+    assert!(!TokenScanner::is_hex_value("&H&"));
+    assert!(!TokenScanner::is_hex_value("&HG0000&"));
+    assert!(!TokenScanner::is_hex_value("&HFF00F&")); // Odd length in hex part
+    assert!(!TokenScanner::is_hex_value("0x123456")); // Wrong prefix
+}
+
+#[test]
+fn is_hex_value_edge_cases() {
+    assert!(!TokenScanner::is_hex_value("&H&"));
+    assert!(!TokenScanner::is_hex_value("&H"));
+    assert!(!TokenScanner::is_hex_value("abc")); // Odd length
+    assert!(TokenScanner::is_hex_value("ab")); // Even length, valid hex
+}
+
+#[test]
+fn scan_field_value_basic() {
+    let source = "Test Script Title";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_field_value().unwrap();
+    assert_eq!(result, TokenType::Text);
+
+    assert!(scanner.navigator().is_at_end());
+}
+
+#[test]
+fn scan_field_value_with_colons() {
+    let source = "0:00:30.50";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_field_value().unwrap();
+    assert_eq!(result, TokenType::Number); // Time format should be recognized as number
+
+    assert!(scanner.navigator().is_at_end());
+}
+
+#[test]
+fn scan_field_value_stops_at_comma() {
+    let source = "Value1,Value2";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_field_value().unwrap();
+    assert_eq!(result, TokenType::Text);
+
+    assert_eq!(scanner.navigator_mut().peek_char().unwrap(), ',');
+}
+
+#[test]
+fn scan_field_value_stops_at_newline() {
+    let source = "Value\nNext line";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_field_value().unwrap();
+    assert_eq!(result, TokenType::Text);
+
+    assert_eq!(scanner.navigator_mut().peek_char().unwrap(), '\n');
+}
+
+#[test]
+fn scan_field_value_stops_at_brace() {
+    let source = "Text{override}";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_field_value().unwrap();
+    assert_eq!(result, TokenType::Text);
+
+    assert_eq!(scanner.navigator_mut().peek_char().unwrap(), '{');
+}
+
+#[test]
+fn scan_field_value_stops_at_bracket() {
+    let source = "Text[section]";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_field_value().unwrap();
+    assert_eq!(result, TokenType::Text);
+
+    assert_eq!(scanner.navigator_mut().peek_char().unwrap(), '[');
+}
+
+#[test]
+fn scan_field_value_numeric_content() {
+    let source = "123.45";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_field_value().unwrap();
+    assert_eq!(result, TokenType::Number);
+
+    assert!(scanner.navigator().is_at_end());
+}
+
+#[test]
+fn scan_field_value_negative_number() {
+    let source = "-123.45";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_field_value().unwrap();
+    assert_eq!(result, TokenType::Number);
+
+    assert!(scanner.navigator().is_at_end());
+}
+
+#[test]
+fn scan_field_value_empty() {
+    let source = "";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_field_value().unwrap();
+    assert_eq!(result, TokenType::Text); // Empty string is now correctly classified as Text
+
+    assert!(scanner.navigator().is_at_end());
+}
+
+#[test]
+fn scan_field_value_whitespace_only() {
+    let source = "   ";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_field_value().unwrap();
+    assert_eq!(result, TokenType::Text); // Whitespace is not numeric
+
+    assert!(scanner.navigator().is_at_end());
+}
+
+#[test]
+fn scan_text_section_header_context() {
+    let source = "Script Info";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_text(TokenContext::SectionHeader).unwrap();
+    assert_eq!(result, TokenType::SectionName);
+
+    assert!(scanner.navigator().is_at_end());
+}
+
+#[test]
+fn scan_text_hex_detection() {
+    let source = "&HFF0000&";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_text(TokenContext::Document).unwrap();
+    assert_eq!(result, TokenType::HexValue);
+
+    assert!(scanner.navigator().is_at_end());
+}
+
+#[test]
+fn scan_text_number_detection() {
+    let source = "123.456";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_text(TokenContext::Document).unwrap();
+    assert_eq!(result, TokenType::Number);
+
+    assert!(scanner.navigator().is_at_end());
+}
+
+#[test]
+fn scan_text_negative_number() {
+    let source = "-456.789";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_text(TokenContext::Document).unwrap();
+    assert_eq!(result, TokenType::Number);
+
+    assert!(scanner.navigator().is_at_end());
+}
+
+#[test]
+fn scan_text_field_value_context_with_colon() {
+    let source = "0:01:23.45,next";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_text(TokenContext::FieldValue).unwrap();
+    assert_eq!(result, TokenType::Text); // Time format should be text since it contains colons
+
+    assert_eq!(scanner.navigator_mut().peek_char().unwrap(), ',');
+}
+
+#[test]
+fn scan_text_document_context_stops_at_colon() {
+    let source = "Field:Value";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_text(TokenContext::Document).unwrap();
+    assert_eq!(result, TokenType::Text);
+
+    assert_eq!(scanner.navigator_mut().peek_char().unwrap(), ':');
+}
+
+#[test]
+fn scan_text_stops_at_semicolon_in_document() {
+    let source = "Text;comment";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_text(TokenContext::Document).unwrap();
+    assert_eq!(result, TokenType::Text);
+
+    // Should consume all text since semicolon only stops in Document context when it's at start
+    assert!(scanner.navigator().is_at_end());
+}
+
+#[test]
+fn scan_text_semicolon_not_delimiter_in_field_value() {
+    let source = "Text;more text";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_text(TokenContext::FieldValue).unwrap();
+    assert_eq!(result, TokenType::Text);
+
+    assert!(scanner.navigator().is_at_end());
+}
+
+#[test]
+fn token_scanner_style_override_nested_braces() {
+    let source = "{\\t({\\an8})\\b1}";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_style_override().unwrap();
+    assert_eq!(result, TokenType::OverrideBlock);
+
+    assert_eq!(scanner.navigator_mut().peek_char().unwrap(), '}');
+}
+
+#[test]
+fn token_scanner_style_override_multiple_levels() {
+    let source = "{{inner}outer}";
+    let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+    let result = scanner.scan_style_override().unwrap();
+    assert_eq!(result, TokenType::OverrideBlock);
+
+    assert_eq!(scanner.navigator_mut().peek_char().unwrap(), '}');
+}
+
+#[test]
+fn char_navigator_peek_next_at_end() {
+    let source = "a";
+    let navigator = CharNavigator::new(source, 0, 1, 1);
+
+    let result = navigator.peek_next();
+    assert!(result.is_err());
+}
+
+#[test]
+fn char_navigator_peek_next_with_unicode() {
+    let source = "こんにちは";
+    let navigator = CharNavigator::new(source, 0, 1, 1);
+
+    assert_eq!(navigator.peek_next().unwrap(), 'ん');
+}

@@ -282,4 +282,229 @@ mod tests {
         let batch: DeltaBatch = deltas.into_iter().collect();
         assert_eq!(batch.len(), 2);
     }
+
+    #[test]
+    fn delta_update_section() {
+        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let delta = ParseDelta::update_section(3, section);
+
+        assert!(matches!(delta, ParseDelta::UpdateSection(3, _)));
+        assert!(!delta.is_error());
+        assert!(delta.is_structural());
+        assert!(delta.section().is_some());
+    }
+
+    #[test]
+    fn delta_section_getter() {
+        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+
+        let add_delta = ParseDelta::add_section(section.clone());
+        assert!(add_delta.section().is_some());
+
+        let update_delta = ParseDelta::update_section(0, section);
+        assert!(update_delta.section().is_some());
+
+        let remove_delta = ParseDelta::remove_section(1);
+        assert!(remove_delta.section().is_none());
+
+        let error_delta = ParseDelta::parse_issue("Test".to_string());
+        assert!(error_delta.section().is_none());
+    }
+
+    #[test]
+    fn delta_debug_formatting() {
+        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let delta = ParseDelta::add_section(section);
+        let debug_str = format!("{delta:?}");
+        assert!(debug_str.contains("AddSection"));
+
+        let error_delta = ParseDelta::parse_issue("Error message".to_string());
+        let error_debug = format!("{error_delta:?}");
+        assert!(error_debug.contains("ParseIssue"));
+        assert!(error_debug.contains("Error message"));
+    }
+
+    #[test]
+    fn delta_clone() {
+        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let delta = ParseDelta::add_section(section);
+        let cloned = delta.clone();
+
+        assert!(matches!(cloned, ParseDelta::AddSection(_)));
+        assert_eq!(delta.is_error(), cloned.is_error());
+        assert_eq!(delta.is_structural(), cloned.is_structural());
+    }
+
+    #[test]
+    fn delta_all_constructors() {
+        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+
+        let add = ParseDelta::add_section(section.clone());
+        assert!(matches!(add, ParseDelta::AddSection(_)));
+
+        let update = ParseDelta::update_section(42, section);
+        assert!(matches!(update, ParseDelta::UpdateSection(42, _)));
+
+        let remove = ParseDelta::remove_section(99);
+        assert!(matches!(remove, ParseDelta::RemoveSection(99)));
+
+        let issue = ParseDelta::parse_issue("Test issue".to_string());
+        assert!(matches!(issue, ParseDelta::ParseIssue(_)));
+    }
+
+    #[test]
+    fn batch_default() {
+        let batch = DeltaBatch::default();
+        assert!(batch.is_empty());
+        assert_eq!(batch.len(), 0);
+        assert!(!batch.has_errors());
+    }
+
+    #[test]
+    fn batch_debug_and_clone() {
+        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let mut batch = DeltaBatch::new();
+        batch.push(ParseDelta::add_section(section));
+
+        let debug_str = format!("{batch:?}");
+        assert!(debug_str.contains("DeltaBatch"));
+
+        let cloned = batch.clone();
+        assert_eq!(batch.len(), cloned.len());
+        assert_eq!(batch.is_empty(), cloned.is_empty());
+    }
+
+    #[test]
+    fn batch_extend_operations() {
+        let mut batch = DeltaBatch::new();
+        let section1 = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section2 = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+
+        let deltas = vec![
+            ParseDelta::add_section(section1),
+            ParseDelta::update_section(0, section2),
+            ParseDelta::remove_section(1),
+        ];
+
+        batch.extend(deltas);
+        assert_eq!(batch.len(), 3);
+        assert!(!batch.has_errors());
+    }
+
+    #[test]
+    fn batch_from_deltas() {
+        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let deltas = vec![
+            ParseDelta::add_section(section),
+            ParseDelta::parse_issue("Warning".to_string()),
+        ];
+
+        let batch = DeltaBatch::from_deltas(deltas);
+        assert_eq!(batch.len(), 2);
+        assert!(batch.has_errors());
+    }
+
+    #[test]
+    fn batch_into_deltas() {
+        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let mut batch = DeltaBatch::new();
+        batch.push(ParseDelta::add_section(section));
+        batch.push(ParseDelta::remove_section(0));
+
+        let deltas = batch.into_deltas();
+        assert_eq!(deltas.len(), 2);
+    }
+
+    #[test]
+    fn batch_complex_filtering() {
+        let section1 = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section2 = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let mut batch = DeltaBatch::new();
+
+        batch.push(ParseDelta::add_section(section1));
+        batch.push(ParseDelta::update_section(0, section2));
+        batch.push(ParseDelta::remove_section(1));
+        batch.push(ParseDelta::parse_issue("Error 1".to_string()));
+        batch.push(ParseDelta::parse_issue("Error 2".to_string()));
+
+        assert_eq!(batch.len(), 5);
+
+        let structural = batch.structural_only();
+        assert_eq!(structural.len(), 3);
+        assert!(!structural.has_errors());
+
+        let errors = batch.errors_only();
+        assert_eq!(errors.len(), 2);
+        assert!(errors.has_errors());
+
+        // Custom filter
+        let only_adds = batch.filter(|delta| matches!(delta, ParseDelta::AddSection(_)));
+        assert_eq!(only_adds.len(), 1);
+    }
+
+    #[test]
+    fn batch_empty_operations() {
+        let batch = DeltaBatch::new();
+
+        let structural = batch.structural_only();
+        assert!(structural.is_empty());
+
+        let errors = batch.errors_only();
+        assert!(errors.is_empty());
+
+        assert!(!batch.has_errors());
+        assert_eq!(batch.deltas().len(), 0);
+    }
+
+    #[test]
+    fn delta_all_variants_coverage() {
+        // Test all ParseDelta variants
+        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+
+        // AddSection
+        let add = ParseDelta::AddSection(section.clone());
+        assert!(add.is_structural());
+        assert!(!add.is_error());
+        assert!(add.section().is_some());
+
+        // UpdateSection
+        let update = ParseDelta::UpdateSection(5, section);
+        assert!(update.is_structural());
+        assert!(!update.is_error());
+        assert!(update.section().is_some());
+
+        // RemoveSection
+        let remove = ParseDelta::RemoveSection(10);
+        assert!(remove.is_structural());
+        assert!(!remove.is_error());
+        assert!(remove.section().is_none());
+
+        // ParseIssue
+        let issue = ParseDelta::ParseIssue("Critical error".to_string());
+        assert!(!issue.is_structural());
+        assert!(issue.is_error());
+        assert!(issue.section().is_none());
+    }
+
+    #[test]
+    fn batch_iterator_trait() {
+        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let deltas = [
+            ParseDelta::add_section(section),
+            ParseDelta::remove_section(0),
+            ParseDelta::parse_issue("Test".to_string()),
+        ];
+
+        let batch: DeltaBatch = deltas.into_iter().collect();
+        assert_eq!(batch.len(), 3);
+
+        // Test that we can collect from any iterator
+        let filtered_deltas = batch
+            .deltas()
+            .iter()
+            .filter(|&d| d.is_structural())
+            .cloned();
+        let filtered_batch: DeltaBatch = filtered_deltas.collect();
+        assert_eq!(filtered_batch.len(), 2);
+    }
 }

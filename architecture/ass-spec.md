@@ -1,8 +1,7 @@
-
 ## Overview
 
-- **Purpose**: Defines the structure and rules for SSA v4.00+ scripts.
-- **Compatibility**: Reads older SSA scripts; v4.00+ scripts incompatible with older versions.
+- **Purpose**: Defines the structure and rules for SSA v4.00+ and v4.00++ scripts.
+- **Compatibility**: Reads older SSA scripts; v4.00+ scripts incompatible with older versions; v4.00++ not backward compatible with v4+ renderers.
 - **Format**: Plain text, editable in any text editor, but must follow strict rules.
 - **Source**: Based on SSA's original specification ([http://www.eswat.demon.co.uk](http://www.eswat.demon.co.uk/)).
 - **Updated for libass 0.17.4 extensions**: LayoutResX/Y, AlphaLevel, Unicode wrapping (link to wiki).
@@ -19,14 +18,14 @@
 - **Single Line Entries**: All information for an entry is in one line.
 - **Unknown Styles**: Default style used if style is missing.
 - **Missing Fonts**: Arial used if specified font is unavailable.
-- **Time Format**: All timing values use `H:MM:SS:CC` format where CC represents centiseconds (1/100th of a second).
+- **Time Format**: All timing values use `H:MM:SS:CC` format where CC represents centiseconds (1/100th of a second).
 
 ### Sections
 
 ```mermaid
 graph TD
     A[SSA Script] --> B[Script Info]
-    A --> C[v4+ Styles]
+    A --> C[V4+ Styles / V4++ Styles]
     A --> D[Events]
     A --> E[Fonts]
     A --> F[Graphics]
@@ -37,7 +36,7 @@ graph TD
 - **Purpose**: Contains headers and general script metadata.
 - **First Line**: Must be `[Script Info]`.
 
-#### [v4+ Styles]
+#### [V4+ Styles] / [V4++ Styles]
 
 - **Purpose**: Defines all styles used in the script.
 
@@ -49,11 +48,11 @@ graph TD
 
 - **Purpose**: Stores embedded TrueType font files.
 - **Format**:
-    
+
     ```
     fontname: <name>_<B/I><encoding>.ttf
     ```
-    
+
     Example: `fontname: chaucer_B0.ttf`
 - **Encoding**: UUencoded binary, 80 characters per line.
 
@@ -61,11 +60,11 @@ graph TD
 
 - **Purpose**: Stores embedded graphic files (e.g., .bmp, .jpg).
 - **Format**:
-    
+
     ```
     filename: <name>
     ```
-    
+
 - **Storage**: Saved in `Pictures` subdirectory.
 - **Encoding**: UUencoded binary, 80 characters per line.
 
@@ -82,7 +81,7 @@ graph TD
 - **Synch Point**: Video sync point (optional).
 - **Script Updated By**: Editor groups (optional).
 - **Update Details**: Update notes (optional).
-- **ScriptType**: Version (e.g., `V4.00+`).
+- **ScriptType**: Version (e.g., `V4.00+` or `V4.00++`).
 - **Collisions**: `Normal` (stack subtitles) or `Reverse` (shift upwards).
 - **PlayResY**: Screen height.
 - **PlayResX**: Screen width.
@@ -94,14 +93,20 @@ graph TD
     - `2`: No wrapping (\n, \N break).
     - `3`: Smart wrapping, wider lower line.
 
-### Style Lines ([v4+ Styles])
+### Style Lines ([V4+ Styles] / [V4++ Styles])
 
-- **Format Line**:
-    
+- **V4+ Format**:
+
     ```
     Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
     ```
-    
+
+- **V4++ Format**:
+
+    ```
+    Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginT, MarginB, Encoding, RelativeTo
+    ```
+
 - **Fields**:
     - **Name**: Style name (case-sensitive, no commas).
     - **Fontname**: Windows font name (case-sensitive).
@@ -121,23 +126,34 @@ graph TD
     - **Outline**: Outline width (0-4 pixels).
     - **Shadow**: Shadow depth (0-4 pixels).
     - **Alignment**: `1` (left), `2` (center), `3` (right); `+4` (top), `+8` (mid).
-    - **MarginL/R/V**: Left/Right/Vertical margins (pixels).
+    - **MarginL/R**: Left/Right margins (pixels).
+    - **MarginV (V4+)**: Vertical margin (pixels).
+    - **MarginT/B (V4++)**: Top/Bottom margins (pixels).
     - **Encoding**: Font character set (e.g., `0` for ANSI).
+    - **RelativeTo (V4++)**: Positioning: `0` (window), `1` (video), `2` (script/default).
 
 ### Dialogue Event Lines ([Events])
 
-- **Format Line**:
-    
+- **V4+ Format**:
+
     ```
     Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     ```
-    
+
+- **V4++ Format**:
+
+    ```
+    Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginT, MarginB, Effect, Text
+    ```
+
 - **Fields**:
     - **Layer**: Integer for layering; higher layers drawn over lower.
-    - **Start/End**: `H:MM:SS:CC` (hours:minutes:seconds:centiseconds, 1/100th of a second).
+    - **Start/End**: `H:MM:SS:CC` (hours:minutes:seconds:centiseconds, 1/100th of a second).
     - **Style**: Style name; `Default` uses script’s default.
     - **Name**: Character name (informational).
-    - **MarginL/R/V**: Margin overrides (4-digit, pixels; `0000` uses style defaults).
+    - **MarginL/R**: Left/Right margin overrides (4-digit, pixels; `0000` uses style defaults).
+    - **MarginV (V4+)**: Vertical margin override (4-digit, pixels; `0000` uses style defaults).
+    - **MarginT/B (V4++)**: Top/Bottom margin overrides (4-digit, pixels; `0000` uses style defaults).
     - **Effect**:
         - `Karaoke`: Obsolete.
         - `Scroll up;y1;y2;delay[;fadeawayheight]`: Scroll text vertically.
@@ -151,10 +167,10 @@ graph TD
 
 ### Picture Event Lines ([Events])
 
-- **Format**: Same as Dialogue, but `Text` is a file path (e.g., `.bmp`, `.jpg`, `.png`).
+- **Format**: Same as Dialogue, but `Text` is a file path (e.g., `.bmp`, `.jpg`, `.png`).
 - **Style**: Ignored.
-- **Margins**: Define bottom-left corner; `0000` centers horizontally/vertically.
-- **Effect**: Supports `Scroll up`.
+- **Margins**: Define bottom-left corner; `0000` centers horizontally/vertically.
+- **Effect**: Supports `Scroll up`.
 
 ### Sound Event Lines ([Events])
 
@@ -179,11 +195,11 @@ graph TD
 
 ## Style Override Codes
 
-- **Syntax**: `{<code>}`; `\n`, `\N` outside braces.
+- **Syntax**: `{<code>}`; `\n`, `\N` outside braces.
 - **Codes**:
-    - `\n`, `\N`: Line breaks (`\n` ignored with smart wrapping).
+    - `\n`, `\N`: Line breaks (`\n` ignored with smart wrapping).
     - `\h`: Hard space (non-breaking space).
-    - `\b<0/1>`: Bold; `>1` for font weight (e.g., `400`=normal, `700`=bold).
+    - `\b<0/1>`: Bold; `>1` for font weight (e.g., `400`=normal, `700`=bold).
     - `\i<0/1>`: Italic.
     - `\u<0/1>`: Underline.
     - `\s<0/1>`: Strikeout.
@@ -201,11 +217,12 @@ graph TD
     - `\1-4c&H<bbggrr>&`: Specific colors.
     - `\1-4a&H<aa>&`: Alpha channels.
     - `\alpha`: Sets all alpha channels.
-    - `\a<alignment>`: Alignment (`1`=left, `2`=center, `3`=right; `+4`=top, `+8`=mid).
+    - `\a<alignment>`: Alignment (`1`=left, `2`=center, `3`=right; `+4`=top, `+8`=mid).
     - `\an<alignment>`: Numpad layout alignment.
     - `\k<duration>`: Karaoke highlight (hundredths of seconds).
     - `\kf<duration>`: Fill highlight.
     - `\ko<duration>`: Outline highlight.
+    - `\kt<duration>`: Absolute karaoke syllable start time (centiseconds, V4++ only).
     - `\q<num>`: Wrapping style.
     - `\r[<style>]`: Reset to style or default.
     - `\t([t1,t2,][accel,]<modifiers>)`: Animate style modifiers (including \fax, \fay).

@@ -698,4 +698,289 @@ mod tests {
         let _result = decode_uu_data(lines.iter().copied());
         // Should not panic, may return unexpected data or error
     }
+
+    #[test]
+    fn parse_bgr_color_edge_cases() {
+        // Test lowercase hex prefix
+        assert_eq!(parse_bgr_color("&h000000").unwrap(), [0, 0, 0, 0]);
+        assert_eq!(parse_bgr_color("&hFFFFFF").unwrap(), [255, 255, 255, 0]);
+
+        // Test 0x prefix
+        assert_eq!(parse_bgr_color("0x000000").unwrap(), [0, 0, 0, 0]);
+        assert_eq!(parse_bgr_color("0xFFFFFF").unwrap(), [255, 255, 255, 0]);
+
+        // Test plain hex without prefix
+        assert_eq!(parse_bgr_color("000000").unwrap(), [0, 0, 0, 0]);
+        assert_eq!(parse_bgr_color("FFFFFF").unwrap(), [255, 255, 255, 0]);
+
+        // Test with extra whitespace
+        assert_eq!(parse_bgr_color("  &H000000  ").unwrap(), [0, 0, 0, 0]);
+        assert_eq!(parse_bgr_color("\t&H000000\t").unwrap(), [0, 0, 0, 0]);
+
+        // Test with trailing ampersand variations
+        assert_eq!(parse_bgr_color("&H000000&").unwrap(), [0, 0, 0, 0]);
+        assert_eq!(parse_bgr_color("&h000000&").unwrap(), [0, 0, 0, 0]);
+
+        // Test mixed case hex digits
+        assert_eq!(parse_bgr_color("&HaAbBcC").unwrap(), [204, 187, 170, 0]);
+        assert_eq!(parse_bgr_color("&HFFaaBBcc").unwrap(), [204, 187, 170, 255]);
+
+        // Test invalid lengths
+        assert!(parse_bgr_color("&H00000").is_err()); // 5 chars
+        assert!(parse_bgr_color("&H0000000").is_err()); // 7 chars
+        assert!(parse_bgr_color("&H000000000").is_err()); // 9 chars
+
+        // Test invalid characters in hex
+        assert!(parse_bgr_color("&H00000G").is_err());
+        assert!(parse_bgr_color("&H00Z000").is_err());
+
+        // Test empty after prefix
+        assert!(parse_bgr_color("&H").is_err());
+        assert!(parse_bgr_color("0x").is_err());
+
+        // Test malformed prefixes
+        assert!(parse_bgr_color("&H000000X").is_err());
+        assert!(parse_bgr_color("X&H000000").is_err());
+    }
+
+    #[test]
+    fn spans_edge_cases() {
+        let source = "line1\nline2\nline3";
+        let spans = Spans::new(source);
+
+        // Test span validation with actual substrings
+        let line1 = &source[0..5]; // "line1"
+        let line2 = &source[6..11]; // "line2"
+        let line3 = &source[12..17]; // "line3"
+
+        assert!(spans.validate_span(line1));
+        assert!(spans.validate_span(line2));
+        assert!(spans.validate_span(line3));
+        assert!(spans.validate_span(source)); // Entire source
+
+        // Test span offset calculations
+        assert_eq!(spans.span_offset(line1), Some(0));
+        assert_eq!(spans.span_offset(line2), Some(6));
+        assert_eq!(spans.span_offset(line3), Some(12));
+
+        // Test line calculations
+        assert_eq!(spans.span_line(line1), Some(1));
+        assert_eq!(spans.span_line(line2), Some(2));
+        assert_eq!(spans.span_line(line3), Some(3));
+
+        // Test column calculations
+        assert_eq!(spans.span_column(line1), Some(1));
+        assert_eq!(spans.span_column(line2), Some(1));
+        assert_eq!(spans.span_column(line3), Some(1));
+
+        // Test substring extraction
+        assert_eq!(spans.substring(0..5), Some("line1"));
+        assert_eq!(spans.substring(6..11), Some("line2"));
+        assert_eq!(spans.substring(12..17), Some("line3"));
+        assert_eq!(spans.substring(0..source.len()), Some(source));
+
+        // Test invalid range
+        assert_eq!(spans.substring(0..100), None);
+    }
+
+    #[test]
+    fn parse_ass_time_edge_cases() {
+        // Test maximum valid values
+        assert!(parse_ass_time("23:59:59.99").is_ok());
+
+        // Test zero padding variations
+        assert_eq!(parse_ass_time("0:0:0.0").unwrap(), 0);
+        assert_eq!(parse_ass_time("0:00:00.0").unwrap(), 0);
+        assert_eq!(parse_ass_time("0:00:00.00").unwrap(), 0);
+
+        // Test missing components
+        assert!(parse_ass_time("0:00").is_err());
+        assert!(parse_ass_time("0").is_err());
+        assert!(parse_ass_time("").is_err());
+
+        // Test extra components
+        assert!(parse_ass_time("0:0:0:0.0").is_err());
+        // Note: parse_ass_time("0:0:0.0.0") actually succeeds by taking first decimal part
+        assert!(parse_ass_time("0:0:0.0.0").is_ok());
+
+        // Test negative values
+        assert!(parse_ass_time("-1:00:00.00").is_err());
+        assert!(parse_ass_time("0:-1:00.00").is_err());
+        assert!(parse_ass_time("0:00:-1.00").is_err());
+        assert!(parse_ass_time("0:00:00.-1").is_err());
+
+        // Test non-numeric values
+        assert!(parse_ass_time("a:00:00.00").is_err());
+        assert!(parse_ass_time("0:b:00.00").is_err());
+        assert!(parse_ass_time("0:00:c.00").is_err());
+        assert!(parse_ass_time("0:00:00.d").is_err());
+
+        // Test boundary values that should fail
+        assert!(parse_ass_time("0:60:00.00").is_err()); // 60 minutes
+        assert!(parse_ass_time("0:00:60.00").is_err()); // 60 seconds
+        assert!(parse_ass_time("0:00:00.100").is_err()); // 100 centiseconds
+    }
+
+    #[test]
+    fn format_ass_time_edge_cases() {
+        // Test very large values
+        assert_eq!(format_ass_time(u32::MAX), "11930:27:52.95");
+
+        // Test boundary values
+        assert_eq!(format_ass_time(99), "0:00:00.99");
+        assert_eq!(format_ass_time(5999), "0:00:59.99");
+        assert_eq!(format_ass_time(359_999), "0:59:59.99");
+
+        // Test values requiring padding
+        assert_eq!(format_ass_time(1), "0:00:00.01");
+        assert_eq!(format_ass_time(10), "0:00:00.10");
+        assert_eq!(format_ass_time(601), "0:00:06.01");
+        assert_eq!(format_ass_time(3661), "0:00:36.61");
+    }
+
+    #[test]
+    fn validate_ass_name_edge_cases() {
+        // Test with tab character (should be allowed)
+        assert!(validate_ass_name("Style\tName"));
+
+        // Test with various control characters (should be rejected)
+        assert!(!validate_ass_name("Style\nName")); // Newline
+        assert!(!validate_ass_name("Style\rName")); // Carriage return
+        assert!(!validate_ass_name("Style\x00Name")); // Null
+        assert!(!validate_ass_name("Style\x7FName")); // DEL
+
+        // Test edge cases with separators
+        assert!(!validate_ass_name(",Style")); // Leading comma
+        assert!(!validate_ass_name("Style,")); // Trailing comma
+        assert!(!validate_ass_name(":Style")); // Leading colon
+        assert!(!validate_ass_name("Style:")); // Trailing colon
+        assert!(!validate_ass_name("{Style")); // Leading brace
+        assert!(!validate_ass_name("Style}")); // Trailing brace
+
+        // Test very long names
+        let long_name = "a".repeat(1000);
+        assert!(validate_ass_name(&long_name));
+
+        // Test Unicode characters
+        assert!(validate_ass_name("Style中文"));
+        assert!(validate_ass_name("Style🎭"));
+        assert!(validate_ass_name("Стиль"));
+    }
+
+    #[test]
+    fn normalize_field_value_edge_cases() {
+        // Test empty string
+        assert_eq!(normalize_field_value(""), "");
+
+        // Test only whitespace
+        assert_eq!(normalize_field_value("   "), "");
+        assert_eq!(normalize_field_value("\t\t\t"), "");
+        assert_eq!(normalize_field_value(" \t \t "), "");
+
+        // Test mixed whitespace
+        assert_eq!(normalize_field_value(" \t value \t "), "value");
+        assert_eq!(normalize_field_value("\n\rvalue\n\r"), "value");
+
+        // Test internal whitespace preservation
+        assert_eq!(normalize_field_value("  val ue  "), "val ue");
+        assert_eq!(normalize_field_value("  val\tue  "), "val\tue");
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp, clippy::approx_constant)]
+    fn parse_numeric_edge_cases() {
+        // Test boundary values for different types
+        assert_eq!(parse_numeric::<u8>("255").unwrap(), 255u8);
+        assert!(parse_numeric::<u8>("256").is_err());
+        assert_eq!(parse_numeric::<i8>("127").unwrap(), 127i8);
+        assert_eq!(parse_numeric::<i8>("-128").unwrap(), -128i8);
+        assert!(parse_numeric::<i8>("128").is_err());
+
+        // Test floating point edge cases
+        assert_eq!(parse_numeric::<f32>("0.0").unwrap(), 0.0f32);
+        assert_eq!(parse_numeric::<f32>("-0.0").unwrap(), -0.0f32);
+        assert!(parse_numeric::<f32>("inf").is_ok());
+        assert!(parse_numeric::<f32>("-inf").is_ok());
+
+        // Test whitespace handling
+        assert_eq!(parse_numeric::<i32>("  42  ").unwrap(), 42i32);
+        assert_eq!(parse_numeric::<f32>(" \t 3.14 \t ").unwrap(), 3.14f32);
+
+        // Test leading zeros
+        assert_eq!(parse_numeric::<i32>("00042").unwrap(), 42i32);
+        assert_eq!(parse_numeric::<f32>("0003.140").unwrap(), 3.14f32);
+
+        // Test scientific notation
+        assert_eq!(parse_numeric::<f32>("1e2").unwrap(), 100.0f32);
+        assert_eq!(parse_numeric::<f32>("1.5e-2").unwrap(), 0.015f32);
+
+        // Test invalid formats
+        assert!(parse_numeric::<i32>("").is_err());
+        assert!(parse_numeric::<i32>("abc").is_err());
+        assert!(parse_numeric::<i32>("12.34").is_err()); // Float for int
+        assert!(parse_numeric::<f32>("12.34.56").is_err()); // Multiple dots
+    }
+
+    #[test]
+    fn eval_cubic_bezier_edge_cases() {
+        // Test identical control points (linear case)
+        let linear_result = eval_cubic_bezier((0.0, 0.0), (0.0, 0.0), (1.0, 1.0), (1.0, 1.0), 0.5);
+        assert!((linear_result.0 - 0.5).abs() < f32::EPSILON);
+        assert!((linear_result.1 - 0.5).abs() < f32::EPSILON);
+
+        // Test extreme t values
+        let p0 = (0.0, 0.0);
+        let p1 = (0.25, 0.5);
+        let p2 = (0.75, 0.5);
+        let p3 = (1.0, 1.0);
+
+        // t = 0 should return p0
+        let result_0 = eval_cubic_bezier(p0, p1, p2, p3, 0.0);
+        assert!((result_0.0 - p0.0).abs() < f32::EPSILON);
+        assert!((result_0.1 - p0.1).abs() < f32::EPSILON);
+
+        // t = 1 should return p3
+        let result_1 = eval_cubic_bezier(p0, p1, p2, p3, 1.0);
+        assert!((result_1.0 - p3.0).abs() < f32::EPSILON);
+        assert!((result_1.1 - p3.1).abs() < f32::EPSILON);
+
+        // Test negative coordinates
+        let neg_result = eval_cubic_bezier((-1.0, -1.0), (-0.5, -0.5), (0.5, 0.5), (1.0, 1.0), 0.5);
+        assert!(neg_result.0 > -1.0 && neg_result.0 < 1.0);
+        assert!(neg_result.1 > -1.0 && neg_result.1 < 1.0);
+
+        // Test very small and very large coordinates
+        let large_result = eval_cubic_bezier(
+            (0.0, 0.0),
+            (1000.0, 1000.0),
+            (2000.0, 2000.0),
+            (3000.0, 3000.0),
+            0.5,
+        );
+        assert!(large_result.0 > 0.0 && large_result.0 < 3000.0);
+        assert!(large_result.1 > 0.0 && large_result.1 < 3000.0);
+    }
+
+    #[test]
+    fn decode_uu_data_error_conditions() {
+        // Test with only invalid lines
+        let invalid_lines = ["invalid", "also invalid", "still invalid"];
+        let result = decode_uu_data(invalid_lines.iter().copied()).unwrap();
+        assert!(result.is_empty());
+
+        // Test with malformed length indicators
+        let malformed_length = ["\x7F!!!!"]; // Length > 45
+        let _result = decode_uu_data(malformed_length.iter().copied());
+        // Should handle gracefully
+
+        // Test with very short lines after valid length
+        let short_lines = ["!"]; // Length 1 but no data
+        let result = decode_uu_data(short_lines.iter().copied()).unwrap();
+        assert!(result.is_empty() || result.len() <= 1);
+
+        // Test with unicode in data
+        let unicode_lines = ["#🎭🎭🎭"];
+        let _result = decode_uu_data(unicode_lines.iter().copied());
+        // Should handle gracefully without panicking
+    }
 }

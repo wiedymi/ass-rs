@@ -370,4 +370,132 @@ mod tests {
         assert!(debug_str.contains("InvalidFieldFormat"));
         assert!(debug_str.contains("99"));
     }
+
+    #[test]
+    fn parse_error_display_missing_required_field() {
+        let error = ParseError::MissingRequiredField {
+            field: "Title".to_string(),
+            section: "Script Info".to_string(),
+        };
+        let message = error.to_string();
+        assert!(message.contains("Title"));
+        assert!(message.contains("Script Info"));
+        assert!(message.contains("Missing required field"));
+    }
+
+    #[test]
+    fn parse_error_display_invalid_field_format() {
+        let error = ParseError::InvalidFieldFormat { line: 42 };
+        let message = error.to_string();
+        assert!(message.contains("line 42"));
+        assert!(message.contains("Invalid field format"));
+        assert!(message.contains("key: value"));
+    }
+
+    #[test]
+    fn parse_error_display_invalid_format_line() {
+        let error = ParseError::InvalidFormatLine {
+            line: 50,
+            reason: "wrong column count".to_string(),
+        };
+        let message = error.to_string();
+        assert!(message.contains("line 50"));
+        assert!(message.contains("wrong column count"));
+        assert!(message.contains("Invalid format line"));
+    }
+
+    #[test]
+    fn parse_error_display_invalid_numeric_value() {
+        let error = ParseError::InvalidNumericValue {
+            value: "not_a_number".to_string(),
+            line: 60,
+            reason: "expected integer".to_string(),
+        };
+        let message = error.to_string();
+        assert!(message.contains("line 60"));
+        assert!(message.contains("not_a_number"));
+        assert!(message.contains("expected integer"));
+        assert!(message.contains("Invalid numeric value"));
+    }
+
+    #[test]
+    fn parse_error_display_invalid_style_override() {
+        let error = ParseError::InvalidStyleOverride {
+            line: 70,
+            reason: "malformed tag".to_string(),
+        };
+        let message = error.to_string();
+        assert!(message.contains("line 70"));
+        assert!(message.contains("malformed tag"));
+        assert!(message.contains("Invalid style override"));
+    }
+
+    #[test]
+    fn parse_error_display_invalid_drawing_command() {
+        let error = ParseError::InvalidDrawingCommand {
+            line: 80,
+            reason: "unknown command".to_string(),
+        };
+        let message = error.to_string();
+        assert!(message.contains("line 80"));
+        assert!(message.contains("unknown command"));
+        assert!(message.contains("Invalid drawing command"));
+    }
+
+    #[test]
+    fn parse_error_display_uu_decode_error() {
+        let error = ParseError::UuDecodeError {
+            line: 90,
+            reason: "invalid encoding".to_string(),
+        };
+        let message = error.to_string();
+        assert!(message.contains("line 90"));
+        assert!(message.contains("invalid encoding"));
+        assert!(message.contains("UU-decode error"));
+    }
+
+    #[test]
+    fn parse_error_display_max_nesting_depth() {
+        let error = ParseError::MaxNestingDepth {
+            line: 100,
+            limit: 16,
+        };
+        let message = error.to_string();
+        assert!(message.contains("line 100"));
+        assert!(message.contains("16"));
+        assert!(message.contains("Maximum nesting depth"));
+        assert!(message.contains("exceeded"));
+    }
+
+    #[test]
+    fn parse_error_display_io_error() {
+        let error = ParseError::IoError {
+            message: "file not found".to_string(),
+        };
+        let message = error.to_string();
+        assert!(message.contains("file not found"));
+        assert!(message.contains("I/O error"));
+    }
+
+    #[test]
+    fn parse_error_display_out_of_memory() {
+        let error = ParseError::OutOfMemory {
+            message: "allocation failed".to_string(),
+        };
+        let message = error.to_string();
+        assert!(message.contains("allocation failed"));
+        assert!(message.contains("Memory allocation failed"));
+    }
+
+    #[test]
+    fn parse_error_display_internal_error() {
+        let error = ParseError::InternalError {
+            line: 110,
+            message: "state corruption".to_string(),
+        };
+        let message = error.to_string();
+        assert!(message.contains("line 110"));
+        assert!(message.contains("state corruption"));
+        assert!(message.contains("Internal parser error"));
+    }
 }

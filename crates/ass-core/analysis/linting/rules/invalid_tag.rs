@@ -46,7 +46,7 @@ use alloc::{string::ToString, vec::Vec};
 /// let rule = InvalidTagRule;
 /// let issues = rule.check_script(&analysis);
 /// // Rule should execute successfully (implementation may vary)
-/// assert!(issues.len() >= 0); // Rule runs without panic
+/// assert!(issues.is_empty()); // Rule runs without panic
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct InvalidTagRule;

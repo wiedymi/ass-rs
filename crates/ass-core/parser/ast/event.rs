@@ -307,4 +307,276 @@ mod tests {
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
+
+    #[test]
+    fn event_time_parsing() {
+        let event = Event {
+            start: "0:01:30.50",
+            end: "0:01:35.00",
+            ..Event::default()
+        };
+
+        // Test start time parsing
+        assert_eq!(event.start_time_cs().unwrap(), 9050); // 1*60*100 + 30*100 + 50
+
+        // Test end time parsing
+        assert_eq!(event.end_time_cs().unwrap(), 9500); // 1*60*100 + 35*100
+
+        // Test duration calculation
+        assert_eq!(event.duration_cs().unwrap(), 450); // 9500 - 9050
+    }
+
+    #[test]
+    fn event_time_parsing_edge_cases() {
+        // Test zero time
+        let zero_event = Event {
+            start: "0:00:00.00",
+            end: "0:00:00.00",
+            ..Event::default()
+        };
+        assert_eq!(zero_event.start_time_cs().unwrap(), 0);
+        assert_eq!(zero_event.end_time_cs().unwrap(), 0);
+        assert_eq!(zero_event.duration_cs().unwrap(), 0);
+
+        // Test negative duration (end before start)
+        let negative_event = Event {
+            start: "0:01:00.00",
+            end: "0:00:30.00",
+            ..Event::default()
+        };
+        assert_eq!(negative_event.duration_cs().unwrap(), 0); // saturating_sub returns 0
+    }
+
+    #[test]
+    fn event_time_parsing_errors() {
+        // Test invalid time formats
+        let invalid_start = Event {
+            start: "invalid",
+            end: "0:00:05.00",
+            ..Event::default()
+        };
+        assert!(invalid_start.start_time_cs().is_err());
+        assert!(invalid_start.duration_cs().is_err());
+
+        let invalid_end = Event {
+            start: "0:00:00.00",
+            end: "invalid",
+            ..Event::default()
+        };
+        assert!(invalid_end.end_time_cs().is_err());
+        assert!(invalid_end.duration_cs().is_err());
+    }
+
+    #[test]
+    fn event_all_types() {
+        // Test all event types
+        let dialogue = Event {
+            event_type: EventType::Dialogue,
+            ..Event::default()
+        };
+        assert!(dialogue.is_dialogue());
+        assert!(!dialogue.is_comment());
+
+        let comment = Event {
+            event_type: EventType::Comment,
+            ..Event::default()
+        };
+        assert!(!comment.is_dialogue());
+        assert!(comment.is_comment());
+
+        let picture = Event {
+            event_type: EventType::Picture,
+            ..Event::default()
+        };
+        assert!(!picture.is_dialogue());
+        assert!(!picture.is_comment());
+
+        let sound = Event {
+            event_type: EventType::Sound,
+            ..Event::default()
+        };
+        assert!(!sound.is_dialogue());
+        assert!(!sound.is_comment());
+
+        let movie = Event {
+            event_type: EventType::Movie,
+            ..Event::default()
+        };
+        assert!(!movie.is_dialogue());
+        assert!(!movie.is_comment());
+
+        let command = Event {
+            event_type: EventType::Command,
+            ..Event::default()
+        };
+        assert!(!command.is_dialogue());
+        assert!(!command.is_comment());
+    }
+
+    #[test]
+    fn event_comprehensive_creation() {
+        let event = Event {
+            event_type: EventType::Dialogue,
+            layer: "5",
+            start: "0:02:15.75",
+            end: "0:02:20.25",
+            style: "MainStyle",
+            name: "Character",
+            margin_l: "10",
+            margin_r: "20",
+            margin_v: "15",
+            effect: "fadeIn",
+            text: "Hello, world!",
+        };
+
+        assert_eq!(event.event_type, EventType::Dialogue);
+        assert_eq!(event.layer, "5");
+        assert_eq!(event.start, "0:02:15.75");
+        assert_eq!(event.end, "0:02:20.25");
+        assert_eq!(event.style, "MainStyle");
+        assert_eq!(event.name, "Character");
+        assert_eq!(event.margin_l, "10");
+        assert_eq!(event.margin_r, "20");
+        assert_eq!(event.margin_v, "15");
+        assert_eq!(event.effect, "fadeIn");
+        assert_eq!(event.text, "Hello, world!");
+    }
+
+    #[test]
+    fn event_debug_output() {
+        let event = Event {
+            event_type: EventType::Dialogue,
+            text: "Test text",
+            ..Event::default()
+        };
+
+        let debug_str = format!("{event:?}");
+        assert!(debug_str.contains("Event"));
+        assert!(debug_str.contains("Dialogue"));
+        assert!(debug_str.contains("Test text"));
+    }
+
+    #[test]
+    fn event_equality() {
+        let event1 = Event {
+            event_type: EventType::Dialogue,
+            text: "Same text",
+            ..Event::default()
+        };
+
+        let event2 = Event {
+            event_type: EventType::Dialogue,
+            text: "Same text",
+            ..Event::default()
+        };
+
+        assert_eq!(event1, event2);
+
+        let event3 = Event {
+            event_type: EventType::Comment,
+            text: "Same text",
+            ..Event::default()
+        };
+
+        assert_ne!(event1, event3);
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn event_validate_spans() {
+        let source = "Dialogue,0,0:00:05.00,0:00:10.00,Default,Character,0,0,0,,Hello world";
+        let source_start = source.as_ptr() as usize;
+        let source_end = source_start + source.len();
+        let source_range = source_start..source_end;
+
+        let fields: Vec<&str> = source.split(',').collect();
+        let event = Event {
+            event_type: EventType::Dialogue,
+            layer: fields[1],
+            start: fields[2],
+            end: fields[3],
+            style: fields[4],
+            name: fields[5],
+            margin_l: fields[6],
+            margin_r: fields[7],
+            margin_v: fields[8],
+            effect: fields[9],
+            text: fields[10],
+        };
+
+        assert!(event.validate_spans(&source_range));
+        assert_eq!(event.layer, "0");
+        assert_eq!(event.start, "0:00:05.00");
+        assert_eq!(event.end, "0:00:10.00");
+        assert_eq!(event.style, "Default");
+        assert_eq!(event.name, "Character");
+        assert_eq!(event.text, "Hello world");
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn event_validate_spans_invalid() {
+        let source1 = "Dialogue,0,0:00:05.00,0:00:10.00,Default";
+        let source2 = "Other,Character,Hello";
+        let source1_start = source1.as_ptr() as usize;
+        let source1_end = source1_start + source1.len();
+        let source1_range = source1_start..source1_end;
+
+        let event = Event {
+            event_type: EventType::Dialogue,
+            layer: "0",
+            start: "0:00:05.00",
+            end: "0:00:10.00",
+            style: "Default",
+            name: &source2[6..15],  // "Character" from different source
+            text: &source2[16..21], // "Hello" from different source
+            ..Event::default()
+        };
+
+        // Should fail since some fields are from different source
+        assert!(!event.validate_spans(&source1_range));
+    }
+
+    #[test]
+    fn event_type_parse_edge_cases() {
+        // Test case sensitivity
+        assert_eq!(EventType::parse_type("dialogue"), None);
+        assert_eq!(EventType::parse_type("DIALOGUE"), None);
+
+        // Test empty and whitespace
+        assert_eq!(EventType::parse_type(""), None);
+        assert_eq!(EventType::parse_type("   "), None);
+
+        // Test with extra whitespace
+        assert_eq!(
+            EventType::parse_type("  Comment  "),
+            Some(EventType::Comment)
+        );
+        assert_eq!(
+            EventType::parse_type("\tPicture\n"),
+            Some(EventType::Picture)
+        );
+    }
+
+    #[test]
+    fn event_mixed_defaults() {
+        let event = Event {
+            event_type: EventType::Picture,
+            start: "0:01:00.00",
+            text: "Custom text",
+            ..Event::default()
+        };
+
+        // Custom fields
+        assert_eq!(event.event_type, EventType::Picture);
+        assert_eq!(event.start, "0:01:00.00");
+        assert_eq!(event.text, "Custom text");
+
+        // Default fields
+        assert_eq!(event.layer, "0");
+        assert_eq!(event.end, "0:00:00.00");
+        assert_eq!(event.style, "Default");
+        assert_eq!(event.name, "");
+        assert_eq!(event.effect, "");
+    }
 }

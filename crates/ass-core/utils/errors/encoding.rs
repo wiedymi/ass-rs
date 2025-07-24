@@ -157,6 +157,19 @@ pub fn validate_bom_handling(bytes: &[u8]) -> Result<(), CoreError> {
         ));
     }
 
+    // Check for partial BOM sequences that could indicate encoding issues
+    if bytes.len() >= 2 && bytes[0..2] == [0xEF, 0xBB] {
+        return Err(validation_error(
+            "Partial UTF-8 BOM detected - file may be corrupted or incorrectly encoded",
+        ));
+    }
+
+    if !bytes.is_empty() && bytes[0] == 0xEF && (bytes.len() == 1 || bytes[1] != 0xBB) {
+        return Err(validation_error(
+            "Suspicious byte sequence that could be partial BOM - check file encoding",
+        ));
+    }
+
     Ok(())
 }
 
@@ -235,5 +248,23 @@ mod tests {
     fn bom_validation_no_bom() {
         let no_bom = b"Hello World";
         assert!(validate_bom_handling(no_bom).is_ok());
+    }
+
+    #[test]
+    fn bom_validation_partial_utf8() {
+        let partial_bom = &[0xEF, 0xBB, b'H', b'i'];
+        assert!(validate_bom_handling(partial_bom).is_err());
+    }
+
+    #[test]
+    fn bom_validation_single_ef_byte() {
+        let single_ef = &[0xEF, b'H', b'i'];
+        assert!(validate_bom_handling(single_ef).is_err());
+    }
+
+    #[test]
+    fn bom_validation_ef_only() {
+        let ef_only = &[0xEF];
+        assert!(validate_bom_handling(ef_only).is_err());
     }
 }

@@ -91,6 +91,12 @@ impl<'a> FontsParser<'a> {
                 continue;
             }
 
+            // Stop at hash comments (# followed by space or at end of line)
+            // But not UU-encoded data (# followed immediately by encoded chars)
+            if trimmed.starts_with("# ") || trimmed == "#" {
+                break;
+            }
+
             data_lines.push(data_line);
             self.skip_line();
         }
@@ -218,6 +224,12 @@ impl<'a> GraphicsParser<'a> {
             if trimmed.starts_with(';') || trimmed.starts_with('!') {
                 self.skip_line();
                 continue;
+            }
+
+            // Stop at hash comments (# followed by space or at end of line)
+            // But not UU-encoded data (# followed immediately by encoded chars)
+            if trimmed.starts_with("# ") || trimmed == "#" {
+                break;
             }
 
             data_lines.push(data_line);
@@ -553,6 +565,271 @@ mod tests {
         if let Section::Graphics(graphics) = section {
             assert_eq!(graphics.len(), 1);
             assert_eq!(graphics[0].filename, "D:\\Images\\logo.png");
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_malformed_entry_no_colon() {
+        let source = "invalid_font_entry\ndata1\ndata2\n";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            // Should skip malformed entries without colon
+            assert!(fonts.is_empty());
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_empty_filename() {
+        let source = "fontname: \ndata1\ndata2\n";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert_eq!(fonts.len(), 1);
+            assert_eq!(fonts[0].filename, "");
+            assert_eq!(fonts[0].data_lines.len(), 2);
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_whitespace_only_filename() {
+        let source = "fontname:   \ndata1\ndata2\n";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert_eq!(fonts.len(), 1);
+            assert_eq!(fonts[0].filename, "");
+            assert_eq!(fonts[0].data_lines.len(), 2);
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_comments_between_data_lines() {
+        let source =
+            "fontname: arial.ttf\ndata1\n; Comment line\ndata2\n! Another comment\ndata3\n";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert_eq!(fonts.len(), 1);
+            assert_eq!(fonts[0].filename, "arial.ttf");
+            // Comments should be skipped, only data lines included
+            assert_eq!(fonts[0].data_lines.len(), 3);
+            assert_eq!(fonts[0].data_lines[0], "data1");
+            assert_eq!(fonts[0].data_lines[1], "data2");
+            assert_eq!(fonts[0].data_lines[2], "data3");
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_empty_lines_between_data() {
+        let source = "fontname: arial.ttf\ndata1\n\n\ndata2\n   \ndata3\n";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert_eq!(fonts.len(), 1);
+            assert_eq!(fonts[0].filename, "arial.ttf");
+            // Parser stops at first empty line
+            assert_eq!(fonts[0].data_lines.len(), 1);
+            assert_eq!(fonts[0].data_lines[0], "data1");
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_entry_at_end_of_file() {
+        let source = "fontname: arial.ttf\ndata1\ndata2";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert_eq!(fonts.len(), 1);
+            assert_eq!(fonts[0].filename, "arial.ttf");
+            assert_eq!(fonts[0].data_lines.len(), 2);
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_mixed_comment_styles() {
+        let source = "fontname: arial.ttf\ndata1\n; Semicolon comment\ndata2\n! Exclamation comment\ndata3\n# Hash comment\ndata4\n";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert_eq!(fonts.len(), 1);
+            // Hash comments are not skipped, so parsing stops at # Hash comment
+            assert_eq!(fonts[0].data_lines.len(), 3);
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_malformed_entry_no_colon() {
+        let source = "invalid_graphic_entry\nimg_data1\nimg_data2\n";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            // Should skip malformed entries without colon
+            assert!(graphics.is_empty());
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_empty_filename() {
+        let source = "filename: \nimg_data1\nimg_data2\n";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert_eq!(graphics.len(), 1);
+            assert_eq!(graphics[0].filename, "");
+            assert_eq!(graphics[0].data_lines.len(), 2);
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_whitespace_only_filename() {
+        let source = "filename:   \nimg_data1\nimg_data2\n";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert_eq!(graphics.len(), 1);
+            assert_eq!(graphics[0].filename, "");
+            assert_eq!(graphics[0].data_lines.len(), 2);
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_comments_between_data_lines() {
+        let source = "filename: logo.png\nimg_data1\n; Comment line\nimg_data2\n! Another comment\nimg_data3\n";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert_eq!(graphics.len(), 1);
+            assert_eq!(graphics[0].filename, "logo.png");
+            // Comments should be skipped, only data lines included
+            assert_eq!(graphics[0].data_lines.len(), 3);
+            assert_eq!(graphics[0].data_lines[0], "img_data1");
+            assert_eq!(graphics[0].data_lines[1], "img_data2");
+            assert_eq!(graphics[0].data_lines[2], "img_data3");
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_empty_lines_between_data() {
+        let source = "filename: logo.png\nimg_data1\n\n\nimg_data2\n   \nimg_data3\n";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert_eq!(graphics.len(), 1);
+            assert_eq!(graphics[0].filename, "logo.png");
+            // Parser stops at first empty line
+            assert_eq!(graphics[0].data_lines.len(), 1);
+            assert_eq!(graphics[0].data_lines[0], "img_data1");
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_entry_at_end_of_file() {
+        let source = "filename: logo.png\nimg_data1\nimg_data2";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert_eq!(graphics.len(), 1);
+            assert_eq!(graphics[0].filename, "logo.png");
+            assert_eq!(graphics[0].data_lines.len(), 2);
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_mixed_comment_styles() {
+        let source = "filename: logo.png\nimg_data1\n; Semicolon comment\nimg_data2\n! Exclamation comment\nimg_data3\n# Hash comment\nimg_data4\n";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert_eq!(graphics.len(), 1);
+            // Hash comments are not skipped, so parsing stops at # Hash comment
+            assert_eq!(graphics[0].data_lines.len(), 3);
+        } else {
+            panic!("Expected Graphics section");
+        }
+    }
+
+    #[test]
+    fn fonts_parser_multiple_entries_with_edge_cases() {
+        let source = "fontname: font1.ttf\ndata1_1\ndata1_2\n\ninvalid_entry_no_colon\n\nfontname: font2.ttf\n; Comment\ndata2_1\n\nfontname: \ndata3_1\n";
+        let parser = FontsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Fonts(fonts) = section {
+            assert_eq!(fonts.len(), 3); // All valid font entries should be parsed
+
+            assert_eq!(fonts[0].filename, "font1.ttf");
+            assert_eq!(fonts[0].data_lines.len(), 2);
+
+            assert_eq!(fonts[1].filename, "font2.ttf");
+            assert_eq!(fonts[1].data_lines.len(), 1);
+
+            assert_eq!(fonts[2].filename, "");
+            assert_eq!(fonts[2].data_lines.len(), 1);
+        } else {
+            panic!("Expected Fonts section");
+        }
+    }
+
+    #[test]
+    fn graphics_parser_multiple_entries_with_edge_cases() {
+        let source = "filename: image1.png\nimg1_1\nimg1_2\n\ninvalid_entry_no_colon\n\nfilename: image2.png\n; Comment\nimg2_1\n\nfilename: \nimg3_1\n";
+        let parser = GraphicsParser::new(source, 0, 1);
+        let section = parser.parse();
+
+        if let Section::Graphics(graphics) = section {
+            assert_eq!(graphics.len(), 3); // All valid graphic entries should be parsed
+
+            assert_eq!(graphics[0].filename, "image1.png");
+            assert_eq!(graphics[0].data_lines.len(), 2);
+
+            assert_eq!(graphics[1].filename, "image2.png");
+            assert_eq!(graphics[1].data_lines.len(), 1);
+
+            assert_eq!(graphics[2].filename, "");
+            assert_eq!(graphics[2].data_lines.len(), 1);
         } else {
             panic!("Expected Graphics section");
         }

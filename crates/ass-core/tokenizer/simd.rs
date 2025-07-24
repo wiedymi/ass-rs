@@ -343,4 +343,259 @@ mod tests {
     fn validate_utf8_invalid() {
         assert!(validate_utf8_batch(&[0xFF, 0xFE]).is_err());
     }
+
+    #[test]
+    fn scan_delimiters_all_delimiter_types() {
+        // Test each delimiter type individually
+        let delimiters = vec![
+            ("text:more", 4, ':'),
+            ("text,more", 4, ','),
+            ("text{more", 4, '{'),
+            ("text}more", 4, '}'),
+            ("text[more", 4, '['),
+            ("text]more", 4, ']'),
+            ("text\nmore", 4, '\n'),
+            ("text\rmore", 4, '\r'),
+        ];
+
+        for (text, expected_pos, _delimiter) in delimiters {
+            assert_eq!(scan_delimiters(text), Some(expected_pos));
+        }
+    }
+
+    #[test]
+    fn scan_delimiters_empty_input() {
+        assert_eq!(scan_delimiters(""), None);
+    }
+
+    #[test]
+    fn scan_delimiters_single_char() {
+        assert_eq!(scan_delimiters(":"), Some(0));
+        assert_eq!(scan_delimiters("a"), None);
+    }
+
+    #[test]
+    fn scan_delimiters_at_beginning() {
+        assert_eq!(scan_delimiters(":text"), Some(0));
+        assert_eq!(scan_delimiters(",text"), Some(0));
+        assert_eq!(scan_delimiters("{text"), Some(0));
+    }
+
+    #[test]
+    fn scan_delimiters_at_end() {
+        assert_eq!(scan_delimiters("text:"), Some(4));
+        assert_eq!(scan_delimiters("text,"), Some(4));
+        assert_eq!(scan_delimiters("text}"), Some(4));
+    }
+
+    #[test]
+    fn scan_delimiters_multiple_delimiters() {
+        // Should find the first one
+        assert_eq!(scan_delimiters("a:b,c{d"), Some(1));
+        assert_eq!(scan_delimiters("text,more:values"), Some(4));
+    }
+
+    #[test]
+    fn scan_delimiters_exactly_16_bytes() {
+        // Test boundary condition for SIMD
+        let text = "abcdefghijklmno:"; // 16 chars
+        assert_eq!(scan_delimiters(text), Some(15));
+    }
+
+    #[test]
+    fn scan_delimiters_less_than_16_bytes() {
+        // Should use scalar implementation
+        let text = "short:text"; // 10 chars
+        assert_eq!(scan_delimiters(text), Some(5));
+    }
+
+    #[test]
+    fn scan_delimiters_much_longer_than_16_bytes() {
+        // Test multiple SIMD chunks
+        let prefix = "a".repeat(32);
+        let text = format!("{prefix}:value");
+        assert_eq!(scan_delimiters(&text), Some(32));
+    }
+
+    #[test]
+    fn scan_delimiters_unicode_text() {
+        let text = "café🎭:value";
+        let colon_pos = text.find(':').unwrap();
+        assert_eq!(scan_delimiters(text), Some(colon_pos));
+    }
+
+    #[test]
+    fn parse_hex_edge_cases() {
+        // Test minimum and maximum lengths
+        assert_eq!(parse_hex_u32("0"), Some(0));
+        assert_eq!(parse_hex_u32("F"), Some(15));
+        assert_eq!(parse_hex_u32("FFFFFFFF"), Some(0xFFFF_FFFF));
+
+        // Test mixed case
+        assert_eq!(parse_hex_u32("aBcDeF"), Some(0x00ab_cdef));
+        assert_eq!(parse_hex_u32("AbCdEf"), Some(0x00ab_cdef));
+
+        // Test leading zeros
+        assert_eq!(parse_hex_u32("00000001"), Some(1));
+        assert_eq!(parse_hex_u32("0000FF00"), Some(0xFF00));
+    }
+
+    #[test]
+    fn parse_hex_invalid_length() {
+        // Too long
+        assert_eq!(parse_hex_u32("123456789"), None);
+        assert_eq!(parse_hex_u32("FFFFFFFFF"), None);
+    }
+
+    #[test]
+    fn parse_hex_invalid_characters() {
+        assert_eq!(parse_hex_u32("GHIJ"), None);
+        assert_eq!(parse_hex_u32("123G"), None);
+        assert_eq!(parse_hex_u32("12 34"), None); // Space
+        assert_eq!(parse_hex_u32("12-34"), None); // Hyphen
+        assert_eq!(parse_hex_u32("FF\n"), None); // Newline
+    }
+
+    #[test]
+    fn parse_hex_overflow_handling() {
+        // Test values that would overflow if not handled properly
+        assert_eq!(parse_hex_u32("FFFFFFFF"), Some(u32::MAX));
+    }
+
+    #[test]
+    fn validate_utf8_empty_input() {
+        assert!(validate_utf8_batch(&[]).is_ok());
+    }
+
+    #[test]
+    fn validate_utf8_ascii_only() {
+        let ascii_text = "Hello, World! 123 @#$%";
+        assert!(validate_utf8_batch(ascii_text.as_bytes()).is_ok());
+    }
+
+    #[test]
+    fn validate_utf8_exactly_16_bytes() {
+        let text = "1234567890123456"; // Exactly 16 ASCII chars
+        assert!(validate_utf8_batch(text.as_bytes()).is_ok());
+    }
+
+    #[test]
+    fn validate_utf8_less_than_16_bytes() {
+        let text = "short"; // 5 ASCII chars
+        assert!(validate_utf8_batch(text.as_bytes()).is_ok());
+    }
+
+    #[test]
+    fn validate_utf8_much_longer() {
+        let text = "a".repeat(100);
+        assert!(validate_utf8_batch(text.as_bytes()).is_ok());
+    }
+
+    #[test]
+    fn validate_utf8_mixed_unicode() {
+        let text = "ASCII中文🎵عربي";
+        assert!(validate_utf8_batch(text.as_bytes()).is_ok());
+    }
+
+    #[test]
+    fn validate_utf8_invalid_sequences() {
+        // Invalid UTF-8 sequences
+        assert!(validate_utf8_batch(&[0xC0, 0x80]).is_err()); // Overlong encoding
+        assert!(validate_utf8_batch(&[0xED, 0xA0, 0x80]).is_err()); // Surrogate
+        assert!(validate_utf8_batch(&[0xF4, 0x90, 0x80, 0x80]).is_err()); // Too large
+    }
+
+    #[test]
+    fn validate_utf8_incomplete_sequences() {
+        // Incomplete UTF-8 sequences
+        assert!(validate_utf8_batch(&[0xC2]).is_err()); // Missing continuation
+        assert!(validate_utf8_batch(&[0xE0, 0x80]).is_err()); // Missing second continuation
+        assert!(validate_utf8_batch(&[0xF0, 0x90, 0x80]).is_err()); // Missing third continuation
+    }
+
+    #[test]
+    fn scan_delimiters_scalar_fallback() {
+        // Test scalar implementation directly by using short strings
+        let short_texts = vec![
+            "a:b",      // 3 chars
+            "test,val", // 8 chars
+            "x{y}z",    // 5 chars
+        ];
+
+        for text in short_texts {
+            let result = scan_delimiters(text);
+            assert!(result.is_some());
+        }
+    }
+
+    #[test]
+    fn parse_hex_scalar_fallback() {
+        // Test scalar implementation with short hex strings
+        assert_eq!(parse_hex_u32("A"), Some(10));
+        assert_eq!(parse_hex_u32("FF"), Some(255));
+        assert_eq!(parse_hex_u32("123"), Some(0x123));
+    }
+
+    #[test]
+    fn scan_delimiters_boundary_at_chunk_edge() {
+        // Test delimiter exactly at 16-byte boundary
+        let text = format!("{}:", "a".repeat(15)); // 15 'a's + ':'
+        assert_eq!(scan_delimiters(&text), Some(15));
+
+        // Test delimiter just after 16-byte boundary
+        let text2 = format!("{}:", "a".repeat(16)); // 16 'a's + ':'
+        assert_eq!(scan_delimiters(&text2), Some(16));
+    }
+
+    #[test]
+    fn validate_utf8_non_ascii_in_chunks() {
+        // Test UTF-8 validation when non-ASCII appears in SIMD chunks
+        let text = format!("{}café", "a".repeat(12)); // Should trigger SIMD with non-ASCII
+        assert!(validate_utf8_batch(text.as_bytes()).is_ok());
+    }
+
+    #[test]
+    fn parse_hex_case_sensitivity() {
+        // Ensure both cases produce same result
+        assert_eq!(parse_hex_u32("abcdef"), parse_hex_u32("ABCDEF"));
+        assert_eq!(parse_hex_u32("deadbeef"), parse_hex_u32("DEADBEEF"));
+    }
+
+    #[test]
+    fn scan_delimiters_no_false_positives() {
+        // Ensure similar characters don't trigger false positives
+        let text = "abcdefghijklmnopqrstuvwxyz"; // No delimiters
+        assert_eq!(scan_delimiters(text), None);
+
+        let text2 = "0123456789"; // No delimiters
+        assert_eq!(scan_delimiters(text2), None);
+    }
+
+    #[test]
+    fn validate_utf8_chunk_remainder_handling() {
+        // Test that remainder after 16-byte chunks is handled correctly
+        let text = format!("{}café", "a".repeat(17)); // 17 ASCII + UTF-8
+        assert!(validate_utf8_batch(text.as_bytes()).is_ok());
+
+        let text2 = format!("{}🎵", "a".repeat(18)); // 18 ASCII + emoji
+        assert!(validate_utf8_batch(text2.as_bytes()).is_ok());
+    }
+
+    #[test]
+    fn parse_hex_maximum_value() {
+        // Test parsing maximum u32 value
+        assert_eq!(parse_hex_u32("FFFFFFFF"), Some(u32::MAX));
+        assert_eq!(parse_hex_u32("ffffffff"), Some(u32::MAX));
+    }
+
+    #[test]
+    fn scan_delimiters_all_positions() {
+        // Test delimiter at every position in a string
+        for i in 0..10 {
+            let mut chars: Vec<char> = "abcdefghij".chars().collect();
+            chars[i] = ':';
+            let text: String = chars.iter().collect();
+            assert_eq!(scan_delimiters(&text), Some(i));
+        }
+    }
 }

@@ -267,4 +267,295 @@ mod tests {
         assert_eq!(context.current_section, None);
         assert!(context.events_format.is_none());
     }
+
+    #[test]
+    fn parser_state_debug_and_clone() {
+        let state = ParserState::ExpectingSection;
+        let debug_str = format!("{state:?}");
+        assert!(debug_str.contains("ExpectingSection"));
+
+        let cloned = state.clone();
+        assert_eq!(state, cloned);
+
+        let section_state = ParserState::InSection(SectionKind::Events);
+        let section_debug = format!("{section_state:?}");
+        assert!(section_debug.contains("InSection"));
+        assert!(section_debug.contains("Events"));
+
+        let event_state = ParserState::InEvent {
+            section: SectionKind::Events,
+            fields_seen: 3,
+        };
+        let event_debug = format!("{event_state:?}");
+        assert!(event_debug.contains("InEvent"));
+        assert!(event_debug.contains("fields_seen"));
+    }
+
+    #[test]
+    fn parser_state_equality() {
+        let state1 = ParserState::ExpectingSection;
+        let state2 = ParserState::ExpectingSection;
+        assert_eq!(state1, state2);
+
+        let state3 = ParserState::InSection(SectionKind::Events);
+        let state4 = ParserState::InSection(SectionKind::Events);
+        assert_eq!(state3, state4);
+
+        let state5 = ParserState::InEvent {
+            section: SectionKind::Events,
+            fields_seen: 2,
+        };
+        let state6 = ParserState::InEvent {
+            section: SectionKind::Events,
+            fields_seen: 2,
+        };
+        assert_eq!(state5, state6);
+
+        // Test inequality
+        assert_ne!(state1, state3);
+        assert_ne!(state3, state5);
+
+        let state7 = ParserState::InEvent {
+            section: SectionKind::Events,
+            fields_seen: 3,
+        };
+        assert_ne!(state5, state7);
+    }
+
+    #[test]
+    fn parser_state_all_variants() {
+        // Test ExpectingSection
+        let expecting = ParserState::ExpectingSection;
+        assert!(!expecting.is_in_section());
+        assert_eq!(expecting.current_section(), None);
+
+        // Test InSection for all section kinds
+        for &kind in &[
+            SectionKind::ScriptInfo,
+            SectionKind::Styles,
+            SectionKind::Events,
+            SectionKind::Fonts,
+            SectionKind::Graphics,
+            SectionKind::Unknown,
+        ] {
+            let in_section = ParserState::InSection(kind);
+            assert!(in_section.is_in_section());
+            assert_eq!(in_section.current_section(), Some(kind));
+        }
+
+        // Test InEvent
+        let in_event = ParserState::InEvent {
+            section: SectionKind::Events,
+            fields_seen: 5,
+        };
+        assert!(in_event.is_in_section());
+        assert_eq!(in_event.current_section(), Some(SectionKind::Events));
+    }
+
+    #[test]
+    fn section_kind_all_variants() {
+        let kinds = [
+            SectionKind::ScriptInfo,
+            SectionKind::Styles,
+            SectionKind::Events,
+            SectionKind::Fonts,
+            SectionKind::Graphics,
+            SectionKind::Unknown,
+        ];
+
+        for &kind in &kinds {
+            let debug_str = format!("{kind:?}");
+            assert!(!debug_str.is_empty());
+
+            // Test Copy trait
+            let copied = kind;
+            assert_eq!(kind, copied);
+        }
+    }
+
+    #[test]
+    fn section_kind_header_parsing_edge_cases() {
+        // Test case insensitive variations
+        assert_eq!(
+            SectionKind::from_header("  Script Info  "),
+            SectionKind::ScriptInfo
+        );
+        assert_eq!(
+            SectionKind::from_header("\tV4+ Styles\t"),
+            SectionKind::Styles
+        );
+
+        // Test empty and whitespace
+        assert_eq!(SectionKind::from_header(""), SectionKind::Unknown);
+        assert_eq!(SectionKind::from_header("   "), SectionKind::Unknown);
+
+        // Test partial matches
+        assert_eq!(SectionKind::from_header("Script"), SectionKind::Unknown);
+        assert_eq!(SectionKind::from_header("Info"), SectionKind::Unknown);
+        assert_eq!(SectionKind::from_header("Styles"), SectionKind::Unknown);
+
+        // Test common variations
+        assert_eq!(SectionKind::from_header("V4 Styles"), SectionKind::Styles);
+        assert_eq!(SectionKind::from_header("V4+ Styles"), SectionKind::Styles);
+    }
+
+    #[test]
+    fn section_kind_all_properties() {
+        // Test expects_format
+        assert!(SectionKind::Styles.expects_format());
+        assert!(SectionKind::Events.expects_format());
+        assert!(!SectionKind::ScriptInfo.expects_format());
+        assert!(!SectionKind::Fonts.expects_format());
+        assert!(!SectionKind::Graphics.expects_format());
+        assert!(!SectionKind::Unknown.expects_format());
+
+        // Test is_timed
+        assert!(SectionKind::Events.is_timed());
+        assert!(!SectionKind::ScriptInfo.is_timed());
+        assert!(!SectionKind::Styles.is_timed());
+        assert!(!SectionKind::Fonts.is_timed());
+        assert!(!SectionKind::Graphics.is_timed());
+        assert!(!SectionKind::Unknown.is_timed());
+
+        // Test is_binary
+        assert!(SectionKind::Fonts.is_binary());
+        assert!(SectionKind::Graphics.is_binary());
+        assert!(!SectionKind::ScriptInfo.is_binary());
+        assert!(!SectionKind::Styles.is_binary());
+        assert!(!SectionKind::Events.is_binary());
+        assert!(!SectionKind::Unknown.is_binary());
+    }
+
+    #[test]
+    fn streaming_context_default() {
+        let context = StreamingContext::default();
+        assert_eq!(context.line_number, 0);
+        assert_eq!(context.current_section, None);
+        assert!(context.events_format.is_none());
+        assert!(context.styles_format.is_none());
+    }
+
+    #[test]
+    fn streaming_context_debug_and_clone() {
+        let context = StreamingContext::new();
+        let debug_str = format!("{context:?}");
+        assert!(debug_str.contains("StreamingContext"));
+        assert!(debug_str.contains("line_number"));
+
+        let mut context_with_data = StreamingContext::new();
+        context_with_data.next_line();
+        context_with_data.enter_section(SectionKind::Events);
+        context_with_data.set_events_format("Test Format".to_string());
+
+        let cloned = context_with_data.clone();
+        assert_eq!(cloned.line_number, context_with_data.line_number);
+        assert_eq!(cloned.current_section, context_with_data.current_section);
+        assert_eq!(cloned.events_format, context_with_data.events_format);
+    }
+
+    #[test]
+    fn streaming_context_format_management() {
+        let mut context = StreamingContext::new();
+
+        // Test events format
+        assert!(context.events_format.is_none());
+        context.set_events_format("Layer, Start, End, Style, Text".to_string());
+        assert!(context.events_format.is_some());
+        assert_eq!(
+            context.events_format.as_ref().unwrap(),
+            "Layer, Start, End, Style, Text"
+        );
+
+        // Test styles format
+        assert!(context.styles_format.is_none());
+        context.set_styles_format("Name, Fontname, Fontsize".to_string());
+        assert!(context.styles_format.is_some());
+        assert_eq!(
+            context.styles_format.as_ref().unwrap(),
+            "Name, Fontname, Fontsize"
+        );
+
+        // Test reset clears formats
+        context.reset();
+        assert!(context.events_format.is_none());
+        assert!(context.styles_format.is_none());
+    }
+
+    #[test]
+    fn streaming_context_section_management() {
+        let mut context = StreamingContext::new();
+        assert_eq!(context.current_section, None);
+
+        context.enter_section(SectionKind::ScriptInfo);
+        assert_eq!(context.current_section, Some(SectionKind::ScriptInfo));
+
+        context.enter_section(SectionKind::Events);
+        assert_eq!(context.current_section, Some(SectionKind::Events));
+
+        context.exit_section();
+        assert_eq!(context.current_section, None);
+    }
+
+    #[test]
+    fn streaming_context_line_tracking() {
+        let mut context = StreamingContext::new();
+        assert_eq!(context.line_number, 0);
+
+        for expected_line in 1..=100 {
+            context.next_line();
+            assert_eq!(context.line_number, expected_line);
+        }
+
+        context.reset();
+        assert_eq!(context.line_number, 0);
+    }
+
+    #[test]
+    fn parser_state_transition_sequences() {
+        let mut state = ParserState::ExpectingSection;
+
+        // Test complete transition sequence
+        state.enter_section(SectionKind::Events);
+        assert!(state.is_in_section());
+        assert_eq!(state.current_section(), Some(SectionKind::Events));
+
+        state.enter_event(SectionKind::Events);
+        assert!(state.is_in_section());
+        assert_eq!(state.current_section(), Some(SectionKind::Events));
+
+        state.exit_section();
+        assert!(!state.is_in_section());
+        assert_eq!(state.current_section(), None);
+
+        // Test direct event entry
+        state.enter_event(SectionKind::Styles);
+        assert!(state.is_in_section());
+        assert_eq!(state.current_section(), Some(SectionKind::Styles));
+    }
+
+    #[test]
+    fn complex_state_context_interaction() {
+        let mut state = ParserState::ExpectingSection;
+        let mut context = StreamingContext::new();
+
+        // Simulate processing script
+        context.next_line(); // Line 1
+        state.enter_section(SectionKind::ScriptInfo);
+        context.enter_section(SectionKind::ScriptInfo);
+
+        context.next_line(); // Line 2
+        context.next_line(); // Line 3
+
+        state.enter_section(SectionKind::Events);
+        context.enter_section(SectionKind::Events);
+        context.set_events_format("Layer, Start, End, Text".to_string());
+
+        context.next_line(); // Line 4
+        state.enter_event(SectionKind::Events);
+
+        assert_eq!(context.line_number, 4);
+        assert!(context.events_format.is_some());
+        assert_eq!(context.current_section, Some(SectionKind::Events));
+        assert_eq!(state.current_section(), Some(SectionKind::Events));
+    }
 }

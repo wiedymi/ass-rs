@@ -471,4 +471,278 @@ mod tests {
         let resolved = ResolvedStyle::from_style(&style).unwrap();
         assert!(resolved.has_performance_issues());
     }
+
+    #[test]
+    fn parse_font_size_edge_cases() {
+        // Test invalid font sizes
+        assert!(parse_font_size("-10").is_err()); // Negative
+        assert!(parse_font_size("0").is_err()); // Zero
+        assert!(parse_font_size("1001").is_err()); // Too large
+        assert!(parse_font_size("abc").is_err()); // Non-numeric
+        assert!(parse_font_size("").is_err()); // Empty
+
+        // Test valid font sizes
+        assert!(parse_font_size("1").is_ok());
+        assert!(parse_font_size("72").is_ok());
+        assert!(parse_font_size("1000").is_ok());
+    }
+
+    #[test]
+    fn parse_color_with_default_invalid_formats() {
+        // Test invalid color formats
+        assert!(parse_color_with_default("invalid").is_err());
+        assert!(parse_color_with_default("&H").is_err());
+        assert!(parse_color_with_default("&HZZZZZ").is_err());
+        assert!(parse_color_with_default("12345G").is_err()); // Invalid hex character
+
+        // Test empty string returns default
+        let default_color = parse_color_with_default("").unwrap();
+        assert_eq!(default_color, [255, 255, 255, 255]);
+
+        // Test whitespace only returns default
+        let whitespace_color = parse_color_with_default("   ").unwrap();
+        assert_eq!(whitespace_color, [255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn parse_bool_flag_invalid_values() {
+        // Test invalid boolean flags
+        assert!(parse_bool_flag("2").is_err());
+        assert!(parse_bool_flag("-1").is_err());
+        assert!(parse_bool_flag("true").is_err());
+        assert!(parse_bool_flag("false").is_err());
+        assert!(parse_bool_flag("yes").is_err());
+        assert!(parse_bool_flag("no").is_err());
+        assert!(parse_bool_flag("").is_err());
+
+        // Test valid boolean flags
+        assert!(!parse_bool_flag("0").unwrap());
+        assert!(parse_bool_flag("1").unwrap());
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)]
+    fn parse_percentage_invalid_values() {
+        // Test invalid percentages
+        assert!(parse_percentage("-10").is_err()); // Negative
+        assert!(parse_percentage("1001").is_err()); // Too large
+        assert!(parse_percentage("abc").is_err()); // Non-numeric
+        assert!(parse_percentage("").is_err()); // Empty
+
+        // Test valid percentages
+        assert_eq!(parse_percentage("0").unwrap(), 0.0);
+        assert_eq!(parse_percentage("100").unwrap(), 100.0);
+        assert_eq!(parse_percentage("1000").unwrap(), 1000.0);
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)]
+    fn parse_float_invalid_values() {
+        assert!(parse_float("abc").is_err());
+        assert!(parse_float("").is_err());
+        assert!(parse_float("1.2.3").is_err());
+        assert!(parse_float("1.2.3.4").is_err());
+        assert!(parse_float("not_a_number").is_err());
+
+        // Test valid floats
+        assert_eq!(parse_float("0").unwrap(), 0.0);
+        assert_eq!(parse_float("-10.5").unwrap(), -10.5);
+        assert_eq!(parse_float("123.456").unwrap(), 123.456);
+    }
+
+    #[test]
+    fn parse_u8_invalid_values() {
+        assert!(parse_u8("256").is_err()); // Too large
+        assert!(parse_u8("-1").is_err()); // Negative
+        assert!(parse_u8("abc").is_err()); // Non-numeric
+        assert!(parse_u8("").is_err()); // Empty
+
+        // Test valid u8 values
+        assert_eq!(parse_u8("0").unwrap(), 0);
+        assert_eq!(parse_u8("255").unwrap(), 255);
+    }
+
+    #[test]
+    fn parse_u16_invalid_values() {
+        assert!(parse_u16("65536").is_err()); // Too large
+        assert!(parse_u16("-1").is_err()); // Negative
+        assert!(parse_u16("abc").is_err()); // Non-numeric
+        assert!(parse_u16("").is_err()); // Empty
+
+        // Test valid u16 values
+        assert_eq!(parse_u16("0").unwrap(), 0);
+        assert_eq!(parse_u16("65535").unwrap(), 65535);
+    }
+
+    #[test]
+    fn resolved_style_from_style_with_invalid_values() {
+        let mut style = create_test_style();
+
+        // Test with invalid font size - should return error
+        style.fontsize = "-10";
+        assert!(ResolvedStyle::from_style(&style).is_err());
+
+        style.fontsize = "abc";
+        assert!(ResolvedStyle::from_style(&style).is_err());
+
+        // Test with invalid color - should return error
+        style.fontsize = "20"; // Reset to valid
+        style.primary_colour = "invalid_color";
+        assert!(ResolvedStyle::from_style(&style).is_err());
+
+        // Test with invalid boolean flag - should return error
+        style.primary_colour = "&HFFFFFF"; // Reset to valid
+        style.bold = "2";
+        assert!(ResolvedStyle::from_style(&style).is_err());
+    }
+
+    #[test]
+    fn complexity_calculation_all_branches() {
+        let mut style = create_test_style();
+
+        // Test baseline complexity
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        let baseline_score = resolved.complexity_score();
+
+        // Test font size increases complexity
+        style.fontsize = "100"; // Large font size
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        assert!(resolved.complexity_score() > baseline_score);
+
+        // Test outline increases complexity
+        style = create_test_style(); // Reset
+        style.outline = "5"; // Large outline
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        assert!(resolved.complexity_score() > baseline_score);
+
+        // Test shadow increases complexity
+        style = create_test_style(); // Reset
+        style.shadow = "5"; // Large shadow
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        assert!(resolved.complexity_score() > baseline_score);
+
+        // Test scaling increases complexity
+        style = create_test_style(); // Reset
+        style.scale_x = "200"; // Non-default scaling
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        assert!(resolved.complexity_score() > baseline_score);
+
+        // Test angle increases complexity
+        style = create_test_style(); // Reset
+        style.angle = "45"; // Rotation
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        assert!(resolved.complexity_score() > baseline_score);
+
+        // Test formatting flags increase complexity
+        style = create_test_style(); // Reset
+        style.bold = "1";
+        style.italic = "1";
+        style.underline = "1";
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        assert!(resolved.complexity_score() > baseline_score);
+    }
+
+    #[test]
+    fn complexity_score_capped_at_100() {
+        let mut style = create_test_style();
+
+        // Set all properties to maximum complexity values
+        style.fontsize = "200"; // Large font
+        style.outline = "10"; // Large outline
+        style.shadow = "10"; // Large shadow
+        style.scale_x = "200"; // Large scaling
+        style.angle = "180"; // Large rotation
+        style.bold = "1";
+        style.italic = "1";
+        style.underline = "1";
+        style.strikeout = "1";
+
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        assert!(resolved.complexity_score() <= 100); // Should be capped at 100
+        assert!(resolved.complexity_score() > 50); // Should be high complexity
+    }
+
+    #[test]
+    fn text_formatting_flags_comprehensive() {
+        let mut style = create_test_style();
+
+        // Test all formatting combinations
+        style.bold = "1";
+        style.italic = "0";
+        style.underline = "0";
+        style.strikeout = "0";
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        assert!(resolved.is_bold());
+        assert!(!resolved.is_italic());
+        assert!(!resolved.is_underline());
+        assert!(!resolved.is_strike_out());
+        assert_eq!(resolved.formatting(), TextFormatting::BOLD);
+
+        // Test italic only
+        style.bold = "0";
+        style.italic = "1";
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        assert!(!resolved.is_bold());
+        assert!(resolved.is_italic());
+        assert_eq!(resolved.formatting(), TextFormatting::ITALIC);
+
+        // Test underline only
+        style.italic = "0";
+        style.underline = "1";
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        assert!(resolved.is_underline());
+        assert_eq!(resolved.formatting(), TextFormatting::UNDERLINE);
+
+        // Test strikeout only
+        style.underline = "0";
+        style.strikeout = "1";
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        assert!(resolved.is_strike_out());
+        assert_eq!(resolved.formatting(), TextFormatting::STRIKE_OUT);
+
+        // Test all flags combined
+        style.bold = "1";
+        style.italic = "1";
+        style.underline = "1";
+        style.strikeout = "1";
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        assert!(resolved.is_bold());
+        assert!(resolved.is_italic());
+        assert!(resolved.is_underline());
+        assert!(resolved.is_strike_out());
+        let expected = TextFormatting::BOLD
+            | TextFormatting::ITALIC
+            | TextFormatting::UNDERLINE
+            | TextFormatting::STRIKE_OUT;
+        assert_eq!(resolved.formatting(), expected);
+    }
+
+    #[test]
+    fn resolved_style_empty_font_name_uses_default() {
+        let mut style = create_test_style();
+        style.fontname = "";
+
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        assert_eq!(resolved.font_name(), "Arial");
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)]
+    fn resolved_style_getters_comprehensive() {
+        let style = create_test_style();
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+
+        // Test all getter methods
+        assert_eq!(resolved.font_name(), "Arial");
+        assert_eq!(resolved.font_size(), 20.0);
+        assert_eq!(resolved.primary_color(), [255, 255, 255, 0]); // &H00FFFFFF
+        assert!(!resolved.has_performance_issues()); // Low complexity
+
+        let formatting = resolved.formatting();
+        assert!(!resolved.is_bold());
+        assert!(!resolved.is_italic());
+        assert!(!resolved.is_underline());
+        assert!(!resolved.is_strike_out());
+        assert_eq!(formatting, TextFormatting::empty());
+    }
 }

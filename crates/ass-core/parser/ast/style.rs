@@ -192,10 +192,73 @@ mod tests {
     }
 
     #[test]
+    fn style_default_all_fields() {
+        let style = Style::default();
+
+        // Test all default field values
+        assert_eq!(style.name, "Default");
+        assert_eq!(style.fontname, "Arial");
+        assert_eq!(style.fontsize, "20");
+        assert_eq!(style.primary_colour, "&Hffffff");
+        assert_eq!(style.secondary_colour, "&H0000ff");
+        assert_eq!(style.outline_colour, "&H000000");
+        assert_eq!(style.back_colour, "&H000000");
+        assert_eq!(style.bold, "0");
+        assert_eq!(style.italic, "0");
+        assert_eq!(style.underline, "0");
+        assert_eq!(style.strikeout, "0");
+        assert_eq!(style.scale_x, "100");
+        assert_eq!(style.scale_y, "100");
+        assert_eq!(style.spacing, "0");
+        assert_eq!(style.angle, "0");
+        assert_eq!(style.border_style, "1");
+        assert_eq!(style.outline, "0");
+        assert_eq!(style.shadow, "0");
+        assert_eq!(style.alignment, "2");
+        assert_eq!(style.margin_l, "10");
+        assert_eq!(style.margin_r, "10");
+        assert_eq!(style.margin_v, "10");
+        assert_eq!(style.encoding, "1");
+    }
+
+    #[test]
     fn style_clone() {
         let style = Style::default();
         let cloned = style.clone();
         assert_eq!(style, cloned);
+    }
+
+    #[test]
+    fn style_clone_custom() {
+        let style = Style {
+            name: "CustomStyle",
+            fontname: "Times New Roman",
+            fontsize: "16",
+            primary_colour: "&H00ff00",
+            bold: "1",
+            italic: "1",
+            underline: "1",
+            strikeout: "1",
+            scale_x: "90",
+            scale_y: "110",
+            spacing: "2",
+            angle: "15",
+            border_style: "3",
+            outline: "2",
+            shadow: "1",
+            alignment: "1",
+            margin_l: "5",
+            margin_r: "15",
+            margin_v: "8",
+            encoding: "0",
+            ..Style::default()
+        };
+
+        let cloned = style.clone();
+        assert_eq!(style, cloned);
+        assert_eq!(cloned.name, "CustomStyle");
+        assert_eq!(cloned.fontname, "Times New Roman");
+        assert_eq!(cloned.bold, "1");
     }
 
     #[test]
@@ -204,6 +267,22 @@ mod tests {
         let debug_str = format!("{style:?}");
         assert!(debug_str.contains("Style"));
         assert!(debug_str.contains("Default"));
+    }
+
+    #[test]
+    fn style_debug_custom() {
+        let style = Style {
+            name: "DebugTest",
+            fontname: "Helvetica",
+            fontsize: "18",
+            ..Style::default()
+        };
+
+        let debug_str = format!("{style:?}");
+        assert!(debug_str.contains("Style"));
+        assert!(debug_str.contains("DebugTest"));
+        assert!(debug_str.contains("Helvetica"));
+        assert!(debug_str.contains("18"));
     }
 
     #[test]
@@ -217,6 +296,36 @@ mod tests {
             ..Style::default()
         };
         assert_ne!(style1, style3);
+    }
+
+    #[test]
+    fn style_partial_eq_different_fields() {
+        let base = Style::default();
+
+        // Test inequality with different fields
+        let name_diff = Style {
+            name: "Different",
+            ..Style::default()
+        };
+        assert_ne!(base, name_diff);
+
+        let font_diff = Style {
+            fontname: "Comic Sans",
+            ..Style::default()
+        };
+        assert_ne!(base, font_diff);
+
+        let size_diff = Style {
+            fontsize: "24",
+            ..Style::default()
+        };
+        assert_ne!(base, size_diff);
+
+        let color_diff = Style {
+            primary_colour: "&H00ff00",
+            ..Style::default()
+        };
+        assert_ne!(base, color_diff);
     }
 
     #[test]
@@ -235,5 +344,436 @@ mod tests {
         assert_eq!(style.fontsize, "24");
         assert_eq!(style.bold, "1");
         assert_eq!(style.italic, "1");
+    }
+
+    #[test]
+    fn style_field_access_comprehensive() {
+        let style = Style {
+            name: "ComprehensiveTest",
+            fontname: "Verdana",
+            fontsize: "14",
+            primary_colour: "&Hff0000",
+            secondary_colour: "&H00ff00",
+            outline_colour: "&H0000ff",
+            back_colour: "&Hffffff",
+            bold: "-1",
+            italic: "1",
+            underline: "1",
+            strikeout: "0",
+            scale_x: "125",
+            scale_y: "75",
+            spacing: "3",
+            angle: "45",
+            border_style: "3",
+            outline: "3",
+            shadow: "2",
+            alignment: "9",
+            margin_l: "20",
+            margin_r: "30",
+            margin_v: "15",
+            encoding: "2",
+        };
+
+        // Test all field accesses
+        assert_eq!(style.name, "ComprehensiveTest");
+        assert_eq!(style.fontname, "Verdana");
+        assert_eq!(style.fontsize, "14");
+        assert_eq!(style.primary_colour, "&Hff0000");
+        assert_eq!(style.secondary_colour, "&H00ff00");
+        assert_eq!(style.outline_colour, "&H0000ff");
+        assert_eq!(style.back_colour, "&Hffffff");
+        assert_eq!(style.bold, "-1");
+        assert_eq!(style.italic, "1");
+        assert_eq!(style.underline, "1");
+        assert_eq!(style.strikeout, "0");
+        assert_eq!(style.scale_x, "125");
+        assert_eq!(style.scale_y, "75");
+        assert_eq!(style.spacing, "3");
+        assert_eq!(style.angle, "45");
+        assert_eq!(style.border_style, "3");
+        assert_eq!(style.outline, "3");
+        assert_eq!(style.shadow, "2");
+        assert_eq!(style.alignment, "9");
+        assert_eq!(style.margin_l, "20");
+        assert_eq!(style.margin_r, "30");
+        assert_eq!(style.margin_v, "15");
+        assert_eq!(style.encoding, "2");
+    }
+
+    #[test]
+    fn style_empty_strings() {
+        let style = Style {
+            name: "",
+            fontname: "",
+            fontsize: "",
+            primary_colour: "",
+            secondary_colour: "",
+            outline_colour: "",
+            back_colour: "",
+            bold: "",
+            italic: "",
+            underline: "",
+            strikeout: "",
+            scale_x: "",
+            scale_y: "",
+            spacing: "",
+            angle: "",
+            border_style: "",
+            outline: "",
+            shadow: "",
+            alignment: "",
+            margin_l: "",
+            margin_r: "",
+            margin_v: "",
+            encoding: "",
+        };
+
+        // All fields should be empty strings
+        assert_eq!(style.name, "");
+        assert_eq!(style.fontname, "");
+        assert_eq!(style.fontsize, "");
+        assert_eq!(style.primary_colour, "");
+        assert_eq!(style.alignment, "");
+        assert_eq!(style.encoding, "");
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn style_validate_spans() {
+        let source = "Default,Arial,20,&Hffffff,&H0000ff,&H000000,&H000000,0,0,0,0,100,100,0,0,1,0,0,2,10,10,10,1";
+        let source_start = source.as_ptr() as usize;
+        let source_end = source_start + source.len();
+        let source_range = source_start..source_end;
+
+        // Parse all fields from the source to ensure all references are within range
+        let fields: Vec<&str> = source.split(',').collect();
+        assert_eq!(fields.len(), 23); // ASS v4+ style has 23 fields
+
+        // Create style with all references within the source range
+        let style = Style {
+            name: fields[0],
+            fontname: fields[1],
+            fontsize: fields[2],
+            primary_colour: fields[3],
+            secondary_colour: fields[4],
+            outline_colour: fields[5],
+            back_colour: fields[6],
+            bold: fields[7],
+            italic: fields[8],
+            underline: fields[9],
+            strikeout: fields[10],
+            scale_x: fields[11],
+            scale_y: fields[12],
+            spacing: fields[13],
+            angle: fields[14],
+            border_style: fields[15],
+            outline: fields[16],
+            shadow: fields[17],
+            alignment: fields[18],
+            margin_l: fields[19],
+            margin_r: fields[20],
+            margin_v: fields[21],
+            encoding: fields[22],
+        };
+
+        // Actually call the validate_spans method
+        assert!(style.validate_spans(&source_range));
+
+        // Verify the fields are correct
+        assert_eq!(style.name, "Default");
+        assert_eq!(style.fontname, "Arial");
+        assert_eq!(style.fontsize, "20");
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn style_validate_spans_invalid() {
+        let source1 = "Default,Arial,20";
+        let source2 = "Other,Times,16";
+        let source1_start = source1.as_ptr() as usize;
+        let source1_end = source1_start + source1.len();
+        let source1_range = source1_start..source1_end;
+
+        // Create style with references from different source
+        let style = Style {
+            name: &source2[0..5],       // "Other" - from different source
+            fontname: &source1[8..13],  // "Arial" - from source1
+            fontsize: &source1[14..16], // "20" - from source1
+            ..Style::default()
+        };
+
+        // This should fail since name is from different source
+        assert!(!style.validate_spans(&source1_range));
+    }
+
+    #[test]
+    fn style_lifetimes() {
+        let source = String::from("TestStyle,Times,16");
+        let style = {
+            let parts: Vec<&str> = source.split(',').collect();
+            Style {
+                name: parts[0],
+                fontname: parts[1],
+                fontsize: parts[2],
+                ..Style::default()
+            }
+        };
+
+        assert_eq!(style.name, "TestStyle");
+        assert_eq!(style.fontname, "Times");
+        assert_eq!(style.fontsize, "16");
+    }
+
+    #[test]
+    fn style_equality_all_combinations() {
+        let style1 = Style::default();
+        let mut style2 = Style::default();
+
+        // Should be equal initially
+        assert_eq!(style1, style2);
+
+        // Test each field for inequality
+        style2.name = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.fontname = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.fontsize = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.primary_colour = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.secondary_colour = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.outline_colour = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.back_colour = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.bold = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.italic = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.underline = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.strikeout = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.scale_x = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.scale_y = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.spacing = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.angle = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.border_style = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.outline = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.shadow = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.alignment = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.margin_l = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.margin_r = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.margin_v = "Different";
+        assert_ne!(style1, style2);
+        style2 = Style::default();
+
+        style2.encoding = "Different";
+        assert_ne!(style1, style2);
+    }
+
+    #[test]
+    fn style_default_construction() {
+        // Test that Default::default() works correctly
+        let style: Style = Style::default();
+        assert_eq!(style.name, "Default");
+        assert_eq!(style.fontname, "Arial");
+        assert_eq!(style.fontsize, "20");
+        assert_eq!(style.primary_colour, "&Hffffff");
+        assert_eq!(style.secondary_colour, "&H0000ff");
+        assert_eq!(style.outline_colour, "&H000000");
+        assert_eq!(style.back_colour, "&H000000");
+        assert_eq!(style.bold, "0");
+        assert_eq!(style.italic, "0");
+        assert_eq!(style.underline, "0");
+        assert_eq!(style.strikeout, "0");
+        assert_eq!(style.scale_x, "100");
+        assert_eq!(style.scale_y, "100");
+        assert_eq!(style.spacing, "0");
+        assert_eq!(style.angle, "0");
+        assert_eq!(style.border_style, "1");
+        assert_eq!(style.outline, "0");
+        assert_eq!(style.shadow, "0");
+        assert_eq!(style.alignment, "2");
+        assert_eq!(style.margin_l, "10");
+        assert_eq!(style.margin_r, "10");
+        assert_eq!(style.margin_v, "10");
+        assert_eq!(style.encoding, "1");
+    }
+
+    #[test]
+    fn style_struct_creation() {
+        // Test direct struct creation syntax
+        let style = Style {
+            name: "TestName",
+            fontname: "TestFont",
+            fontsize: "12",
+            primary_colour: "&H123456",
+            secondary_colour: "&H654321",
+            outline_colour: "&Habcdef",
+            back_colour: "&Hfedcba",
+            bold: "1",
+            italic: "1",
+            underline: "1",
+            strikeout: "1",
+            scale_x: "150",
+            scale_y: "75",
+            spacing: "5",
+            angle: "90",
+            border_style: "2",
+            outline: "1",
+            shadow: "3",
+            alignment: "5",
+            margin_l: "25",
+            margin_r: "35",
+            margin_v: "20",
+            encoding: "3",
+        };
+
+        // Verify all fields are set correctly
+        assert_eq!(style.name, "TestName");
+        assert_eq!(style.fontname, "TestFont");
+        assert_eq!(style.fontsize, "12");
+        assert_eq!(style.primary_colour, "&H123456");
+        assert_eq!(style.secondary_colour, "&H654321");
+        assert_eq!(style.outline_colour, "&Habcdef");
+        assert_eq!(style.back_colour, "&Hfedcba");
+        assert_eq!(style.bold, "1");
+        assert_eq!(style.italic, "1");
+        assert_eq!(style.underline, "1");
+        assert_eq!(style.strikeout, "1");
+        assert_eq!(style.scale_x, "150");
+        assert_eq!(style.scale_y, "75");
+        assert_eq!(style.spacing, "5");
+        assert_eq!(style.angle, "90");
+        assert_eq!(style.border_style, "2");
+        assert_eq!(style.outline, "1");
+        assert_eq!(style.shadow, "3");
+        assert_eq!(style.alignment, "5");
+        assert_eq!(style.margin_l, "25");
+        assert_eq!(style.margin_r, "35");
+        assert_eq!(style.margin_v, "20");
+        assert_eq!(style.encoding, "3");
+    }
+
+    #[test]
+    fn style_mix_default_and_custom() {
+        // Test struct update syntax with defaults
+        let style = Style {
+            name: "MixedStyle",
+            fontsize: "22",
+            bold: "1",
+            italic: "1",
+            primary_colour: "&Hff00ff",
+            alignment: "7",
+            ..Style::default()
+        };
+
+        // Custom fields
+        assert_eq!(style.name, "MixedStyle");
+        assert_eq!(style.fontsize, "22");
+        assert_eq!(style.bold, "1");
+        assert_eq!(style.italic, "1");
+        assert_eq!(style.primary_colour, "&Hff00ff");
+        assert_eq!(style.alignment, "7");
+
+        // Default fields
+        assert_eq!(style.fontname, "Arial");
+        assert_eq!(style.underline, "0");
+        assert_eq!(style.strikeout, "0");
+        assert_eq!(style.scale_x, "100");
+        assert_eq!(style.encoding, "1");
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn style_validate_spans_comprehensive() {
+        let source = "Name,Font,Size,Primary,Secondary,Outline,Back,Bold,Italic,Under,Strike,ScX,ScY,Sp,Ang,Border,Out,Shad,Align,ML,MR,MV,Enc";
+        let source_start = source.as_ptr() as usize;
+        let source_end = source_start + source.len();
+        let source_range = source_start..source_end;
+
+        let fields: Vec<&str> = source.split(',').collect();
+        let style = Style {
+            name: fields[0],
+            fontname: fields[1],
+            fontsize: fields[2],
+            primary_colour: fields[3],
+            secondary_colour: fields[4],
+            outline_colour: fields[5],
+            back_colour: fields[6],
+            bold: fields[7],
+            italic: fields[8],
+            underline: fields[9],
+            strikeout: fields[10],
+            scale_x: fields[11],
+            scale_y: fields[12],
+            spacing: fields[13],
+            angle: fields[14],
+            border_style: fields[15],
+            outline: fields[16],
+            shadow: fields[17],
+            alignment: fields[18],
+            margin_l: fields[19],
+            margin_r: fields[20],
+            margin_v: fields[21],
+            encoding: fields[22],
+        };
+
+        // Should validate successfully since all fields are from source
+        assert!(style.validate_spans(&source_range));
     }
 }

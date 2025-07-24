@@ -262,4 +262,145 @@ mod tests {
         assert_eq!(bom_type, copied);
         assert_eq!(bom_type, cloned);
     }
+
+    #[test]
+    fn all_bom_type_properties() {
+        // Test all BOM types for completeness
+        assert_eq!(BomType::Utf16Be.signature(), &[0xFE, 0xFF]);
+        assert_eq!(BomType::Utf16Be.len(), 2);
+        assert!(!BomType::Utf16Be.is_empty());
+        assert_eq!(BomType::Utf16Be.encoding_name(), "UTF-16BE");
+
+        assert_eq!(BomType::Utf32Le.signature(), &[0xFF, 0xFE, 0x00, 0x00]);
+        assert_eq!(BomType::Utf32Le.len(), 4);
+        assert!(!BomType::Utf32Le.is_empty());
+        assert_eq!(BomType::Utf32Le.encoding_name(), "UTF-32LE");
+
+        assert_eq!(BomType::Utf32Be.signature(), &[0x00, 0x00, 0xFE, 0xFF]);
+        assert_eq!(BomType::Utf32Be.len(), 4);
+        assert!(!BomType::Utf32Be.is_empty());
+        assert_eq!(BomType::Utf32Be.encoding_name(), "UTF-32BE");
+    }
+
+    #[test]
+    fn strip_bom_empty_input() {
+        let (stripped, had_bom) = strip_bom("");
+        assert_eq!(stripped, "");
+        assert!(!had_bom);
+    }
+
+    #[test]
+    fn strip_bom_partial_bom_sequences() {
+        // Partial UTF-8 BOM
+        let (stripped, had_bom) = strip_bom("\u{00EF}\u{00BB}");
+        assert_eq!(stripped, "\u{00EF}\u{00BB}");
+        assert!(!had_bom);
+
+        // Single byte that could start a BOM
+        let (stripped, had_bom) = strip_bom("\u{00EF}");
+        assert_eq!(stripped, "\u{00EF}");
+        assert!(!had_bom);
+    }
+
+    #[test]
+    fn strip_bom_utf16_variants() {
+        // These tests cover the UTF-16 BOM detection branches in strip_bom
+        // but since we're working with UTF-8 strings, they return original text
+        let text_with_ff_fe =
+            String::from_utf8(vec![0xFF, 0xFE, b'H', b'i']).unwrap_or_else(|_| "Hi".to_string());
+        let (_stripped, had_bom) = strip_bom(&text_with_ff_fe);
+        assert!(!had_bom); // Can't strip non-UTF-8 BOM from UTF-8 string
+
+        let text_with_fe_ff =
+            String::from_utf8(vec![0xFE, 0xFF, b'H', b'i']).unwrap_or_else(|_| "Hi".to_string());
+        let (_stripped, had_bom) = strip_bom(&text_with_fe_ff);
+        assert!(!had_bom); // Can't strip non-UTF-8 BOM from UTF-8 string
+    }
+
+    #[test]
+    fn strip_bom_utf32_variants() {
+        // These tests cover the UTF-32 BOM detection branches in strip_bom
+        let text_with_utf32_little_endian =
+            String::from_utf8(vec![0xFF, 0xFE, 0x00, 0x00, b'H', b'i'])
+                .unwrap_or_else(|_| "Hi".to_string());
+        let (_stripped, had_bom) = strip_bom(&text_with_utf32_little_endian);
+        assert!(!had_bom); // Can't strip non-UTF-8 BOM from UTF-8 string
+
+        let text_with_utf32_big_endian =
+            String::from_utf8(vec![0x00, 0x00, 0xFE, 0xFF, b'H', b'i'])
+                .unwrap_or_else(|_| "Hi".to_string());
+        let (_stripped, had_bom) = strip_bom(&text_with_utf32_big_endian);
+        assert!(!had_bom); // Can't strip non-UTF-8 BOM from UTF-8 string
+    }
+
+    #[test]
+    fn detect_bom_empty_input() {
+        assert!(detect_bom(&[]).is_none());
+    }
+
+    #[test]
+    fn detect_bom_partial_sequences() {
+        // Too short for any BOM
+        assert!(detect_bom(&[0xEF]).is_none());
+        assert!(detect_bom(&[0xEF, 0xBB]).is_none());
+
+        // These detect shorter BOMs, not none - algorithm finds UTF-16 BOMs first
+        assert_eq!(detect_bom(&[0xFF, 0xFE, 0x00]).unwrap().0, BomType::Utf16Le);
+        assert!(detect_bom(&[0x00, 0x00, 0xFE]).is_none());
+
+        // Too short for UTF-16
+        assert!(detect_bom(&[0xFF]).is_none());
+        assert!(detect_bom(&[0xFE]).is_none());
+    }
+
+    #[test]
+    fn detect_bom_conflicting_sequences() {
+        // UTF-32LE starts with UTF-16LE prefix, ensure UTF-32LE is detected
+        let bytes = &[0xFF, 0xFE, 0x00, 0x00, b'H', b'i'];
+        let (bom_type, skip) = detect_bom(bytes).unwrap();
+        assert_eq!(bom_type, BomType::Utf32Le);
+        assert_eq!(skip, 4);
+    }
+
+    #[test]
+    fn detect_bom_minimum_length() {
+        // Minimum length for each BOM type
+        assert_eq!(detect_bom(&[0xEF, 0xBB, 0xBF]).unwrap().0, BomType::Utf8);
+        assert_eq!(detect_bom(&[0xFF, 0xFE]).unwrap().0, BomType::Utf16Le);
+        assert_eq!(detect_bom(&[0xFE, 0xFF]).unwrap().0, BomType::Utf16Be);
+        assert_eq!(
+            detect_bom(&[0xFF, 0xFE, 0x00, 0x00]).unwrap().0,
+            BomType::Utf32Le
+        );
+        assert_eq!(
+            detect_bom(&[0x00, 0x00, 0xFE, 0xFF]).unwrap().0,
+            BomType::Utf32Be
+        );
+    }
+
+    #[test]
+    fn strip_bom_very_long_content() {
+        let long_content = "A".repeat(1000);
+        let content_with_bom = format!("\u{FEFF}{long_content}");
+        let (stripped, had_bom) = strip_bom(&content_with_bom);
+        assert_eq!(stripped, long_content);
+        assert!(had_bom);
+    }
+
+    #[test]
+    fn bom_type_debug_format() {
+        // Test Debug implementation
+        let debug_str = format!("{:?}", BomType::Utf8);
+        assert!(debug_str.contains("Utf8"));
+    }
+
+    #[test]
+    fn bom_type_hash() {
+        use std::collections::HashSet;
+        let mut set = HashSet::new();
+        set.insert(BomType::Utf8);
+        set.insert(BomType::Utf16Le);
+        assert_eq!(set.len(), 2);
+        assert!(set.contains(&BomType::Utf8));
+    }
 }

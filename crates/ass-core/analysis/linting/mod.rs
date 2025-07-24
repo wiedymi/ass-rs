@@ -358,3 +358,222 @@ pub fn lint_script(script: &Script, config: &LintConfig) -> Result<Vec<LintIssue
     // Now run linting with the prepared analysis
     lint_script_with_analysis(&analysis, config)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::Script;
+
+    #[test]
+    fn issue_severity_display() {
+        assert_eq!(IssueSeverity::Info.to_string(), "info");
+        assert_eq!(IssueSeverity::Hint.to_string(), "hint");
+        assert_eq!(IssueSeverity::Warning.to_string(), "warning");
+        assert_eq!(IssueSeverity::Error.to_string(), "error");
+        assert_eq!(IssueSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn issue_severity_ordering() {
+        assert!(IssueSeverity::Info < IssueSeverity::Hint);
+        assert!(IssueSeverity::Hint < IssueSeverity::Warning);
+        assert!(IssueSeverity::Warning < IssueSeverity::Error);
+        assert!(IssueSeverity::Error < IssueSeverity::Critical);
+    }
+
+    #[test]
+    fn issue_category_display() {
+        assert_eq!(IssueCategory::Timing.to_string(), "timing");
+        assert_eq!(IssueCategory::Styling.to_string(), "styling");
+        assert_eq!(IssueCategory::Content.to_string(), "content");
+        assert_eq!(IssueCategory::Performance.to_string(), "performance");
+        assert_eq!(IssueCategory::Compliance.to_string(), "compliance");
+        assert_eq!(IssueCategory::Accessibility.to_string(), "accessibility");
+        assert_eq!(IssueCategory::Encoding.to_string(), "encoding");
+    }
+
+    #[test]
+    fn issue_location_creation() {
+        let location = IssueLocation {
+            line: 42,
+            column: 10,
+            offset: 1000,
+            length: 5,
+            span: "error".to_string(),
+        };
+
+        assert_eq!(location.line, 42);
+        assert_eq!(location.column, 10);
+        assert_eq!(location.offset, 1000);
+        assert_eq!(location.length, 5);
+        assert_eq!(location.span, "error");
+    }
+
+    #[test]
+    fn lint_issue_creation() {
+        let issue = LintIssue::new(
+            IssueSeverity::Warning,
+            IssueCategory::Timing,
+            "test_rule",
+            "Test message".to_string(),
+        );
+
+        assert_eq!(issue.severity(), IssueSeverity::Warning);
+        assert_eq!(issue.category(), IssueCategory::Timing);
+        assert_eq!(issue.message(), "Test message");
+        assert_eq!(issue.rule_id(), "test_rule");
+        assert!(issue.description().is_none());
+        assert!(issue.location().is_none());
+        assert!(issue.suggested_fix().is_none());
+    }
+
+    #[test]
+    fn lint_issue_with_description() {
+        let issue = LintIssue::new(
+            IssueSeverity::Error,
+            IssueCategory::Styling,
+            "style_rule",
+            "Style error".to_string(),
+        )
+        .with_description("Detailed description".to_string());
+
+        assert_eq!(issue.description(), Some("Detailed description"));
+    }
+
+    #[test]
+    fn lint_issue_with_location() {
+        let location = IssueLocation {
+            line: 5,
+            column: 2,
+            offset: 100,
+            length: 3,
+            span: "bad".to_string(),
+        };
+
+        let issue = LintIssue::new(
+            IssueSeverity::Critical,
+            IssueCategory::Content,
+            "content_rule",
+            "Content error".to_string(),
+        )
+        .with_location(location);
+
+        let loc = issue.location().unwrap();
+        assert_eq!(loc.line, 5);
+        assert_eq!(loc.column, 2);
+        assert_eq!(loc.span, "bad");
+    }
+
+    #[test]
+    fn lint_issue_with_suggested_fix() {
+        let issue = LintIssue::new(
+            IssueSeverity::Hint,
+            IssueCategory::Performance,
+            "perf_rule",
+            "Performance hint".to_string(),
+        )
+        .with_suggested_fix("Use simpler approach".to_string());
+
+        assert_eq!(issue.suggested_fix(), Some("Use simpler approach"));
+    }
+
+    #[test]
+    fn lint_config_default() {
+        let config = LintConfig::default();
+        assert_eq!(config.min_severity, IssueSeverity::Info);
+        assert_eq!(config.max_issues, 0);
+        assert!(!config.strict_mode);
+        assert!(config.enabled_rules.is_empty());
+        assert!(config.disabled_rules.is_empty());
+    }
+
+    #[test]
+    fn lint_config_with_min_severity() {
+        let config = LintConfig::default().with_min_severity(IssueSeverity::Warning);
+        assert_eq!(config.min_severity, IssueSeverity::Warning);
+    }
+
+    #[test]
+    fn lint_config_with_max_issues() {
+        let config = LintConfig::default().with_max_issues(100);
+        assert_eq!(config.max_issues, 100);
+    }
+
+    #[test]
+    fn lint_config_with_strict_compliance() {
+        let config = LintConfig::default().with_strict_compliance(true);
+        assert!(config.strict_mode);
+    }
+
+    #[test]
+    fn lint_config_is_rule_enabled_all_disabled() {
+        let mut config = LintConfig::default();
+        config.disabled_rules.push("test_rule");
+
+        assert!(!config.is_rule_enabled("test_rule"));
+        assert!(config.is_rule_enabled("other_rule"));
+    }
+
+    #[test]
+    fn lint_config_is_rule_enabled_specific_enabled() {
+        let mut config = LintConfig::default();
+        config.enabled_rules.push("test_rule");
+
+        assert!(config.is_rule_enabled("test_rule"));
+        assert!(!config.is_rule_enabled("other_rule"));
+    }
+
+    #[test]
+    fn lint_config_should_report_severity() {
+        let config = LintConfig::default().with_min_severity(IssueSeverity::Warning);
+
+        assert!(!config.should_report_severity(IssueSeverity::Info));
+        assert!(!config.should_report_severity(IssueSeverity::Hint));
+        assert!(config.should_report_severity(IssueSeverity::Warning));
+        assert!(config.should_report_severity(IssueSeverity::Error));
+        assert!(config.should_report_severity(IssueSeverity::Critical));
+    }
+
+    #[test]
+    fn lint_script_empty_script() {
+        let script_content = "[Script Info]\nTitle: Test\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,16,&Hffffff,&Hffffff,&H0,&H0,0,0,0,0,100,100,0,0,1,2,0,2,30,30,30,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";
+
+        let script = Script::parse(script_content).unwrap();
+        let config = LintConfig::default();
+
+        let issues = lint_script(&script, &config);
+        assert!(issues.is_ok());
+    }
+
+    #[test]
+    fn lint_script_with_analysis_empty() {
+        let script_content = "[Script Info]\nTitle: Test\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,16,&Hffffff,&Hffffff,&H0,&H0,0,0,0,0,100,100,0,0,1,2,0,2,30,30,30,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";
+
+        let script = Script::parse(script_content).unwrap();
+        let analysis = ScriptAnalysis {
+            script: &script,
+            lint_issues: Vec::new(),
+            resolved_styles: Vec::new(),
+            dialogue_info: Vec::new(),
+            config: AnalysisConfig::default(),
+        };
+
+        let config = LintConfig::default();
+        let issues = lint_script_with_analysis(&analysis, &config);
+        assert!(issues.is_ok());
+    }
+
+    #[test]
+    fn lint_script_with_max_issues() {
+        let script_content = "[Script Info]\nTitle: Test\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,16,&Hffffff,&Hffffff,&H0,&H0,0,0,0,0,100,100,0,0,1,2,0,2,30,30,30,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";
+
+        let script = Script::parse(script_content).unwrap();
+        let config = LintConfig::default().with_max_issues(1);
+
+        let issues = lint_script(&script, &config);
+        assert!(issues.is_ok());
+        if let Ok(issues) = issues {
+            assert!(issues.len() <= 1);
+        }
+    }
+}

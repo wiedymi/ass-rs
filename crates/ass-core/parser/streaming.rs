@@ -282,4 +282,233 @@ mod tests {
         parser.feed_chunk(chunk2).unwrap();
         assert!(parser.buffer.is_empty());
     }
+
+    #[test]
+    fn streaming_parser_with_capacity() {
+        let parser = StreamingParser::with_capacity(100);
+        assert_eq!(parser.sections.len(), 0);
+        assert!(parser.sections.capacity() >= 100);
+    }
+
+    #[test]
+    fn streaming_parser_default() {
+        let parser = StreamingParser::default();
+        assert_eq!(parser.sections.len(), 0);
+    }
+
+    #[test]
+    fn feed_chunk_invalid_utf8() {
+        let mut parser = StreamingParser::new();
+        let invalid_utf8 = b"\xff\xfe";
+        let result = parser.feed_chunk(invalid_utf8);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn feed_chunk_complete_lines() {
+        let mut parser = StreamingParser::new();
+        let chunk = b"[Script Info]\nTitle: Test\n";
+        let result = parser.feed_chunk(chunk);
+        assert!(result.is_ok());
+        assert!(parser.buffer.is_empty());
+    }
+
+    #[test]
+    fn feed_chunk_partial_lines() {
+        let mut parser = StreamingParser::new();
+
+        // Feed partial line without newline
+        let chunk1 = b"[Script Info]\nTitle: ";
+        parser.feed_chunk(chunk1).unwrap();
+        assert_eq!(parser.buffer, "Title: ");
+
+        // Complete the partial line
+        let chunk2 = b"Test\n";
+        parser.feed_chunk(chunk2).unwrap();
+        assert!(parser.buffer.is_empty());
+    }
+
+    #[test]
+    fn feed_chunk_multiple_calls() {
+        let mut parser = StreamingParser::new();
+
+        let chunk1 = b"[Script Info]\n";
+        let chunk2 = b"Title: Test\n";
+        let chunk3 = b"Author: Someone\n";
+
+        parser.feed_chunk(chunk1).unwrap();
+        parser.feed_chunk(chunk2).unwrap();
+        parser.feed_chunk(chunk3).unwrap();
+
+        assert!(parser.buffer.is_empty());
+    }
+
+    #[test]
+    fn feed_chunk_different_line_endings() {
+        let mut parser = StreamingParser::new();
+
+        // Unix line endings
+        parser.feed_chunk(b"Line1\nLine2\n").unwrap();
+        assert!(parser.buffer.is_empty());
+
+        // Windows line endings
+        parser.feed_chunk(b"Line3\r\nLine4\r\n").unwrap();
+        assert!(parser.buffer.is_empty());
+
+        // Mac line endings
+        parser.feed_chunk(b"Line5\rLine6\r").unwrap();
+        assert!(parser.buffer.is_empty());
+    }
+
+    #[test]
+    fn finish_with_empty_buffer() {
+        let parser = StreamingParser::new();
+        let result = parser.finish();
+        assert!(result.is_ok());
+
+        let streaming_result = result.unwrap();
+        assert_eq!(streaming_result.sections().len(), 0);
+        assert_eq!(streaming_result.version(), ScriptVersion::AssV4);
+        assert_eq!(streaming_result.issues().len(), 0);
+    }
+
+    #[test]
+    fn finish_with_buffered_content() {
+        let mut parser = StreamingParser::new();
+
+        // Feed content without final newline
+        parser.feed_chunk(b"[Script Info]\nTitle: Test").unwrap();
+        assert!(!parser.buffer.is_empty());
+
+        let result = parser.finish();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn reset_functionality() {
+        let mut parser = StreamingParser::new();
+
+        // Add some content
+        parser.feed_chunk(b"[Script Info]\nTitle: ").unwrap();
+        assert!(!parser.buffer.is_empty());
+
+        // Reset should clear everything
+        parser.reset();
+        assert!(parser.buffer.is_empty());
+        assert_eq!(parser.sections.len(), 0);
+    }
+
+    #[test]
+    fn streaming_result_accessors() {
+        let result = StreamingResult {
+            sections: vec!["Section1".to_string(), "Section2".to_string()],
+            version: ScriptVersion::AssV4,
+            issues: Vec::new(),
+        };
+
+        assert_eq!(result.sections().len(), 2);
+        assert_eq!(result.sections()[0], "Section1");
+        assert_eq!(result.version(), ScriptVersion::AssV4);
+        assert_eq!(result.issues().len(), 0);
+    }
+
+    #[test]
+    fn streaming_result_debug_clone() {
+        let result = StreamingResult {
+            sections: vec!["Test".to_string()],
+            version: ScriptVersion::AssV4,
+            issues: Vec::new(),
+        };
+
+        let debug_str = format!("{result:?}");
+        assert!(debug_str.contains("StreamingResult"));
+
+        let cloned = result.clone();
+        assert_eq!(cloned.sections().len(), result.sections().len());
+        assert_eq!(cloned.version(), result.version());
+    }
+
+    #[test]
+    fn parse_incremental_basic() {
+        use crate::parser::Script;
+
+        let content = "[Script Info]\nTitle: Test";
+        let script = Script::parse(content).unwrap();
+
+        let result = parse_incremental(&script, "Modified", 0..5);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn build_modified_source_basic() {
+        let original = "Hello World";
+        let result = build_modified_source(original, 0..5, "Hi");
+        // Function currently returns empty string (simplified implementation)
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn feed_chunk_whitespace_only() {
+        let mut parser = StreamingParser::new();
+        let result = parser.feed_chunk(b"   \n\t\n  \n");
+        assert!(result.is_ok());
+        assert!(parser.buffer.is_empty());
+    }
+
+    #[test]
+    fn feed_chunk_unicode_content() {
+        let mut parser = StreamingParser::new();
+        let unicode_content = "[Script Info]\nTitle: Unicode Test 测试 🎬\n";
+        let result = parser.feed_chunk(unicode_content.as_bytes());
+        assert!(result.is_ok());
+        assert!(parser.buffer.is_empty());
+    }
+
+    #[test]
+    fn streaming_large_chunk_comprehensive() {
+        use std::fmt::Write;
+
+        let mut parser = StreamingParser::new();
+        // Create a large chunk
+        let mut large_content = String::from("[Script Info]\n");
+        for i in 0..1000 {
+            writeln!(large_content, "Field{i}: Value{i}").unwrap();
+        }
+
+        let result = parser.feed_chunk(large_content.as_bytes());
+        assert!(result.is_ok());
+        assert!(parser.buffer.is_empty());
+    }
+
+    #[test]
+    fn feed_chunk_edge_cases() {
+        let mut parser = StreamingParser::new();
+
+        // Single character
+        parser.feed_chunk(b"a").unwrap();
+        assert_eq!(parser.buffer, "a");
+
+        // Just newline
+        parser.feed_chunk(b"\n").unwrap();
+        assert!(parser.buffer.is_empty());
+
+        // Empty line
+        parser.reset();
+        parser.feed_chunk(b"\n").unwrap();
+        assert!(parser.buffer.is_empty());
+    }
+
+    #[cfg(feature = "benches")]
+    #[test]
+    fn memory_tracking() {
+        let mut parser = StreamingParser::new();
+        let initial_memory = parser.peak_memory();
+
+        // Feed some content to increase memory usage
+        parser.feed_chunk(b"[Script Info]\nTitle: Test\n").unwrap();
+
+        // Memory should be tracked
+        assert!(parser.peak_memory() >= initial_memory);
+    }
 }

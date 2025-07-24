@@ -1,2 +1,5 @@
 .*
 target
+*.profraw
+cobertura.xml
+tarpaulin-report.html

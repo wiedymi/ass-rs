@@ -371,4 +371,236 @@ mod tests {
         assert_eq!(issues.len(), 2);
         assert!(!collector.has_issues());
     }
+
+    #[test]
+    fn token_context_all_variants() {
+        // Test all TokenContext variants for is_delimited_block
+        assert!(!TokenContext::Document.is_delimited_block());
+        assert!(TokenContext::SectionHeader.is_delimited_block());
+        assert!(!TokenContext::FieldValue.is_delimited_block());
+        assert!(TokenContext::StyleOverride.is_delimited_block());
+        assert!(!TokenContext::DrawingCommands.is_delimited_block());
+        assert!(!TokenContext::UuEncodedData.is_delimited_block());
+    }
+
+    #[test]
+    fn token_context_whitespace_skipping_all_variants() {
+        // Test all TokenContext variants for allows_whitespace_skipping
+        assert!(TokenContext::Document.allows_whitespace_skipping());
+        assert!(TokenContext::SectionHeader.allows_whitespace_skipping());
+        assert!(!TokenContext::FieldValue.allows_whitespace_skipping());
+        assert!(TokenContext::StyleOverride.allows_whitespace_skipping());
+        assert!(TokenContext::DrawingCommands.allows_whitespace_skipping());
+        assert!(!TokenContext::UuEncodedData.allows_whitespace_skipping());
+    }
+
+    #[test]
+    fn token_context_closing_delimiters_all_variants() {
+        // Test all TokenContext variants for closing_delimiter
+        assert_eq!(TokenContext::Document.closing_delimiter(), None);
+        assert_eq!(TokenContext::SectionHeader.closing_delimiter(), Some(']'));
+        assert_eq!(TokenContext::FieldValue.closing_delimiter(), None);
+        assert_eq!(TokenContext::StyleOverride.closing_delimiter(), Some('}'));
+        assert_eq!(TokenContext::DrawingCommands.closing_delimiter(), None);
+        assert_eq!(TokenContext::UuEncodedData.closing_delimiter(), None);
+    }
+
+    #[test]
+    fn token_context_enter_field_value_all_variants() {
+        // Test enter_field_value from all contexts
+        assert_eq!(
+            TokenContext::Document.enter_field_value(),
+            TokenContext::FieldValue
+        );
+        assert_eq!(
+            TokenContext::SectionHeader.enter_field_value(),
+            TokenContext::SectionHeader
+        );
+        assert_eq!(
+            TokenContext::FieldValue.enter_field_value(),
+            TokenContext::FieldValue
+        );
+        assert_eq!(
+            TokenContext::StyleOverride.enter_field_value(),
+            TokenContext::StyleOverride
+        );
+        assert_eq!(
+            TokenContext::DrawingCommands.enter_field_value(),
+            TokenContext::DrawingCommands
+        );
+        assert_eq!(
+            TokenContext::UuEncodedData.enter_field_value(),
+            TokenContext::UuEncodedData
+        );
+    }
+
+    #[test]
+    fn token_context_reset_to_document_all_variants() {
+        // Test reset_to_document from all contexts
+        assert_eq!(
+            TokenContext::Document.reset_to_document(),
+            TokenContext::Document
+        );
+        assert_eq!(
+            TokenContext::SectionHeader.reset_to_document(),
+            TokenContext::Document
+        );
+        assert_eq!(
+            TokenContext::FieldValue.reset_to_document(),
+            TokenContext::Document
+        );
+        assert_eq!(
+            TokenContext::StyleOverride.reset_to_document(),
+            TokenContext::Document
+        );
+        assert_eq!(
+            TokenContext::DrawingCommands.reset_to_document(),
+            TokenContext::Document
+        );
+        assert_eq!(
+            TokenContext::UuEncodedData.reset_to_document(),
+            TokenContext::Document
+        );
+    }
+
+    #[test]
+    fn token_context_default() {
+        assert_eq!(TokenContext::default(), TokenContext::Document);
+    }
+
+    #[test]
+    fn issue_level_as_str() {
+        assert_eq!(IssueLevel::Warning.as_str(), "warning");
+        assert_eq!(IssueLevel::Error.as_str(), "error");
+        assert_eq!(IssueLevel::Critical.as_str(), "critical");
+    }
+
+    #[test]
+    fn token_issue_all_constructors() {
+        let span = "test span";
+
+        let warning = TokenIssue::warning("Warning message".to_string(), span, 10, 5);
+        assert_eq!(warning.level, IssueLevel::Warning);
+        assert_eq!(warning.message, "Warning message");
+        assert!(!warning.is_error());
+
+        let error = TokenIssue::error("Error message".to_string(), span, 15, 8);
+        assert_eq!(error.level, IssueLevel::Error);
+        assert_eq!(error.message, "Error message");
+        assert!(error.is_error());
+
+        let critical = TokenIssue::critical("Critical message".to_string(), span, 20, 12);
+        assert_eq!(critical.level, IssueLevel::Critical);
+        assert_eq!(critical.message, "Critical message");
+        assert!(critical.is_error());
+    }
+
+    #[test]
+    fn token_issue_location_string() {
+        let issue = TokenIssue::new(IssueLevel::Warning, "Test".to_string(), "span", 42, 13);
+        assert_eq!(issue.location_string(), "42:13");
+    }
+
+    #[test]
+    fn token_issue_format_issue() {
+        let issue = TokenIssue::error("Test error message".to_string(), "span", 5, 10);
+        let formatted = issue.format_issue();
+        assert!(formatted.contains("error"));
+        assert!(formatted.contains("Test error message"));
+        assert!(formatted.contains("5:10"));
+    }
+
+    #[test]
+    fn issue_collector_new_vs_default() {
+        let collector1 = IssueCollector::new();
+        let collector2 = IssueCollector::default();
+
+        assert_eq!(collector1.issue_count(), collector2.issue_count());
+        assert_eq!(collector1.has_issues(), collector2.has_issues());
+    }
+
+    #[test]
+    fn issue_collector_add_issue_directly() {
+        let mut collector = IssueCollector::new();
+        let issue = TokenIssue::warning("Direct issue".to_string(), "span", 1, 1);
+
+        collector.add_issue(issue.clone());
+        assert_eq!(collector.issue_count(), 1);
+        assert_eq!(collector.issues()[0], issue);
+    }
+
+    #[test]
+    fn issue_collector_add_critical() {
+        let mut collector = IssueCollector::new();
+        collector.add_critical("Critical issue".to_string(), "span", 3, 7);
+
+        assert!(collector.has_issues());
+        assert!(collector.has_errors());
+        assert_eq!(collector.issues()[0].level, IssueLevel::Critical);
+        assert!(collector.issues()[0].level.should_abort());
+    }
+
+    #[test]
+    fn issue_collector_clear() {
+        let mut collector = IssueCollector::new();
+        collector.add_warning("Warning".to_string(), "span", 1, 1);
+        collector.add_error("Error".to_string(), "span", 2, 2);
+
+        assert!(collector.has_issues());
+        assert_eq!(collector.issue_count(), 2);
+
+        collector.clear();
+        assert!(!collector.has_issues());
+        assert_eq!(collector.issue_count(), 0);
+    }
+
+    #[test]
+    fn issue_collector_mixed_issue_types() {
+        let mut collector = IssueCollector::new();
+
+        collector.add_warning("First warning".to_string(), "span1", 1, 1);
+        collector.add_error("First error".to_string(), "span2", 2, 2);
+        collector.add_critical("Critical issue".to_string(), "span3", 3, 3);
+        collector.add_warning("Second warning".to_string(), "span4", 4, 4);
+
+        assert_eq!(collector.issue_count(), 4);
+        assert!(collector.has_issues());
+        assert!(collector.has_errors());
+
+        let issues = collector.issues();
+        assert_eq!(issues[0].level, IssueLevel::Warning);
+        assert_eq!(issues[1].level, IssueLevel::Error);
+        assert_eq!(issues[2].level, IssueLevel::Critical);
+        assert_eq!(issues[3].level, IssueLevel::Warning);
+    }
+
+    #[test]
+    fn token_issue_equality() {
+        let issue1 = TokenIssue::warning("Same message".to_string(), "same span", 5, 10);
+        let issue2 = TokenIssue::warning("Same message".to_string(), "same span", 5, 10);
+        let issue3 = TokenIssue::error("Same message".to_string(), "same span", 5, 10);
+
+        assert_eq!(issue1, issue2);
+        assert_ne!(issue1, issue3); // Different levels
+    }
+
+    #[test]
+    fn issue_level_clone_and_copy() {
+        let level1 = IssueLevel::Warning;
+        let level2 = level1;
+        let level3 = level1;
+
+        assert_eq!(level1, level2);
+        assert_eq!(level1, level3);
+    }
+
+    #[test]
+    fn token_context_clone_and_copy() {
+        let context1 = TokenContext::StyleOverride;
+        let context2 = context1;
+        let context3 = context1;
+
+        assert_eq!(context1, context2);
+        assert_eq!(context1, context3);
+    }
 }

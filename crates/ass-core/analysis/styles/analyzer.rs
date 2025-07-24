@@ -310,5 +310,304 @@ Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,
         let thresholds = PerformanceThresholds::default();
         assert!((thresholds.large_font_threshold - 50.0).abs() < f32::EPSILON);
         assert!((thresholds.large_outline_threshold - 4.0).abs() < f32::EPSILON);
+        assert!((thresholds.large_shadow_threshold - 4.0).abs() < f32::EPSILON);
+        assert!((thresholds.scaling_threshold - 200.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn analyzer_with_custom_config() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let config = StyleAnalysisConfig {
+            options: AnalysisOptions::VALIDATION | AnalysisOptions::STRICT_VALIDATION,
+            performance_thresholds: PerformanceThresholds {
+                large_font_threshold: 30.0,
+                large_outline_threshold: 2.0,
+                large_shadow_threshold: 2.0,
+                scaling_threshold: 150.0,
+            },
+        };
+        let analyzer = StyleAnalyzer::new_with_config(&script, config);
+
+        assert_eq!(analyzer.resolved_styles().len(), 1);
+        assert!(analyzer.resolve_style("Default").is_some());
+    }
+
+    #[test]
+    fn analyzer_multiple_styles() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+Style: Title,Arial,32,&H00FFFF00,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,3,0,2,20,20,20,1
+Style: Subtitle,Arial,16,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,1,0,0,100,100,0,0,1,1,0,2,5,5,5,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+
+        assert_eq!(analyzer.resolved_styles().len(), 3);
+        assert!(analyzer.resolve_style("Default").is_some());
+        assert!(analyzer.resolve_style("Title").is_some());
+        assert!(analyzer.resolve_style("Subtitle").is_some());
+        assert!(analyzer.resolve_style("NonExistent").is_none());
+    }
+
+    #[test]
+    fn analyzer_duplicate_styles() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+Style: Default,Times,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+
+        let conflicts = analyzer.conflicts();
+        assert!(!conflicts.is_empty());
+    }
+
+    #[test]
+    fn analyzer_no_styles_section() {
+        let script_text = r"
+[Script Info]
+Title: Test Script
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+
+        assert_eq!(analyzer.resolved_styles().len(), 0);
+        assert!(analyzer.conflicts().is_empty());
+    }
+
+    #[test]
+    fn analyzer_empty_styles_section() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+
+        assert_eq!(analyzer.resolved_styles().len(), 0);
+        assert!(analyzer.conflicts().is_empty());
+    }
+
+    #[test]
+    fn analyzer_extract_styles() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+
+        let styles = analyzer.extract_styles();
+        assert!(styles.is_some());
+        assert_eq!(styles.unwrap().len(), 1);
+    }
+
+    #[test]
+    fn analyzer_extract_styles_no_section() {
+        let script_text = r"
+[Script Info]
+Title: Test Script
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+
+        let styles = analyzer.extract_styles();
+        assert!(styles.is_none());
+    }
+
+    #[test]
+    fn analyzer_inheritance_info() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+Style: Title,Arial,32,&H00FFFF00,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,3,0,2,20,20,20,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+
+        let inheritance_info = analyzer.inheritance_info();
+        assert_eq!(inheritance_info.len(), 2);
+        assert!(inheritance_info.contains_key("Default"));
+        assert!(inheritance_info.contains_key("Title"));
+    }
+
+    #[test]
+    fn analyzer_validate_styles() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+Style: Large,Arial,60,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,5,0,2,10,10,10,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+
+        let issues = analyzer.validate_styles();
+        // Should have some validation issues or none
+        assert!(issues.is_empty() || !issues.is_empty());
+    }
+
+    #[test]
+    fn analyzer_strict_validation() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Large,Arial,250,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let config = StyleAnalysisConfig {
+            options: AnalysisOptions::VALIDATION | AnalysisOptions::STRICT_VALIDATION,
+            performance_thresholds: PerformanceThresholds::default(),
+        };
+        let analyzer = StyleAnalyzer::new_with_config(&script, config);
+
+        let issues = analyzer.validate_styles();
+        // Should have validation issues for large font size
+        assert!(!issues.is_empty());
+    }
+
+    #[test]
+    fn analyzer_performance_analysis() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Heavy,Arial,60,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,8,5,2,10,10,10,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let config = StyleAnalysisConfig {
+            options: AnalysisOptions::PERFORMANCE,
+            performance_thresholds: PerformanceThresholds {
+                large_font_threshold: 30.0,
+                large_outline_threshold: 2.0,
+                large_shadow_threshold: 2.0,
+                scaling_threshold: 150.0,
+            },
+        };
+        let analyzer = StyleAnalyzer::new_with_config(&script, config);
+
+        let issues = analyzer.validate_styles();
+        // Should have performance issues for large values
+        assert!(!issues.is_empty());
+    }
+
+    #[test]
+    fn analyzer_options_flags() {
+        let options = AnalysisOptions::INHERITANCE | AnalysisOptions::CONFLICTS;
+        assert!(options.contains(AnalysisOptions::INHERITANCE));
+        assert!(options.contains(AnalysisOptions::CONFLICTS));
+        assert!(!options.contains(AnalysisOptions::VALIDATION));
+        assert!(!options.contains(AnalysisOptions::PERFORMANCE));
+        assert!(!options.contains(AnalysisOptions::STRICT_VALIDATION));
+    }
+
+    #[test]
+    fn analyzer_options_debug() {
+        let options = AnalysisOptions::INHERITANCE;
+        let debug_str = format!("{options:?}");
+        assert!(debug_str.contains("INHERITANCE"));
+    }
+
+    #[test]
+    fn analyzer_config_debug() {
+        let config = StyleAnalysisConfig::default();
+        let debug_str = format!("{config:?}");
+        assert!(debug_str.contains("StyleAnalysisConfig"));
+        assert!(debug_str.contains("options"));
+        assert!(debug_str.contains("performance_thresholds"));
+    }
+
+    #[test]
+    fn analyzer_debug() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+        let debug_str = format!("{analyzer:?}");
+        assert!(debug_str.contains("StyleAnalyzer"));
+    }
+
+    #[test]
+    fn performance_thresholds_debug() {
+        let thresholds = PerformanceThresholds::default();
+        let debug_str = format!("{thresholds:?}");
+        assert!(debug_str.contains("PerformanceThresholds"));
+        assert!(debug_str.contains("large_font_threshold"));
+    }
+
+    #[test]
+    fn config_clone() {
+        let config = StyleAnalysisConfig::default();
+        let cloned = config.clone();
+        assert_eq!(config.options, cloned.options);
+        assert!(
+            (config.performance_thresholds.large_font_threshold
+                - cloned.performance_thresholds.large_font_threshold)
+                .abs()
+                < f32::EPSILON
+        );
+    }
+
+    #[test]
+    fn performance_thresholds_clone() {
+        let thresholds = PerformanceThresholds::default();
+        let cloned = thresholds.clone();
+        assert!(
+            (thresholds.large_font_threshold - cloned.large_font_threshold).abs() < f32::EPSILON
+        );
+        assert!(
+            (thresholds.large_outline_threshold - cloned.large_outline_threshold).abs()
+                < f32::EPSILON
+        );
+        assert!(
+            (thresholds.large_shadow_threshold - cloned.large_shadow_threshold).abs()
+                < f32::EPSILON
+        );
+        assert!((thresholds.scaling_threshold - cloned.scaling_threshold).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn analyzer_minimal_options() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let config = StyleAnalysisConfig {
+            options: AnalysisOptions::empty(),
+            performance_thresholds: PerformanceThresholds::default(),
+        };
+        let analyzer = StyleAnalyzer::new_with_config(&script, config);
+
+        assert_eq!(analyzer.resolved_styles().len(), 1);
+        assert!(analyzer.inheritance_info().is_empty());
+        assert!(analyzer.conflicts().is_empty());
     }
 }

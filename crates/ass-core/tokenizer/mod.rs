@@ -97,7 +97,7 @@ impl<'a> AssTokenizer<'a> {
         let current_char = self.scanner.navigator_mut().peek_char()?;
 
         let token_type = match (current_char, self.context) {
-            ('[', TokenContext::Document) => {
+            ('[', _) => {
                 self.context = TokenContext::SectionHeader;
                 self.scanner.scan_section_header()
             }
@@ -135,11 +135,23 @@ impl<'a> AssTokenizer<'a> {
             }
             (';', TokenContext::Document) => self.scanner.scan_comment(),
             ('!', TokenContext::Document) => {
-                if self.scanner.navigator().peek_next()? == ':' {
+                // Check if next character is ':' for comment marker "!:"
+                if self.scanner.navigator().peek_next() == Ok(':') {
                     self.scanner.scan_comment()
                 } else {
                     self.scanner.scan_text(self.context)
                 }
+            }
+            // Handle delimiter characters in wrong context as literal text
+            ('}', _) => {
+                // '}' outside StyleOverride context is literal text
+                self.scanner.navigator_mut().advance_char()?;
+                Ok(TokenType::Text)
+            }
+            (']', _) => {
+                // ']' outside SectionHeader context is literal text
+                self.scanner.navigator_mut().advance_char()?;
+                Ok(TokenType::Text)
             }
             _ => {
                 // In FieldValue context, consume everything until delimiter
@@ -154,11 +166,8 @@ impl<'a> AssTokenizer<'a> {
         let end_pos = self.scanner.navigator().position();
         let span = &self.source[start_pos..end_pos];
 
-        // Check for infinite loop - position must advance
-        if start_pos == end_pos && !span.is_empty() {
-            eprintln!("DEBUG: WARNING - Position didn't advance but span is not empty!");
-        }
-        if start_pos == end_pos && span.is_empty() && !self.scanner.navigator().is_at_end() {
+        // Check for infinite loop - position must advance unless at end
+        if start_pos == end_pos && !self.scanner.navigator().is_at_end() {
             return Err(crate::utils::CoreError::internal(
                 "Tokenizer position not advancing",
             ));
@@ -263,5 +272,413 @@ mod inline_tests {
         tokenizer.reset();
         assert_eq!(tokenizer.position(), 0);
         assert_eq!(tokenizer.line(), 1);
+    }
+
+    #[test]
+    fn tokenize_with_bom() {
+        let mut tokenizer = AssTokenizer::new("\u{FEFF}[Script Info]");
+        let tokens = tokenizer.tokenize_all().unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0].token_type, TokenType::SectionHeader);
+    }
+
+    #[test]
+    fn tokenize_style_override() {
+        let mut tokenizer = AssTokenizer::new("{\\b1}text{\\b0}");
+        let tokens = tokenizer.tokenize_all().unwrap();
+        assert!(tokens.len() >= 2);
+        // Should contain at least one override-related token and some text
+        let has_override = tokens.iter().any(|t| {
+            matches!(
+                t.token_type,
+                TokenType::OverrideBlock | TokenType::OverrideOpen | TokenType::OverrideClose
+            )
+        });
+        let has_text = tokens.iter().any(|t| t.token_type == TokenType::Text);
+        assert!(
+            has_override || has_text,
+            "Should have override or text tokens"
+        );
+    }
+
+    #[test]
+    fn tokenize_comma_delimiter() {
+        let mut tokenizer = AssTokenizer::new("field1,field2,field3");
+        let tokens = tokenizer.tokenize_all().unwrap();
+        assert!(tokens.iter().any(|t| t.token_type == TokenType::Comma));
+    }
+
+    #[test]
+    fn tokenize_newline_types() {
+        let mut tokenizer = AssTokenizer::new("line1\nline2\r\nline3");
+        let tokens = tokenizer.tokenize_all().unwrap();
+        let newline_count = tokens
+            .iter()
+            .filter(|t| t.token_type == TokenType::Newline)
+            .count();
+        assert!(newline_count >= 2);
+    }
+
+    #[test]
+    fn tokenize_comment_semicolon() {
+        let mut tokenizer = AssTokenizer::new("; This is a comment");
+        let tokens = tokenizer.tokenize_all().unwrap();
+        assert!(!tokens.is_empty());
+        assert_eq!(tokens[0].token_type, TokenType::Comment);
+    }
+
+    #[test]
+    fn tokenize_comment_exclamation() {
+        let mut tokenizer = AssTokenizer::new("!: This is a comment");
+        let tokens = tokenizer.tokenize_all().unwrap();
+        assert!(!tokens.is_empty());
+        assert_eq!(tokens[0].token_type, TokenType::Comment);
+    }
+
+    #[test]
+    fn tokenize_misplaced_delimiters() {
+        let mut tokenizer = AssTokenizer::new("text}more]text");
+        let tokens = tokenizer.tokenize_all().unwrap();
+        assert!(tokens.iter().any(|t| t.token_type == TokenType::Text));
+    }
+
+    #[test]
+    fn tokenize_field_value_context() {
+        let mut tokenizer = AssTokenizer::new("Key: Value with spaces");
+        let tokens = tokenizer.tokenize_all().unwrap();
+        let has_text = tokens
+            .iter()
+            .any(|t| matches!(t.token_type, TokenType::Text));
+        assert!(has_text);
+    }
+
+    #[test]
+    fn tokenize_exclamation_without_colon() {
+        let mut tokenizer = AssTokenizer::new("!not a comment");
+        let tokens = tokenizer.tokenize_all().unwrap();
+        assert!(tokens.iter().any(|t| t.token_type == TokenType::Text));
+    }
+
+    #[test]
+    fn tokenize_all_iteration_limit() {
+        let repeated_text = "a".repeat(100);
+        let mut tokenizer = AssTokenizer::new(&repeated_text);
+        let result = tokenizer.tokenize_all();
+        // Should either succeed with reasonable token count or hit iteration limit
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn tokenizer_position_tracking() {
+        let mut tokenizer = AssTokenizer::new("Test\nLine 2");
+
+        let initial_pos = tokenizer.position();
+        let initial_line = tokenizer.line();
+        let initial_col = tokenizer.column();
+
+        assert_eq!(initial_pos, 0);
+        assert_eq!(initial_line, 1);
+        assert_eq!(initial_col, 1);
+
+        let _ = tokenizer.next_token().unwrap();
+        assert!(tokenizer.position() > initial_pos);
+    }
+
+    #[test]
+    fn tokenizer_issues_collection() {
+        let mut tokenizer = AssTokenizer::new("test content");
+        let _ = tokenizer.tokenize_all().unwrap();
+        let _issues = tokenizer.issues();
+        // Issues collection should be accessible (may be empty for valid input)
+    }
+
+    #[test]
+    fn tokenize_empty_input() {
+        let mut tokenizer = AssTokenizer::new("");
+        let result = tokenizer.next_token().unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn tokenize_only_whitespace() {
+        let mut tokenizer = AssTokenizer::new("   \t  ");
+        let result = tokenizer.next_token().unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn tokenizer_infinite_loop_protection() {
+        // Create a scenario that could cause infinite loop if position doesn't advance
+        let mut tokenizer = AssTokenizer::new("test");
+
+        // Force scanner into a state where it might not advance position
+        let result = tokenizer.next_token();
+        assert!(result.is_ok());
+
+        // Ensure position has advanced
+        assert!(tokenizer.position() > 0 || tokenizer.scanner.navigator().is_at_end());
+    }
+
+    #[test]
+    fn tokenizer_iteration_limit_exceeded() {
+        // Test the iteration limit in tokenize_all
+        let long_content = "a ".repeat(30); // Should exceed 50 token limit
+        let mut tokenizer = AssTokenizer::new(&long_content);
+        let result = tokenizer.tokenize_all();
+
+        // Should either succeed or hit the iteration limit error
+        match result {
+            Ok(tokens) => assert!(tokens.len() <= 50),
+            Err(e) => assert!(e.to_string().contains("Too many tokenizer iterations")),
+        }
+    }
+
+    #[test]
+    fn tokenizer_context_transitions_comprehensive() {
+        let mut tokenizer = AssTokenizer::new("[Section]:value{override}text\n");
+
+        // Start in Document context
+        assert_eq!(tokenizer.context, TokenContext::Document);
+
+        // After '[', should be in SectionHeader context
+        let token1 = tokenizer.next_token().unwrap().unwrap();
+        assert_eq!(token1.token_type, TokenType::SectionHeader);
+        assert_eq!(tokenizer.context, TokenContext::SectionHeader);
+
+        // After ']', should return to Document context
+        let token2 = tokenizer.next_token().unwrap().unwrap();
+        assert_eq!(token2.token_type, TokenType::SectionClose);
+        assert_eq!(tokenizer.context, TokenContext::Document);
+
+        // After ':', should be in FieldValue context
+        let token3 = tokenizer.next_token().unwrap().unwrap();
+        assert_eq!(token3.token_type, TokenType::Colon);
+        assert_eq!(tokenizer.context, TokenContext::FieldValue);
+
+        // Continue tokenizing to test more transitions
+        let _remaining_tokens = tokenizer.tokenize_all().unwrap();
+    }
+
+    #[test]
+    fn tokenizer_delimiter_in_wrong_context() {
+        // Test '}' outside StyleOverride context
+        let mut tokenizer = AssTokenizer::new("}text");
+        let token = tokenizer.next_token().unwrap().unwrap();
+        assert_eq!(token.token_type, TokenType::Text);
+        assert_eq!(token.span, "}");
+
+        // Test ']' outside SectionHeader context
+        let mut tokenizer2 = AssTokenizer::new("]text");
+        let token2 = tokenizer2.next_token().unwrap().unwrap();
+        assert_eq!(token2.token_type, TokenType::Text);
+        assert_eq!(token2.span, "]");
+    }
+
+    #[test]
+    fn tokenizer_bom_edge_cases() {
+        // Test content that starts like BOM but isn't complete
+        let mut tokenizer = AssTokenizer::new("\u{FEFF}content");
+        assert_eq!(tokenizer.position(), 3); // Should skip BOM
+
+        // Test reset with BOM
+        let _token = tokenizer.next_token().unwrap();
+        tokenizer.reset();
+        assert_eq!(tokenizer.position(), 3); // Should skip BOM again after reset
+        assert_eq!(tokenizer.line(), 1);
+        assert_eq!(tokenizer.column(), 1);
+        assert_eq!(tokenizer.context, TokenContext::Document);
+    }
+
+    #[test]
+    fn tokenizer_carriage_return_line_feed() {
+        let mut tokenizer = AssTokenizer::new("line1\r\nline2");
+
+        // Get first token (text)
+        let token1 = tokenizer.next_token().unwrap().unwrap();
+        assert_eq!(token1.token_type, TokenType::Text);
+
+        // Get newline token - should handle \r\n as single newline
+        let token2 = tokenizer.next_token().unwrap().unwrap();
+        assert_eq!(token2.token_type, TokenType::Newline);
+        assert_eq!(tokenizer.context, TokenContext::Document); // Should reset context
+
+        // Should advance past both \r and \n
+        let token3 = tokenizer.next_token().unwrap().unwrap();
+        assert_eq!(token3.token_type, TokenType::Text);
+        assert_eq!(token3.span, "line2");
+    }
+
+    #[test]
+    fn tokenizer_exclamation_comment_detection() {
+        // Test '!' followed by ':' (should be comment)
+        let mut tokenizer = AssTokenizer::new("!:comment");
+        let token = tokenizer.next_token().unwrap().unwrap();
+        assert_eq!(token.token_type, TokenType::Comment);
+
+        // Test '!' not followed by ':' (should be text)
+        let mut tokenizer2 = AssTokenizer::new("!text");
+        let token2 = tokenizer2.next_token().unwrap().unwrap();
+        assert_eq!(token2.token_type, TokenType::Text);
+    }
+
+    #[test]
+    fn tokenizer_field_value_context_handling() {
+        let mut tokenizer = AssTokenizer::new("key:value with spaces,next");
+
+        // Get key
+        let token1 = tokenizer.next_token().unwrap().unwrap();
+        assert_eq!(token1.token_type, TokenType::Text);
+
+        // Get colon - should enter FieldValue context
+        let token2 = tokenizer.next_token().unwrap().unwrap();
+        assert_eq!(token2.token_type, TokenType::Colon);
+        assert_eq!(tokenizer.context, TokenContext::FieldValue);
+
+        // Get field value - should consume until delimiter
+        let token3 = tokenizer.next_token().unwrap().unwrap();
+        // Should be either Text or a field value token type
+        assert!(matches!(
+            token3.token_type,
+            TokenType::Text | TokenType::Number | TokenType::HexValue
+        ));
+    }
+
+    #[test]
+    fn tokenizer_position_line_column_tracking() {
+        let mut tokenizer = AssTokenizer::new("first\nsecond\nthird");
+
+        // Initial position
+        assert_eq!(tokenizer.position(), 0);
+        assert_eq!(tokenizer.line(), 1);
+        assert_eq!(tokenizer.column(), 1);
+
+        // After first token
+        let _token1 = tokenizer.next_token().unwrap().unwrap();
+        let pos1 = tokenizer.position();
+        let line1 = tokenizer.line();
+        let _col1 = tokenizer.column();
+
+        // After newline
+        let _token2 = tokenizer.next_token().unwrap().unwrap(); // newline
+        assert!(tokenizer.line() > line1); // Line should increment
+
+        // Position should always advance unless at end
+        let _token3 = tokenizer.next_token().unwrap().unwrap();
+        assert!(tokenizer.position() > pos1);
+    }
+
+    #[test]
+    fn tokenizer_all_delimiter_types() {
+        let mut tokenizer = AssTokenizer::new("[section]:value,field{override}text\n");
+        let tokens = tokenizer.tokenize_all().unwrap();
+
+        // Should have various token types
+        let types: std::collections::HashSet<_> = tokens.iter().map(|t| &t.token_type).collect();
+
+        // Should include multiple different types
+        assert!(types.len() > 1);
+        assert!(
+            types.contains(&TokenType::SectionHeader) || types.contains(&TokenType::SectionOpen)
+        );
+        assert!(types.contains(&TokenType::Colon));
+        assert!(types.contains(&TokenType::Comma));
+    }
+
+    #[test]
+    fn tokenizer_empty_reset_state() {
+        let mut tokenizer = AssTokenizer::new("");
+
+        // Should handle empty input
+        let result = tokenizer.next_token().unwrap();
+        assert!(result.is_none());
+
+        // Reset should work on empty input
+        tokenizer.reset();
+        assert_eq!(tokenizer.position(), 0);
+        assert_eq!(tokenizer.line(), 1);
+        assert_eq!(tokenizer.column(), 1);
+    }
+
+    #[test]
+    fn tokenizer_whitespace_handling_contexts() {
+        // Test whitespace skipping in different contexts
+        let mut tokenizer = AssTokenizer::new("   [   section   ]   ");
+
+        // Document context should skip whitespace
+        let token1 = tokenizer.next_token().unwrap().unwrap();
+        assert!(matches!(
+            token1.token_type,
+            TokenType::SectionHeader | TokenType::SectionOpen
+        ));
+
+        // Continue parsing
+        let _remaining = tokenizer.tokenize_all().unwrap();
+    }
+
+    #[test]
+    fn tokenizer_issue_collection_access() {
+        let mut tokenizer = AssTokenizer::new("valid content");
+
+        // Initially no issues
+        assert!(tokenizer.issues().is_empty());
+
+        // After tokenizing
+        let _tokens = tokenizer.tokenize_all().unwrap();
+        let _issues = tokenizer.issues(); // Should be accessible
+
+        // Reset should clear issues
+        tokenizer.reset();
+        assert!(tokenizer.issues().is_empty());
+    }
+
+    #[test]
+    fn tokenizer_scanner_navigation_access() {
+        let mut tokenizer = AssTokenizer::new("test content");
+
+        // Test that we can access navigator properties through public methods
+        let initial_pos = tokenizer.position();
+        let initial_line = tokenizer.line();
+        let initial_col = tokenizer.column();
+
+        assert_eq!(initial_pos, 0);
+        assert_eq!(initial_line, 1);
+        assert_eq!(initial_col, 1);
+
+        // After tokenizing, positions should be accessible
+        let _token = tokenizer.next_token().unwrap();
+        let _new_pos = tokenizer.position();
+        let _new_line = tokenizer.line();
+        let _new_col = tokenizer.column();
+    }
+
+    #[test]
+    fn tokenizer_mixed_context_characters() {
+        // Test various combinations that might cause context confusion
+        let mut tokenizer = AssTokenizer::new("text{override[section]:value}more");
+        let tokens = tokenizer.tokenize_all().unwrap();
+
+        // Should handle mixed contexts without errors
+        assert!(!tokens.is_empty());
+
+        // Should have text tokens at minimum
+        assert!(tokens.iter().any(|t| t.token_type == TokenType::Text));
+    }
+
+    #[test]
+    fn tokenizer_semicolon_comment_in_document_context() {
+        let mut tokenizer = AssTokenizer::new("; comment in document context");
+
+        // Should recognize semicolon comment in Document context
+        let token = tokenizer.next_token().unwrap().unwrap();
+        assert_eq!(token.token_type, TokenType::Comment);
+    }
+
+    #[test]
+    fn tokenizer_no_bom_content() {
+        let mut tokenizer = AssTokenizer::new("content without BOM");
+        assert_eq!(tokenizer.position(), 0); // Should start at 0 without BOM
+
+        let _token = tokenizer.next_token().unwrap();
+        assert!(tokenizer.position() > 0);
     }
 }

@@ -170,4 +170,206 @@ mod tests {
         let handlers = create_formatting_handlers();
         assert_eq!(handlers.len(), 4);
     }
+
+    #[test]
+    fn bold_handler_validation() {
+        let handler = BoldTagHandler;
+        assert!(handler.validate("0"));
+        assert!(handler.validate("1"));
+        assert!(handler.validate(""));
+        assert!(handler.validate(" 0 ")); // whitespace handling
+        assert!(handler.validate(" 1 "));
+        assert!(!handler.validate("2"));
+        assert!(!handler.validate("invalid"));
+        assert!(!handler.validate("-1"));
+    }
+
+    #[test]
+    fn bold_handler_whitespace_handling() {
+        let handler = BoldTagHandler;
+        assert_eq!(handler.process(" 0 "), TagResult::Processed);
+        assert_eq!(handler.process(" 1 "), TagResult::Processed);
+        assert_eq!(handler.process("  "), TagResult::Processed);
+        assert_eq!(handler.process("\t0\t"), TagResult::Processed);
+    }
+
+    #[test]
+    fn bold_handler_error_messages() {
+        let handler = BoldTagHandler;
+        if let TagResult::Failed(msg) = handler.process("2") {
+            assert_eq!(msg, "Bold tag accepts only 0, 1, or empty");
+        } else {
+            panic!("Expected TagResult::Failed");
+        }
+    }
+
+    #[test]
+    fn italic_handler_process_valid() {
+        let handler = ItalicTagHandler;
+        assert_eq!(handler.process("0"), TagResult::Processed);
+        assert_eq!(handler.process("1"), TagResult::Processed);
+        assert_eq!(handler.process(""), TagResult::Processed);
+    }
+
+    #[test]
+    fn italic_handler_process_invalid() {
+        let handler = ItalicTagHandler;
+        assert!(matches!(handler.process("2"), TagResult::Failed(_)));
+        assert!(matches!(handler.process("invalid"), TagResult::Failed(_)));
+        assert!(matches!(handler.process("-1"), TagResult::Failed(_)));
+    }
+
+    #[test]
+    fn italic_handler_whitespace_handling() {
+        let handler = ItalicTagHandler;
+        assert_eq!(handler.process(" 0 "), TagResult::Processed);
+        assert_eq!(handler.process(" 1 "), TagResult::Processed);
+        assert_eq!(handler.process("  "), TagResult::Processed);
+        assert!(handler.validate(" 0 "));
+        assert!(handler.validate(" 1 "));
+    }
+
+    #[test]
+    fn italic_handler_error_messages() {
+        let handler = ItalicTagHandler;
+        if let TagResult::Failed(msg) = handler.process("invalid") {
+            assert_eq!(msg, "Italic tag accepts only 0, 1, or empty");
+        } else {
+            panic!("Expected TagResult::Failed");
+        }
+    }
+
+    #[test]
+    fn underline_handler_process_valid() {
+        let handler = UnderlineTagHandler;
+        assert_eq!(handler.process("0"), TagResult::Processed);
+        assert_eq!(handler.process("1"), TagResult::Processed);
+        assert_eq!(handler.process(""), TagResult::Processed);
+    }
+
+    #[test]
+    fn underline_handler_process_invalid() {
+        let handler = UnderlineTagHandler;
+        assert!(matches!(handler.process("2"), TagResult::Failed(_)));
+        assert!(matches!(handler.process("invalid"), TagResult::Failed(_)));
+    }
+
+    #[test]
+    fn underline_handler_validation() {
+        let handler = UnderlineTagHandler;
+        assert!(handler.validate("0"));
+        assert!(handler.validate("1"));
+        assert!(handler.validate(""));
+        assert!(handler.validate(" 0 "));
+        assert!(!handler.validate("2"));
+        assert!(!handler.validate("invalid"));
+    }
+
+    #[test]
+    fn underline_handler_whitespace_handling() {
+        let handler = UnderlineTagHandler;
+        assert_eq!(handler.process(" 0 "), TagResult::Processed);
+        assert_eq!(handler.process(" 1 "), TagResult::Processed);
+        assert_eq!(handler.process("  "), TagResult::Processed);
+    }
+
+    #[test]
+    fn underline_handler_error_messages() {
+        let handler = UnderlineTagHandler;
+        if let TagResult::Failed(msg) = handler.process("invalid") {
+            assert_eq!(msg, "Underline tag accepts only 0, 1, or empty");
+        } else {
+            panic!("Expected TagResult::Failed");
+        }
+    }
+
+    #[test]
+    fn strikeout_handler_process_valid() {
+        let handler = StrikeoutTagHandler;
+        assert_eq!(handler.process("0"), TagResult::Processed);
+        assert_eq!(handler.process("1"), TagResult::Processed);
+        assert_eq!(handler.process(""), TagResult::Processed);
+    }
+
+    #[test]
+    fn strikeout_handler_process_invalid() {
+        let handler = StrikeoutTagHandler;
+        assert!(matches!(handler.process("2"), TagResult::Failed(_)));
+        assert!(matches!(handler.process("invalid"), TagResult::Failed(_)));
+    }
+
+    #[test]
+    fn strikeout_handler_validation() {
+        let handler = StrikeoutTagHandler;
+        assert!(handler.validate("0"));
+        assert!(handler.validate("1"));
+        assert!(handler.validate(""));
+        assert!(handler.validate(" 1 "));
+        assert!(!handler.validate("2"));
+        assert!(!handler.validate("invalid"));
+    }
+
+    #[test]
+    fn strikeout_handler_whitespace_handling() {
+        let handler = StrikeoutTagHandler;
+        assert_eq!(handler.process(" 0 "), TagResult::Processed);
+        assert_eq!(handler.process(" 1 "), TagResult::Processed);
+        assert_eq!(handler.process("  "), TagResult::Processed);
+    }
+
+    #[test]
+    fn strikeout_handler_error_messages() {
+        let handler = StrikeoutTagHandler;
+        if let TagResult::Failed(msg) = handler.process("bad") {
+            assert_eq!(msg, "Strikeout tag accepts only 0, 1, or empty");
+        } else {
+            panic!("Expected TagResult::Failed");
+        }
+    }
+
+    #[test]
+    fn all_handlers_consistency() {
+        let handlers = create_formatting_handlers();
+
+        // Test that all handlers behave consistently
+        for handler in &handlers {
+            assert_eq!(handler.process("0"), TagResult::Processed);
+            assert_eq!(handler.process("1"), TagResult::Processed);
+            assert_eq!(handler.process(""), TagResult::Processed);
+            assert!(handler.validate("0"));
+            assert!(handler.validate("1"));
+            assert!(handler.validate(""));
+            assert!(!handler.validate("2"));
+            assert!(!handler.validate("invalid"));
+        }
+    }
+
+    #[test]
+    fn handlers_name_uniqueness() {
+        let handlers = create_formatting_handlers();
+        let mut names = std::collections::HashSet::new();
+
+        for handler in &handlers {
+            let name = handler.name();
+            assert!(!names.contains(name), "Duplicate handler name: {name}");
+            names.insert(name);
+        }
+    }
+
+    #[test]
+    fn edge_case_arguments() {
+        let handlers = create_formatting_handlers();
+
+        for handler in &handlers {
+            // Test extreme whitespace
+            assert_eq!(handler.process("\n\t \r"), TagResult::Processed);
+            assert!(handler.validate("\n\t \r"));
+
+            // Test numeric edge cases
+            assert!(matches!(handler.process("00"), TagResult::Failed(_)));
+            assert!(matches!(handler.process("01"), TagResult::Failed(_)));
+            assert!(matches!(handler.process("10"), TagResult::Failed(_)));
+            assert!(matches!(handler.process("11"), TagResult::Failed(_)));
+        }
+    }
 }
