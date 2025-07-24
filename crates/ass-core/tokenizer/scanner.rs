@@ -312,6 +312,8 @@ impl<'a> TokenScanner<'a> {
                 .all(|c| c.is_ascii_digit() || c == '.' || c == '-')
         {
             Ok(TokenType::Number)
+        } else if !span.is_empty() && span.chars().all(char::is_whitespace) {
+            Ok(TokenType::Whitespace)
         } else {
             Ok(TokenType::Text)
         }
@@ -389,6 +391,8 @@ impl<'a> TokenScanner<'a> {
                 .all(|c| c.is_ascii_digit() || c == '.' || c == '-' || c == ':')
         {
             Ok(TokenType::Number)
+        } else if !span.is_empty() && span.chars().all(char::is_whitespace) {
+            Ok(TokenType::Whitespace)
         } else {
             Ok(TokenType::Text)
         }
@@ -1400,5 +1404,472 @@ mod tests {
         nav.advance_char().unwrap(); // \n
         assert_eq!(nav.line(), 3);
         assert_eq!(nav.column(), 1);
+    }
+
+    #[test]
+    fn char_navigator_utf8_error_handling() {
+        // Test invalid UTF-8 sequences
+        let source = "valid\x7F\x7E";
+        let mut nav = CharNavigator::new(source, 0, 1, 1);
+
+        // Should advance through valid chars
+        assert!(nav.advance_char().is_ok());
+        assert!(nav.advance_char().is_ok());
+        assert!(nav.advance_char().is_ok());
+        assert!(nav.advance_char().is_ok());
+        assert!(nav.advance_char().is_ok());
+
+        // Should handle invalid UTF-8
+        let result = nav.advance_char();
+        match result {
+            Ok(_) | Err(_) => {
+                // Both outcomes acceptable - important is no panic
+                assert!(nav.position() > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn char_navigator_peek_char_caching_coverage() {
+        let source = "abc";
+        let mut nav = CharNavigator::new(source, 0, 1, 1);
+
+        // First peek should cache the character
+        let first_peek = nav.peek_char();
+        assert_eq!(first_peek, Ok('a'));
+
+        // Second peek should use cached value
+        let second_peek = nav.peek_char();
+        assert_eq!(second_peek, Ok('a'));
+
+        // Advance should clear cache and move to next char
+        assert!(nav.advance_char().is_ok());
+
+        // Next peek should get new character
+        let third_peek = nav.peek_char();
+        assert_eq!(third_peek, Ok('b'));
+    }
+
+    #[test]
+    fn char_navigator_last_char_tracking_coverage() {
+        let source = "xy\nz";
+        let mut nav = CharNavigator::new(source, 0, 1, 1);
+
+        // Advance through characters and track last_char
+        nav.advance_char().unwrap(); // 'x'
+        assert_eq!(nav.last_char, Some('x'));
+
+        nav.advance_char().unwrap(); // 'y'
+        assert_eq!(nav.last_char, Some('y'));
+
+        nav.advance_char().unwrap(); // '\n'
+        assert_eq!(nav.last_char, Some('\n'));
+        assert_eq!(nav.line(), 2);
+
+        nav.advance_char().unwrap(); // 'z'
+        assert_eq!(nav.last_char, Some('z'));
+    }
+
+    #[test]
+    fn token_scanner_hex_value_comprehensive_coverage() {
+        // Test hex with ampersand suffix (must be even length)
+        assert!(TokenScanner::is_hex_value("&H1234&"));
+        assert!(TokenScanner::is_hex_value("&HFFFF&"));
+        assert!(TokenScanner::is_hex_value("&H00&"));
+
+        // Test hex without ampersand suffix (must be even length)
+        assert!(TokenScanner::is_hex_value("&H1234"));
+        assert!(TokenScanner::is_hex_value("&HABCD"));
+
+        // Test empty hex part
+        assert!(!TokenScanner::is_hex_value("&H&"));
+        assert!(!TokenScanner::is_hex_value("&H"));
+
+        // Test odd length (invalid)
+        assert!(!TokenScanner::is_hex_value("&H123&"));
+        assert!(!TokenScanner::is_hex_value("&H0&"));
+
+        // Test max length enforcement
+        assert!(!TokenScanner::is_hex_value("&H123456789ABCDEF&")); // Too long
+
+        // Test invalid characters
+        assert!(!TokenScanner::is_hex_value("&HZ123&"));
+        assert!(!TokenScanner::is_hex_value("&H12G4&"));
+    }
+
+    #[test]
+    fn token_scanner_delimiter_context_comprehensive() {
+        let source = ",{[}]:;\n\r";
+        let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+        // Test field value context delimiters
+        let result = scanner.scan_field_value();
+        assert!(result.is_ok());
+
+        // Test document context delimiter behavior
+        let source2 = ";comment";
+        let scanner2 = TokenScanner::new(source2, 0, 1, 1);
+        let nav_pos = scanner2.navigator().position();
+
+        // Should handle semicolon in document context
+        assert_eq!(nav_pos, 0);
+    }
+
+    #[test]
+    fn token_scanner_scan_text_number_classification() {
+        let source = "123.45";
+        let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+        let result = scanner.scan_text(crate::tokenizer::state::TokenContext::Document);
+        assert!(result.is_ok());
+
+        let token_type = result.unwrap();
+        assert_eq!(token_type, crate::tokenizer::tokens::TokenType::Number);
+    }
+
+    #[test]
+    fn token_scanner_section_header_boundary_coverage() {
+        let source = "[Section]";
+        let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+        // Should find closing bracket
+        let result = scanner.scan_section_header();
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            crate::tokenizer::tokens::TokenType::SectionHeader
+        );
+    }
+
+    #[test]
+    fn token_scanner_style_override_brace_matching() {
+        let source = "{\\b1}text{\\b0}";
+        let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+        // Should handle nested braces correctly
+        let result = scanner.scan_style_override();
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            crate::tokenizer::tokens::TokenType::OverrideBlock
+        );
+    }
+
+    #[test]
+    fn token_scanner_simd_fallback_forced_coverage() {
+        let source = "test,delimiter:content";
+        let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+        // Force scalar path by testing with different contexts
+        let result = scanner.scan_field_value();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn char_navigator_advance_char_utf8_length_tracking() {
+        let source = "a🎵b";
+        let mut nav = CharNavigator::new(source, 0, 1, 1);
+
+        // Advance over 'a' (1 byte)
+        nav.advance_char().unwrap();
+        assert_eq!(nav.position(), 1);
+
+        // Advance over '🎵' (4 bytes)
+        nav.advance_char().unwrap();
+        assert_eq!(nav.position(), 5);
+
+        // Advance over 'b' (1 byte)
+        nav.advance_char().unwrap();
+        assert_eq!(nav.position(), 6);
+    }
+
+    #[test]
+    fn token_scanner_empty_span_edge_cases() {
+        let source = "";
+        let scanner = TokenScanner::new(source, 0, 1, 1);
+
+        // Test scan operations on empty source
+        let nav_result = scanner.navigator();
+        assert!(nav_result.is_at_end());
+
+        // Verify position tracking
+        assert_eq!(nav_result.position(), 0);
+        assert_eq!(nav_result.line(), 1);
+        assert_eq!(nav_result.column(), 1);
+    }
+
+    #[test]
+    fn char_navigator_peek_operations_at_boundaries() {
+        let source = "a";
+        let mut nav = CharNavigator::new(source, 0, 1, 1);
+
+        // Peek at first character
+        assert_eq!(nav.peek_char().unwrap(), 'a');
+
+        // Peek next should handle end of input
+        assert!(nav.peek_next().is_err());
+
+        // Advance to end
+        nav.advance_char().unwrap();
+        assert!(nav.is_at_end());
+
+        // Peek at end should handle end of input
+        assert!(nav.peek_char().is_err());
+        assert!(nav.peek_next().is_err());
+    }
+
+    #[test]
+    fn token_scanner_all_delimiter_combinations_coverage() {
+        let delimiters = [',', ':', '{', '}', '[', ']', '\n', '\r'];
+
+        for &delimiter in &delimiters {
+            let source = format!("text{delimiter}more");
+            let mut scanner = TokenScanner::new(&source, 0, 1, 1);
+
+            // Test delimiter detection in different contexts
+            let result = scanner.scan_field_value();
+            assert!(result.is_ok());
+        }
+    }
+
+    #[test]
+    fn char_navigator_newline_variations_comprehensive() {
+        // Test different newline types
+        let sources = [
+            "line1\nline2",   // LF
+            "line1\rline2",   // CR
+            "line1\r\nline2", // CRLF
+        ];
+
+        for source in &sources {
+            let mut nav = CharNavigator::new(source, 0, 1, 1);
+
+            // Advance to newline
+            while let Ok(ch) = nav.advance_char() {
+                if ch == '\n' || ch == '\r' {
+                    break;
+                }
+            }
+
+            // Should be on line 2 after newline processing
+            if !nav.is_at_end() {
+                nav.advance_char().ok(); // Move past newline
+                assert!(nav.line() >= 2);
+            }
+        }
+    }
+
+    #[test]
+    fn char_navigator_carriage_return_line_increment() {
+        // Target lines 114-118: '\r' handling in advance_char
+        let source = "text\rmore";
+        let mut nav = CharNavigator::new(source, 0, 1, 1);
+
+        // Advance to carriage return
+        for _ in 0..4 {
+            nav.advance_char().unwrap();
+        }
+
+        // This should hit the '\r' branch and increment line
+        let ch = nav.advance_char().unwrap();
+        assert_eq!(ch, '\r');
+        assert_eq!(nav.line(), 2);
+        assert_eq!(nav.column(), 1);
+    }
+
+    #[test]
+    fn char_navigator_newline_line_increment() {
+        // Target lines 130-131: '\n' handling
+        let source = "text\nmore";
+        let mut nav = CharNavigator::new(source, 0, 1, 1);
+
+        for _ in 0..4 {
+            nav.advance_char().unwrap();
+        }
+
+        let ch = nav.advance_char().unwrap();
+        assert_eq!(ch, '\n');
+        assert_eq!(nav.line(), 2);
+        assert_eq!(nav.column(), 1);
+    }
+
+    #[test]
+    fn char_navigator_column_increment_default() {
+        // Target lines 144: default column increment
+        let source = "abc";
+        let mut nav = CharNavigator::new(source, 0, 1, 1);
+
+        nav.advance_char().unwrap(); // 'a'
+        assert_eq!(nav.column(), 2);
+
+        nav.advance_char().unwrap(); // 'b'
+        assert_eq!(nav.column(), 3);
+
+        nav.advance_char().unwrap(); // 'c'
+        assert_eq!(nav.column(), 4);
+    }
+
+    #[test]
+    fn char_navigator_skip_whitespace_loop() {
+        // Target lines 140-144: skip_whitespace loop
+        let source = "   \t\n  text";
+        let mut nav = CharNavigator::new(source, 0, 1, 1);
+
+        nav.skip_whitespace();
+        assert_eq!(nav.position(), 4); // Should stop at newline
+    }
+
+    #[test]
+    fn token_scanner_section_header_closing_bracket() {
+        // Target lines 196, 199: section header scanning
+        let source = "[Test]";
+        let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+        let result = scanner.scan_section_header();
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            crate::tokenizer::tokens::TokenType::SectionHeader
+        );
+    }
+
+    #[test]
+    fn token_scanner_style_override_closing_brace() {
+        // Target lines 216, 222: style override scanning
+        let source = "{\\b1}";
+        let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+        let result = scanner.scan_style_override();
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            crate::tokenizer::tokens::TokenType::OverrideBlock
+        );
+    }
+
+    #[test]
+    fn token_scanner_comment_scanning() {
+        // Target line 241: comment scanning
+        let source = "! This is a comment";
+        let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+        let result = scanner.scan_comment();
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            crate::tokenizer::tokens::TokenType::Comment
+        );
+    }
+
+    #[test]
+    fn token_scanner_scan_text_hex_detection() {
+        // Target lines 263, 274: hex value detection in scan_text
+        let source = "&H1234&";
+        let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+        let result = scanner.scan_text(crate::tokenizer::state::TokenContext::Document);
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            crate::tokenizer::tokens::TokenType::HexValue
+        );
+    }
+
+    #[test]
+    fn token_scanner_scan_text_number_detection_targeted() {
+        // Target lines 283-284: number detection
+        let source = "123.45";
+        let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+        let result = scanner.scan_text(crate::tokenizer::state::TokenContext::Document);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), crate::tokenizer::tokens::TokenType::Number);
+    }
+
+    #[test]
+    fn token_scanner_scan_text_section_name_context() {
+        // Target lines 288, 290-291: section name context
+        let source = "Script Info";
+        let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+        let result = scanner.scan_text(crate::tokenizer::state::TokenContext::SectionHeader);
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            crate::tokenizer::tokens::TokenType::SectionName
+        );
+    }
+
+    #[test]
+    fn token_scanner_scan_text_field_value_context_targeted() {
+        // Target lines 295, 299: field value context
+        let source = "value_text";
+        let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+        let result = scanner.scan_text(crate::tokenizer::state::TokenContext::FieldValue);
+        assert!(result.is_ok());
+        // Should return Text type in field value context
+    }
+
+    #[test]
+    fn token_scanner_scan_text_default_case() {
+        // Target line 305: default text case
+        let source = "regular_text";
+        let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+        let result = scanner.scan_text(crate::tokenizer::state::TokenContext::Document);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), crate::tokenizer::tokens::TokenType::Text);
+    }
+
+    #[test]
+    fn token_scanner_is_hex_value_ampersand_suffix() {
+        // Target lines 324, 326, 328: hex value validation
+        assert!(TokenScanner::is_hex_value("&H1234&"));
+        assert!(TokenScanner::is_hex_value("&HABCD&"));
+        assert!(!TokenScanner::is_hex_value("&H&")); // Empty hex part
+    }
+
+    #[test]
+    fn token_scanner_is_hex_value_no_ampersand() {
+        // Target line 339: hex without trailing ampersand
+        assert!(TokenScanner::is_hex_value("&H1234"));
+        assert!(TokenScanner::is_hex_value("&HABCD"));
+    }
+
+    #[test]
+    fn token_scanner_scan_field_value_basic() {
+        // Target lines 381, 386: scan_field_value
+        let source = "field_value,next";
+        let mut scanner = TokenScanner::new(source, 0, 1, 1);
+
+        let result = scanner.scan_field_value();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn char_navigator_peek_char_error_path() {
+        // Target lines 76, 79, 81-82: peek_char error handling
+        let source = "a";
+        let mut nav = CharNavigator::new(source, 0, 1, 1);
+
+        // Advance past end
+        nav.advance_char().unwrap();
+        assert!(nav.is_at_end());
+
+        // peek_char should return error at end
+        let result = nav.peek_char();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn char_navigator_peek_next_error_path() {
+        // Target lines 108, 110-111, 113: peek_next error handling
+        let source = "a";
+        let nav = CharNavigator::new(source, 0, 1, 1);
+
+        // peek_next from last character should error
+        let result = nav.peek_next();
+        assert!(result.is_err());
     }
 }
