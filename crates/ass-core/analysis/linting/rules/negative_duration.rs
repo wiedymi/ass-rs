@@ -113,7 +113,12 @@ mod tests {
         let rule = NegativeDurationRule;
         assert_eq!(rule.id(), "negative-duration");
         assert_eq!(rule.name(), "Negative Duration");
+        assert_eq!(
+            rule.description(),
+            "Detects events with negative or zero duration"
+        );
         assert_eq!(rule.default_severity(), IssueSeverity::Error);
+        assert_eq!(rule.category(), IssueCategory::Timing);
     }
 
     #[test]

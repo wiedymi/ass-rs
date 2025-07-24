@@ -154,7 +154,12 @@ mod tests {
         let rule = PerformanceRule;
         assert_eq!(rule.id(), "performance");
         assert_eq!(rule.name(), "Performance");
+        assert_eq!(
+            rule.description(),
+            "Detects potential performance issues in the script"
+        );
         assert_eq!(rule.default_severity(), IssueSeverity::Hint);
+        assert_eq!(rule.category(), IssueCategory::Performance);
     }
 
     #[test]

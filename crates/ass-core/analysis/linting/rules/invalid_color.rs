@@ -175,7 +175,12 @@ mod tests {
         let rule = InvalidColorRule;
         assert_eq!(rule.id(), "invalid-color");
         assert_eq!(rule.name(), "Invalid Color");
+        assert_eq!(
+            rule.description(),
+            "Detects invalid color format in styles and override tags"
+        );
         assert_eq!(rule.default_severity(), IssueSeverity::Error);
+        assert_eq!(rule.category(), IssueCategory::Styling);
     }
 
     #[test]

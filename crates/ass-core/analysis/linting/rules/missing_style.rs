@@ -116,7 +116,12 @@ mod tests {
         let rule = MissingStyleRule;
         assert_eq!(rule.id(), "missing-style");
         assert_eq!(rule.name(), "Missing Style");
+        assert_eq!(
+            rule.description(),
+            "Detects events referencing non-existent styles"
+        );
         assert_eq!(rule.default_severity(), IssueSeverity::Error);
+        assert_eq!(rule.category(), IssueCategory::Styling);
     }
 
     #[test]

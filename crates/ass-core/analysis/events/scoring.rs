@@ -207,4 +207,11 @@ mod tests {
         assert_eq!(get_performance_impact(70), PerformanceImpact::High);
         assert_eq!(get_performance_impact(90), PerformanceImpact::Critical);
     }
+
+    #[test]
+    fn test_complexity_score_medium_char_count() {
+        // Test the 501-1000 character range (line 127)
+        let score = calculate_complexity_score(0, 750, 0);
+        assert_eq!(score, 30); // Should match the 501..=1000 => 30 case
+    }
 }

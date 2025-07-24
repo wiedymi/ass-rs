@@ -120,7 +120,12 @@ mod tests {
         let rule = InvalidTagRule;
         assert_eq!(rule.id(), "invalid-tag");
         assert_eq!(rule.name(), "Invalid Tag");
+        assert_eq!(
+            rule.description(),
+            "Detects invalid or malformed override tags in event text"
+        );
         assert_eq!(rule.default_severity(), IssueSeverity::Warning);
+        assert_eq!(rule.category(), IssueCategory::Content);
     }
 
     #[test]

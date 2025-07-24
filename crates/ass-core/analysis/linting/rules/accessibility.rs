@@ -189,7 +189,9 @@ mod tests {
         let rule = AccessibilityRule;
         assert_eq!(rule.id(), "accessibility");
         assert_eq!(rule.name(), "Accessibility");
+        assert_eq!(rule.description(), "Detects potential accessibility issues");
         assert_eq!(rule.default_severity(), IssueSeverity::Hint);
+        assert_eq!(rule.category(), IssueCategory::Accessibility);
     }
 
     #[test]

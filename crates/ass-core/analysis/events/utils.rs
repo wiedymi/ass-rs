@@ -322,4 +322,24 @@ mod tests {
         let indices = find_events_in_range(&events, 250, 600); // 2.5s to 6s
         assert_eq!(indices, vec![0, 1]); // First two events overlap this range
     }
+
+    #[test]
+    fn sort_events_same_start_time() {
+        // Test sorting when events have same start time (covers line 121)
+        let mut events = vec![
+            create_test_dialogue_info("0:00:05.00", "0:00:10.00"), // Same start, longer duration
+            create_test_dialogue_info("0:00:05.00", "0:00:08.00"), // Same start, shorter duration
+            create_test_dialogue_info("0:00:05.00", "0:00:12.00"), // Same start, longest duration
+        ];
+
+        sort_events_by_time(&mut events);
+
+        // All should have same start time but be sorted by end time
+        assert_eq!(events[0].start_time_cs(), 500);
+        assert_eq!(events[0].end_time_cs(), 800); // Shortest duration first
+        assert_eq!(events[1].start_time_cs(), 500);
+        assert_eq!(events[1].end_time_cs(), 1000); // Medium duration second
+        assert_eq!(events[2].start_time_cs(), 500);
+        assert_eq!(events[2].end_time_cs(), 1200); // Longest duration last
+    }
 }

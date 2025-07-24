@@ -579,4 +579,42 @@ mod tests {
         assert_eq!(info.event().start, "0:00:00.00");
         assert_eq!(info.event().end, "0:00:01.00");
     }
+
+    #[test]
+    fn dialogue_info_analyze_invalid_start_time() {
+        let event = Event {
+            event_type: EventType::Dialogue,
+            start: "invalid_time",
+            end: "0:00:05.00",
+            text: "Test",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        assert!(DialogueInfo::analyze(&event).is_err());
+    }
+
+    #[test]
+    fn dialogue_info_analyze_invalid_end_time() {
+        let event = Event {
+            event_type: EventType::Dialogue,
+            start: "0:00:00.00",
+            end: "invalid_time",
+            text: "Test",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            effect: "",
+        };
+
+        assert!(DialogueInfo::analyze(&event).is_err());
+    }
 }

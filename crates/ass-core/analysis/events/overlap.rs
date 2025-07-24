@@ -528,4 +528,17 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_find_overlapping_event_refs_with_invalid_end_time() {
+        let event1 = create_test_event("0:00:00.00", "invalid_end");
+        let event2 = create_test_event("0:00:03.00", "0:00:08.00");
+        let event_refs = vec![&event1, &event2];
+        let result = find_overlapping_event_refs(&event_refs);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid end time format"));
+    }
 }

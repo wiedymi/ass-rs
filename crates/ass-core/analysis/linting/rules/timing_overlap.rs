@@ -121,7 +121,12 @@ mod tests {
         let rule = TimingOverlapRule;
         assert_eq!(rule.id(), "timing-overlap");
         assert_eq!(rule.name(), "Timing Overlap");
+        assert_eq!(
+            rule.description(),
+            "Detects overlapping dialogue events that may cause rendering conflicts"
+        );
         assert_eq!(rule.default_severity(), IssueSeverity::Warning);
+        assert_eq!(rule.category(), IssueCategory::Timing);
     }
 
     #[test]

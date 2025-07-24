@@ -182,7 +182,12 @@ mod tests {
         let rule = EncodingRule;
         assert_eq!(rule.id(), "encoding");
         assert_eq!(rule.name(), "Encoding");
+        assert_eq!(
+            rule.description(),
+            "Detects potential encoding or character issues"
+        );
         assert_eq!(rule.default_severity(), IssueSeverity::Warning);
+        assert_eq!(rule.category(), IssueCategory::Encoding);
     }
 
     #[test]
@@ -303,5 +308,29 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{heavy_unicode}"
         assert!(issues
             .iter()
             .any(|issue| issue.message().contains("multi-byte characters")));
+    }
+
+    #[test]
+    fn control_character_in_event_detected() {
+        // Test control characters in events (not script info) to cover lines 101-104, 107, 110, 112
+        let script_text = "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Text with\x00control char";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let rule = EncodingRule;
+        let analysis = ScriptAnalysis::analyze(&script).unwrap();
+        let issues = rule.check_script(&analysis);
+
+        assert!(!issues.is_empty());
+        assert!(issues
+            .iter()
+            .any(|issue| issue.message().contains("non-printable control characters")));
+
+        // Check that the issue has description and suggested fix
+        let control_issue = issues
+            .iter()
+            .find(|issue| issue.message().contains("non-printable control characters"))
+            .unwrap();
+        assert!(control_issue.description().is_some());
+        assert!(control_issue.suggested_fix().is_some());
     }
 }
