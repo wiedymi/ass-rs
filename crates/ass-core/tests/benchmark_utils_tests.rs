@@ -337,6 +337,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
             text,
         }

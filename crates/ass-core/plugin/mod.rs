@@ -337,3 +337,4 @@ pub use tags::formatting::{
     create_formatting_handlers, BoldTagHandler, ItalicTagHandler, StrikeoutTagHandler,
     UnderlineTagHandler,
 };
+pub use tags::karaoke::{create_karaoke_handlers, KaraokeTimingTagHandler};

@@ -220,7 +220,19 @@ impl<'a> StylesParser<'a> {
             margin_l: get_field("MarginL"),
             margin_r: get_field("MarginR"),
             margin_v: get_field("MarginV"),
+            margin_t: format
+                .iter()
+                .any(|&f| f.eq_ignore_ascii_case("MarginT"))
+                .then(|| get_field("MarginT")),
+            margin_b: format
+                .iter()
+                .any(|&f| f.eq_ignore_ascii_case("MarginB"))
+                .then(|| get_field("MarginB")),
             encoding: get_field("Encoding"),
+            relative_to: format
+                .iter()
+                .any(|&f| f.eq_ignore_ascii_case("RelativeTo"))
+                .then(|| get_field("RelativeTo")),
         })
     }
 

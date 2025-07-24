@@ -223,6 +223,8 @@ pub const fn create_test_event<'a>(start: &'a str, end: &'a str, text: &'a str) 
         margin_l: "0",
         margin_r: "0",
         margin_v: "0",
+        margin_t: None,
+        margin_b: None,
         effect: "",
         text,
     }

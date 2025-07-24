@@ -53,8 +53,14 @@ pub struct Event<'a> {
     /// Right margin override (pixels)
     pub margin_r: &'a str,
 
-    /// Vertical margin override (pixels)
+    /// Vertical margin override (pixels) (V4+)
     pub margin_v: &'a str,
+
+    /// Top margin override (pixels) (V4++)
+    pub margin_t: Option<&'a str>,
+
+    /// Bottom margin override (pixels) (V4++)
+    pub margin_b: Option<&'a str>,
 
     /// Effect specification for special rendering
     pub effect: &'a str,
@@ -232,6 +238,8 @@ impl Default for Event<'_> {
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
             text: "",
         }
@@ -425,6 +433,8 @@ mod tests {
             margin_l: "10",
             margin_r: "20",
             margin_v: "15",
+            margin_t: None,
+            margin_b: None,
             effect: "fadeIn",
             text: "Hello, world!",
         };
@@ -500,6 +510,8 @@ mod tests {
             margin_l: fields[6],
             margin_r: fields[7],
             margin_v: fields[8],
+            margin_t: None,
+            margin_b: None,
             effect: fields[9],
             text: fields[10],
         };

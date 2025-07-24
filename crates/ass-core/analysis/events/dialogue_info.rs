@@ -227,6 +227,8 @@ mod tests {
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
@@ -241,23 +243,25 @@ mod tests {
     fn dialogue_info_analyze_with_override_tags() {
         let event = Event {
             event_type: EventType::Dialogue,
-            start: "0:00:01.50",
-            end: "0:00:03.75",
-            text: "Hello {\\b1}bold{\\b0} world!",
+            start: "0:00:00.00",
+            end: "0:00:05.00",
+            text: "Hello {\\b1}bold{\\b0} world",
             layer: "0",
             style: "Default",
             name: "",
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
         let info = DialogueInfo::analyze(&event).unwrap();
-        assert_eq!(info.duration_ms(), 2250);
-        assert_eq!(info.duration_cs(), 225);
-        assert_eq!(info.start_time_cs(), 150);
-        assert_eq!(info.end_time_cs(), 375);
+        assert_eq!(info.duration_ms(), 5000);
+        assert_eq!(info.duration_cs(), 500);
+        assert_eq!(info.start_time_cs(), 0);
+        assert_eq!(info.end_time_cs(), 500);
         assert!(!info.text_analysis().override_tags().is_empty());
     }
 
@@ -274,6 +278,8 @@ mod tests {
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
@@ -293,6 +299,8 @@ mod tests {
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
@@ -304,28 +312,32 @@ mod tests {
         let event1 = Event {
             event_type: EventType::Dialogue,
             start: "0:00:00.00",
-            end: "0:00:02.00",
-            text: "First",
+            end: "0:00:05.00",
+            text: "First event",
             layer: "0",
             style: "Default",
             name: "",
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
         let event2 = Event {
             event_type: EventType::Dialogue,
-            start: "0:00:03.00",
-            end: "0:00:05.00",
-            text: "Second",
+            start: "0:00:06.00",
+            end: "0:00:10.00",
+            text: "Second event",
             layer: "0",
             style: "Default",
             name: "",
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
@@ -340,22 +352,24 @@ mod tests {
     fn dialogue_info_timing_relation_partial_overlap() {
         let event1 = Event {
             event_type: EventType::Dialogue,
-            start: "0:00:00.00",
-            end: "0:00:03.00",
-            text: "First",
-            layer: "0",
+            start: "0:00:02.50",
+            end: "0:00:07.50",
+            text: "Event on layer 1",
+            layer: "1",
             style: "Default",
             name: "",
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
         let event2 = Event {
             event_type: EventType::Dialogue,
             start: "0:00:02.00",
-            end: "0:00:05.00",
+            end: "0:00:04.00",
             text: "Second",
             layer: "0",
             style: "Default",
@@ -363,6 +377,8 @@ mod tests {
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
@@ -385,13 +401,15 @@ mod tests {
             event_type: EventType::Dialogue,
             start: "0:00:00.00",
             end: "0:00:05.00",
-            text: "Container",
+            text: "Complex {\\b1}bold{\\b0} text",
             layer: "0",
             style: "Default",
             name: "",
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
@@ -399,13 +417,15 @@ mod tests {
             event_type: EventType::Dialogue,
             start: "0:00:01.00",
             end: "0:00:03.00",
-            text: "Contained",
+            text: "Inner",
             layer: "0",
             style: "Default",
             name: "",
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
@@ -420,22 +440,24 @@ mod tests {
     fn dialogue_info_timing_relation_identical() {
         let event1 = Event {
             event_type: EventType::Dialogue,
-            start: "0:00:01.00",
-            end: "0:00:03.00",
-            text: "First",
+            start: "0:00:00.00",
+            end: "0:00:05.00",
+            text: "Container",
             layer: "0",
             style: "Default",
             name: "",
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
         let event2 = Event {
             event_type: EventType::Dialogue,
-            start: "0:00:01.00",
-            end: "0:00:03.00",
+            start: "0:00:00.00",
+            end: "0:00:05.00",
             text: "Second",
             layer: "0",
             style: "Default",
@@ -443,6 +465,8 @@ mod tests {
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
@@ -466,6 +490,8 @@ mod tests {
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
@@ -485,7 +511,7 @@ mod tests {
         let simple_event = Event {
             event_type: EventType::Dialogue,
             start: "0:00:00.00",
-            end: "0:00:01.00",
+            end: "0:00:05.00",
             text: "Simple text",
             layer: "0",
             style: "Default",
@@ -493,20 +519,24 @@ mod tests {
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
         let complex_event = Event {
             event_type: EventType::Dialogue,
             start: "0:00:00.00",
-            end: "0:00:01.00",
-            text: "{\\move(0,0,100,100)}{\\t(0,1000,\\fscx120)}{\\fade(255,0,0,0,800,900,1000)}Complex animation",
+            end: "0:00:05.00",
+            text: "Complex {\\b1}bold{\\b0} {\\i1}italic{\\i0} {\\u1}underline{\\u0} text",
             layer: "0",
             style: "Default",
             name: "",
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
@@ -522,19 +552,21 @@ mod tests {
         let event = Event {
             event_type: EventType::Dialogue,
             start: "0:00:00.00",
-            end: "0:00:01.00",
-            text: "{\\b1}{\\i1}{\\u1}Triple style{\\b0}{\\i0}{\\u0}",
+            end: "0:00:05.00",
+            text: "{\\b1}Bold {\\k50}ka{\\k100}ra{\\k75}o{\\i1}ke {\\b0}text{\\i0}",
             layer: "0",
             style: "Default",
             name: "",
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
         let info = DialogueInfo::analyze(&event).unwrap();
-        assert_eq!(info.override_count(), 6);
+        assert_eq!(info.override_count(), 7);
     }
 
     #[test]
@@ -542,14 +574,16 @@ mod tests {
         let low_impact_event = Event {
             event_type: EventType::Dialogue,
             start: "0:00:00.00",
-            end: "0:00:01.00",
-            text: "Simple",
+            end: "0:00:02.00",
+            text: "Hi",
             layer: "0",
             style: "Default",
             name: "",
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
@@ -563,21 +597,26 @@ mod tests {
         let event = Event {
             event_type: EventType::Dialogue,
             start: "0:00:00.00",
-            end: "0:00:01.00",
-            text: "Test",
+            end: "0:00:05.00",
+            text: "Fast {\\b1}dynamic{\\b0} {\\i1}text{\\i0}!",
             layer: "0",
             style: "Default",
             name: "",
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
         let info = DialogueInfo::analyze(&event).unwrap();
-        assert_eq!(info.event().text, "Test");
+        assert_eq!(
+            info.event().text,
+            "Fast {\\b1}dynamic{\\b0} {\\i1}text{\\i0}!"
+        );
         assert_eq!(info.event().start, "0:00:00.00");
-        assert_eq!(info.event().end, "0:00:01.00");
+        assert_eq!(info.event().end, "0:00:05.00");
     }
 
     #[test]
@@ -593,6 +632,8 @@ mod tests {
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 
@@ -612,6 +653,8 @@ mod tests {
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         };
 

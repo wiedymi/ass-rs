@@ -81,8 +81,10 @@ pub struct ResolvedStyle<'a> {
     margin_l: u16,
     /// Right margin in pixels
     margin_r: u16,
-    /// Vertical margin in pixels
-    margin_v: u16,
+    /// Top margin in pixels
+    margin_t: u16,
+    /// Bottom margin in pixels
+    margin_b: u16,
     /// Text encoding
     encoding: u8,
     /// Rendering complexity score (0-100)
@@ -157,7 +159,16 @@ impl<'a> ResolvedStyle<'a> {
         let alignment = parse_u8(style.alignment)?;
         let margin_l = parse_u16(style.margin_l)?;
         let margin_r = parse_u16(style.margin_r)?;
-        let margin_v = parse_u16(style.margin_v)?;
+
+        // Handle v4+ vs v4++ margin formats
+        let (margin_t, margin_b) = if let (Some(t), Some(b)) = (style.margin_t, style.margin_b) {
+            // v4++ format with separate top/bottom margins
+            (parse_u16(t)?, parse_u16(b)?)
+        } else {
+            // v4+ format with single vertical margin
+            let margin_v = parse_u16(style.margin_v)?;
+            (margin_v, margin_v)
+        };
 
         let encoding = parse_u8(style.encoding)?;
 
@@ -180,7 +191,8 @@ impl<'a> ResolvedStyle<'a> {
             alignment,
             margin_l,
             margin_r,
-            margin_v,
+            margin_t,
+            margin_b,
             encoding,
             complexity_score: 0, // Will be computed
         };
@@ -249,6 +261,30 @@ impl<'a> ResolvedStyle<'a> {
     #[must_use]
     pub const fn is_strike_out(&self) -> bool {
         self.formatting.contains(TextFormatting::STRIKE_OUT)
+    }
+
+    /// Get left margin in pixels
+    #[must_use]
+    pub const fn margin_l(&self) -> u16 {
+        self.margin_l
+    }
+
+    /// Get right margin in pixels
+    #[must_use]
+    pub const fn margin_r(&self) -> u16 {
+        self.margin_r
+    }
+
+    /// Get top margin in pixels
+    #[must_use]
+    pub const fn margin_t(&self) -> u16 {
+        self.margin_t
+    }
+
+    /// Get bottom margin in pixels
+    #[must_use]
+    pub const fn margin_b(&self) -> u16 {
+        self.margin_b
     }
 
     /// Calculate rendering complexity score
@@ -386,7 +422,10 @@ mod tests {
             margin_l: "10",
             margin_r: "10",
             margin_v: "10",
+            margin_t: None,
+            margin_b: None,
             encoding: "1",
+            relative_to: None,
         }
     }
 

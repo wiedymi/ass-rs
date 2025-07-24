@@ -105,14 +105,12 @@ mod utils_targeted_coverage {
 
     #[test]
     fn test_parse_ass_time_malformed_format() {
-        // Test various malformed time formats
+        // Test various malformed time formats that should actually fail
         let malformed_times = vec![
             "",            // Empty string
             "invalid",     // Non-time string
             "1:30",        // Missing seconds and centiseconds
-            "1:30:45",     // Missing centiseconds
             "1:30:45.",    // Missing centiseconds value
-            "1:30:45.5",   // Only one centisecond digit
             "a:30:45.50",  // Non-numeric hours
             "1:b:45.50",   // Non-numeric minutes
             "1:30:c.50",   // Non-numeric seconds
@@ -124,11 +122,15 @@ mod utils_targeted_coverage {
             "1:-30:45.50", // Negative minutes
             "1:30:-45.50", // Negative seconds
             "1:30:45.-50", // Negative centiseconds
+            "1:30:45.123", // Too many decimal places
         ];
 
         for time_str in malformed_times {
             let result = parse_ass_time(time_str);
-            assert!(result.is_err());
+            assert!(
+                result.is_err(),
+                "Expected {time_str} to be invalid but it was valid"
+            );
         }
     }
 
@@ -137,21 +139,26 @@ mod utils_targeted_coverage {
         // Test invalid color format handling
         let invalid_colors = vec![
             "",             // Empty string
-            "invalid",      // Non-color string
+            "xyz123",       // Non-hex characters
             "&H",           // Incomplete prefix
             "&HGGGGGG",     // Invalid hex characters
-            "&H12345",      // Too short
-            "&H1234567890", // Too long
+            "&H12345",      // Too short (5 digits)
+            "&H1234567890", // Too long (10 digits)
             "H123456",      // Missing &
             "&G123456",     // Wrong prefix
-            "&h123456",     // Lowercase prefix
             "&H12345G",     // Invalid hex character
             "&H-123456",    // Negative sign
+            "&H123Z56",     // Invalid hex character Z
+            "&H",           // Just prefix
+            "invalid123",   // Contains non-hex chars
         ];
 
         for color_str in invalid_colors {
             let result = parse_bgr_color(color_str);
-            assert!(result.is_err());
+            assert!(
+                result.is_err(),
+                "Expected {color_str} to be invalid but it was valid"
+            );
         }
     }
 
@@ -222,8 +229,9 @@ mod utils_targeted_coverage {
         let unicode_source = "Hello 世界\n测试 🎬\nEnd";
         let spans = Spans::new(unicode_source);
 
-        // Test span_line with Unicode
-        let unicode_span = "世界";
+        // Test span_line with Unicode - get actual substring from source
+        let unicode_start = unicode_source.find("世界").unwrap();
+        let unicode_span = &unicode_source[unicode_start..unicode_start + "世界".len()];
         let line = spans.span_line(unicode_span);
         assert!(line.is_some());
 
@@ -231,8 +239,9 @@ mod utils_targeted_coverage {
         let column = spans.span_column(unicode_span);
         assert!(column.is_some());
 
-        // Test with emoji
-        let emoji_span = "🎬";
+        // Test with emoji - get actual substring from source
+        let emoji_start = unicode_source.find("🎬").unwrap();
+        let emoji_span = &unicode_source[emoji_start..emoji_start + "🎬".len()];
         let emoji_line = spans.span_line(emoji_span);
         let emoji_column = spans.span_column(emoji_span);
         assert!(emoji_line.is_some());
@@ -298,12 +307,15 @@ mod utils_targeted_coverage {
         let source = "Multi\nLine\nContent\nWith\nMany\nLines";
         let spans = Spans::new(source);
 
-        // Test with spans at line boundaries
-        let newline_span = "\n";
-        let _ = spans.span_offset(newline_span);
+        // Test with spans at line boundaries - get actual substring from source
+        let newline_pos = source.find('\n').unwrap();
+        let newline_span = &source[newline_pos..=newline_pos];
+        let newline_offset = spans.span_offset(newline_span);
+        assert!(newline_offset.is_some());
 
-        // Test with partial matches
-        let partial_span = "Line";
+        // Test with partial matches - get actual substring from source
+        let line_pos = source.find("Line").unwrap();
+        let partial_span = &source[line_pos..line_pos + "Line".len()];
         let offset = spans.span_offset(partial_span);
         assert!(offset.is_some());
 

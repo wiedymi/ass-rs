@@ -255,6 +255,8 @@ mod tests {
             margin_l: "0",
             margin_r: "0",
             margin_v: "0",
+            margin_t: None,
+            margin_b: None,
             effect: "",
         }));
         DialogueInfo::analyze(event).unwrap()

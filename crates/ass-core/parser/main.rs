@@ -153,7 +153,7 @@ impl<'a> Parser<'a> {
 
                 Ok(section)
             }
-            "V4+ Styles" | "V4 Styles" => {
+            "V4+ Styles" | "V4 Styles" | "V4++ Styles" => {
                 let parser = StylesParser::new(self.source, self.position, start_line);
                 let (section, format, issues, final_position, final_line) =
                     parser.parse().map_err(CoreError::from)?;

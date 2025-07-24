@@ -7,6 +7,7 @@
 //! # Modules
 //!
 //! - [`formatting`] - Basic text formatting tags (bold, italic, underline, strikeout)
+//! - [`karaoke`] - Karaoke timing tags (\k, \kf, \ko, \kt)
 //!
 //! # Usage
 //!
@@ -20,8 +21,10 @@
 //! ```
 
 pub mod formatting;
+pub mod karaoke;
 
 pub use formatting::{
     create_formatting_handlers, BoldTagHandler, ItalicTagHandler, StrikeoutTagHandler,
     UnderlineTagHandler,
 };
+pub use karaoke::{create_karaoke_handlers, KaraokeTimingTagHandler};

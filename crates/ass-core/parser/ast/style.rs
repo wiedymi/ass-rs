@@ -92,11 +92,20 @@ pub struct Style<'a> {
     /// Right margin in pixels
     pub margin_r: &'a str,
 
-    /// Vertical margin in pixels
+    /// Vertical margin in pixels (V4+)
     pub margin_v: &'a str,
+
+    /// Top margin in pixels (V4++)
+    pub margin_t: Option<&'a str>,
+
+    /// Bottom margin in pixels (V4++)
+    pub margin_b: Option<&'a str>,
 
     /// Font encoding identifier
     pub encoding: &'a str,
+
+    /// Positioning context (V4++)
+    pub relative_to: Option<&'a str>,
 }
 
 impl Style<'_> {
@@ -172,7 +181,10 @@ impl Default for Style<'_> {
             margin_l: "10",
             margin_r: "10",
             margin_v: "10",
+            margin_t: None,
+            margin_b: None,
             encoding: "1",
+            relative_to: None,
         }
     }
 }
@@ -233,25 +245,30 @@ mod tests {
         let style = Style {
             name: "CustomStyle",
             fontname: "Times New Roman",
-            fontsize: "16",
+            fontsize: "18",
             primary_colour: "&H00ff00",
+            secondary_colour: "&Hff0000",
+            outline_colour: "&H0000ff",
+            back_colour: "&H808080",
             bold: "1",
             italic: "1",
-            underline: "1",
+            underline: "0",
             strikeout: "1",
-            scale_x: "90",
-            scale_y: "110",
+            scale_x: "110",
+            scale_y: "90",
             spacing: "2",
             angle: "15",
             border_style: "3",
             outline: "2",
             shadow: "1",
-            alignment: "1",
-            margin_l: "5",
-            margin_r: "15",
-            margin_v: "8",
+            alignment: "5",
+            margin_l: "15",
+            margin_r: "25",
+            margin_v: "20",
+            margin_t: None,
+            margin_b: None,
             encoding: "0",
-            ..Style::default()
+            relative_to: None,
         };
 
         let cloned = style.clone();
@@ -371,7 +388,10 @@ mod tests {
             margin_l: "20",
             margin_r: "30",
             margin_v: "15",
+            margin_t: None,
+            margin_b: None,
             encoding: "2",
+            relative_to: None,
         };
 
         // Test all field accesses
@@ -425,7 +445,10 @@ mod tests {
             margin_l: "",
             margin_r: "",
             margin_v: "",
+            margin_t: None,
+            margin_b: None,
             encoding: "",
+            relative_to: None,
         };
 
         // All fields should be empty strings
@@ -473,7 +496,10 @@ mod tests {
             margin_l: fields[19],
             margin_r: fields[20],
             margin_v: fields[21],
+            margin_t: None,
+            margin_b: None,
             encoding: fields[22],
+            relative_to: None,
         };
 
         // Actually call the validate_spans method
@@ -680,7 +706,10 @@ mod tests {
             margin_l: "25",
             margin_r: "35",
             margin_v: "20",
+            margin_t: None,
+            margin_b: None,
             encoding: "3",
+            relative_to: None,
         };
 
         // Verify all fields are set correctly
@@ -770,7 +799,10 @@ mod tests {
             margin_l: fields[19],
             margin_r: fields[20],
             margin_v: fields[21],
+            margin_t: None,
+            margin_b: None,
             encoding: fields[22],
+            relative_to: None,
         };
 
         // Should validate successfully since all fields are from source
