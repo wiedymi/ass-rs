@@ -23,10 +23,15 @@
 use alloc::{format, string::String, vec::Vec};
 use core::{fmt, ops::Range};
 
+pub mod benchmark_generators;
 pub mod errors;
 pub mod hashers;
 pub mod utf8;
 
+pub use benchmark_generators::{
+    create_test_event, generate_overlapping_script, generate_script_with_issues, ComplexityLevel,
+    ScriptGenerator,
+};
 pub use errors::CoreError;
 pub use hashers::{create_hash_map, create_hash_map_with_capacity, create_hasher, hash_value};
 pub use utf8::{detect_encoding, normalize_line_endings, recover_utf8, strip_bom, validate_utf8};
