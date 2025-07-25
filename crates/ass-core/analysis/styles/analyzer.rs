@@ -338,9 +338,7 @@ impl<'a> StyleAnalyzer<'a> {
                 // Get parent's resolved style
                 self.resolved_styles.get(parent_name).map_or_else(
                     || ResolvedStyle::from_style(style),
-                    |parent_resolved| {
-                        ResolvedStyle::from_style_with_parent(style, parent_resolved)
-                    },
+                    |parent_resolved| ResolvedStyle::from_style_with_parent(style, parent_resolved),
                 )
             } else {
                 // No parent - resolve directly

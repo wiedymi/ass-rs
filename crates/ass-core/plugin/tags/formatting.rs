@@ -29,15 +29,45 @@ impl TagHandler for BoldTagHandler {
     }
 
     fn process(&self, args: &str) -> TagResult {
-        match args.trim() {
-            "0" | "1" | "" => TagResult::Processed, // Empty args defaults to toggle
-            _ => TagResult::Failed(String::from("Bold tag accepts only 0, 1, or empty")),
+        let trimmed = args.trim();
+
+        // Handle basic cases
+        match trimmed {
+            "" | "0" | "1" => return TagResult::Processed,
+            _ => {}
         }
+
+        // Handle font weight values (100-900)
+        trimmed.parse::<u32>().map_or_else(
+            |_| {
+                TagResult::Failed(String::from(
+                    "Bold tag accepts 0, 1, or font weight (100-900 in steps of 100)",
+                ))
+            },
+            |weight| {
+                if (100..=900).contains(&weight) && weight % 100 == 0 {
+                    TagResult::Processed
+                } else {
+                    TagResult::Failed(String::from(
+                        "Bold tag accepts 0, 1, or font weight (100-900 in steps of 100)",
+                    ))
+                }
+            },
+        )
     }
 
     fn validate(&self, args: &str) -> bool {
         let trimmed = args.trim();
-        trimmed.is_empty() || trimmed == "0" || trimmed == "1"
+
+        // Basic cases
+        if trimmed.is_empty() || trimmed == "0" || trimmed == "1" {
+            return true;
+        }
+
+        // Font weight values
+        trimmed
+            .parse::<u32>()
+            .is_ok_and(|weight| (100..=900).contains(&weight) && weight % 100 == 0)
     }
 }
 
@@ -145,7 +175,25 @@ mod tests {
     fn bold_handler_invalid_args() {
         let handler = BoldTagHandler;
         assert!(matches!(handler.process("2"), TagResult::Failed(_)));
+        assert!(matches!(handler.process("50"), TagResult::Failed(_))); // Not a valid weight
+        assert!(matches!(handler.process("150"), TagResult::Failed(_))); // Not multiple of 100
+        assert!(matches!(handler.process("1000"), TagResult::Failed(_))); // Too high
         assert!(matches!(handler.process("invalid"), TagResult::Failed(_)));
+    }
+
+    #[test]
+    fn bold_handler_font_weights() {
+        let handler = BoldTagHandler;
+        // Valid font weights (100-900 in steps of 100)
+        assert_eq!(handler.process("100"), TagResult::Processed); // Thin
+        assert_eq!(handler.process("200"), TagResult::Processed); // Extra Light
+        assert_eq!(handler.process("300"), TagResult::Processed); // Light
+        assert_eq!(handler.process("400"), TagResult::Processed); // Normal
+        assert_eq!(handler.process("500"), TagResult::Processed); // Medium
+        assert_eq!(handler.process("600"), TagResult::Processed); // Semi Bold
+        assert_eq!(handler.process("700"), TagResult::Processed); // Bold
+        assert_eq!(handler.process("800"), TagResult::Processed); // Extra Bold
+        assert_eq!(handler.process("900"), TagResult::Processed); // Black
     }
 
     #[test]
@@ -179,9 +227,13 @@ mod tests {
         assert!(handler.validate(""));
         assert!(handler.validate(" 0 ")); // whitespace handling
         assert!(handler.validate(" 1 "));
+        assert!(handler.validate("400")); // font weight
+        assert!(handler.validate("700")); // font weight
         assert!(!handler.validate("2"));
         assert!(!handler.validate("invalid"));
         assert!(!handler.validate("-1"));
+        assert!(!handler.validate("450")); // not multiple of 100
+        assert!(!handler.validate("1000")); // too high
     }
 
     #[test]
@@ -197,7 +249,10 @@ mod tests {
     fn bold_handler_error_messages() {
         let handler = BoldTagHandler;
         if let TagResult::Failed(msg) = handler.process("2") {
-            assert_eq!(msg, "Bold tag accepts only 0, 1, or empty");
+            assert_eq!(
+                msg,
+                "Bold tag accepts 0, 1, or font weight (100-900 in steps of 100)"
+            );
         } else {
             panic!("Expected TagResult::Failed");
         }
@@ -331,8 +386,9 @@ mod tests {
     fn all_handlers_consistency() {
         let handlers = create_formatting_handlers();
 
-        // Test that all handlers behave consistently
-        for handler in &handlers {
+        // Test that all handlers except bold behave consistently
+        // Skip bold handler (index 0) as it has extended functionality
+        for handler in handlers.iter().skip(1) {
             assert_eq!(handler.process("0"), TagResult::Processed);
             assert_eq!(handler.process("1"), TagResult::Processed);
             assert_eq!(handler.process(""), TagResult::Processed);
@@ -360,7 +416,8 @@ mod tests {
     fn edge_case_arguments() {
         let handlers = create_formatting_handlers();
 
-        for handler in &handlers {
+        // Skip bold handler (index 0) as it has extended functionality
+        for handler in handlers.iter().skip(1) {
             // Test extreme whitespace
             assert_eq!(handler.process("\n\t \r"), TagResult::Processed);
             assert!(handler.validate("\n\t \r"));
