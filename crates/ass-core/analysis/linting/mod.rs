@@ -349,6 +349,8 @@ pub fn lint_script(script: &Script, config: &LintConfig) -> Result<Vec<LintIssue
         resolved_styles: Vec::new(),
         dialogue_info: Vec::new(),
         config: AnalysisConfig::default(),
+        #[cfg(feature = "plugins")]
+        registry: None,
     };
 
     // Run only style resolution and event analysis (no linting)
@@ -556,6 +558,8 @@ mod tests {
             resolved_styles: Vec::new(),
             dialogue_info: Vec::new(),
             config: AnalysisConfig::default(),
+            #[cfg(feature = "plugins")]
+            registry: None,
         };
 
         let config = LintConfig::default();
@@ -589,6 +593,8 @@ mod tests {
             resolved_styles: Vec::new(),
             dialogue_info: Vec::new(),
             config: AnalysisConfig::default(),
+            #[cfg(feature = "plugins")]
+            registry: None,
         };
 
         // Create config with specific rules disabled to trigger continue path

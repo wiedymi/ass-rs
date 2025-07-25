@@ -20,6 +20,9 @@ use super::{
     sections::{EventsParser, ScriptInfoParser, StylesParser},
 };
 
+#[cfg(feature = "plugins")]
+use crate::plugin::{ExtensionRegistry, SectionResult};
+
 /// Internal parser state for coordinating section parsing
 pub(super) struct Parser<'a> {
     /// Source text being parsed
@@ -38,6 +41,9 @@ pub(super) struct Parser<'a> {
     styles_format: Option<Vec<&'a str>>,
     /// Format fields for [Events] section
     events_format: Option<Vec<&'a str>>,
+    /// Extension registry for custom tag handlers and section processors
+    #[cfg(feature = "plugins")]
+    registry: Option<&'a ExtensionRegistry>,
 }
 
 impl<'a> Parser<'a> {
@@ -52,6 +58,27 @@ impl<'a> Parser<'a> {
             issues: Vec::new(),
             styles_format: None,
             events_format: None,
+            #[cfg(feature = "plugins")]
+            registry: None,
+        }
+    }
+
+    /// Create new parser with extension registry
+    #[cfg(feature = "plugins")]
+    pub const fn new_with_registry(
+        source: &'a str,
+        registry: Option<&'a ExtensionRegistry>,
+    ) -> Self {
+        Self {
+            source,
+            position: 0,
+            line: 1,
+            version: ScriptVersion::AssV4, // Default, updated when ScriptType found
+            sections: Vec::new(),
+            issues: Vec::new(),
+            styles_format: None,
+            events_format: None,
+            registry,
         }
     }
 
@@ -198,6 +225,14 @@ impl<'a> Parser<'a> {
                 Ok(section)
             }
             _ => {
+                #[cfg(feature = "plugins")]
+                if self.registry.is_some() {
+                    // Try to process unknown section with registered processors
+                    if let Some(result) = self.try_process_with_registry(section_name, start_line) {
+                        return result;
+                    }
+                }
+
                 let suggestion = self.skip_to_next_section();
                 let error = ParseError::UnknownSection {
                     section: section_name.to_string(),
@@ -271,6 +306,62 @@ impl<'a> Parser<'a> {
             } else {
                 break;
             }
+        }
+    }
+
+    /// Try to process unknown section using registered processors
+    #[cfg(feature = "plugins")]
+    fn try_process_with_registry(
+        &mut self,
+        section_name: &str,
+        start_line: usize,
+    ) -> Option<Result<Section<'a>>> {
+        let registry = self.registry?;
+
+        // Collect section lines
+        let mut lines = Vec::new();
+
+        while self.position < self.source.len() && !self.at_next_section() {
+            let line_start = self.position;
+            let line_end = self.source[self.position..]
+                .find('\n')
+                .map_or(self.source.len(), |i| self.position + i);
+
+            if line_end > line_start {
+                let line = &self.source[line_start..line_end];
+                lines.push(line);
+            }
+
+            self.skip_line();
+        }
+
+        // Try to process with registry
+        match registry.process_section(section_name, section_name, &lines) {
+            Some(SectionResult::Processed) => {
+                // Create a custom section for processed content
+                // For now, we'll create a generic unknown section
+                // In a full implementation, this would create a proper custom section type
+                self.issues.push(ParseIssue::new(
+                    IssueSeverity::Info,
+                    IssueCategory::Structure,
+                    format!("Section '{section_name}' processed by plugin"),
+                    start_line,
+                ));
+
+                // Return success but skip the section content since we don't have
+                // a proper custom section AST type yet
+                None
+            }
+            Some(SectionResult::Failed(msg)) => {
+                self.issues.push(ParseIssue::new(
+                    IssueSeverity::Warning,
+                    IssueCategory::Structure,
+                    format!("Plugin failed to process section '{section_name}': {msg}"),
+                    start_line,
+                ));
+                None
+            }
+            Some(SectionResult::Ignored) | None => None,
         }
     }
 

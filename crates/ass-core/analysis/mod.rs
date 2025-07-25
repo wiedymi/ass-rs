@@ -55,6 +55,9 @@ use crate::{
     parser::{Script, Section},
     Result,
 };
+
+#[cfg(feature = "plugins")]
+use crate::plugin::ExtensionRegistry;
 use alloc::vec::Vec;
 
 bitflags::bitflags! {
@@ -103,6 +106,10 @@ pub struct ScriptAnalysis<'a> {
 
     /// Analysis configuration
     config: AnalysisConfig,
+
+    /// Extension registry for custom tag handlers
+    #[cfg(feature = "plugins")]
+    registry: Option<&'a ExtensionRegistry>,
 }
 
 /// Configuration for script analysis
@@ -142,7 +149,32 @@ impl<'a> ScriptAnalysis<'a> {
     ///
     /// Returns an error if script analysis fails or contains invalid data.
     pub fn analyze(script: &'a Script<'a>) -> Result<Self> {
-        Self::analyze_with_config(script, AnalysisConfig::default())
+        #[cfg(feature = "plugins")]
+        return Self::analyze_with_registry(script, None, AnalysisConfig::default());
+        #[cfg(not(feature = "plugins"))]
+        return Self::analyze_with_config(script, AnalysisConfig::default());
+    }
+
+    /// Analyze script with extension registry support
+    ///
+    /// Same as [`analyze`](Self::analyze) but allows custom tag handlers via registry.
+    /// Uses default analysis configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `script` - Script to analyze
+    /// * `registry` - Optional registry for custom tag handlers
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if script analysis fails or contains invalid data.
+    #[cfg(feature = "plugins")]
+    pub fn analyze_with_registry(
+        script: &'a Script<'a>,
+        registry: Option<&'a ExtensionRegistry>,
+        config: AnalysisConfig,
+    ) -> Result<Self> {
+        Ok(Self::analyze_impl(script, registry, config))
     }
 
     /// Analyze script with custom configuration
@@ -153,6 +185,38 @@ impl<'a> ScriptAnalysis<'a> {
     ///
     /// Returns an error if script analysis fails or contains invalid data.
     pub fn analyze_with_config(script: &'a Script<'a>, config: AnalysisConfig) -> Result<Self> {
+        #[cfg(feature = "plugins")]
+        return Ok(Self::analyze_impl(script, None, config));
+        #[cfg(not(feature = "plugins"))]
+        return Ok(Self::analyze_impl_no_plugins(script, config));
+    }
+
+    /// Internal implementation with plugins support
+    #[cfg(feature = "plugins")]
+    fn analyze_impl(
+        script: &'a Script<'a>,
+        registry: Option<&'a ExtensionRegistry>,
+        config: AnalysisConfig,
+    ) -> Self {
+        let mut analysis = Self {
+            script,
+            lint_issues: Vec::new(),
+            resolved_styles: Vec::new(),
+            dialogue_info: Vec::new(),
+            config,
+            registry,
+        };
+
+        analysis.resolve_all_styles();
+        analysis.analyze_events();
+        analysis.run_linting();
+
+        analysis
+    }
+
+    /// Internal implementation without plugins support
+    #[cfg(not(feature = "plugins"))]
+    fn analyze_impl_no_plugins(script: &'a Script<'a>, config: AnalysisConfig) -> Self {
         let mut analysis = Self {
             script,
             lint_issues: Vec::new(),
@@ -165,7 +229,7 @@ impl<'a> ScriptAnalysis<'a> {
         analysis.analyze_events();
         analysis.run_linting();
 
-        Ok(analysis)
+        analysis
     }
 
     /// Get all lint issues found during analysis
@@ -263,7 +327,16 @@ impl<'a> ScriptAnalysis<'a> {
             .find(|s| matches!(s, Section::Events(_)))
         {
             for event in events {
-                if let Ok(info) = DialogueInfo::analyze(event) {
+                #[cfg(feature = "plugins")]
+                let info_result = self.registry.map_or_else(
+                    || DialogueInfo::analyze(event),
+                    |registry| DialogueInfo::analyze_with_registry(event, Some(registry)),
+                );
+
+                #[cfg(not(feature = "plugins"))]
+                let info_result = DialogueInfo::analyze(event);
+
+                if let Ok(info) = info_result {
                     self.dialogue_info.push(info);
                 }
             }

@@ -30,6 +30,9 @@ use crate::{
     Result,
 };
 
+#[cfg(feature = "plugins")]
+use crate::plugin::ExtensionRegistry;
+
 /// Timing relationship between two dialogue events
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimingRelation {
@@ -99,6 +102,48 @@ impl<'a> DialogueInfo<'a> {
     ///
     /// Returns an error if the event times are invalid or cannot be parsed.
     pub fn analyze(event: &'a Event<'a>) -> Result<Self> {
+        #[cfg(feature = "plugins")]
+        return Self::analyze_with_registry(event, None);
+        #[cfg(not(feature = "plugins"))]
+        return Self::analyze_impl(event);
+    }
+
+    /// Analyze a dialogue event with extension registry support
+    ///
+    /// Same as [`analyze`](Self::analyze) but allows custom tag handlers via registry.
+    /// Unhandled tags fall back to standard processing.
+    ///
+    /// # Arguments
+    ///
+    /// * `event` - Dialogue event to analyze
+    /// * `registry` - Optional registry for custom tag handlers
+    ///
+    /// # Returns
+    ///
+    /// `DialogueInfo` with complete analysis results, or error if parsing fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the event times are invalid or cannot be parsed.
+    #[cfg(feature = "plugins")]
+    pub fn analyze_with_registry(
+        event: &'a Event<'a>,
+        registry: Option<&ExtensionRegistry>,
+    ) -> Result<Self> {
+        Self::analyze_impl_with_registry(event, registry)
+    }
+
+    /// Internal implementation without plugins support
+    #[cfg(not(feature = "plugins"))]
+    fn analyze_impl(event: &'a Event<'a>) -> Result<Self> {
+        Self::analyze_impl_with_registry(event)
+    }
+
+    /// Internal implementation that supports optional registry
+    fn analyze_impl_with_registry(
+        event: &'a Event<'a>,
+        #[cfg(feature = "plugins")] registry: Option<&ExtensionRegistry>,
+    ) -> Result<Self> {
         let start_cs = parse_ass_time(event.start)?;
 
         let end_cs = parse_ass_time(event.end)?;
@@ -107,7 +152,16 @@ impl<'a> DialogueInfo<'a> {
             return Err(CoreError::parse("Start time must be before end time"));
         }
 
+        #[cfg(feature = "plugins")]
+        let text_info = if let Some(registry) = registry {
+            TextAnalysis::analyze_with_registry(event.text, Some(registry))?
+        } else {
+            TextAnalysis::analyze(event.text)?
+        };
+
+        #[cfg(not(feature = "plugins"))]
         let text_info = TextAnalysis::analyze(event.text)?;
+
         let animation_score = calculate_animation_score(text_info.override_tags());
         let complexity_score = calculate_complexity_score(
             animation_score,
@@ -120,7 +174,6 @@ impl<'a> DialogueInfo<'a> {
             start_cs,
             end_cs,
             animation_score,
-
             complexity_score,
             text_info,
         })

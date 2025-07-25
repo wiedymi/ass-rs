@@ -23,6 +23,12 @@ use crate::{
     utils::{errors::resource::check_depth_limit, CoreError},
     Result,
 };
+
+#[cfg(feature = "plugins")]
+use crate::analysis::events::tags::parse_override_block_with_registry;
+
+#[cfg(feature = "plugins")]
+use crate::plugin::ExtensionRegistry;
 use alloc::{string::String, vec::Vec};
 
 /// Analysis results for dialogue text content
@@ -76,6 +82,48 @@ impl<'a> TextAnalysis<'a> {
     ///
     /// Returns an error if text parsing fails or contains invalid override tags.
     pub fn analyze(text: &'a str) -> Result<Self> {
+        #[cfg(feature = "plugins")]
+        return Self::analyze_with_registry(text, None);
+        #[cfg(not(feature = "plugins"))]
+        return Self::analyze_impl(text);
+    }
+
+    /// Analyze dialogue text content with extension registry support
+    ///
+    /// Same as [`analyze`](Self::analyze) but allows custom tag handlers via registry.
+    /// Unhandled tags fall back to standard processing.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - Original dialogue text with potential override tags
+    /// * `registry` - Optional registry for custom tag handlers
+    ///
+    /// # Returns
+    ///
+    /// Complete text analysis results or parsing error.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if text parsing fails or contains invalid override tags.
+    #[cfg(feature = "plugins")]
+    pub fn analyze_with_registry(
+        text: &'a str,
+        registry: Option<&ExtensionRegistry>,
+    ) -> Result<Self> {
+        Self::analyze_impl_with_registry(text, registry)
+    }
+
+    /// Internal implementation without plugins support
+    #[cfg(not(feature = "plugins"))]
+    fn analyze_impl(text: &'a str) -> Result<Self> {
+        Self::analyze_impl_with_registry(text)
+    }
+
+    /// Internal implementation of analysis with optional registry support
+    fn analyze_impl_with_registry(
+        text: &'a str,
+        #[cfg(feature = "plugins")] registry: Option<&ExtensionRegistry>,
+    ) -> Result<Self> {
         const MAX_BRACE_DEPTH: usize = 100; // Prevent DoS with deeply nested braces
 
         let mut override_tags = Vec::new();
@@ -110,6 +158,26 @@ impl<'a> TextAnalysis<'a> {
 
                 if position > tag_start {
                     let tag_content = &text[tag_start..position];
+
+                    #[cfg(feature = "plugins")]
+                    if let Some(registry) = registry {
+                        parse_override_block_with_registry(
+                            tag_content,
+                            tag_start,
+                            &mut override_tags,
+                            &mut parse_diagnostics,
+                            Some(registry),
+                        );
+                    } else {
+                        parse_override_block(
+                            tag_content,
+                            tag_start,
+                            &mut override_tags,
+                            &mut parse_diagnostics,
+                        );
+                    }
+
+                    #[cfg(not(feature = "plugins"))]
                     parse_override_block(
                         tag_content,
                         tag_start,

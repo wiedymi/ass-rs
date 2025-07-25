@@ -20,6 +20,9 @@
 
 use alloc::{string::String, vec::Vec};
 
+#[cfg(feature = "plugins")]
+use crate::plugin::{ExtensionRegistry, TagResult};
+
 /// Diagnostic information for tag parsing issues
 #[derive(Debug, Clone)]
 pub struct TagDiagnostic<'a> {
@@ -151,6 +154,117 @@ pub fn parse_override_block<'a>(
                         complexity,
                         position: start_pos + tag_start,
                     });
+                }
+            } else {
+                let span_end = (tag_start + 2).min(content.len());
+                diagnostics.push(TagDiagnostic {
+                    span: &content[tag_start..span_end],
+                    offset: start_pos + tag_start,
+                    kind: DiagnosticKind::EmptyOverride,
+                });
+                pos += 1;
+            }
+        } else {
+            pos += 1;
+        }
+    }
+}
+
+/// Parse override block with extension registry support
+///
+/// Enhanced version of [`parse_override_block`] that can use custom tag handlers
+/// from an extension registry. Unknown tags are first checked against the registry
+/// before falling back to standard processing.
+///
+/// # Arguments
+///
+/// * `content` - Text content to parse (e.g., "\\b1\\i1")
+/// * `start_pos` - Byte offset in the original source text
+/// * `tags` - Mutable vector to collect parsed tags
+/// * `diagnostics` - Mutable vector to collect parsing diagnostics
+/// * `registry` - Optional registry for custom tag handlers
+#[cfg(feature = "plugins")]
+pub fn parse_override_block_with_registry<'a>(
+    content: &'a str,
+    start_pos: usize,
+    tags: &mut Vec<OverrideTag<'a>>,
+    diagnostics: &mut Vec<TagDiagnostic<'a>>,
+    registry: Option<&ExtensionRegistry>,
+) {
+    let mut pos = 0;
+    let chars: Vec<char> = content.chars().collect();
+
+    while pos < chars.len() {
+        if chars[pos] == '\\' {
+            let tag_start = pos;
+            pos += 1;
+
+            let name_start = pos;
+            while pos < chars.len() && chars[pos].is_ascii_alphabetic() {
+                pos += 1;
+            }
+
+            if pos > name_start {
+                let name_end = pos;
+                let args_start = pos;
+
+                while pos < chars.len() && chars[pos] != '\\' {
+                    pos += 1;
+                }
+
+                let tag_name = &content[name_start..name_end];
+                let args = &content[args_start..pos];
+
+                // Try to process with registry first
+                let mut handled_by_plugin = false;
+                if let Some(registry) = registry {
+                    if let Some(result) = registry.process_tag(tag_name, args) {
+                        match result {
+                            TagResult::Processed => {
+                                // Plugin successfully handled the tag
+                                handled_by_plugin = true;
+
+                                // Still add to tags for downstream analysis
+                                tags.push(OverrideTag {
+                                    name: tag_name,
+                                    args,
+                                    complexity: 2, // Default complexity for plugin tags
+                                    position: start_pos + tag_start,
+                                });
+                            }
+                            TagResult::Failed(_msg) => {
+                                // Plugin failed to process the tag
+                                diagnostics.push(TagDiagnostic {
+                                    span: &content[tag_start..pos],
+                                    offset: start_pos + tag_start,
+                                    kind: DiagnosticKind::MalformedTag,
+                                });
+                            }
+                            TagResult::Ignored => {
+                                // Plugin ignored the tag, fall back to standard processing
+                            }
+                        }
+                    }
+                }
+
+                // If not handled by plugin, use standard processing
+                if !handled_by_plugin {
+                    let complexity = calculate_tag_complexity(tag_name);
+
+                    if tag_name.trim().is_empty() {
+                        diagnostics.push(TagDiagnostic {
+                            span: &content[tag_start..pos],
+                            offset: start_pos + tag_start,
+                            kind: DiagnosticKind::EmptyOverride,
+                        });
+                    } else {
+                        tags.push(OverrideTag {
+                            name: tag_name,
+                            args,
+                            complexity,
+                            position: start_pos + tag_start,
+                        });
+                    }
                 }
             } else {
                 let span_end = (tag_start + 2).min(content.len());
