@@ -311,6 +311,18 @@ impl<'a> ResolvedStyle<'a> {
         self.outline_color
     }
 
+    /// Get character spacing
+    #[must_use]
+    pub const fn spacing(&self) -> f32 {
+        self.spacing
+    }
+
+    /// Get text rotation angle
+    #[must_use]
+    pub const fn angle(&self) -> f32 {
+        self.angle
+    }
+
     /// Create resolved style with inheritance from parent
     ///
     /// # Arguments
@@ -438,11 +450,12 @@ impl<'a> ResolvedStyle<'a> {
             if !b.is_empty() {
                 resolved.margin_b = parse_u16(b)?;
             }
-        } else if !style.margin_v.is_empty() {
+        } else if !style.margin_v.is_empty() && style.margin_v != "0" {
             let margin_v = parse_u16(style.margin_v)?;
             resolved.margin_t = margin_v;
             resolved.margin_b = margin_v;
         }
+        // If margin_v is empty or "0", keep inherited margins
 
         if !style.encoding.is_empty() {
             resolved.encoding = parse_u8(style.encoding)?;
@@ -452,6 +465,40 @@ impl<'a> ResolvedStyle<'a> {
         resolved.complexity_score = Self::calculate_complexity(&resolved);
 
         Ok(resolved)
+    }
+
+    /// Apply resolution scaling to coordinate-based properties
+    ///
+    /// Scales font size, spacing, outline, shadow, and margins based on the
+    /// resolution difference between layout and play resolutions.
+    ///
+    /// # Arguments
+    ///
+    /// * `scale_x` - Horizontal scaling factor (`PlayResX` / `LayoutResX`)
+    /// * `scale_y` - Vertical scaling factor (`PlayResY` / `LayoutResY`)
+    pub fn apply_resolution_scaling(&mut self, scale_x: f32, scale_y: f32) {
+        // Scale font size (use average of X/Y scaling to maintain aspect ratio)
+        let avg_scale = (scale_x + scale_y) / 2.0;
+        self.font_size *= avg_scale;
+
+        // Scale spacing (horizontal)
+        self.spacing *= scale_x;
+
+        // Scale outline and shadow (use average scaling)
+        self.outline *= avg_scale;
+        self.shadow *= avg_scale;
+
+        // Scale margins
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        {
+            self.margin_l = (f32::from(self.margin_l) * scale_x) as u16;
+            self.margin_r = (f32::from(self.margin_r) * scale_x) as u16;
+            self.margin_t = (f32::from(self.margin_t) * scale_y) as u16;
+            self.margin_b = (f32::from(self.margin_b) * scale_y) as u16;
+        }
+
+        // Recalculate complexity score after scaling
+        self.complexity_score = Self::calculate_complexity(self);
     }
 
     /// Calculate rendering complexity score
@@ -951,5 +998,123 @@ mod tests {
         assert!(!resolved.is_underline());
         assert!(!resolved.is_strike_out());
         assert_eq!(formatting, TextFormatting::empty());
+    }
+
+    #[test]
+    fn resolved_style_apply_resolution_scaling_symmetric() {
+        let style = create_test_style();
+        let mut resolved = ResolvedStyle::from_style(&style).unwrap();
+
+        // Apply 2x scaling
+        resolved.apply_resolution_scaling(2.0, 2.0);
+
+        assert!((resolved.font_size() - 40.0).abs() < f32::EPSILON); // 20 * 2
+        assert!((resolved.spacing() - 0.0).abs() < f32::EPSILON); // 0 * 2
+        assert!((resolved.outline() - 4.0).abs() < f32::EPSILON); // 2 * 2
+        assert!((resolved.shadow() - 0.0).abs() < f32::EPSILON); // 0 * 2
+        assert_eq!(resolved.margin_l(), 20); // 10 * 2
+        assert_eq!(resolved.margin_r(), 20); // 10 * 2
+        assert_eq!(resolved.margin_t(), 20); // 10 * 2
+        assert_eq!(resolved.margin_b(), 20); // 10 * 2
+    }
+
+    #[test]
+    fn resolved_style_apply_resolution_scaling_asymmetric() {
+        let mut style = create_test_style();
+        style.spacing = "4";
+        style.shadow = "2";
+        style.margin_l = "10";
+        style.margin_r = "20";
+        style.margin_v = "30";
+
+        let mut resolved = ResolvedStyle::from_style(&style).unwrap();
+
+        // Apply asymmetric scaling (3x horizontal, 2x vertical)
+        resolved.apply_resolution_scaling(3.0, 2.0);
+
+        // Average scale for font/outline/shadow: (3 + 2) / 2 = 2.5
+        assert!((resolved.font_size() - 50.0).abs() < f32::EPSILON); // 20 * 2.5
+        assert!((resolved.spacing() - 12.0).abs() < f32::EPSILON); // 4 * 3
+        assert!((resolved.outline() - 5.0).abs() < f32::EPSILON); // 2 * 2.5
+        assert!((resolved.shadow() - 5.0).abs() < f32::EPSILON); // 2 * 2.5
+        assert_eq!(resolved.margin_l(), 30); // 10 * 3
+        assert_eq!(resolved.margin_r(), 60); // 20 * 3
+        assert_eq!(resolved.margin_t(), 60); // 30 * 2
+        assert_eq!(resolved.margin_b(), 60); // 30 * 2
+    }
+
+    #[test]
+    fn resolved_style_apply_resolution_scaling_downscale() {
+        let style = create_test_style();
+        let mut resolved = ResolvedStyle::from_style(&style).unwrap();
+
+        // Apply 0.5x scaling (downscale)
+        resolved.apply_resolution_scaling(0.5, 0.5);
+
+        assert!((resolved.font_size() - 10.0).abs() < f32::EPSILON); // 20 * 0.5
+        assert!((resolved.spacing() - 0.0).abs() < f32::EPSILON); // 0 * 0.5
+        assert!((resolved.outline() - 1.0).abs() < f32::EPSILON); // 2 * 0.5
+        assert!((resolved.shadow() - 0.0).abs() < f32::EPSILON); // 0 * 0.5
+        assert_eq!(resolved.margin_l(), 5); // 10 * 0.5
+        assert_eq!(resolved.margin_r(), 5); // 10 * 0.5
+        assert_eq!(resolved.margin_t(), 5); // 10 * 0.5
+        assert_eq!(resolved.margin_b(), 5); // 10 * 0.5
+    }
+
+    #[test]
+    fn resolved_style_apply_resolution_scaling_updates_complexity() {
+        let mut style = create_test_style();
+        style.fontsize = "30"; // Not quite large enough to trigger complexity
+
+        let mut resolved = ResolvedStyle::from_style(&style).unwrap();
+        let initial_complexity = resolved.complexity_score();
+
+        // Apply 3x scaling to push font size over complexity threshold
+        resolved.apply_resolution_scaling(3.0, 3.0);
+
+        assert!((resolved.font_size() - 90.0).abs() < f32::EPSILON); // 30 * 3
+        assert!(resolved.complexity_score() > initial_complexity); // Should increase due to large font
+    }
+
+    #[test]
+    fn resolved_style_apply_resolution_scaling_preserves_other_properties() {
+        let mut style = create_test_style();
+        style.bold = "1";
+        style.italic = "1";
+        style.primary_colour = "&H00FF0000"; // Red
+        style.angle = "45";
+
+        let mut resolved = ResolvedStyle::from_style(&style).unwrap();
+        let initial_color = resolved.primary_color();
+        let initial_angle = resolved.angle;
+        let initial_formatting = resolved.formatting();
+
+        // Apply scaling
+        resolved.apply_resolution_scaling(2.0, 2.0);
+
+        // These properties should not be affected by scaling
+        assert_eq!(resolved.primary_color(), initial_color);
+        assert!((resolved.angle - initial_angle).abs() < f32::EPSILON);
+        assert_eq!(resolved.formatting(), initial_formatting);
+        assert!(resolved.is_bold());
+        assert!(resolved.is_italic());
+    }
+
+    #[test]
+    fn resolved_style_spacing_getter() {
+        let mut style = create_test_style();
+        style.spacing = "5.5";
+
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        assert!((resolved.spacing() - 5.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn resolved_style_angle_getter() {
+        let mut style = create_test_style();
+        style.angle = "45.5";
+
+        let resolved = ResolvedStyle::from_style(&style).unwrap();
+        assert!((resolved.angle() - 45.5).abs() < f32::EPSILON);
     }
 }
