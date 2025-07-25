@@ -207,8 +207,7 @@ impl<'a> Parser<'a> {
                 Ok(section)
             }
             "Fonts" => {
-                let parser = FontsParser::new(self.source, self.position, start_line);
-                let section = parser.parse();
+                let section = FontsParser::parse(self.source, self.position, start_line);
 
                 // Update position to end of fonts section
                 self.position = self.find_section_end();
@@ -216,8 +215,7 @@ impl<'a> Parser<'a> {
                 Ok(section)
             }
             "Graphics" => {
-                let parser = GraphicsParser::new(self.source, self.position, start_line);
-                let section = parser.parse();
+                let section = GraphicsParser::parse(self.source, self.position, start_line);
 
                 // Update position to end of graphics section
                 self.position = self.find_section_end();
