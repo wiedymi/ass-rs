@@ -27,6 +27,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Performance**: <5ms/operation, <1.1x input memory; use zero-copy, arenas, SIMD where beneficial
 - **Modularity**: Submodules per concern; traits for extensibility; file size <200 LOC
 - **Features**: Consistent across crates; default minimal; gate extras; maintain no_std compatibility
+- **Workarounds**: Never use workarounds, bypass, or skip logic; never use `allow(clippy)` to fix something
 
 ## Architecture Overview
 
