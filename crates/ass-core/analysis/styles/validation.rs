@@ -152,6 +152,13 @@ impl<'a> StyleInheritance<'a> {
         }
     }
 
+    /// Set parent style (for single inheritance)
+    pub fn set_parent(&mut self, parent: &'a str) {
+        self.parents.clear();
+        self.parents.push(parent);
+        self.depth = 1; // Will be adjusted later based on parent's depth
+    }
+
     /// Add child style that inherits from this one
     pub fn add_child(&mut self, child: &'a str) {
         if !self.children.contains(&child) {
@@ -229,6 +236,19 @@ impl<'a> StyleConflict<'a> {
             vec![referencing_style],
             &description,
             ValidationSeverity::Error,
+        )
+    }
+
+    /// Create missing parent conflict
+    #[must_use]
+    pub fn missing_parent(style_name: &'a str, parent_name: &'a str) -> Self {
+        let description =
+            format!("Style '{style_name}' inherits from non-existent parent '{parent_name}'");
+        Self::new(
+            ConflictType::MissingReference,
+            vec![style_name],
+            &description,
+            ValidationSeverity::Warning,
         )
     }
 }

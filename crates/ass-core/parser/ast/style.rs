@@ -32,6 +32,9 @@ pub struct Style<'a> {
     /// Style name (must be unique within script)
     pub name: &'a str,
 
+    /// Parent style name for inheritance (None if no inheritance)
+    pub parent: Option<&'a str>,
+
     /// Font name for text rendering
     pub fontname: &'a str,
 
@@ -160,6 +163,7 @@ impl Default for Style<'_> {
     fn default() -> Self {
         Self {
             name: "Default",
+            parent: None,
             fontname: "Arial",
             fontsize: "20",
             primary_colour: "&Hffffff",
@@ -244,6 +248,7 @@ mod tests {
     fn style_clone_custom() {
         let style = Style {
             name: "CustomStyle",
+            parent: None,
             fontname: "Times New Roman",
             fontsize: "18",
             primary_colour: "&H00ff00",
@@ -290,6 +295,7 @@ mod tests {
     fn style_debug_custom() {
         let style = Style {
             name: "DebugTest",
+            parent: None,
             fontname: "Helvetica",
             fontsize: "18",
             ..Style::default()
@@ -310,6 +316,7 @@ mod tests {
 
         let style3 = Style {
             name: "Custom",
+            parent: None,
             ..Style::default()
         };
         assert_ne!(style1, style3);
@@ -322,24 +329,28 @@ mod tests {
         // Test inequality with different fields
         let name_diff = Style {
             name: "Different",
+            parent: None,
             ..Style::default()
         };
         assert_ne!(base, name_diff);
 
         let font_diff = Style {
             fontname: "Comic Sans",
+            parent: None,
             ..Style::default()
         };
         assert_ne!(base, font_diff);
 
         let size_diff = Style {
             fontsize: "24",
+            parent: None,
             ..Style::default()
         };
         assert_ne!(base, size_diff);
 
         let color_diff = Style {
             primary_colour: "&H00ff00",
+            parent: None,
             ..Style::default()
         };
         assert_ne!(base, color_diff);
@@ -349,6 +360,7 @@ mod tests {
     fn style_field_access() {
         let style = Style {
             name: "TestStyle",
+            parent: None,
             fontname: "Comic Sans",
             fontsize: "24",
             bold: "1",
@@ -367,6 +379,7 @@ mod tests {
     fn style_field_access_comprehensive() {
         let style = Style {
             name: "ComprehensiveTest",
+            parent: None,
             fontname: "Verdana",
             fontsize: "14",
             primary_colour: "&Hff0000",
@@ -424,6 +437,7 @@ mod tests {
     fn style_empty_strings() {
         let style = Style {
             name: "",
+            parent: None,
             fontname: "",
             fontsize: "",
             primary_colour: "",
@@ -475,6 +489,7 @@ mod tests {
         // Create style with all references within the source range
         let style = Style {
             name: fields[0],
+            parent: None,
             fontname: fields[1],
             fontsize: fields[2],
             primary_colour: fields[3],
@@ -522,7 +537,8 @@ mod tests {
 
         // Create style with references from different source
         let style = Style {
-            name: &source2[0..5],       // "Other" - from different source
+            name: &source2[0..5], // "Other" - from different source
+            parent: None,
             fontname: &source1[8..13],  // "Arial" - from source1
             fontsize: &source1[14..16], // "20" - from source1
             ..Style::default()
@@ -539,6 +555,7 @@ mod tests {
             let parts: Vec<&str> = source.split(',').collect();
             Style {
                 name: parts[0],
+                parent: None,
                 fontname: parts[1],
                 fontsize: parts[2],
                 ..Style::default()
@@ -685,6 +702,7 @@ mod tests {
         // Test direct struct creation syntax
         let style = Style {
             name: "TestName",
+            parent: None,
             fontname: "TestFont",
             fontsize: "12",
             primary_colour: "&H123456",
@@ -743,6 +761,7 @@ mod tests {
         // Test struct update syntax with defaults
         let style = Style {
             name: "MixedStyle",
+            parent: None,
             fontsize: "22",
             bold: "1",
             italic: "1",
@@ -778,6 +797,7 @@ mod tests {
         let fields: Vec<&str> = source.split(',').collect();
         let style = Style {
             name: fields[0],
+            parent: None,
             fontname: fields[1],
             fontsize: fields[2],
             primary_colour: fields[3],

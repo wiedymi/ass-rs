@@ -145,7 +145,20 @@ impl<'a> StylesParser<'a> {
 
     /// Parse single style definition line
     fn parse_style_line(&mut self, line: &'a str) -> Option<Style<'a>> {
-        let parts: Vec<&str> = line.split(',').collect();
+        // First check if this is an inheritance style
+        let (adjusted_line, parent_style) = if line.trim_start().starts_with('*') {
+            // Find the first comma after the asterisk to extract parent style
+            line.find(',').map_or((line, None), |first_comma| {
+                let parent_part = &line[0..first_comma];
+                let parent_name = parent_part.trim_start().trim_start_matches('*').trim();
+                let remaining = &line[first_comma + 1..];
+                (remaining, Some(parent_name))
+            })
+        } else {
+            (line, None)
+        };
+
+        let parts: Vec<&str> = adjusted_line.split(',').collect();
 
         let format = self.format.as_deref().unwrap_or(&[
             "Name",
@@ -199,6 +212,7 @@ impl<'a> StylesParser<'a> {
 
         Some(Style {
             name: get_field("Name"),
+            parent: parent_style,
             fontname: get_field("Fontname"),
             fontsize: get_field("Fontsize"),
             primary_colour: get_field("PrimaryColour"),
@@ -1018,6 +1032,110 @@ mod tests {
         if let Section::Styles(styles) = section {
             assert_eq!(styles.len(), 1);
             assert_eq!(styles[0].name, "Default");
+        }
+    }
+
+    #[test]
+    fn parse_style_with_inheritance() {
+        let content =
+            "Format: Name, Fontname, Fontsize\nStyle: *BaseStyle,DerivedStyle, Arial, 16\n";
+        let parser = StylesParser::new(content, 0, 1);
+        let result = parser.parse().unwrap();
+        let (section, _format, _issues, _pos, _line) = result;
+
+        if let Section::Styles(styles) = section {
+            assert_eq!(styles.len(), 1);
+            let style = &styles[0];
+            assert_eq!(style.name, "DerivedStyle");
+            assert_eq!(style.parent, Some("BaseStyle"));
+            assert_eq!(style.fontname, "Arial");
+            assert_eq!(style.fontsize, "16");
+        } else {
+            panic!("Expected Styles section");
+        }
+    }
+
+    #[test]
+    fn parse_style_without_inheritance() {
+        let content = "Format: Name, Fontname, Fontsize\nStyle: NormalStyle, Arial, 16\n";
+        let parser = StylesParser::new(content, 0, 1);
+        let result = parser.parse().unwrap();
+        let (section, _format, _issues, _pos, _line) = result;
+
+        if let Section::Styles(styles) = section {
+            assert_eq!(styles.len(), 1);
+            let style = &styles[0];
+            assert_eq!(style.name, "NormalStyle");
+            assert_eq!(style.parent, None);
+            assert_eq!(style.fontname, "Arial");
+            assert_eq!(style.fontsize, "16");
+        } else {
+            panic!("Expected Styles section");
+        }
+    }
+
+    #[test]
+    fn parse_style_with_asterisk_but_no_comma() {
+        // Test edge case where name starts with * but has no comma after parent
+        // Should be skipped due to insufficient fields
+        let content = "Format: Name, Fontname, Fontsize\nStyle: *BaseStyleNoComma\n";
+        let parser = StylesParser::new(content, 0, 1);
+        let result = parser.parse().unwrap();
+        let (section, _format, issues, _pos, _line) = result;
+
+        if let Section::Styles(styles) = section {
+            // Should be empty due to insufficient fields
+            assert_eq!(styles.len(), 0);
+        } else {
+            panic!("Expected Styles section");
+        }
+
+        // Should have a warning about field count mismatch
+        assert!(!issues.is_empty());
+        assert!(issues[0].message.contains("fields, expected"));
+    }
+
+    #[test]
+    fn parse_multiple_styles_with_inheritance() {
+        let content = "Format: Name, Fontname, Fontsize\nStyle: BaseStyle, Arial, 16\nStyle: *BaseStyle,Derived1, Verdana, 14\nStyle: *BaseStyle,Derived2, Times, 18\nStyle: NormalStyle, Courier, 12\n";
+        let parser = StylesParser::new(content, 0, 1);
+        let result = parser.parse().unwrap();
+        let (section, _format, _issues, _pos, _line) = result;
+
+        if let Section::Styles(styles) = section {
+            assert_eq!(styles.len(), 4);
+
+            assert_eq!(styles[0].name, "BaseStyle");
+            assert_eq!(styles[0].parent, None);
+
+            assert_eq!(styles[1].name, "Derived1");
+            assert_eq!(styles[1].parent, Some("BaseStyle"));
+
+            assert_eq!(styles[2].name, "Derived2");
+            assert_eq!(styles[2].parent, Some("BaseStyle"));
+
+            assert_eq!(styles[3].name, "NormalStyle");
+            assert_eq!(styles[3].parent, None);
+        } else {
+            panic!("Expected Styles section");
+        }
+    }
+
+    #[test]
+    fn parse_style_with_inheritance_whitespace_handling() {
+        let content =
+            "Format: Name, Fontname, Fontsize\nStyle: * BaseStyle , DerivedStyle , Arial, 16\n";
+        let parser = StylesParser::new(content, 0, 1);
+        let result = parser.parse().unwrap();
+        let (section, _format, _issues, _pos, _line) = result;
+
+        if let Section::Styles(styles) = section {
+            assert_eq!(styles.len(), 1);
+            let style = &styles[0];
+            assert_eq!(style.name, "DerivedStyle");
+            assert_eq!(style.parent, Some("BaseStyle"));
+        } else {
+            panic!("Expected Styles section");
         }
     }
 }

@@ -182,6 +182,7 @@ fn test_resolved_style_margin_logic() {
     // v4+ style with single vertical margin
     let v4plus_style = Style {
         name: "V4Plus",
+        parent: None,
         fontname: "Arial",
         fontsize: "20",
         primary_colour: "&H00FFFFFF",
@@ -218,6 +219,7 @@ fn test_resolved_style_margin_logic() {
     // v4++ style with separate top/bottom margins
     let v4plusplus_style = Style {
         name: "V4PlusPlus",
+        parent: None,
         fontname: "Arial",
         fontsize: "20",
         primary_colour: "&H00FFFFFF",

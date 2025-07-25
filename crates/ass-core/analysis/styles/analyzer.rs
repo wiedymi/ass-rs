@@ -25,7 +25,7 @@ use crate::{
     },
     parser::{Script, Section, Style},
 };
-use alloc::{collections::BTreeMap, vec::Vec};
+use alloc::{collections::BTreeMap, collections::BTreeSet, vec::Vec};
 
 bitflags::bitflags! {
     /// Analysis options for style analyzer
@@ -175,20 +175,15 @@ impl<'a> StyleAnalyzer<'a> {
     fn analyze_all_styles(&mut self) {
         for section in self.script.sections() {
             if let Section::Styles(styles) = section {
-                for style in styles {
-                    // TODO: Implement style inheritance resolution
-                    // Currently creates ResolvedStyle directly without considering parent styles
-                    // Need to:
-                    // 1. Build inheritance hierarchy from style relationships
-                    // 2. Resolve parent properties before creating ResolvedStyle
-                    // 3. Apply inheritance chain with proper property precedence
-                    if let Ok(resolved) = ResolvedStyle::from_style(style) {
-                        self.resolved_styles.insert(style.name, resolved);
-                    }
-
-                    if self.config.options.contains(AnalysisOptions::INHERITANCE) {
-                        let inheritance = StyleInheritance::new(style.name);
-                        self.inheritance_info.insert(style.name, inheritance);
+                // Build dependency graph and resolve in order
+                if let Some(ordered_styles) = self.build_dependency_order(styles) {
+                    self.resolve_styles_with_inheritance(&ordered_styles);
+                } else {
+                    // Fall back to non-inherited resolution if circular dependency detected
+                    for style in styles {
+                        if let Ok(resolved) = ResolvedStyle::from_style(style) {
+                            self.resolved_styles.insert(style.name, resolved);
+                        }
                     }
                 }
 
@@ -196,6 +191,164 @@ impl<'a> StyleAnalyzer<'a> {
                     self.detect_style_conflicts_from_section(styles);
                 }
                 break;
+            }
+        }
+    }
+
+    /// Build dependency order for styles using topological sort
+    /// Returns None if circular dependency is detected
+    fn build_dependency_order(&mut self, styles: &'a [Style<'a>]) -> Option<Vec<&'a Style<'a>>> {
+        // Create style map for quick lookup
+        let style_map: BTreeMap<&str, &Style> = styles.iter().map(|s| (s.name, s)).collect();
+
+        // Build adjacency list (child -> parent)
+        let mut dependencies: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+        let mut in_degree: BTreeMap<&str, usize> = BTreeMap::new();
+
+        // Initialize all styles
+        for style in styles {
+            dependencies.insert(style.name, BTreeSet::new());
+            in_degree.insert(style.name, 0);
+        }
+
+        // Build dependency graph
+        for style in styles {
+            if let Some(parent_name) = style.parent {
+                if style_map.contains_key(parent_name) {
+                    dependencies
+                        .get_mut(style.name)
+                        .unwrap()
+                        .insert(parent_name);
+                    *in_degree.get_mut(parent_name).unwrap() += 1;
+
+                    // Track inheritance for analysis
+                    if self.config.options.contains(AnalysisOptions::INHERITANCE) {
+                        if let Some(inheritance) = self.inheritance_info.get_mut(style.name) {
+                            inheritance.set_parent(parent_name);
+                        } else {
+                            let mut inheritance = StyleInheritance::new(style.name);
+                            inheritance.set_parent(parent_name);
+                            self.inheritance_info.insert(style.name, inheritance);
+                        }
+                    }
+                } else {
+                    // Parent style not found - add warning conflict
+                    self.conflicts
+                        .push(StyleConflict::missing_parent(style.name, parent_name));
+                }
+            } else if self.config.options.contains(AnalysisOptions::INHERITANCE) {
+                // Style has no parent
+                self.inheritance_info
+                    .insert(style.name, StyleInheritance::new(style.name));
+            }
+        }
+
+        // Check for circular dependencies using DFS
+        if Self::has_circular_dependency(&dependencies) {
+            self.conflicts.push(StyleConflict::circular_inheritance(
+                dependencies.keys().copied().collect(),
+            ));
+            return None;
+        }
+
+        // Perform topological sort
+        let mut result = Vec::new();
+        let mut queue: Vec<&str> = Vec::new();
+
+        // Find all nodes with no dependencies
+        for (name, degree) in &in_degree {
+            if *degree == 0 {
+                queue.push(name);
+            }
+        }
+
+        while let Some(current) = queue.pop() {
+            if let Some(style) = style_map.get(current) {
+                result.push(*style);
+            }
+
+            // Update in-degrees
+            for (child, parents) in &dependencies {
+                if parents.contains(current) {
+                    if let Some(degree) = in_degree.get_mut(child) {
+                        *degree = degree.saturating_sub(1);
+                        if *degree == 0 {
+                            queue.push(child);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check if all styles were processed
+        if result.len() == styles.len() {
+            Some(result)
+        } else {
+            // Not all styles processed - circular dependency exists
+            None
+        }
+    }
+
+    /// Check for circular dependencies using DFS
+    fn has_circular_dependency(dependencies: &BTreeMap<&str, BTreeSet<&str>>) -> bool {
+        let mut visited = BTreeSet::new();
+        let mut rec_stack = BTreeSet::new();
+
+        for node in dependencies.keys() {
+            if !visited.contains(node)
+                && Self::dfs_has_cycle(node, dependencies, &mut visited, &mut rec_stack)
+            {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// DFS helper for cycle detection
+    fn dfs_has_cycle<'b>(
+        node: &'b str,
+        dependencies: &BTreeMap<&'b str, BTreeSet<&'b str>>,
+        visited: &mut BTreeSet<&'b str>,
+        rec_stack: &mut BTreeSet<&'b str>,
+    ) -> bool {
+        visited.insert(node);
+        rec_stack.insert(node);
+
+        if let Some(neighbors) = dependencies.get(node) {
+            for neighbor in neighbors {
+                if !visited.contains(neighbor) {
+                    if Self::dfs_has_cycle(neighbor, dependencies, visited, rec_stack) {
+                        return true;
+                    }
+                } else if rec_stack.contains(neighbor) {
+                    return true;
+                }
+            }
+        }
+
+        rec_stack.remove(node);
+        false
+    }
+
+    /// Resolve styles with inheritance support
+    fn resolve_styles_with_inheritance(&mut self, ordered_styles: &[&'a Style<'a>]) {
+        for style in ordered_styles {
+            let resolved = if let Some(parent_name) = style.parent {
+                // Get parent's resolved style
+                self.resolved_styles.get(parent_name).map_or_else(
+                    || ResolvedStyle::from_style(style),
+                    |parent_resolved| {
+                        ResolvedStyle::from_style_with_parent(style, parent_resolved)
+                    },
+                )
+            } else {
+                // No parent - resolve directly
+                ResolvedStyle::from_style(style)
+            };
+
+            if let Ok(resolved_style) = resolved {
+                self.resolved_styles.insert(style.name, resolved_style);
             }
         }
     }
@@ -280,6 +433,7 @@ impl<'a> StyleAnalyzer<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::analysis::styles::validation::ConflictType;
 
     #[test]
     fn analyzer_creation() {
@@ -609,5 +763,207 @@ Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,
         assert_eq!(analyzer.resolved_styles().len(), 1);
         assert!(analyzer.inheritance_info().is_empty());
         assert!(analyzer.conflicts().is_empty());
+    }
+
+    #[test]
+    fn analyzer_style_inheritance_basic() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: BaseStyle,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+Style: *BaseStyle,DerivedStyle,Verdana,24,&HFF00FFFF,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+
+        assert_eq!(analyzer.resolved_styles().len(), 2);
+
+        let base_style = analyzer.resolve_style("BaseStyle").unwrap();
+        assert_eq!(base_style.font_name(), "Arial");
+        assert!((base_style.font_size() - 20.0).abs() < f32::EPSILON);
+        assert!(!base_style.is_bold());
+
+        let derived_style = analyzer.resolve_style("DerivedStyle").unwrap();
+        assert_eq!(derived_style.font_name(), "Verdana");
+        assert!((derived_style.font_size() - 24.0).abs() < f32::EPSILON);
+        assert!(derived_style.is_bold());
+        // Should inherit colors from base
+        assert_eq!(derived_style.primary_color(), [255, 255, 0, 255]); // Overridden
+        assert_eq!(
+            derived_style.secondary_color(),
+            base_style.secondary_color()
+        );
+        assert_eq!(derived_style.outline_color(), base_style.outline_color());
+    }
+
+    #[test]
+    fn analyzer_style_inheritance_partial_override() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: BaseStyle,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,1,1,0,0,100,100,0,0,1,2,3,2,10,10,10,1
+Style: *BaseStyle,DerivedStyle,Verdana,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,2,3,2,10,10,10,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+
+        let base_style = analyzer.resolve_style("BaseStyle").unwrap();
+        let derived_style = analyzer.resolve_style("DerivedStyle").unwrap();
+
+        // Should override font name
+        assert_eq!(derived_style.font_name(), "Verdana");
+        // Should override font size
+        assert!((derived_style.font_size() - 24.0).abs() < f32::EPSILON);
+        // Should inherit colors
+        assert_eq!(derived_style.primary_color(), base_style.primary_color());
+        // Should inherit bold but override italic
+        assert!(derived_style.is_bold());
+        assert!(!derived_style.is_italic());
+        // Should inherit shadow
+        assert!((derived_style.shadow() - 3.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn analyzer_style_inheritance_chain() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: GrandParent,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+Style: *GrandParent,Parent,Verdana,24,&H00FFFF00,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,3,0,2,15,15,15,1
+Style: *Parent,Child,Times,28,&H00FF00FF,&H000000FF,&H00000000,&H00000000,1,1,0,0,100,100,0,0,1,4,0,2,20,20,20,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+
+        assert_eq!(analyzer.resolved_styles().len(), 3);
+
+        let grandparent = analyzer.resolve_style("GrandParent").unwrap();
+        let parent = analyzer.resolve_style("Parent").unwrap();
+        let child = analyzer.resolve_style("Child").unwrap();
+
+        // GrandParent properties
+        assert_eq!(grandparent.font_name(), "Arial");
+        assert!((grandparent.font_size() - 20.0).abs() < f32::EPSILON);
+        assert!(!grandparent.is_bold());
+        assert!((grandparent.outline() - 2.0).abs() < f32::EPSILON);
+
+        // Parent inherits and overrides
+        assert_eq!(parent.font_name(), "Verdana");
+        assert!((parent.font_size() - 24.0).abs() < f32::EPSILON);
+        assert!(parent.is_bold());
+        assert!((parent.outline() - 3.0).abs() < f32::EPSILON);
+        assert_eq!(parent.margin_l(), 15);
+
+        // Child inherits from Parent and overrides
+        assert_eq!(child.font_name(), "Times");
+        assert!((child.font_size() - 28.0).abs() < f32::EPSILON);
+        assert!(child.is_bold());
+        assert!(child.is_italic());
+        assert!((child.outline() - 4.0).abs() < f32::EPSILON);
+        assert_eq!(child.margin_l(), 20);
+    }
+
+    #[test]
+    fn analyzer_style_inheritance_missing_parent() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: *NonExistent,Orphan,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+
+        // Should still resolve the style without inheritance
+        assert_eq!(analyzer.resolved_styles().len(), 1);
+        let orphan = analyzer.resolve_style("Orphan").unwrap();
+        assert_eq!(orphan.font_name(), "Arial");
+
+        // Should have a conflict for missing parent
+        let conflicts = analyzer.conflicts();
+        assert!(!conflicts.is_empty());
+        assert!(conflicts
+            .iter()
+            .any(|c| matches!(c.conflict_type, ConflictType::MissingReference)));
+    }
+
+    #[test]
+    fn analyzer_style_circular_inheritance() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: *StyleB,StyleA,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+Style: *StyleA,StyleB,Verdana,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+
+        // Should still resolve styles without inheritance due to circular dependency
+        assert_eq!(analyzer.resolved_styles().len(), 2);
+
+        // Should detect circular inheritance
+        let conflicts = analyzer.conflicts();
+        assert!(conflicts
+            .iter()
+            .any(|c| matches!(c.conflict_type, ConflictType::CircularInheritance)));
+    }
+
+    #[test]
+    fn analyzer_style_self_inheritance() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: *SelfRef,SelfRef,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+
+        // Should resolve without inheritance due to self-reference
+        assert_eq!(analyzer.resolved_styles().len(), 1);
+
+        // Should detect circular inheritance
+        let conflicts = analyzer.conflicts();
+        assert!(conflicts
+            .iter()
+            .any(|c| matches!(c.conflict_type, ConflictType::CircularInheritance)));
+    }
+
+    #[test]
+    fn analyzer_inheritance_info_tracking() {
+        let script_text = r"
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: BaseStyle,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+Style: *BaseStyle,Child1,Verdana,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+Style: *BaseStyle,Child2,Times,18,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+";
+
+        let script = crate::parser::Script::parse(script_text).unwrap();
+        let analyzer = StyleAnalyzer::new(&script);
+
+        let inheritance_info = analyzer.inheritance_info();
+        assert_eq!(inheritance_info.len(), 3);
+
+        // Check BaseStyle has no parent
+        let base_info = inheritance_info.get("BaseStyle").unwrap();
+        assert!(base_info.is_root());
+        assert!(base_info.parents.is_empty());
+
+        // Check Child1 has BaseStyle as parent
+        let child1_info = inheritance_info.get("Child1").unwrap();
+        assert!(!child1_info.is_root());
+        assert_eq!(child1_info.parents.len(), 1);
+        assert_eq!(child1_info.parents[0], "BaseStyle");
+
+        // Check Child2 has BaseStyle as parent
+        let child2_info = inheritance_info.get("Child2").unwrap();
+        assert!(!child2_info.is_root());
+        assert_eq!(child2_info.parents.len(), 1);
+        assert_eq!(child2_info.parents[0], "BaseStyle");
     }
 }
