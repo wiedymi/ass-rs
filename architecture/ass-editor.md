@@ -1,7 +1,7 @@
 
 ## Overview
 
-`ass-editor` is a high-performance, ergonomic editor layer built atop `ass-core`, enabling interactive ASS subtitle manipulation with focus on user-friendly APIs (builders, macros, fluent chaining) while maintaining zero-copy efficiency (spans from core), incremental updates (<1ms edits, <5ms re-parses), and thread-safety (Send+Sync commands). It surpasses libass's lack of editor support (libass is just a renderer with global state bugs, forcing forks like Aegisub to duplicate parsing inefficiently) by reusing core's modularity: Delegate parsing to `ass-core::Script::parse_partial()`, analysis/linting via core modules, and extensibility through shared `ExtensionRegistry`. Critically, avoid libass pitfalls like strdup copies—use lifetimes `'a` for borrows, optional arenas (bumpalo) for histories, and lazy validation to cap memory at ~1.2x script size.
+`ass-editor` is a high-performance, ergonomic editor layer built atop `ass-core`, enabling interactive ASS subtitle manipulation with focus on user-friendly APIs (builders, macros, fluent chaining) while maintaining zero-copy efficiency (spans from core), incremental updates (<1ms edits, <5ms re-parses), and thread-safety (implicit Send+Sync via core's immutable Script design). It surpasses libass's lack of editor support (libass is just a renderer with global state bugs, forcing forks like Aegisub to duplicate parsing inefficiently) by reusing core's modularity: Delegate parsing to `ass-core::Script::parse_partial()`, analysis/linting via core modules, and extensibility through shared `ExtensionRegistry`. Critically, avoid libass pitfalls like strdup copies—use lifetimes `'a` for borrows, optional arenas (bumpalo) for histories, and lazy validation to cap memory at ~1.2x script size.
 
 Core functionalities:
 - Document management: Multi-session support (tabs/batches) with pooled resources.
@@ -104,7 +104,7 @@ classDiagram
     CommandResult --> Delta : includes
     DocumentSearch --> Script : searches
     EditorExtension --> TagHandler : implements
-    LazyValidator --> LazyValidator : wraps
+    LazyValidator --> ScriptAnalysis : wraps
     SearchIndex --> SearchIndex : uses
     EventChannel --> DocumentEvent : emits
 ```
@@ -141,14 +141,14 @@ crates/ass-editor/
 │   ├── mod.rs  # SearchOptions builder
 │   ├── search.rs   # DocumentSearch trait with trie-based indexing. WASM opt: If fst regex slow, fallback to core linear (benchmark <1ms)
 │   ├── indexing.rs # FST-based search index for regex/fuzzy queries
-│   └── validator.rs  # LazyValidator wrapper. Support core's new unicode-wrap feature; lint LayoutRes mismatches in validator.rs
+│   └── validator.rs  # LazyValidator implementation wrapping core's ScriptAnalysis. Support core's unicode-wrap feature; lint LayoutRes mismatches
 └── benches/    # Perf tests (criterion: multi-session edits)
 ```
 
 ## Interactions with ASS-Core
 
 - **Parsing**: `EditorDocument::from_str(text)` → `ass-core::Script::parse(text)`; incremental: `script.parse_partial(range)`.
-- **Analysis/Linting**: `doc.validate_partial()` → core `LazyValidator`; `analysis_update` from `ScriptAnalysis`.
+- **Analysis/Linting**: `doc.validate_partial()` → editor's `LazyValidator` wrapper around core's `ScriptAnalysis`; `analysis_update` from `ScriptAnalysis`.
 - **Plugins**: Shared `ExtensionRegistry`: Register editor exts (e.g., `SyntaxHighlightExtension` impls core `TagHandler` for tag parsing).
 - **Rendering Prep**: Hook core `TagComputedValues` for previews (no full render; defer to ass-renderer).
 - **Search/Indexing**: `doc.search()` → FST-based trie index for fast regex queries on 1000+ events (fallback to core linear search).
@@ -157,3 +157,10 @@ crates/ass-editor/
 - **Async Handling**: Feature-gated async only for UI responsiveness; avoid unnecessary futures bloat in CLI integrations.
 
 Critique: Superior to libass (no sessions, inefficient globals) and Aegisub (single-thread forks). Ropey reduces deps vs xi-rope; FST indexing handles large scripts. Watch lifetime complexity in sessions—test for borrows. Arena resets prevent accumulation. Extend via registry without forks.
+
+## Implementation Notes
+
+Based on ass-core analysis:
+- **LazyValidator**: Not provided by core; implement in editor as wrapper around `ScriptAnalysis` for on-demand validation
+- **Thread-safety**: Core's `Script<'a>` has immutable design but lacks explicit Send+Sync bounds (would require unsafe); rely on implicit safety
+- **All other features ready**: Delta tracking, plugin system, incremental parsing, SIMD, arenas all available in core
