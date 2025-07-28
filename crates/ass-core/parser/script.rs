@@ -13,10 +13,13 @@ use core::ops::Range;
 #[cfg(feature = "stream")]
 use super::streaming;
 use super::{
-    ast::{Event, Font, Graphic, Section, SectionType, Style},
+    ast::{Event, Section, SectionType, Style},
     errors::{ParseError, ParseIssue},
     main::Parser,
 };
+
+#[cfg(feature = "stream")]
+use super::ast::{Font, Graphic};
 
 #[cfg(feature = "plugins")]
 use crate::plugin::ExtensionRegistry;

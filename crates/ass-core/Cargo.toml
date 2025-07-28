@@ -81,8 +81,33 @@ missing_docs_in_private_items = "warn"
 undocumented_unsafe_blocks = "deny"
 
 [[bench]]
-name = "parser_benchmarks"
+name = "parser_benchmarks" 
 harness = false
+required-features = ["benches"]
+
+[[bench]]
+name = "incremental_benchmarks"
+harness = false
+required-features = ["benches"]
+
+[[bench]]
+name = "memory_benchmarks"
+harness = false
+required-features = ["benches"]
+
+[[bin]]
+name = "validate-bench-results" 
+path = "bin/validate_bench_results.rs"
+required-features = ["benches"]
+
+[[bin]]
+name = "check-perf-regression"
+path = "bin/check_perf_regression.rs"
+required-features = ["benches"]
+
+[[bin]]
+name = "memory-profile"
+path = "bin/memory_profile.rs"
 required-features = ["benches"]
 
 [package.metadata.docs.rs]

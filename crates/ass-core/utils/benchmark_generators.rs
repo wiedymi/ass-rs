@@ -34,6 +34,16 @@ pub enum ComplexityLevel {
     Complex,
     /// Extreme complexity to stress-test parser
     Extreme,
+    /// Anime subtitles - heavy styling and effects
+    AnimeRealistic,
+    /// Movie subtitles - simple, timing-focused
+    MovieRealistic,
+    /// Karaoke files - complex animations and timing
+    KaraokeRealistic,
+    /// Sign translations - positioning and styling
+    SignRealistic,
+    /// Educational content - long dialogues and formatting
+    EducationalRealistic,
 }
 
 impl ScriptGenerator {
@@ -78,6 +88,61 @@ impl ScriptGenerator {
             styles_count: 20,
             events_count,
             complexity_level: ComplexityLevel::Extreme,
+        }
+    }
+
+    /// Create generator for anime-style subtitles
+    #[must_use]
+    pub fn anime_realistic(events_count: usize) -> Self {
+        Self {
+            title: "Anime Subtitles".to_string(),
+            styles_count: 15,
+            events_count,
+            complexity_level: ComplexityLevel::AnimeRealistic,
+        }
+    }
+
+    /// Create generator for movie subtitles
+    #[must_use]
+    pub fn movie_realistic(events_count: usize) -> Self {
+        Self {
+            title: "Movie Subtitles".to_string(),
+            styles_count: 3,
+            events_count,
+            complexity_level: ComplexityLevel::MovieRealistic,
+        }
+    }
+
+    /// Create generator for karaoke files
+    #[must_use]
+    pub fn karaoke_realistic(events_count: usize) -> Self {
+        Self {
+            title: "Karaoke Script".to_string(),
+            styles_count: 8,
+            events_count,
+            complexity_level: ComplexityLevel::KaraokeRealistic,
+        }
+    }
+
+    /// Create generator for sign translation subtitles
+    #[must_use]
+    pub fn sign_realistic(events_count: usize) -> Self {
+        Self {
+            title: "Sign Translation".to_string(),
+            styles_count: 12,
+            events_count,
+            complexity_level: ComplexityLevel::SignRealistic,
+        }
+    }
+
+    /// Create generator for educational content
+    #[must_use]
+    pub fn educational_realistic(events_count: usize) -> Self {
+        Self {
+            title: "Educational Content".to_string(),
+            styles_count: 6,
+            events_count,
+            complexity_level: ComplexityLevel::EducationalRealistic,
         }
     }
 
@@ -197,7 +262,120 @@ PlayResY: 1080",
                     r"{{\pos(100,200)\move(100,200,500,400)\fad(300,300)\t(0,500,\fscx120\fscy120)\t(500,1000,\fscx100\fscy100)\b1\i1\u1\s1\bord2\shad2\c&H00FF00&\3c&H0000FF&\4c&H000000&\alpha&H00\3a&H80}}{base_text}{{\b0\i0\u0\s0\r}} {{\k50}}with {{\k30}}karaoke {{\k40}}timing {{\k60}}and {{\k45}}complex {{\k35}}animations"
                 )
             }
+            ComplexityLevel::AnimeRealistic => {
+                Self::generate_anime_dialogue(event_index, &base_text)
+            }
+            ComplexityLevel::MovieRealistic => {
+                Self::generate_movie_dialogue(event_index, &base_text)
+            }
+            ComplexityLevel::KaraokeRealistic => {
+                Self::generate_karaoke_dialogue(event_index, &base_text)
+            }
+            ComplexityLevel::SignRealistic => {
+                Self::generate_sign_dialogue(event_index, &base_text)
+            }
+            ComplexityLevel::EducationalRealistic => {
+                Self::generate_educational_dialogue(event_index, &base_text)
+            }
         }
+    }
+
+    /// Generate anime-style dialogue with heavy effects
+    fn generate_anime_dialogue(event_index: usize, base_text: &str) -> String {
+        let patterns = [
+            // Character speaking with glow effect
+            format!(r"{{\an8\pos(960,80)\fad(250,250)\bord3\shad0\c&H00FFFFFF&\3c&H00FF8C00&}}{base_text}"),
+            // Thought bubble with transparency
+            format!(r"{{\an5\pos(960,540)\fad(500,500)\alpha&H80&\bord2\c&H00E6E6FA&\3c&H00483D8B&}}{base_text}"),
+            // Dramatic effect with color change
+            format!(r"{{\an2\pos(960,980)\fad(300,800)\b1\bord4\shad3\c&H0000FFFF&\3c&H000000FF&\4c&H00000000&\t(0,2000,\c&H00FF0000&)}}{base_text}"),
+            // Side character with positioning
+            format!(r"{{\an7\pos(200,400)\fad(200,200)\bord2\c&H00FFFFFF&\3c&H00800080&}}{base_text}"),
+        ];
+        patterns[event_index % patterns.len()].clone()
+    }
+
+    /// Generate movie-style dialogue (simple and clean)
+    fn generate_movie_dialogue(event_index: usize, base_text: &str) -> String {
+        let patterns = [
+            // Standard dialogue
+            base_text.to_string(),
+            // Italic for emphasis
+            format!(r"{{\i1}}{base_text}{{\i0}}"),
+            // Bold for shouting
+            format!(r"{{\b1}}{base_text}{{\b0}}"),
+            // Different speaker position
+            format!(r"{{\an8}}{base_text}"),
+        ];
+        patterns[event_index % patterns.len()].clone()
+    }
+
+    /// Generate karaoke-style dialogue with timing
+    fn generate_karaoke_dialogue(event_index: usize, base_text: &str) -> String {
+        use std::fmt::Write;
+        
+        let words: Vec<&str> = base_text.split_whitespace().collect();
+        let mut karaoke_text = String::new();
+        
+        // Add base styling
+        karaoke_text.push_str(r"{\an5\pos(960,540)\fad(200,200)\b1\bord2\shad1\c&H00FFFFFF&\3c&H00FF6347&}");
+        
+        // Add karaoke timing for each word
+        for (i, word) in words.iter().enumerate() {
+            let timing = 50 + (i * 30); // Varying timing
+            write!(karaoke_text, r"{{\k{timing}}}{word} ").unwrap();
+        }
+        
+        // Add final effect
+        if event_index % 3 == 0 {
+            karaoke_text.push_str(r"{\t(2000,3000,\fscx120\fscy120\alpha&HFF&)}");
+        }
+        
+        karaoke_text
+    }
+
+    /// Generate sign translation dialogue with positioning
+    fn generate_sign_dialogue(event_index: usize, base_text: &str) -> String {
+        let positions = [
+            // Top signs
+            (r"{\an8\pos(960,100)", "RESTAURANT"),
+            (r"{\an9\pos(1700,150)", "EXIT"),
+            (r"{\an7\pos(220,120)", "HOTEL"),
+            // Screen text
+            (r"{\an5\pos(960,540)", "NEWS FLASH"),
+            // Bottom signs
+            (r"{\an2\pos(960,950)", "SUBWAY"),
+            // Side signs
+            (r"{\an4\pos(100,540)", "STORE"),
+        ];
+        
+        let (pos_tag, sign_type) = &positions[event_index % positions.len()];
+        let sign_text = if base_text.contains("number") {
+            format!("{sign_type}: {}", base_text.replace("dialogue line", "sign"))
+        } else {
+            (*sign_type).to_string()
+        };
+        
+        format!(r"{pos_tag}\fad(500,500)\bord3\shad2\c&H00000000&\3c&H00FFFFFF&\fn{{Arial}}\fs36}}{sign_text}")
+    }
+
+    /// Generate educational content dialogue
+    fn generate_educational_dialogue(event_index: usize, base_text: &str) -> String {
+        let patterns = [
+            // Main content
+            format!(r"{{\an2\pos(960,900)\fad(200,200)\bord1\c&H00FFFFFF&}}{base_text} - This explains the concept in detail with proper formatting."),
+            // Question format
+            format!(r"{{\an8\pos(960,150)\fad(200,200)\b1\c&H0000FFFF&}}Question {}: {base_text}", event_index + 1),
+            // Answer format
+            format!(r"{{\an7\pos(100,400)\fad(200,200)\i1\c&H0000FF00&}}Answer: {base_text}"),
+            // Definition
+            format!(r"{{\an5\pos(960,540)\fad(200,200)\bord2\c&H00FFFFFF&\3c&H000080FF&}}Definition: {base_text}"),
+            // Example
+            format!(r"{{\an1\pos(100,900)\fad(200,200)\c&H00FFFF00&}}Example: {base_text}"),
+            // Summary
+            format!(r"{{\an9\pos(1700,100)\fad(200,200)\b1\c&H00FF8000&}}Summary: {base_text}"),
+        ];
+        patterns[event_index % patterns.len()].clone()
     }
 }
 
@@ -479,6 +657,73 @@ mod tests {
         assert!(text.contains(r"{\k"));
         assert!(text.contains("karaoke"));
         assert!(text.contains("animations"));
+    }
+
+    #[test]
+    fn anime_realistic_generator() {
+        let generator = ScriptGenerator::anime_realistic(5);
+        assert_eq!(generator.events_count, 5);
+        assert_eq!(generator.styles_count, 15);
+        assert!(matches!(
+            generator.complexity_level,
+            ComplexityLevel::AnimeRealistic
+        ));
+        
+        let script = generator.generate();
+        assert!(script.contains("Anime Subtitles"));
+    }
+
+    #[test]
+    fn movie_realistic_generator() {
+        let generator = ScriptGenerator::movie_realistic(3);
+        assert_eq!(generator.events_count, 3);
+        assert_eq!(generator.styles_count, 3);
+        assert!(matches!(
+            generator.complexity_level,
+            ComplexityLevel::MovieRealistic
+        ));
+    }
+
+    #[test]
+    fn karaoke_realistic_generator() {
+        let generator = ScriptGenerator::karaoke_realistic(2);
+        assert_eq!(generator.events_count, 2);
+        assert_eq!(generator.styles_count, 8);
+        assert!(matches!(
+            generator.complexity_level,
+            ComplexityLevel::KaraokeRealistic
+        ));
+        
+        let text = generator.generate_dialogue_text(0);
+        assert!(text.contains(r"{\k"));
+    }
+
+    #[test]
+    fn sign_realistic_generator() {
+        let generator = ScriptGenerator::sign_realistic(4);
+        assert_eq!(generator.events_count, 4);
+        assert_eq!(generator.styles_count, 12);
+        assert!(matches!(
+            generator.complexity_level,
+            ComplexityLevel::SignRealistic
+        ));
+        
+        let text = generator.generate_dialogue_text(0);
+        assert!(text.contains(r"{\pos(") || text.contains(r"{\an"));
+    }
+
+    #[test]
+    fn educational_realistic_generator() {
+        let generator = ScriptGenerator::educational_realistic(6);
+        assert_eq!(generator.events_count, 6);
+        assert_eq!(generator.styles_count, 6);
+        assert!(matches!(
+            generator.complexity_level,
+            ComplexityLevel::EducationalRealistic
+        ));
+        
+        let text = generator.generate_dialogue_text(1);
+        assert!(text.contains("Question") || text.contains("Answer") || text.contains("Definition"));
     }
 
     #[test]
