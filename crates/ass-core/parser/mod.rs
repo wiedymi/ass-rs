@@ -32,7 +32,9 @@
 pub mod ast;
 pub mod binary_data;
 pub mod errors;
+pub mod incremental;
 pub mod main;
+pub mod position_tracker;
 pub mod script;
 pub mod sections;
 
@@ -44,10 +46,10 @@ pub use ast::{Event, ScriptInfo, Section, SectionType, Style};
 pub use errors::{IssueCategory, IssueSeverity, ParseError, ParseIssue, ParseResult};
 pub use script::Script;
 #[cfg(feature = "stream")]
-pub use script::{ScriptDelta, ScriptDeltaOwned};
+pub use script::{calculate_delta, ScriptDelta, ScriptDeltaOwned};
 
 #[cfg(feature = "stream")]
-pub use streaming::{build_modified_source, parse_incremental};
+pub use streaming::build_modified_source;
 
 #[cfg(test)]
 mod tests {

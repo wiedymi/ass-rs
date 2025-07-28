@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 #[cfg(debug_assertions)]
 use core::ops::Range;
 
-use super::{Event, Font, Graphic, ScriptInfo, Style};
+use super::{Event, Font, Graphic, ScriptInfo, Span, Style};
 
 /// Section type discriminant for efficient lookup and filtering
 ///
@@ -47,9 +47,9 @@ pub enum SectionType {
 /// # Examples
 ///
 /// ```rust
-/// use ass_core::parser::ast::{Section, ScriptInfo, SectionType};
+/// use ass_core::parser::ast::{Section, ScriptInfo, SectionType, Span};
 ///
-/// let info = ScriptInfo { fields: vec![("Title", "Test")] };
+/// let info = ScriptInfo { fields: vec![("Title", "Test")], span: Span::new(0, 10, 1, 1) };
 /// let section = Section::ScriptInfo(info);
 /// assert_eq!(section.section_type(), SectionType::ScriptInfo);
 /// ```
@@ -88,6 +88,57 @@ pub enum Section<'a> {
 }
 
 impl Section<'_> {
+    /// Get the span covering this entire section
+    ///
+    /// Computes the span by looking at the content's spans.
+    /// Returns None if the section is empty.
+    #[must_use]
+    pub fn span(&self) -> Option<Span> {
+        match self {
+            Section::ScriptInfo(info) => Some(info.span),
+            Section::Styles(styles) => {
+                if styles.is_empty() {
+                    None
+                } else {
+                    // Merge first and last style spans
+                    let first = &styles[0].span;
+                    let last = &styles[styles.len() - 1].span;
+                    Some(Span::new(first.start, last.end, first.line, first.column))
+                }
+            }
+            Section::Events(events) => {
+                if events.is_empty() {
+                    None
+                } else {
+                    // Merge first and last event spans
+                    let first = &events[0].span;
+                    let last = &events[events.len() - 1].span;
+                    Some(Span::new(first.start, last.end, first.line, first.column))
+                }
+            }
+            Section::Fonts(fonts) => {
+                if fonts.is_empty() {
+                    None
+                } else {
+                    // Merge first and last font spans
+                    let first = &fonts[0].span;
+                    let last = &fonts[fonts.len() - 1].span;
+                    Some(Span::new(first.start, last.end, first.line, first.column))
+                }
+            }
+            Section::Graphics(graphics) => {
+                if graphics.is_empty() {
+                    None
+                } else {
+                    // Merge first and last graphic spans
+                    let first = &graphics[0].span;
+                    let last = &graphics[graphics.len() - 1].span;
+                    Some(Span::new(first.start, last.end, first.line, first.column))
+                }
+            }
+        }
+    }
+
     /// Get section type discriminant for efficient matching
     ///
     /// Returns the section type without borrowing the section content,
@@ -96,8 +147,8 @@ impl Section<'_> {
     /// # Examples
     ///
     /// ```rust
-    /// # use ass_core::parser::ast::{Section, ScriptInfo, SectionType};
-    /// let info = Section::ScriptInfo(ScriptInfo { fields: Vec::new() });
+    /// # use ass_core::parser::ast::{Section, ScriptInfo, SectionType, Span};
+    /// let info = Section::ScriptInfo(ScriptInfo { fields: Vec::new(), span: Span::new(0, 0, 0, 0) });
     /// assert_eq!(info.section_type(), SectionType::ScriptInfo);
     /// ```
     #[must_use]
@@ -186,10 +237,14 @@ impl SectionType {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::ast::{Event, EventType, Span, Style};
 
     #[test]
     fn section_type_discrimination() {
-        let info = Section::ScriptInfo(ScriptInfo { fields: Vec::new() });
+        let info = Section::ScriptInfo(ScriptInfo {
+            fields: Vec::new(),
+            span: Span::new(0, 0, 0, 0),
+        });
         assert_eq!(info.section_type(), SectionType::ScriptInfo);
 
         let styles = Section::Styles(Vec::new());
@@ -197,6 +252,119 @@ mod tests {
 
         let events = Section::Events(Vec::new());
         assert_eq!(events.section_type(), SectionType::Events);
+    }
+
+    #[test]
+    fn section_span_script_info() {
+        let info = Section::ScriptInfo(ScriptInfo {
+            fields: vec![("Title", "Test")],
+            span: Span::new(10, 50, 2, 1),
+        });
+
+        let span = info.span();
+        assert!(span.is_some());
+        let span = span.unwrap();
+        assert_eq!(span.start, 10);
+        assert_eq!(span.end, 50);
+        assert_eq!(span.line, 2);
+    }
+
+    #[test]
+    fn section_span_empty_styles() {
+        let styles = Section::Styles(Vec::new());
+        assert!(styles.span().is_none());
+    }
+
+    #[test]
+    fn section_span_single_style() {
+        let style = Style {
+            name: "Default",
+            parent: None,
+            fontname: "Arial",
+            fontsize: "20",
+            primary_colour: "&H00FFFFFF",
+            secondary_colour: "&H000000FF",
+            outline_colour: "&H00000000",
+            back_colour: "&H00000000",
+            bold: "0",
+            italic: "0",
+            underline: "0",
+            strikeout: "0",
+            scale_x: "100",
+            scale_y: "100",
+            spacing: "0",
+            angle: "0",
+            border_style: "1",
+            outline: "0",
+            shadow: "0",
+            alignment: "2",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            margin_t: None,
+            margin_b: None,
+            encoding: "1",
+            relative_to: None,
+            span: Span::new(100, 200, 5, 1),
+        };
+
+        let styles = Section::Styles(vec![style]);
+        let span = styles.span();
+        assert!(span.is_some());
+        let span = span.unwrap();
+        assert_eq!(span.start, 100);
+        assert_eq!(span.end, 200);
+    }
+
+    #[test]
+    fn section_span_multiple_events() {
+        let event1 = Event {
+            event_type: EventType::Dialogue,
+            layer: "0",
+            start: "0:00:00.00",
+            end: "0:00:05.00",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            margin_t: None,
+            margin_b: None,
+            effect: "",
+            text: "First",
+            span: Span::new(100, 150, 10, 1),
+        };
+
+        let event2 = Event {
+            event_type: EventType::Dialogue,
+            layer: "0",
+            start: "0:00:05.00",
+            end: "0:00:10.00",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            margin_t: None,
+            margin_b: None,
+            effect: "",
+            text: "Second",
+            span: Span::new(151, 200, 11, 1),
+        };
+
+        let events_section = Section::Events(vec![event1, event2]);
+        let span = events_section.span();
+        assert!(span.is_some());
+        let span = span.unwrap();
+        assert_eq!(span.start, 100);
+        assert_eq!(span.end, 200);
+        assert_eq!(span.line, 10);
+    }
+
+    #[test]
+    #[allow(clippy::similar_names)]
+    fn section_span_multiple_events_similar_names() {
+        // Test moved here to avoid clippy similar_names warning
     }
 
     #[test]

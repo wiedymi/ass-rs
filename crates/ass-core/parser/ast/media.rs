@@ -7,6 +7,8 @@ use alloc::vec::Vec;
 #[cfg(debug_assertions)]
 use core::ops::Range;
 
+use super::Span;
+
 /// Embedded font from [Fonts] section
 ///
 /// Represents a font file embedded in the ASS script using UU-encoding.
@@ -16,11 +18,12 @@ use core::ops::Range;
 /// # Examples
 ///
 /// ```rust
-/// use ass_core::parser::ast::Font;
+/// use ass_core::parser::ast::{Font, Span};
 ///
 /// let font = Font {
 ///     filename: "custom.ttf",
 ///     data_lines: vec!["begin 644 custom.ttf", "M'XL..."],
+///     span: Span::new(0, 0, 0, 0),
 /// };
 ///
 /// // Decode when needed
@@ -34,6 +37,9 @@ pub struct Font<'a> {
 
     /// UU-encoded font data lines as zero-copy spans
     pub data_lines: Vec<&'a str>,
+
+    /// Span in source text where this font is defined
+    pub span: Span,
 }
 
 impl Font<'_> {
@@ -53,8 +59,8 @@ impl Font<'_> {
     /// # Examples
     ///
     /// ```rust
-    /// # use ass_core::parser::ast::Font;
-    /// # let font = Font { filename: "test.ttf", data_lines: vec![] };
+    /// # use ass_core::parser::ast::{Font, Span};
+    /// # let font = Font { filename: "test.ttf", data_lines: vec![], span: Span::new(0, 0, 0, 0) };
     /// match font.decode_data() {
     ///     Ok(data) => println!("Font size: {} bytes", data.len()),
     ///     Err(e) => eprintln!("Decode error: {}", e),
@@ -95,11 +101,12 @@ impl Font<'_> {
 /// # Examples
 ///
 /// ```rust
-/// use ass_core::parser::ast::Graphic;
+/// use ass_core::parser::ast::{Graphic, Span};
 ///
 /// let graphic = Graphic {
 ///     filename: "logo.png",
 ///     data_lines: vec!["begin 644 logo.png", "M89PNG..."],
+///     span: Span::new(0, 0, 0, 0),
 /// };
 ///
 /// let decoded = graphic.decode_data()?;
@@ -112,6 +119,9 @@ pub struct Graphic<'a> {
 
     /// UU-encoded graphic data lines as zero-copy spans
     pub data_lines: Vec<&'a str>,
+
+    /// Span in source text where this graphic is defined
+    pub span: Span,
 }
 
 impl Graphic<'_> {
@@ -162,6 +172,7 @@ mod tests {
         let font = Font {
             filename: "test.ttf",
             data_lines: vec!["line1", "line2"],
+            span: Span::new(0, 0, 0, 0),
         };
 
         assert_eq!(font.filename, "test.ttf");
@@ -175,6 +186,7 @@ mod tests {
         let graphic = Graphic {
             filename: "logo.png",
             data_lines: vec!["data1", "data2", "data3"],
+            span: Span::new(0, 0, 0, 0),
         };
 
         assert_eq!(graphic.filename, "logo.png");
@@ -187,6 +199,7 @@ mod tests {
         let font = Font {
             filename: "test.ttf",
             data_lines: vec!["data"],
+            span: Span::new(0, 0, 0, 0),
         };
 
         let cloned = font.clone();
@@ -198,6 +211,7 @@ mod tests {
         let graphic = Graphic {
             filename: "test.png",
             data_lines: vec!["data"],
+            span: Span::new(0, 0, 0, 0),
         };
 
         let cloned = graphic.clone();
@@ -209,6 +223,7 @@ mod tests {
         let font = Font {
             filename: "debug.ttf",
             data_lines: vec!["test"],
+            span: Span::new(0, 0, 0, 0),
         };
 
         let debug_str = format!("{font:?}");
@@ -221,6 +236,7 @@ mod tests {
         let graphic = Graphic {
             filename: "debug.png",
             data_lines: vec!["test"],
+            span: Span::new(0, 0, 0, 0),
         };
 
         let debug_str = format!("{graphic:?}");
@@ -233,11 +249,13 @@ mod tests {
         let font = Font {
             filename: "empty.ttf",
             data_lines: Vec::new(),
+            span: Span::new(0, 0, 0, 0),
         };
 
         let graphic = Graphic {
             filename: "empty.png",
             data_lines: Vec::new(),
+            span: Span::new(0, 0, 0, 0),
         };
 
         assert!(font.data_lines.is_empty());
@@ -249,11 +267,13 @@ mod tests {
         let font1 = Font {
             filename: "font1.ttf",
             data_lines: vec!["data"],
+            span: Span::new(0, 0, 0, 0),
         };
 
         let font2 = Font {
             filename: "font2.ttf",
             data_lines: vec!["data"],
+            span: Span::new(0, 0, 0, 0),
         };
 
         assert_ne!(font1, font2);
@@ -265,6 +285,7 @@ mod tests {
         let font = Font {
             filename: "test.ttf",
             data_lines: vec!["#0V%T", "`"],
+            span: Span::new(0, 0, 0, 0),
         };
         let decoded = font.decode_data().unwrap();
         assert_eq!(decoded, b"Cat");
@@ -275,6 +296,7 @@ mod tests {
         let font = Font {
             filename: "test.ttf",
             data_lines: vec![],
+            span: Span::new(0, 0, 0, 0),
         };
         let decoded = font.decode_data().unwrap();
         assert!(decoded.is_empty());
@@ -285,6 +307,7 @@ mod tests {
         let font = Font {
             filename: "test.ttf",
             data_lines: vec!["   ", "\t\n", ""],
+            span: Span::new(0, 0, 0, 0),
         };
         let decoded = font.decode_data().unwrap();
         assert!(decoded.is_empty());
@@ -295,6 +318,7 @@ mod tests {
         let font = Font {
             filename: "test.ttf",
             data_lines: vec!["#0V%T", "end"],
+            span: Span::new(0, 0, 0, 0),
         };
         let decoded = font.decode_data().unwrap();
         assert_eq!(decoded, b"Cat");
@@ -305,6 +329,7 @@ mod tests {
         let font = Font {
             filename: "test.ttf",
             data_lines: vec!["#0V%T", " "],
+            span: Span::new(0, 0, 0, 0),
         };
         let decoded = font.decode_data().unwrap();
         assert_eq!(decoded, b"Cat");
@@ -316,6 +341,7 @@ mod tests {
         let font = Font {
             filename: "test.ttf",
             data_lines: vec!["$4F3\"", "$4F3\""],
+            span: Span::new(0, 0, 0, 0),
         };
         let decoded = font.decode_data().unwrap();
         // Should decode both lines and concatenate results
@@ -328,6 +354,7 @@ mod tests {
         let graphic = Graphic {
             filename: "test.png",
             data_lines: vec!["#4$Y'"],
+            span: Span::new(0, 0, 0, 0),
         };
         let decoded = graphic.decode_data().unwrap();
         assert_eq!(decoded, b"PNG");
@@ -338,6 +365,7 @@ mod tests {
         let graphic = Graphic {
             filename: "test.png",
             data_lines: vec![],
+            span: Span::new(0, 0, 0, 0),
         };
         let decoded = graphic.decode_data().unwrap();
         assert!(decoded.is_empty());
@@ -348,6 +376,7 @@ mod tests {
         let graphic = Graphic {
             filename: "test.png",
             data_lines: vec!["#4$Y'", "end"],
+            span: Span::new(0, 0, 0, 0),
         };
         let decoded = graphic.decode_data().unwrap();
         assert_eq!(decoded, b"PNG");
@@ -358,6 +387,7 @@ mod tests {
         let graphic = Graphic {
             filename: "test.png",
             data_lines: vec!["#4$Y'  ", "\t\n", ""],
+            span: Span::new(0, 0, 0, 0),
         };
         let decoded = graphic.decode_data().unwrap();
         assert_eq!(decoded, b"PNG");
@@ -369,6 +399,7 @@ mod tests {
         let font = Font {
             filename: "test.ttf",
             data_lines: vec!["invalid-characters-here"],
+            span: Span::new(0, 0, 0, 0),
         };
         // Should not panic, result depends on UU decoder implementation
         let _result = font.decode_data();
@@ -380,6 +411,7 @@ mod tests {
         let graphic = Graphic {
             filename: "test.png",
             data_lines: vec!["!@#$%^&*()"],
+            span: Span::new(0, 0, 0, 0),
         };
         // Should not panic, result depends on UU decoder implementation
         let _result = graphic.decode_data();
@@ -391,6 +423,7 @@ mod tests {
         let font = Font {
             filename: "test.ttf",
             data_lines: vec!["!    "], // '!' encodes length 1, but provides more data
+            span: Span::new(0, 0, 0, 0),
         };
         let decoded = font.decode_data().unwrap();
         assert_eq!(decoded.len(), 1); // Should be truncated to declared length
@@ -402,6 +435,7 @@ mod tests {
         let graphic = Graphic {
             filename: "test.png",
             data_lines: vec!["\"````"], // '"' encodes length 2, provides padding
+            span: Span::new(0, 0, 0, 0),
         };
         let decoded = graphic.decode_data().unwrap();
         assert_eq!(decoded.len(), 2); // Should be truncated to declared length
@@ -414,6 +448,7 @@ mod tests {
         let font = Font {
             filename: &source[10..18],                          // "test.ttf"
             data_lines: vec![&source[19..24], &source[25..30]], // "data1", "data2"
+            span: Span::new(0, 0, 0, 0),
         };
 
         let source_range = (source.as_ptr() as usize)..(source.as_ptr() as usize + source.len());
@@ -427,6 +462,7 @@ mod tests {
         let graphic = Graphic {
             filename: &source[10..18],                          // "logo.png"
             data_lines: vec![&source[19..25], &source[26..32]], // "image1", "image2"
+            span: Span::new(0, 0, 0, 0),
         };
 
         let source_range = (source.as_ptr() as usize)..(source.as_ptr() as usize + source.len());
@@ -442,6 +478,7 @@ mod tests {
         let font = Font {
             filename: &source1[10..18],       // "test.ttf" from source1
             data_lines: vec![&source2[0..9]], // "different" from source2
+            span: Span::new(0, 0, 0, 0),
         };
 
         let source1_range =

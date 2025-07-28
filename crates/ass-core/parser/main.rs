@@ -94,7 +94,14 @@ impl<'a> Parser<'a> {
                 self.line,
             ));
             // Return early with empty script for security
-            return Script::from_parts(self.source, self.version, Vec::new(), self.issues);
+            return Script::from_parts(
+                self.source,
+                self.version,
+                Vec::new(),
+                self.issues,
+                self.styles_format,
+                self.events_format,
+            );
         }
 
         // Validate and handle BOM if present
@@ -143,7 +150,14 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Script::from_parts(self.source, self.version, self.sections, self.issues)
+        Script::from_parts(
+            self.source,
+            self.version,
+            self.sections,
+            self.issues,
+            self.styles_format,
+            self.events_format,
+        )
     }
 
     /// Parse a single section (e.g., [Script Info])
@@ -207,18 +221,22 @@ impl<'a> Parser<'a> {
                 Ok(section)
             }
             "Fonts" => {
-                let section = FontsParser::parse(self.source, self.position, start_line);
+                let (section, final_position, final_line) =
+                    FontsParser::parse(self.source, self.position, start_line);
 
-                // Update position to end of fonts section
-                self.position = self.find_section_end();
+                // Update parser state
+                self.position = final_position;
+                self.line = final_line;
 
                 Ok(section)
             }
             "Graphics" => {
-                let section = GraphicsParser::parse(self.source, self.position, start_line);
+                let (section, final_position, final_line) =
+                    GraphicsParser::parse(self.source, self.position, start_line);
 
-                // Update position to end of graphics section
-                self.position = self.find_section_end();
+                // Update parser state
+                self.position = final_position;
+                self.line = final_line;
 
                 Ok(section)
             }
@@ -253,18 +271,6 @@ impl<'a> Parser<'a> {
                 Err(CoreError::from(error))
             }
         }
-    }
-
-    /// Find end of current section for binary data sections
-    fn find_section_end(&mut self) -> usize {
-        while self.position < self.source.len() {
-            if self.at_next_section() {
-                break;
-            }
-            self.skip_line();
-        }
-
-        self.position
     }
 
     /// Check if at start of next section

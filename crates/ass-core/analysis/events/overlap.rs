@@ -237,6 +237,7 @@ pub fn count_overlapping_events(events: &[Event]) -> Result<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::ast::Span;
 
     fn create_test_event(start: &'static str, end: &'static str) -> Event<'static> {
         Event {
@@ -253,6 +254,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         }
     }
 

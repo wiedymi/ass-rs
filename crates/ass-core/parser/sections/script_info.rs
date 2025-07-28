@@ -7,6 +7,7 @@ use crate::{
     parser::{
         ast::{ScriptInfo, Section},
         errors::{IssueCategory, IssueSeverity, ParseIssue},
+        position_tracker::PositionTracker,
         sections::ScriptInfoParseResult,
         ParseResult,
     },
@@ -25,12 +26,8 @@ use alloc::vec::Vec;
 /// - Memory: Zero allocations via lifetime-generic spans
 /// - Target: <0.5ms for typical script info sections
 pub struct ScriptInfoParser<'a> {
-    /// Source text being parsed
-    source: &'a str,
-    /// Current byte position in source
-    position: usize,
-    /// Current line number for error reporting
-    line: usize,
+    /// Position tracker for accurate span generation
+    tracker: PositionTracker<'a>,
     /// Parse issues and warnings collected during parsing
     issues: Vec<ParseIssue>,
 }
@@ -44,11 +41,15 @@ impl<'a> ScriptInfoParser<'a> {
     /// * `start_position` - Starting byte position in source
     /// * `start_line` - Starting line number for error reporting
     #[must_use]
-    pub const fn new(source: &'a str, start_position: usize, start_line: usize) -> Self {
+    #[allow(clippy::missing_const_for_fn)] // Can't be const due to Vec::new()
+    pub fn new(source: &'a str, start_position: usize, start_line: usize) -> Self {
         Self {
-            source,
-            position: start_position,
-            line: start_line,
+            tracker: PositionTracker::new_at(
+                source,
+                start_position,
+                u32::try_from(start_line).unwrap_or(u32::MAX),
+                1,
+            ),
             issues: Vec::new(),
         }
     }
@@ -67,19 +68,22 @@ impl<'a> ScriptInfoParser<'a> {
     /// Returns an error if the script info section contains malformed key-value pairs or
     /// other unrecoverable syntax errors.
     pub fn parse(mut self) -> ParseResult<ScriptInfoParseResult<'a>> {
+        let section_start = self.tracker.checkpoint();
         let mut fields = Vec::new();
         let mut detected_version = None;
 
-        while self.position < self.source.len() && !self.at_next_section() {
+        while !self.tracker.is_at_end() && !self.at_next_section() {
             self.skip_whitespace_and_comments();
 
-            if self.position >= self.source.len() || self.at_next_section() {
+            if self.tracker.is_at_end() || self.at_next_section() {
                 break;
             }
 
+            let line_start = self.tracker.checkpoint();
             let line = self.current_line().trim();
+
             if line.is_empty() {
-                self.skip_line();
+                self.tracker.skip_line();
                 continue;
             }
 
@@ -99,70 +103,56 @@ impl<'a> ScriptInfoParser<'a> {
                     IssueSeverity::Warning,
                     IssueCategory::Format,
                     "Invalid script info line format".into(),
-                    self.line,
+                    line_start.line() as usize,
                 ));
             }
 
-            self.skip_line();
+            self.tracker.skip_line();
         }
 
-        let section = Section::ScriptInfo(ScriptInfo { fields });
+        let span = self.tracker.span_from(&section_start);
+        let section = Section::ScriptInfo(ScriptInfo { fields, span });
+
         Ok((
             section,
             detected_version,
             self.issues,
-            self.position,
-            self.line,
+            self.tracker.offset(),
+            self.tracker.line() as usize,
         ))
     }
 
     /// Get current line from source
     fn current_line(&self) -> &'a str {
-        let start = self.position;
-        let end = self.source[self.position..]
-            .find('\n')
-            .map_or(self.source.len(), |pos| self.position + pos);
-
-        &self.source[start..end]
+        let remaining = self.tracker.remaining();
+        let end = remaining.find('\n').unwrap_or(remaining.len());
+        &remaining[..end]
     }
 
     /// Check if at start of next section
     fn at_next_section(&self) -> bool {
-        let remaining = &self.source[self.position..];
-        remaining.trim_start().starts_with('[')
-    }
-
-    /// Skip current line and advance position
-    fn skip_line(&mut self) {
-        if let Some(newline_pos) = self.source[self.position..].find('\n') {
-            self.position += newline_pos + 1;
-            self.line += 1;
-        } else {
-            self.position = self.source.len();
-        }
+        self.tracker.remaining().trim_start().starts_with('[')
     }
 
     /// Skip whitespace and comment lines
     fn skip_whitespace_and_comments(&mut self) {
         loop {
-            let remaining = &self.source[self.position..];
-            let trimmed = remaining.trim_start();
+            self.tracker.skip_whitespace();
 
-            if trimmed.is_empty() {
-                self.position = self.source.len();
+            let remaining = self.tracker.remaining();
+            if remaining.is_empty() {
                 break;
             }
 
-            if trimmed.starts_with(';') || trimmed.starts_with('#') {
-                self.skip_line();
+            if remaining.starts_with(';') || remaining.starts_with('#') {
+                self.tracker.skip_line();
                 continue;
             }
 
-            let whitespace_len = remaining.len() - trimmed.len();
-            if whitespace_len > 0 {
-                let newlines = remaining[..whitespace_len].matches('\n').count();
-                self.position += whitespace_len;
-                self.line += newlines;
+            // Check for newlines in whitespace
+            if remaining.starts_with('\n') {
+                self.tracker.advance(1);
+                continue;
             }
 
             break;
@@ -189,6 +179,8 @@ mod tests {
         let (section, version, ..) = result.unwrap();
         if let Section::ScriptInfo(info) = section {
             assert!(info.fields.is_empty());
+            assert_eq!(info.span.start, 0);
+            assert_eq!(info.span.end, 0);
         } else {
             panic!("Expected ScriptInfo section");
         }
@@ -207,6 +199,10 @@ mod tests {
             assert_eq!(info.fields.len(), 2);
             assert_eq!(info.get_field("Title"), Some("Test Script"));
             assert_eq!(info.get_field("ScriptType"), Some("v4.00+"));
+            assert_eq!(info.span.start, 0);
+            assert_eq!(info.span.end, content.len());
+            assert_eq!(info.span.line, 1);
+            assert_eq!(info.span.column, 1);
         } else {
             panic!("Expected ScriptInfo section");
         }
@@ -236,7 +232,7 @@ mod tests {
         let result = parser.parse();
         assert!(result.is_ok());
 
-        let (section, ..) = result.unwrap();
+        let (section, _, issues, ..) = result.unwrap();
         if let Section::ScriptInfo(info) = section {
             assert_eq!(info.fields.len(), 2);
             assert_eq!(info.get_field("Title"), Some("Test"));
@@ -244,5 +240,38 @@ mod tests {
         } else {
             panic!("Expected ScriptInfo section");
         }
+
+        // Should have a warning about the invalid line
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].severity, IssueSeverity::Warning);
+    }
+
+    #[test]
+    fn parse_with_position_tracking() {
+        // Create a larger content that simulates a full file
+        let prefix = "Some prefix\n"; // 12 bytes
+        let section_content = "Title: Test\nAuthor: Someone\n";
+        let full_content = format!("{prefix}{section_content}");
+
+        // Parser starts at position 12 (after prefix)
+        let parser = ScriptInfoParser::new(&full_content, 12, 2);
+        let result = parser.parse();
+        assert!(result.is_ok());
+
+        let (section, _, _, final_pos, final_line) = result.unwrap();
+        if let Section::ScriptInfo(info) = section {
+            assert_eq!(info.fields.len(), 2);
+            assert_eq!(info.fields[0], ("Title", "Test"));
+            assert_eq!(info.fields[1], ("Author", "Someone"));
+            assert_eq!(info.span.start, 12);
+            assert_eq!(info.span.end, 12 + section_content.len());
+            assert_eq!(info.span.line, 2);
+            assert_eq!(info.span.column, 1);
+        } else {
+            panic!("Expected ScriptInfo section");
+        }
+
+        assert_eq!(final_pos, 12 + section_content.len());
+        assert_eq!(final_line, 4); // Started at line 2, added 2 lines
     }
 }

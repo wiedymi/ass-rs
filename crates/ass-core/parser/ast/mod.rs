@@ -17,10 +17,10 @@
 //! # Examples
 //!
 //! ```rust
-//! use ass_core::parser::ast::{Section, ScriptInfo, Event, EventType};
+//! use ass_core::parser::ast::{Section, ScriptInfo, Event, EventType, Span};
 //!
 //! // Create script info
-//! let info = ScriptInfo { fields: vec![("Title", "Test")] };
+//! let info = ScriptInfo { fields: vec![("Title", "Test")], span: Span::new(0, 0, 0, 0) };
 //! let section = Section::ScriptInfo(info);
 //!
 //! // Create dialogue event
@@ -46,15 +46,108 @@ pub use script_info::ScriptInfo;
 pub use section::{Section, SectionType};
 pub use style::Style;
 
+/// Represents a span in the source text with position information
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Span {
+    /// Byte offset in source where span starts
+    pub start: usize,
+    /// Byte offset in source where span ends
+    pub end: usize,
+    /// Line number (1-based) where span starts
+    pub line: u32,
+    /// Column number (1-based) where span starts
+    pub column: u32,
+}
+
+impl Span {
+    /// Create a new span with position information
+    #[must_use]
+    pub const fn new(start: usize, end: usize, line: u32, column: u32) -> Self {
+        Self {
+            start,
+            end,
+            line,
+            column,
+        }
+    }
+
+    /// Check if a byte offset is contained within this span
+    #[must_use]
+    pub const fn contains(&self, offset: usize) -> bool {
+        offset >= self.start && offset < self.end
+    }
+
+    /// Merge two spans to create a span covering both
+    #[must_use]
+    pub fn merge(&self, other: &Self) -> Self {
+        use core::cmp::Ordering;
+
+        Self {
+            start: self.start.min(other.start),
+            end: self.end.max(other.end),
+            line: self.line.min(other.line),
+            column: match self.line.cmp(&other.line) {
+                Ordering::Less => self.column,
+                Ordering::Greater => other.column,
+                Ordering::Equal => self.column.min(other.column),
+            },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use alloc::vec;
 
     #[test]
+    fn test_span_creation() {
+        let span = Span::new(0, 10, 1, 1);
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, 10);
+        assert_eq!(span.line, 1);
+        assert_eq!(span.column, 1);
+    }
+
+    #[test]
+    fn test_span_contains() {
+        let span = Span::new(0, 10, 1, 1);
+        assert!(span.contains(0));
+        assert!(span.contains(5));
+        assert!(span.contains(9));
+        assert!(!span.contains(10));
+        assert!(!span.contains(15));
+    }
+
+    #[test]
+    fn test_span_merge() {
+        let span1 = Span::new(0, 10, 1, 1);
+        let span2 = Span::new(5, 15, 1, 6);
+        let merged = span1.merge(&span2);
+
+        assert_eq!(merged.start, 0);
+        assert_eq!(merged.end, 15);
+        assert_eq!(merged.line, 1);
+        assert_eq!(merged.column, 1);
+
+        // Test merge with different lines
+        let span3 = Span::new(20, 30, 2, 5);
+        let span4 = Span::new(25, 35, 3, 10);
+        let merged2 = span3.merge(&span4);
+
+        assert_eq!(merged2.start, 20);
+        assert_eq!(merged2.end, 35);
+        assert_eq!(merged2.line, 2);
+        assert_eq!(merged2.column, 5);
+    }
+
+    #[test]
     fn ast_integration_script_info() {
         let fields = vec![("Title", "Integration Test"), ("ScriptType", "v4.00+")];
-        let info = ScriptInfo { fields };
+        let info = ScriptInfo {
+            fields,
+            span: Span::new(0, 0, 0, 0),
+        };
         let section = Section::ScriptInfo(info);
 
         assert_eq!(section.section_type(), SectionType::ScriptInfo);
@@ -97,6 +190,7 @@ mod tests {
         let font = Font {
             filename: "test.ttf",
             data_lines: vec!["encoded data line 1", "encoded data line 2"],
+            span: Span::new(0, 0, 0, 0),
         };
 
         let fonts = vec![font];
@@ -110,6 +204,7 @@ mod tests {
         let graphic = Graphic {
             filename: "logo.png",
             data_lines: vec!["encoded image data"],
+            span: Span::new(0, 0, 0, 0),
         };
 
         let graphics = vec![graphic];

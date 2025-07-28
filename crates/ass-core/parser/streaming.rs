@@ -224,30 +224,34 @@ impl Default for StreamingParser {
     }
 }
 
-/// Parse incremental changes to an existing script
-/// Parse incremental changes to an existing script
-///
-/// # Errors
-///
-/// Returns an error if parsing the incremental changes fails.
-pub const fn parse_incremental<'a>(
-    _script: &crate::parser::Script<'a>,
-    _new_text: &str,
-    _range: Range<usize>,
-) -> Result<Vec<ParseDelta<'a>>> {
-    // Simplified implementation for now
-    Ok(Vec::new())
-}
-
 /// Build modified source with range replacement
+///
+/// Creates a new source string by replacing the specified range with new text.
+///
+/// # Arguments
+///
+/// * `original` - The original source text
+/// * `range` - The byte range to replace
+/// * `replacement` - The text to insert in place of the range
+///
+/// # Returns
+///
+/// A new string with the replacement applied
 #[must_use]
-pub const fn build_modified_source(
-    _original: &str,
-    _range: Range<usize>,
-    _replacement: &str,
-) -> String {
-    // Simplified implementation for now
-    String::new()
+pub fn build_modified_source(original: &str, range: Range<usize>, replacement: &str) -> String {
+    let mut result =
+        String::with_capacity(original.len() - (range.end - range.start) + replacement.len());
+
+    // Add text before the range
+    result.push_str(&original[..range.start]);
+
+    // Add replacement text
+    result.push_str(replacement);
+
+    // Add text after the range
+    result.push_str(&original[range.end..]);
+
+    result
 }
 
 #[cfg(test)]
@@ -429,23 +433,18 @@ mod tests {
     }
 
     #[test]
-    fn parse_incremental_basic() {
-        use crate::parser::Script;
-
-        let content = "[Script Info]\nTitle: Test";
-        let script = Script::parse(content).unwrap();
-
-        let result = parse_incremental(&script, "Modified", 0..5);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_empty());
-    }
-
-    #[test]
     fn build_modified_source_basic() {
         let original = "Hello World";
         let result = build_modified_source(original, 0..5, "Hi");
-        // Function currently returns empty string (simplified implementation)
-        assert_eq!(result, "");
+        assert_eq!(result, "Hi World");
+
+        // Test replacing in the middle
+        let result = build_modified_source(original, 6..11, "Universe");
+        assert_eq!(result, "Hello Universe");
+
+        // Test replacing entire string
+        let result = build_modified_source(original, 0..11, "Goodbye");
+        assert_eq!(result, "Goodbye");
     }
 
     #[test]

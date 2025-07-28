@@ -265,7 +265,7 @@ impl<'a> DialogueInfo<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::ast::{Event, EventType};
+    use crate::parser::ast::{Event, EventType, Span};
 
     #[test]
     fn dialogue_info_analyze_valid() {
@@ -283,6 +283,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let info = DialogueInfo::analyze(&event).unwrap();
@@ -308,6 +309,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let info = DialogueInfo::analyze(&event).unwrap();
@@ -334,6 +336,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         assert!(DialogueInfo::analyze(&event).is_err());
@@ -355,6 +358,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         assert!(DialogueInfo::analyze(&event).is_err());
@@ -376,6 +380,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let event2 = Event {
@@ -392,6 +397,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let info1 = DialogueInfo::analyze(&event1).unwrap();
@@ -417,6 +423,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let event2 = Event {
@@ -433,6 +440,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let info1 = DialogueInfo::analyze(&event1).unwrap();
@@ -464,6 +472,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let event2 = Event {
@@ -480,6 +489,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let info1 = DialogueInfo::analyze(&event1).unwrap();
@@ -505,6 +515,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let event2 = Event {
@@ -521,6 +532,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let info1 = DialogueInfo::analyze(&event1).unwrap();
@@ -546,6 +558,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let info = DialogueInfo::analyze(&event).unwrap();
@@ -575,6 +588,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let complex_event = Event {
@@ -591,6 +605,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let simple_info = DialogueInfo::analyze(&simple_event).unwrap();
@@ -616,6 +631,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let info = DialogueInfo::analyze(&event).unwrap();
@@ -638,6 +654,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let info = DialogueInfo::analyze(&low_impact_event).unwrap();
@@ -661,6 +678,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         let info = DialogueInfo::analyze(&event).unwrap();
@@ -688,6 +706,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         assert!(DialogueInfo::analyze(&event).is_err());
@@ -709,6 +728,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         };
 
         assert!(DialogueInfo::analyze(&event).is_err());

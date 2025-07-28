@@ -239,7 +239,7 @@ pub fn find_events_in_range(events: &[DialogueInfo<'_>], start_cs: u32, end_cs: 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::Event;
+    use crate::parser::{ast::Span, Event};
 
     fn create_test_dialogue_info(start: &'static str, end: &'static str) -> DialogueInfo<'static> {
         // Create a static event for the lifetime requirement
@@ -258,6 +258,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
+            span: Span::new(0, 0, 0, 0),
         }));
         DialogueInfo::analyze(event).unwrap()
     }

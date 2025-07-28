@@ -8,7 +8,7 @@
 use ass_core::{
     analysis::styles::resolved_style::ResolvedStyle,
     parser::{
-        ast::{Section, SectionType, Style},
+        ast::{Section, SectionType, Span, Style},
         Script,
     },
     plugin::{tags::karaoke::create_karaoke_handlers, ExtensionRegistry, TagResult},
@@ -208,6 +208,7 @@ fn test_resolved_style_margin_logic() {
         margin_b: None,
         encoding: "1",
         relative_to: None,
+        span: Span::new(0, 0, 0, 0),
     };
 
     let resolved_v4plus = ResolvedStyle::from_style(&v4plus_style).unwrap();
@@ -245,6 +246,7 @@ fn test_resolved_style_margin_logic() {
         margin_b: Some("25"),
         encoding: "1",
         relative_to: Some("1"),
+        span: Span::new(0, 0, 0, 0),
     };
 
     let resolved_v4plusplus = ResolvedStyle::from_style(&v4plusplus_style).unwrap();

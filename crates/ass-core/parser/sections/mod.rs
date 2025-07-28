@@ -50,6 +50,62 @@ pub use events::EventsParser;
 pub use script_info::ScriptInfoParser;
 pub use styles::StylesParser;
 
+use crate::parser::ast::{Section, SectionType};
+use crate::parser::errors::{ParseError, ParseResult};
+
+/// Formats detected during initial parse
+#[derive(Clone, Debug)]
+pub struct SectionFormats<'a> {
+    /// Format fields for styles section
+    pub styles_format: Option<Vec<&'a str>>,
+    /// Format fields for events section  
+    pub events_format: Option<Vec<&'a str>>,
+}
+
+/// Parse a specific section type from text with context
+///
+/// # Errors
+///
+/// Returns [`ParseError::MissingFormat`] if required format is not provided
+/// Returns [`ParseError::UnsupportedSection`] for Fonts/Graphics sections
+/// Returns other parse errors from section-specific parsers
+pub fn parse_section_with_context<'a>(
+    section_type: SectionType,
+    text: &'a str,
+    line_offset: u32,
+    existing_formats: &SectionFormats<'a>,
+) -> ParseResult<Section<'a>> {
+    match section_type {
+        SectionType::ScriptInfo => {
+            let parser = ScriptInfoParser::new(text, 0, line_offset as usize);
+            let (section, ..) = parser.parse()?;
+            Ok(section)
+        }
+        SectionType::Styles => {
+            let format = existing_formats
+                .styles_format
+                .as_ref()
+                .ok_or(ParseError::MissingFormat)?;
+            let parser = StylesParser::with_format(text, format, 0, line_offset);
+            let (section, ..) = parser.parse()?;
+            Ok(section)
+        }
+        SectionType::Events => {
+            let format = existing_formats
+                .events_format
+                .as_ref()
+                .ok_or(ParseError::MissingFormat)?;
+            let parser = EventsParser::with_format(text, format, 0, line_offset);
+            let (section, ..) = parser.parse()?;
+            Ok(section)
+        }
+        SectionType::Fonts | SectionType::Graphics => {
+            // These sections are parsed as binary data
+            Err(ParseError::UnsupportedSection(section_type))
+        }
+    }
+}
+
 /// Result type for section parsing with metadata
 pub type SectionParseResult<'a> = (
     crate::parser::ast::Section<'a>,

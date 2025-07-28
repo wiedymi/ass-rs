@@ -6,6 +6,8 @@
 #[cfg(debug_assertions)]
 use core::ops::Range;
 
+use super::Span;
+
 /// Event from [Events] section (dialogue, comments, etc.)
 ///
 /// Represents a single event in the subtitle timeline. Events can be dialogue
@@ -67,6 +69,9 @@ pub struct Event<'a> {
 
     /// Text content with possible style overrides
     pub text: &'a str,
+
+    /// Span in source text where this event is defined
+    pub span: Span,
 }
 
 /// Event type discriminant for different kinds of timeline events
@@ -242,6 +247,7 @@ impl Default for Event<'_> {
             margin_b: None,
             effect: "",
             text: "",
+            span: Span::new(0, 0, 0, 0),
         }
     }
 }
@@ -437,6 +443,7 @@ mod tests {
             margin_b: None,
             effect: "fadeIn",
             text: "Hello, world!",
+            span: Span::new(0, 0, 0, 0),
         };
 
         assert_eq!(event.event_type, EventType::Dialogue);
@@ -514,6 +521,7 @@ mod tests {
             margin_b: None,
             effect: fields[9],
             text: fields[10],
+            span: Span::new(0, 0, 0, 0),
         };
 
         assert!(event.validate_spans(&source_range));

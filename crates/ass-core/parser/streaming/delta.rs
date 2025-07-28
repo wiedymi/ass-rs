@@ -225,12 +225,15 @@ impl<'a> FromIterator<ParseDelta<'a>> for DeltaBatch<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::ast::{ScriptInfo, Section};
+    use crate::parser::ast::{ScriptInfo, Span};
     use alloc::vec;
 
     #[test]
     fn delta_creation() {
-        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
         let delta = ParseDelta::add_section(section);
         assert!(matches!(delta, ParseDelta::AddSection(_)));
         assert!(!delta.is_error());
@@ -255,7 +258,10 @@ mod tests {
         assert!(batch.is_empty());
         assert_eq!(batch.len(), 0);
 
-        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
         batch.push(ParseDelta::add_section(section));
         batch.push(ParseDelta::parse_issue("Warning".to_string()));
 
@@ -285,7 +291,10 @@ mod tests {
 
     #[test]
     fn delta_update_section() {
-        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
         let delta = ParseDelta::update_section(3, section);
 
         assert!(matches!(delta, ParseDelta::UpdateSection(3, _)));
@@ -296,7 +305,10 @@ mod tests {
 
     #[test]
     fn delta_section_getter() {
-        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
 
         let add_delta = ParseDelta::add_section(section.clone());
         assert!(add_delta.section().is_some());
@@ -313,7 +325,10 @@ mod tests {
 
     #[test]
     fn delta_debug_formatting() {
-        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
         let delta = ParseDelta::add_section(section);
         let debug_str = format!("{delta:?}");
         assert!(debug_str.contains("AddSection"));
@@ -326,7 +341,10 @@ mod tests {
 
     #[test]
     fn delta_clone() {
-        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
         let delta = ParseDelta::add_section(section);
         let cloned = delta.clone();
 
@@ -337,7 +355,10 @@ mod tests {
 
     #[test]
     fn delta_all_constructors() {
-        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
 
         let add = ParseDelta::add_section(section.clone());
         assert!(matches!(add, ParseDelta::AddSection(_)));
@@ -362,7 +383,10 @@ mod tests {
 
     #[test]
     fn batch_debug_and_clone() {
-        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
         let mut batch = DeltaBatch::new();
         batch.push(ParseDelta::add_section(section));
 
@@ -377,8 +401,14 @@ mod tests {
     #[test]
     fn batch_extend_operations() {
         let mut batch = DeltaBatch::new();
-        let section1 = Section::ScriptInfo(ScriptInfo { fields: vec![] });
-        let section2 = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section1 = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
+        let section2 = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
 
         let deltas = vec![
             ParseDelta::add_section(section1),
@@ -393,7 +423,10 @@ mod tests {
 
     #[test]
     fn batch_from_deltas() {
-        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
         let deltas = vec![
             ParseDelta::add_section(section),
             ParseDelta::parse_issue("Warning".to_string()),
@@ -406,7 +439,10 @@ mod tests {
 
     #[test]
     fn batch_into_deltas() {
-        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
         let mut batch = DeltaBatch::new();
         batch.push(ParseDelta::add_section(section));
         batch.push(ParseDelta::remove_section(0));
@@ -417,8 +453,14 @@ mod tests {
 
     #[test]
     fn batch_complex_filtering() {
-        let section1 = Section::ScriptInfo(ScriptInfo { fields: vec![] });
-        let section2 = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section1 = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
+        let section2 = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
         let mut batch = DeltaBatch::new();
 
         batch.push(ParseDelta::add_section(section1));
@@ -459,7 +501,10 @@ mod tests {
     #[test]
     fn delta_all_variants_coverage() {
         // Test all ParseDelta variants
-        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
 
         // AddSection
         let add = ParseDelta::AddSection(section.clone());
@@ -488,7 +533,10 @@ mod tests {
 
     #[test]
     fn batch_iterator_trait() {
-        let section = Section::ScriptInfo(ScriptInfo { fields: vec![] });
+        let section = Section::ScriptInfo(ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        });
         let deltas = [
             ParseDelta::add_section(section),
             ParseDelta::remove_section(0),

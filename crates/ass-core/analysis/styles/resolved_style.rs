@@ -611,6 +611,7 @@ fn parse_u16(u16_str: &str) -> Result<u16> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::ast::Span;
 
     fn create_test_style() -> Style<'static> {
         Style {
@@ -641,6 +642,7 @@ mod tests {
             margin_b: None,
             encoding: "1",
             relative_to: None,
+            span: Span::new(0, 0, 0, 0),
         }
     }
 

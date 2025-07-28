@@ -6,6 +6,8 @@
 #[cfg(debug_assertions)]
 use core::ops::Range;
 
+use super::Span;
+
 /// Style definition from [V4+ Styles] section
 ///
 /// Represents a single style definition that can be referenced by events.
@@ -109,6 +111,9 @@ pub struct Style<'a> {
 
     /// Positioning context (V4++)
     pub relative_to: Option<&'a str>,
+
+    /// Span in source text where this style is defined
+    pub span: Span,
 }
 
 impl Style<'_> {
@@ -189,6 +194,7 @@ impl Default for Style<'_> {
             margin_b: None,
             encoding: "1",
             relative_to: None,
+            span: Span::new(0, 0, 0, 0),
         }
     }
 }
@@ -274,6 +280,7 @@ mod tests {
             margin_b: None,
             encoding: "0",
             relative_to: None,
+            span: Span::new(0, 0, 0, 0),
         };
 
         let cloned = style.clone();
@@ -405,6 +412,7 @@ mod tests {
             margin_b: None,
             encoding: "2",
             relative_to: None,
+            span: Span::new(0, 0, 0, 0),
         };
 
         // Test all field accesses
@@ -463,6 +471,7 @@ mod tests {
             margin_b: None,
             encoding: "",
             relative_to: None,
+            span: Span::new(0, 0, 0, 0),
         };
 
         // All fields should be empty strings
@@ -515,6 +524,7 @@ mod tests {
             margin_b: None,
             encoding: fields[22],
             relative_to: None,
+            span: Span::new(0, 0, 0, 0),
         };
 
         // Actually call the validate_spans method
@@ -728,6 +738,7 @@ mod tests {
             margin_b: None,
             encoding: "3",
             relative_to: None,
+            span: Span::new(0, 0, 0, 0),
         };
 
         // Verify all fields are set correctly
@@ -823,6 +834,7 @@ mod tests {
             margin_b: None,
             encoding: fields[22],
             relative_to: None,
+            span: Span::new(0, 0, 0, 0),
         };
 
         // Should validate successfully since all fields are from source

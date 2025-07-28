@@ -5,7 +5,10 @@
 //! All generators produce valid ASS format strings that can be parsed by
 //! the core parser.
 
-use crate::parser::{ast::EventType, Event};
+use crate::parser::{
+    ast::{EventType, Span},
+    Event,
+};
 use std::fmt::Write;
 
 /// Synthetic ASS script generator for benchmarking
@@ -227,6 +230,7 @@ pub const fn create_test_event<'a>(start: &'a str, end: &'a str, text: &'a str) 
         margin_b: None,
         effect: "",
         text,
+        span: Span::new(0, 0, 0, 0),
     }
 }
 

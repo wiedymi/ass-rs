@@ -10,6 +10,8 @@ use core::fmt;
 #[cfg(feature = "std")]
 use thiserror::Error;
 
+use crate::parser::SectionType;
+
 /// Primary parse error type for ASS scripts
 ///
 /// Represents unrecoverable parsing errors that prevent script construction.
@@ -102,6 +104,28 @@ pub enum ParseError {
 
     /// Internal parser state corruption
     InternalError { line: usize, message: String },
+
+    /// Invalid event type
+    InvalidEventType { line: usize },
+
+    /// Insufficient fields in line
+    InsufficientFields {
+        expected: usize,
+        found: usize,
+        line: usize,
+    },
+
+    /// Missing format specification
+    MissingFormat,
+
+    /// Section not found
+    SectionNotFound,
+
+    /// Index out of bounds
+    IndexOutOfBounds,
+
+    /// Unsupported section type for operation
+    UnsupportedSection(SectionType),
 }
 
 impl ParseError {
@@ -214,6 +238,34 @@ impl ParseError {
             }
             Self::InternalError { line, message } => {
                 write!(f, "Internal parser error at line {line}: {message}")
+            }
+            Self::InvalidEventType { line } => {
+                write!(f, "Invalid event type at line {line}: expected Dialogue, Comment, Picture, Sound, Movie, or Command")
+            }
+            Self::InsufficientFields {
+                expected,
+                found,
+                line,
+            } => {
+                write!(
+                    f,
+                    "Insufficient fields at line {line}: expected {expected}, found {found}"
+                )
+            }
+            Self::MissingFormat => {
+                write!(f, "Missing format specification for section")
+            }
+            Self::SectionNotFound => {
+                write!(f, "Section not found")
+            }
+            Self::IndexOutOfBounds => {
+                write!(f, "Index out of bounds")
+            }
+            Self::UnsupportedSection(section_type) => {
+                write!(
+                    f,
+                    "Unsupported section type for operation: {section_type:?}"
+                )
             }
             _ => Err(fmt::Error),
         }

@@ -326,7 +326,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         end: &'static str,
         text: &'static str,
     ) -> ass_core::parser::ast::Event<'static> {
-        use ass_core::parser::ast::{Event, EventType};
+        use ass_core::parser::ast::{Event, EventType, Span};
         Event {
             event_type: EventType::Dialogue,
             layer: "0",
@@ -341,6 +341,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             margin_b: None,
             effect: "",
             text,
+            span: Span::new(0, 0, 0, 0),
         }
     }
 
