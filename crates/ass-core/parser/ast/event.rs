@@ -197,6 +197,106 @@ impl Event<'_> {
         Ok(end.saturating_sub(start))
     }
 
+    /// Convert event to ASS string representation
+    ///
+    /// Generates the standard ASS event line format. Uses `margin_v` by default,
+    /// but will use `margin_t/margin_b` if provided (V4++ format).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use ass_core::parser::ast::{Event, EventType};
+    /// let event = Event {
+    ///     event_type: EventType::Dialogue,
+    ///     layer: "0",
+    ///     start: "0:00:05.00",
+    ///     end: "0:00:10.00",
+    ///     style: "Default",
+    ///     text: "Hello",
+    ///     ..Event::default()
+    /// };
+    /// assert_eq!(
+    ///     event.to_ass_string(),
+    ///     "Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,Hello"
+    /// );
+    /// ```
+    #[must_use]
+    pub fn to_ass_string(&self) -> alloc::string::String {
+        use alloc::format;
+        let event_type_str = self.event_type.as_str();
+
+        // Use standard V4+ format by default
+        // TODO: Support custom format lines
+        format!(
+            "{event_type_str}: {},{},{},{},{},{},{},{},{},{}",
+            self.layer,
+            self.start,
+            self.end,
+            self.style,
+            self.name,
+            self.margin_l,
+            self.margin_r,
+            self.margin_v,
+            self.effect,
+            self.text
+        )
+    }
+
+    /// Convert event to ASS string with specific format
+    ///
+    /// Generates an ASS event line according to the provided format specification.
+    /// This allows handling both V4+ and V4++ formats, as well as custom formats.
+    ///
+    /// # Arguments
+    ///
+    /// * `format` - Field names in order (e.g., `["Layer", "Start", "End", "Style", "Text"]`)
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use ass_core::parser::ast::{Event, EventType};
+    /// let event = Event {
+    ///     event_type: EventType::Comment,
+    ///     start: "0:00:00.00",
+    ///     end: "0:00:05.00",
+    ///     text: "Note",
+    ///     ..Event::default()
+    /// };
+    /// let format = vec!["Start", "End", "Text"];
+    /// assert_eq!(
+    ///     event.to_ass_string_with_format(&format),
+    ///     "Comment: 0:00:00.00,0:00:05.00,Note"
+    /// );
+    /// ```
+    #[must_use]
+    pub fn to_ass_string_with_format(&self, format: &[&str]) -> alloc::string::String {
+        use alloc::{format, vec::Vec};
+
+        let event_type_str = self.event_type.as_str();
+        let mut field_values = Vec::with_capacity(format.len());
+
+        for field in format {
+            let value = match *field {
+                "Layer" => self.layer,
+                "Start" => self.start,
+                "End" => self.end,
+                "Style" => self.style,
+                "Name" | "Actor" => self.name,
+                "MarginL" => self.margin_l,
+                "MarginR" => self.margin_r,
+                "MarginV" => self.margin_v,
+                "MarginT" => self.margin_t.unwrap_or("0"),
+                "MarginB" => self.margin_b.unwrap_or("0"),
+                "Effect" => self.effect,
+                "Text" => self.text,
+                _ => "", // Unknown fields default to empty
+            };
+            field_values.push(value);
+        }
+
+        format!("{event_type_str}: {}", field_values.join(","))
+    }
+
     /// Validate all spans in this Event reference valid source
     ///
     /// Debug helper to ensure zero-copy invariants are maintained.
@@ -598,5 +698,74 @@ mod tests {
         assert_eq!(event.style, "Default");
         assert_eq!(event.name, "");
         assert_eq!(event.effect, "");
+    }
+
+    #[test]
+    fn event_to_ass_string() {
+        let event = Event {
+            event_type: EventType::Dialogue,
+            layer: "0",
+            start: "0:00:05.00",
+            end: "0:00:10.00",
+            style: "Default",
+            name: "Speaker",
+            margin_l: "10",
+            margin_r: "20",
+            margin_v: "15",
+            effect: "fade",
+            text: "Hello world",
+            ..Event::default()
+        };
+
+        let ass_string = event.to_ass_string();
+        assert_eq!(
+            ass_string,
+            "Dialogue: 0,0:00:05.00,0:00:10.00,Default,Speaker,10,20,15,fade,Hello world"
+        );
+    }
+
+    #[test]
+    fn event_to_ass_string_with_format() {
+        let event = Event {
+            event_type: EventType::Comment,
+            start: "0:00:00.00",
+            end: "0:00:05.00",
+            text: "Test comment",
+            ..Event::default()
+        };
+
+        // V4+ format
+        let v4_format = vec![
+            "Layer", "Start", "End", "Style", "Name", "MarginL", "MarginR", "MarginV", "Effect",
+            "Text",
+        ];
+        let v4_string = event.to_ass_string_with_format(&v4_format);
+        assert_eq!(
+            v4_string,
+            "Comment: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Test comment"
+        );
+
+        // Custom minimal format
+        let min_format = vec!["Start", "End", "Text"];
+        let min_string = event.to_ass_string_with_format(&min_format);
+        assert_eq!(min_string, "Comment: 0:00:00.00,0:00:05.00,Test comment");
+
+        // V4++ format with margin_t/margin_b
+        let event_v4pp = Event {
+            event_type: EventType::Dialogue,
+            margin_t: Some("5"),
+            margin_b: Some("10"),
+            text: "V4++ test",
+            ..Event::default()
+        };
+        let v4pp_format = vec![
+            "Layer", "Start", "End", "Style", "Name", "MarginL", "MarginR", "MarginT", "MarginB",
+            "Effect", "Text",
+        ];
+        let v4pp_string = event_v4pp.to_ass_string_with_format(&v4pp_format);
+        assert_eq!(
+            v4pp_string,
+            "Dialogue: 0,0:00:00.00,0:00:00.00,Default,,0,0,5,10,,V4++ test"
+        );
     }
 }

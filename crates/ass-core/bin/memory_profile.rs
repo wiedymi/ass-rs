@@ -14,12 +14,12 @@ fn get_memory_usage() -> Option<usize> {
         .args(["-o", "rss=", "-p", &std::process::id().to_string()])
         .output()
         .ok()?;
-    
+
     let rss_kb = String::from_utf8_lossy(&output.stdout)
         .trim()
         .parse::<usize>()
         .ok()?;
-    
+
     Some(rss_kb * 1024) // Convert KB to bytes
 }
 
@@ -42,33 +42,33 @@ fn format_bytes(bytes: usize) -> String {
 fn profile_memory(name: &str, script_text: &str) {
     println!("\n=== Memory Profile: {name} ===");
     println!("Input size: {}", format_bytes(script_text.len()));
-    
+
     // Measure memory before parsing
     let mem_before = get_memory_usage();
-    
+
     // Parse the script
     let start = std::time::Instant::now();
     let script = Script::parse(script_text).expect("Failed to parse");
     let parse_time = start.elapsed();
-    
+
     // Measure memory after parsing
     let mem_after = get_memory_usage();
-    
+
     // Calculate statistics
     let sections = script.sections().len();
-    
+
     println!("Parse time: {:.2}ms", parse_time.as_secs_f64() * 1000.0);
     println!("Sections: {sections}");
-    
+
     if let (Some(before), Some(after)) = (mem_before, mem_after) {
         let used = after.saturating_sub(before);
         let ratio = used as f64 / script_text.len() as f64;
-        
+
         println!("Memory before: {}", format_bytes(before));
         println!("Memory after: {}", format_bytes(after));
         println!("Memory used: {}", format_bytes(used));
         println!("Memory ratio: {ratio:.2}x input size");
-        
+
         if ratio <= 1.1 {
             println!("✅ PASS: Memory usage within target (<1.1x)");
         } else {
@@ -82,20 +82,32 @@ fn profile_memory(name: &str, script_text: &str) {
 fn main() {
     println!("ASS Parser Memory Profiler");
     println!("=========================");
-    
+
     // Test various sizes
     let test_cases = [
-        ("Small (100 events)", ScriptGenerator::simple(100).generate()),
-        ("Medium (1000 events)", ScriptGenerator::moderate(1000).generate()),
-        ("Large (10000 events)", ScriptGenerator::complex(10000).generate()),
-        ("Anime Episode", ScriptGenerator::anime_realistic(10000).generate()),
+        (
+            "Small (100 events)",
+            ScriptGenerator::simple(100).generate(),
+        ),
+        (
+            "Medium (1000 events)",
+            ScriptGenerator::moderate(1000).generate(),
+        ),
+        (
+            "Large (10000 events)",
+            ScriptGenerator::complex(10000).generate(),
+        ),
+        (
+            "Anime Episode",
+            ScriptGenerator::anime_realistic(10000).generate(),
+        ),
         ("Movie", ScriptGenerator::movie_realistic(30000).generate()),
     ];
-    
+
     for (name, script) in &test_cases {
         profile_memory(name, script);
     }
-    
+
     // Summary
     println!("\n=== Summary ===");
     println!("Target: <1.1x input memory ratio");

@@ -60,44 +60,44 @@ impl RegressionAnalysis {
             target_violations: Vec::new(),
         }
     }
-    
+
     /// Check if analysis found any failures
     fn has_failures(&self) -> bool {
         !self.regressions.is_empty() || !self.target_violations.is_empty()
     }
-    
+
     /// Print summary of analysis results
     fn print_summary(&self) {
         println!("\\n=== Performance Regression Analysis ===");
-        
+
         if !self.target_violations.is_empty() {
             println!("\\n🚨 PERFORMANCE TARGET VIOLATIONS:");
             for violation in &self.target_violations {
                 println!("  {violation}");
             }
         }
-        
+
         if !self.regressions.is_empty() {
             println!("\\n📉 PERFORMANCE REGRESSIONS:");
             for regression in &self.regressions {
                 println!("  {regression}");
             }
         }
-        
+
         if !self.improvements.is_empty() {
             println!("\\n📈 PERFORMANCE IMPROVEMENTS:");
             for improvement in &self.improvements {
                 println!("  {improvement}");
             }
         }
-        
+
         if !self.within_threshold.is_empty() {
             println!("\\n✅ WITHIN ACCEPTABLE RANGE:");
             for within in &self.within_threshold {
                 println!("  {within}");
             }
         }
-        
+
         println!("\\nSummary:");
         println!("  Target violations: {}", self.target_violations.len());
         println!("  Regressions: {}", self.regressions.len());
@@ -112,14 +112,14 @@ fn main() {
         eprintln!("Usage: {} <criterion_output_dir>", args[0]);
         process::exit(1);
     }
-    
+
     let criterion_dir = &args[1];
     let mut analysis = RegressionAnalysis::new();
-    
+
     // Load and analyze benchmark results
     if let Ok(results) = load_criterion_results(criterion_dir) {
         analyze_performance_targets(&results, &mut analysis);
-        
+
         // Look for comparison data if available
         if let Ok(comparisons) = load_comparison_data(criterion_dir) {
             analyze_regressions(&comparisons, &mut analysis);
@@ -128,10 +128,10 @@ fn main() {
         eprintln!("Failed to load benchmark results from {criterion_dir}");
         process::exit(1);
     }
-    
+
     // Print analysis results
     analysis.print_summary();
-    
+
     if analysis.has_failures() {
         println!("\\n💥 Performance validation failed!");
         process::exit(1);
@@ -144,21 +144,21 @@ fn main() {
 fn load_criterion_results(criterion_dir: &str) -> io::Result<HashMap<String, BenchmarkResult>> {
     let mut results = HashMap::new();
     let criterion_path = Path::new(criterion_dir);
-    
+
     if !criterion_path.exists() {
         return Err(io::Error::new(
             io::ErrorKind::NotFound,
             format!("Criterion directory not found: {criterion_dir}"),
         ));
     }
-    
+
     // Walk through criterion output structure
     for entry in std::fs::read_dir(criterion_path)? {
         let entry = entry?;
         if entry.file_type()?.is_dir() {
             let bench_name = entry.file_name().to_string_lossy().to_string();
             let estimates_path = entry.path().join("base").join("estimates.json");
-            
+
             if estimates_path.exists() {
                 if let Ok(result) = load_estimates_file(&estimates_path, &bench_name) {
                     results.insert(bench_name, result);
@@ -166,7 +166,7 @@ fn load_criterion_results(criterion_dir: &str) -> io::Result<HashMap<String, Ben
             }
         }
     }
-    
+
     Ok(results)
 }
 
@@ -174,16 +174,16 @@ fn load_criterion_results(criterion_dir: &str) -> io::Result<HashMap<String, Ben
 fn load_estimates_file(path: &Path, bench_name: &str) -> io::Result<BenchmarkResult> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
-    
+
     // Parse JSON manually (simplified parser)
     let mut content = String::new();
     for line in reader.lines() {
         content.push_str(&line?);
     }
-    
+
     // Extract mean estimate (simplified JSON parsing)
     let time_ns = extract_mean_estimate(&content)?;
-    
+
     Ok(BenchmarkResult {
         _name: bench_name.to_string(),
         time_ns,
@@ -198,15 +198,17 @@ fn extract_mean_estimate(json_content: &str) -> io::Result<f64> {
         let mean_section = &json_content[mean_start..];
         if let Some(estimate_start) = mean_section.find("\"point_estimate\":") {
             let estimate_section = &mean_section[estimate_start + 17..];
-            let estimate_end = estimate_section.find(&[',', '}'][..]).unwrap_or(estimate_section.len());
+            let estimate_end = estimate_section
+                .find(&[',', '}'][..])
+                .unwrap_or(estimate_section.len());
             let estimate_str = &estimate_section[..estimate_end];
-            
+
             return estimate_str.parse().map_err(|e| {
                 io::Error::new(io::ErrorKind::InvalidData, format!("Parse error: {e}"))
             });
         }
     }
-    
+
     Err(io::Error::new(
         io::ErrorKind::InvalidData,
         "Could not find mean estimate in JSON",
@@ -217,14 +219,14 @@ fn extract_mean_estimate(json_content: &str) -> io::Result<f64> {
 fn load_comparison_data(criterion_dir: &str) -> io::Result<HashMap<String, f64>> {
     let mut comparisons = HashMap::new();
     let criterion_path = Path::new(criterion_dir);
-    
+
     // Look for change estimates
     for entry in std::fs::read_dir(criterion_path)? {
         let entry = entry?;
         if entry.file_type()?.is_dir() {
             let bench_name = entry.file_name().to_string_lossy().to_string();
             let change_path = entry.path().join("change").join("estimates.json");
-            
+
             if change_path.exists() {
                 if let Ok(change_percent) = load_change_estimate(&change_path) {
                     comparisons.insert(bench_name, change_percent);
@@ -232,7 +234,7 @@ fn load_comparison_data(criterion_dir: &str) -> io::Result<HashMap<String, f64>>
             }
         }
     }
-    
+
     Ok(comparisons)
 }
 
@@ -240,28 +242,30 @@ fn load_comparison_data(criterion_dir: &str) -> io::Result<HashMap<String, f64>>
 fn load_change_estimate(path: &Path) -> io::Result<f64> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
-    
+
     let mut content = String::new();
     for line in reader.lines() {
         content.push_str(&line?);
     }
-    
+
     // Extract difference point estimate
     if let Some(diff_start) = content.find("\"difference\":{") {
         let diff_section = &content[diff_start..];
         if let Some(estimate_start) = diff_section.find("\"point_estimate\":") {
             let estimate_section = &diff_section[estimate_start + 17..];
-            let estimate_end = estimate_section.find(&[',', '}'][..]).unwrap_or(estimate_section.len());
+            let estimate_end = estimate_section
+                .find(&[',', '}'][..])
+                .unwrap_or(estimate_section.len());
             let estimate_str = &estimate_section[..estimate_end];
-            
+
             let ratio: f64 = estimate_str.parse().map_err(|e| {
                 io::Error::new(io::ErrorKind::InvalidData, format!("Parse error: {e}"))
             })?;
-            
+
             return Ok(ratio * 100.0); // Convert to percentage
         }
     }
-    
+
     Err(io::Error::new(
         io::ErrorKind::InvalidData,
         "Could not find difference estimate in JSON",
@@ -275,7 +279,7 @@ fn analyze_performance_targets(
 ) {
     for (name, result) in results {
         let time_ms = result.time_ms();
-        
+
         // Check incremental parsing targets
         if name.contains("incremental") {
             if time_ms > INCREMENTAL_PARSING_TARGET_MS {
@@ -292,13 +296,10 @@ fn analyze_performance_targets(
 }
 
 /// Analyze performance regressions against baseline
-fn analyze_regressions(
-    comparisons: &HashMap<String, f64>,
-    analysis: &mut RegressionAnalysis,
-) {
+fn analyze_regressions(comparisons: &HashMap<String, f64>, analysis: &mut RegressionAnalysis) {
     for (name, change_percent) in comparisons {
         let abs_change = change_percent.abs();
-        
+
         if abs_change > REGRESSION_THRESHOLD_PERCENT {
             if *change_percent > 0.0 {
                 // Performance got worse
@@ -307,9 +308,9 @@ fn analyze_regressions(
                 ));
             } else {
                 // Performance improved significantly
-                analysis.improvements.push(format!(
-                    "📈 {name}: {abs_change:.1}% faster"
-                ));
+                analysis
+                    .improvements
+                    .push(format!("📈 {name}: {abs_change:.1}% faster"));
             }
         } else {
             analysis.within_threshold.push(format!(

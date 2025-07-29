@@ -7,7 +7,12 @@
 //!
 //! Includes real-world editing scenarios and stress testing.
 
-#![allow(clippy::missing_docs_in_private_items, clippy::option_if_let_else, clippy::range_plus_one, clippy::cast_precision_loss)]
+#![allow(
+    clippy::missing_docs_in_private_items,
+    clippy::option_if_let_else,
+    clippy::range_plus_one,
+    clippy::cast_precision_loss
+)]
 
 use ass_core::{
     parser::{incremental::TextChange, Script},
@@ -24,7 +29,7 @@ fn is_quick_bench() -> bool {
 /// Benchmark core incremental parsing operations
 fn bench_incremental_parsing(c: &mut Criterion) {
     let mut group = c.benchmark_group("incremental_parsing");
-    
+
     if is_quick_bench() {
         group.sample_size(50);
         group.measurement_time(std::time::Duration::from_secs(2));
@@ -36,9 +41,9 @@ fn bench_incremental_parsing(c: &mut Criterion) {
 
     let sizes = [100, 1000, 5000, 10000];
     let change_sizes = [
-        ("small", 10),    // 1-10 chars
-        ("medium", 100),  // 10-100 chars
-        ("large", 1000),  // 100-1000 chars
+        ("small", 10),   // 1-10 chars
+        ("medium", 100), // 10-100 chars
+        ("large", 1000), // 100-1000 chars
     ];
 
     for &size in &sizes {
@@ -48,7 +53,7 @@ fn bench_incremental_parsing(c: &mut Criterion) {
             // Test single section changes
             let change = create_section_change(&script_text, *change_size);
             group.throughput(Throughput::Bytes(script_text.len() as u64));
-            
+
             group.bench_with_input(
                 BenchmarkId::new(format!("section_change_{change_name}"), size),
                 &(script_text.as_str(), &change),
@@ -97,7 +102,7 @@ fn bench_incremental_vs_full(c: &mut Criterion) {
 
     for &size in &sizes {
         let script_text = ScriptGenerator::complex(size).generate();
-        
+
         for (change_name, change_size) in &change_types {
             let change = create_section_change(&script_text, *change_size);
             let modified_text = apply_text_change(&script_text, &change);
@@ -152,11 +157,11 @@ fn bench_editor_simulation(c: &mut Criterion) {
             b.iter(|| {
                 let mut current_text = (*text).to_string();
                 let start = Instant::now();
-                
+
                 for change in *changes {
                     current_text = apply_text_change(&current_text, change);
                 }
-                
+
                 let duration = start.elapsed();
                 std_black_box((current_text, duration))
             });
@@ -172,11 +177,11 @@ fn bench_editor_simulation(c: &mut Criterion) {
             b.iter(|| {
                 let mut current_text = (*text).to_string();
                 let start = Instant::now();
-                
+
                 for change in *changes {
                     current_text = apply_text_change(&current_text, change);
                 }
-                
+
                 let duration = start.elapsed();
                 std_black_box((current_text, duration))
             });
@@ -192,11 +197,11 @@ fn bench_editor_simulation(c: &mut Criterion) {
             b.iter(|| {
                 let mut current_text = (*text).to_string();
                 let start = Instant::now();
-                
+
                 for change in *changes {
                     current_text = apply_text_change(&current_text, change);
                 }
-                
+
                 let duration = start.elapsed();
                 std_black_box((current_text, duration))
             });
@@ -226,7 +231,7 @@ fn bench_memory_usage(c: &mut Criterion) {
                     let start = Instant::now();
                     let result = apply_incremental_change(black_box(text), black_box(change));
                     let duration = start.elapsed();
-                    
+
                     // Simulate memory pressure measurement
                     let estimated_memory = text.len() + change.new_text.len();
                     std_black_box((result, duration, estimated_memory))
@@ -247,14 +252,20 @@ fn bench_real_world_files(c: &mut Criterion) {
     let realistic_profiles = [
         ("anime", ScriptGenerator::anime_realistic(size).generate()),
         ("movie", ScriptGenerator::movie_realistic(size).generate()),
-        ("karaoke", ScriptGenerator::karaoke_realistic(size).generate()),
+        (
+            "karaoke",
+            ScriptGenerator::karaoke_realistic(size).generate(),
+        ),
         ("sign", ScriptGenerator::sign_realistic(size).generate()),
-        ("educational", ScriptGenerator::educational_realistic(size).generate()),
+        (
+            "educational",
+            ScriptGenerator::educational_realistic(size).generate(),
+        ),
     ];
 
     for (profile_name, script_text) in &realistic_profiles {
         let change = create_section_change(script_text, 100);
-        
+
         group.bench_with_input(
             BenchmarkId::new("realistic_incremental", profile_name),
             &(script_text.as_str(), &change),
@@ -295,7 +306,7 @@ fn bench_stress_scenarios(c: &mut Criterion) {
     // Test section boundary changes
     let script_text = ScriptGenerator::complex(1000).generate();
     let boundary_change = create_section_boundary_change(&script_text);
-    
+
     group.bench_with_input(
         BenchmarkId::new("section_boundary", "change"),
         &(script_text.as_str(), &boundary_change),
@@ -350,17 +361,17 @@ fn bench_large_scale_anime(c: &mut Criterion) {
 
     // Test different large file sizes representative of real anime releases
     let large_sizes = [
-        ("24min_episode", 10_000),      // ~5-10MB typical TV episode
-        ("movie_2hr", 30_000),          // ~15-30MB typical movie
-        ("ova_complex", 50_000),        // ~25-50MB OVA with heavy effects
-        ("bdmv_full", 100_000),         // ~50MB+ BD release with all tracks
+        ("24min_episode", 10_000), // ~5-10MB typical TV episode
+        ("movie_2hr", 30_000),     // ~15-30MB typical movie
+        ("ova_complex", 50_000),   // ~25-50MB OVA with heavy effects
+        ("bdmv_full", 100_000),    // ~50MB+ BD release with all tracks
     ];
 
     for (profile_name, event_count) in &large_sizes {
         // Generate large anime subtitle file
         let script_text = ScriptGenerator::anime_realistic(*event_count).generate();
         let file_size_mb = script_text.len() as f64 / 1_048_576.0;
-        
+
         println!("Generated {profile_name}: {file_size_mb:.1}MB ({event_count} events)");
 
         // Test incremental changes on large files
@@ -435,11 +446,11 @@ fn bench_large_scale_anime(c: &mut Criterion) {
                     let start = Instant::now();
                     let result = apply_incremental_change(black_box(text), black_box(change));
                     let duration = start.elapsed();
-                    
+
                     // Estimate memory usage (in real implementation would use actual measurements)
                     let estimated_memory = input_size + change.new_text.len();
                     let memory_ratio = estimated_memory as f64 / input_size as f64;
-                    
+
                     std_black_box((result, duration, memory_ratio))
                 });
             },
@@ -454,42 +465,48 @@ fn bench_large_scale_anime(c: &mut Criterion) {
 /// Create a change within a single section
 fn create_section_change(script_text: &str, size: usize) -> TextChange {
     // Find Events section and create a change within it
-    script_text.find("[Events]").map_or_else(|| {
-        // Fallback to middle of script
-        let mid = script_text.len() / 2;
-        TextChange {
-            range: mid..mid + 10,
-            new_text: "x".repeat(size),
-            line_range: 5..6,
-        }
-    }, |events_start| {
-        let change_start = events_start + 50; // Skip header
-        TextChange {
-            range: change_start..change_start + 20,
-            new_text: "x".repeat(size),
-            line_range: 10..11,
-        }
-    })
+    script_text.find("[Events]").map_or_else(
+        || {
+            // Fallback to middle of script
+            let mid = script_text.len() / 2;
+            TextChange {
+                range: mid..mid + 10,
+                new_text: "x".repeat(size),
+                line_range: 5..6,
+            }
+        },
+        |events_start| {
+            let change_start = events_start + 50; // Skip header
+            TextChange {
+                range: change_start..change_start + 20,
+                new_text: "x".repeat(size),
+                line_range: 10..11,
+            }
+        },
+    )
 }
 
 /// Create a change that spans multiple sections
 fn create_cross_section_change(script_text: &str, size: usize) -> TextChange {
     // Find boundary between sections
-    script_text.find("[Events]").map_or_else(|| {
-        let mid = script_text.len() / 2;
-        TextChange {
-            range: mid..mid + 20,
-            new_text: "x".repeat(size),
-            line_range: 5..7,
-        }
-    }, |styles_end| {
-        let change_start = styles_end.saturating_sub(20);
-        TextChange {
-            range: change_start..styles_end + 20,
-            new_text: format!("\n{}\n[Events]\n", "x".repeat(size)),
-            line_range: 8..12,
-        }
-    })
+    script_text.find("[Events]").map_or_else(
+        || {
+            let mid = script_text.len() / 2;
+            TextChange {
+                range: mid..mid + 20,
+                new_text: "x".repeat(size),
+                line_range: 5..7,
+            }
+        },
+        |styles_end| {
+            let change_start = styles_end.saturating_sub(20);
+            TextChange {
+                range: change_start..styles_end + 20,
+                new_text: format!("\n{}\n[Events]\n", "x".repeat(size)),
+                line_range: 8..12,
+            }
+        },
+    )
 }
 
 /// Create a change at section boundary
@@ -513,7 +530,7 @@ fn create_section_boundary_change(script_text: &str) -> TextChange {
 fn create_typing_simulation(script_text: &str, count: usize) -> Vec<TextChange> {
     let mut changes = Vec::new();
     let start_pos = script_text.len() / 2;
-    
+
     for i in 0..count {
         changes.push(TextChange {
             range: start_pos + i..start_pos + i,
@@ -521,7 +538,7 @@ fn create_typing_simulation(script_text: &str, count: usize) -> Vec<TextChange> 
             line_range: 10..10,
         });
     }
-    
+
     changes
 }
 
@@ -529,7 +546,7 @@ fn create_typing_simulation(script_text: &str, count: usize) -> Vec<TextChange> 
 fn create_backspace_simulation(script_text: &str, count: usize) -> Vec<TextChange> {
     let mut changes = Vec::new();
     let start_pos = script_text.len() / 2;
-    
+
     for i in 0..count {
         let pos = start_pos.saturating_sub(i);
         changes.push(TextChange {
@@ -538,7 +555,7 @@ fn create_backspace_simulation(script_text: &str, count: usize) -> Vec<TextChang
             line_range: 10..10,
         });
     }
-    
+
     changes
 }
 
@@ -546,7 +563,7 @@ fn create_backspace_simulation(script_text: &str, count: usize) -> Vec<TextChang
 fn create_paste_simulation(script_text: &str, count: usize) -> Vec<TextChange> {
     let mut changes = Vec::new();
     let start_pos = script_text.len() / 2;
-    
+
     for i in 0..count {
         changes.push(TextChange {
             range: start_pos + i * 100..start_pos + i * 100,
@@ -554,7 +571,7 @@ fn create_paste_simulation(script_text: &str, count: usize) -> Vec<TextChange> {
             line_range: 10 + u32::try_from(i).unwrap_or(0)..11 + u32::try_from(i).unwrap_or(0),
         });
     }
-    
+
     changes
 }
 
@@ -592,7 +609,7 @@ fn apply_incremental_change(text: &str, change: &TextChange) -> Result<String, S
     // For now, simulate incremental parsing by applying the change and re-parsing
     // In the real implementation, this would use the actual incremental parser
     let modified_text = apply_text_change(text, change);
-    
+
     // Simulate incremental parsing overhead (minimal compared to full parse)
     match Script::parse(&modified_text) {
         Ok(_) => Ok(modified_text),

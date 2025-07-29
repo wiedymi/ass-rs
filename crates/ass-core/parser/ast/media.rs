@@ -70,6 +70,35 @@ impl Font<'_> {
         crate::utils::decode_uu_data(self.data_lines.iter().copied())
     }
 
+    /// Convert font to ASS string representation
+    ///
+    /// Generates the font entry as it appears in the [Fonts] section.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use ass_core::parser::ast::{Font, Span};
+    /// let font = Font {
+    ///     filename: "custom.ttf",
+    ///     data_lines: vec!["begin 644 custom.ttf", "M'XL...", "end"],
+    ///     span: Span::new(0, 0, 0, 0),
+    /// };
+    /// let ass_string = font.to_ass_string();
+    /// assert!(ass_string.starts_with("fontname: custom.ttf\n"));
+    /// assert!(ass_string.contains("M'XL..."));
+    /// ```
+    #[must_use]
+    pub fn to_ass_string(&self) -> alloc::string::String {
+        use alloc::format;
+
+        let mut result = format!("fontname: {}\n", self.filename);
+        for line in &self.data_lines {
+            result.push_str(line);
+            result.push('\n');
+        }
+        result
+    }
+
     /// Validate all spans in this Font reference valid source
     ///
     /// Debug helper to ensure zero-copy invariants are maintained.
@@ -139,6 +168,35 @@ impl Graphic<'_> {
     /// Returns an error if the UU-encoded data is malformed or cannot be decoded.
     pub fn decode_data(&self) -> Result<Vec<u8>, crate::utils::CoreError> {
         crate::utils::decode_uu_data(self.data_lines.iter().copied())
+    }
+
+    /// Convert graphic to ASS string representation
+    ///
+    /// Generates the graphic entry as it appears in the [Graphics] section.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use ass_core::parser::ast::{Graphic, Span};
+    /// let graphic = Graphic {
+    ///     filename: "logo.png",
+    ///     data_lines: vec!["begin 644 logo.png", "M'XL...", "end"],
+    ///     span: Span::new(0, 0, 0, 0),
+    /// };
+    /// let ass_string = graphic.to_ass_string();
+    /// assert!(ass_string.starts_with("filename: logo.png\n"));
+    /// assert!(ass_string.contains("M'XL..."));
+    /// ```
+    #[must_use]
+    pub fn to_ass_string(&self) -> alloc::string::String {
+        use alloc::format;
+
+        let mut result = format!("filename: {}\n", self.filename);
+        for line in &self.data_lines {
+            result.push_str(line);
+            result.push('\n');
+        }
+        result
     }
 
     /// Validate all spans in this Graphic reference valid source

@@ -1,0 +1,92 @@
+[package]
+name = "ass-editor"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/your-org/ass-rs"
+description = "High-performance, ergonomic editor layer for ASS subtitles"
+readme = "README.md"
+categories = ["multimedia::video", "text-editors", "parser-implementations"]
+keywords = ["ass", "subtitle", "editor", "ssa", "substation"]
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+ass-core = { path = "../ass-core", features = ["stream"] }
+thiserror = { workspace = true }
+
+# Rope data structure for text editing (feature-gated)
+ropey = { version = "1.6.1", optional = true }
+
+# Arena allocator for pooling histories and deltas
+bumpalo = { version = "3.14", optional = true }
+
+# FST-based search indexing (feature-gated)
+fst = { version = "0.4.7", optional = true }
+
+# For multi-threading support (feature-gated)
+parking_lot = { version = "0.12", optional = true }
+
+# For async support (feature-gated)
+futures = { version = "0.3", optional = true }
+tokio = { version = "1.35", features = ["sync"], optional = true }
+
+# For serialization support (feature-gated)
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+# For nostd support
+hashbrown = { version = "0.14", optional = true }
+
+# For format conversion regex patterns
+regex = { version = "1.10", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+tempfile = "3.8"
+pretty_assertions = "1.4"
+
+[features]
+default = ["std", "analysis", "plugins", "rope", "formats"]
+
+# Core features
+std = ["ass-core/std"]
+analysis = ["ass-core/analysis"]
+plugins = ["ass-core/plugins"]
+
+# Editor-specific features
+rope = ["dep:ropey"]
+arena = ["dep:bumpalo"]
+search-index = ["dep:fst"]
+serde = ["dep:serde", "ass-core/serde"]
+
+# Performance features
+simd = ["ass-core/simd"]
+simd-full = ["ass-core/simd-full"]
+
+# Threading features
+multi-thread = ["dep:parking_lot", "std"]
+async = ["dep:futures", "dep:tokio", "std"]
+
+# Memory optimization
+nostd = ["hashbrown", "ass-core/nostd"]
+
+# Format support
+formats = ["dep:regex"]
+
+# Development features
+benches = []
+stream = ["ass-core/stream"]
+
+# Undo depth configuration (default 50)
+undo-limit-10 = []
+undo-limit-25 = []
+undo-limit-50 = [] # default
+undo-limit-100 = []
+undo-limit-unlimited = []
+
+# [[bench]]
+# name = "editor_benchmarks"
+# harness = false
+# required-features = ["benches"]

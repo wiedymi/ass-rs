@@ -91,7 +91,7 @@ fn bench_parsing(c: &mut Criterion) {
 /// Benchmark streaming parser performance (placeholder - requires stream feature)
 fn bench_streaming(c: &mut Criterion) {
     let mut group = c.benchmark_group("streaming");
-    
+
     // Placeholder benchmark - streaming parser requires 'stream' feature
     let script = ScriptGenerator::moderate(100).generate();
     group.bench_function("streaming_placeholder", |b| {

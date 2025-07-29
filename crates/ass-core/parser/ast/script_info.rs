@@ -133,6 +133,32 @@ impl<'a> ScriptInfo<'a> {
             .unwrap_or(0)
     }
 
+    /// Convert script info to ASS string representation
+    ///
+    /// Generates the [Script Info] section with all fields.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use ass_core::parser::ast::{ScriptInfo, Span};
+    /// let fields = vec![("Title", "Test Script"), ("ScriptType", "v4.00+")];
+    /// let info = ScriptInfo { fields, span: Span::new(0, 0, 0, 0) };
+    /// let ass_string = info.to_ass_string();
+    /// assert!(ass_string.contains("[Script Info]"));
+    /// assert!(ass_string.contains("Title: Test Script"));
+    /// assert!(ass_string.contains("ScriptType: v4.00+"));
+    /// ```
+    #[must_use]
+    pub fn to_ass_string(&self) -> alloc::string::String {
+        use alloc::string::String;
+        use core::fmt::Write;
+        let mut result = String::from("[Script Info]\n");
+        for (key, value) in &self.fields {
+            let _ = writeln!(result, "{key}: {value}");
+        }
+        result
+    }
+
     /// Validate all spans in this `ScriptInfo` reference valid source
     ///
     /// Debug helper to ensure zero-copy invariants are maintained.
@@ -259,5 +285,39 @@ mod tests {
         };
         assert_eq!(info.get_field("Title"), Some("Correct"));
         assert_eq!(info.get_field("title"), Some("Test"));
+    }
+
+    #[test]
+    fn script_info_to_ass_string() {
+        let fields = vec![
+            ("Title", "Test Script"),
+            ("ScriptType", "v4.00+"),
+            ("WrapStyle", "0"),
+            ("ScaledBorderAndShadow", "yes"),
+            ("YCbCr Matrix", "None"),
+        ];
+        let info = ScriptInfo {
+            fields,
+            span: Span::new(0, 0, 0, 0),
+        };
+
+        let ass_string = info.to_ass_string();
+        assert!(ass_string.starts_with("[Script Info]\n"));
+        assert!(ass_string.contains("Title: Test Script\n"));
+        assert!(ass_string.contains("ScriptType: v4.00+\n"));
+        assert!(ass_string.contains("WrapStyle: 0\n"));
+        assert!(ass_string.contains("ScaledBorderAndShadow: yes\n"));
+        assert!(ass_string.contains("YCbCr Matrix: None\n"));
+    }
+
+    #[test]
+    fn script_info_to_ass_string_empty() {
+        let info = ScriptInfo {
+            fields: vec![],
+            span: Span::new(0, 0, 0, 0),
+        };
+
+        let ass_string = info.to_ass_string();
+        assert_eq!(ass_string, "[Script Info]\n");
     }
 }

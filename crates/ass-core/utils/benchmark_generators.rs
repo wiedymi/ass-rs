@@ -271,9 +271,7 @@ PlayResY: 1080",
             ComplexityLevel::KaraokeRealistic => {
                 Self::generate_karaoke_dialogue(event_index, &base_text)
             }
-            ComplexityLevel::SignRealistic => {
-                Self::generate_sign_dialogue(event_index, &base_text)
-            }
+            ComplexityLevel::SignRealistic => Self::generate_sign_dialogue(event_index, &base_text),
             ComplexityLevel::EducationalRealistic => {
                 Self::generate_educational_dialogue(event_index, &base_text)
             }
@@ -284,13 +282,21 @@ PlayResY: 1080",
     fn generate_anime_dialogue(event_index: usize, base_text: &str) -> String {
         let patterns = [
             // Character speaking with glow effect
-            format!(r"{{\an8\pos(960,80)\fad(250,250)\bord3\shad0\c&H00FFFFFF&\3c&H00FF8C00&}}{base_text}"),
+            format!(
+                r"{{\an8\pos(960,80)\fad(250,250)\bord3\shad0\c&H00FFFFFF&\3c&H00FF8C00&}}{base_text}"
+            ),
             // Thought bubble with transparency
-            format!(r"{{\an5\pos(960,540)\fad(500,500)\alpha&H80&\bord2\c&H00E6E6FA&\3c&H00483D8B&}}{base_text}"),
+            format!(
+                r"{{\an5\pos(960,540)\fad(500,500)\alpha&H80&\bord2\c&H00E6E6FA&\3c&H00483D8B&}}{base_text}"
+            ),
             // Dramatic effect with color change
-            format!(r"{{\an2\pos(960,980)\fad(300,800)\b1\bord4\shad3\c&H0000FFFF&\3c&H000000FF&\4c&H00000000&\t(0,2000,\c&H00FF0000&)}}{base_text}"),
+            format!(
+                r"{{\an2\pos(960,980)\fad(300,800)\b1\bord4\shad3\c&H0000FFFF&\3c&H000000FF&\4c&H00000000&\t(0,2000,\c&H00FF0000&)}}{base_text}"
+            ),
             // Side character with positioning
-            format!(r"{{\an7\pos(200,400)\fad(200,200)\bord2\c&H00FFFFFF&\3c&H00800080&}}{base_text}"),
+            format!(
+                r"{{\an7\pos(200,400)\fad(200,200)\bord2\c&H00FFFFFF&\3c&H00800080&}}{base_text}"
+            ),
         ];
         patterns[event_index % patterns.len()].clone()
     }
@@ -313,24 +319,26 @@ PlayResY: 1080",
     /// Generate karaoke-style dialogue with timing
     fn generate_karaoke_dialogue(event_index: usize, base_text: &str) -> String {
         use std::fmt::Write;
-        
+
         let words: Vec<&str> = base_text.split_whitespace().collect();
         let mut karaoke_text = String::new();
-        
+
         // Add base styling
-        karaoke_text.push_str(r"{\an5\pos(960,540)\fad(200,200)\b1\bord2\shad1\c&H00FFFFFF&\3c&H00FF6347&}");
-        
+        karaoke_text.push_str(
+            r"{\an5\pos(960,540)\fad(200,200)\b1\bord2\shad1\c&H00FFFFFF&\3c&H00FF6347&}",
+        );
+
         // Add karaoke timing for each word
         for (i, word) in words.iter().enumerate() {
             let timing = 50 + (i * 30); // Varying timing
             write!(karaoke_text, r"{{\k{timing}}}{word} ").unwrap();
         }
-        
+
         // Add final effect
         if event_index % 3 == 0 {
             karaoke_text.push_str(r"{\t(2000,3000,\fscx120\fscy120\alpha&HFF&)}");
         }
-        
+
         karaoke_text
     }
 
@@ -348,28 +356,40 @@ PlayResY: 1080",
             // Side signs
             (r"{\an4\pos(100,540)", "STORE"),
         ];
-        
+
         let (pos_tag, sign_type) = &positions[event_index % positions.len()];
         let sign_text = if base_text.contains("number") {
-            format!("{sign_type}: {}", base_text.replace("dialogue line", "sign"))
+            format!(
+                "{sign_type}: {}",
+                base_text.replace("dialogue line", "sign")
+            )
         } else {
             (*sign_type).to_string()
         };
-        
-        format!(r"{pos_tag}\fad(500,500)\bord3\shad2\c&H00000000&\3c&H00FFFFFF&\fn{{Arial}}\fs36}}{sign_text}")
+
+        format!(
+            r"{pos_tag}\fad(500,500)\bord3\shad2\c&H00000000&\3c&H00FFFFFF&\fn{{Arial}}\fs36}}{sign_text}"
+        )
     }
 
     /// Generate educational content dialogue
     fn generate_educational_dialogue(event_index: usize, base_text: &str) -> String {
         let patterns = [
             // Main content
-            format!(r"{{\an2\pos(960,900)\fad(200,200)\bord1\c&H00FFFFFF&}}{base_text} - This explains the concept in detail with proper formatting."),
+            format!(
+                r"{{\an2\pos(960,900)\fad(200,200)\bord1\c&H00FFFFFF&}}{base_text} - This explains the concept in detail with proper formatting."
+            ),
             // Question format
-            format!(r"{{\an8\pos(960,150)\fad(200,200)\b1\c&H0000FFFF&}}Question {}: {base_text}", event_index + 1),
+            format!(
+                r"{{\an8\pos(960,150)\fad(200,200)\b1\c&H0000FFFF&}}Question {}: {base_text}",
+                event_index + 1
+            ),
             // Answer format
             format!(r"{{\an7\pos(100,400)\fad(200,200)\i1\c&H0000FF00&}}Answer: {base_text}"),
             // Definition
-            format!(r"{{\an5\pos(960,540)\fad(200,200)\bord2\c&H00FFFFFF&\3c&H000080FF&}}Definition: {base_text}"),
+            format!(
+                r"{{\an5\pos(960,540)\fad(200,200)\bord2\c&H00FFFFFF&\3c&H000080FF&}}Definition: {base_text}"
+            ),
             // Example
             format!(r"{{\an1\pos(100,900)\fad(200,200)\c&H00FFFF00&}}Example: {base_text}"),
             // Summary
@@ -668,7 +688,7 @@ mod tests {
             generator.complexity_level,
             ComplexityLevel::AnimeRealistic
         ));
-        
+
         let script = generator.generate();
         assert!(script.contains("Anime Subtitles"));
     }
@@ -693,7 +713,7 @@ mod tests {
             generator.complexity_level,
             ComplexityLevel::KaraokeRealistic
         ));
-        
+
         let text = generator.generate_dialogue_text(0);
         assert!(text.contains(r"{\k"));
     }
@@ -707,7 +727,7 @@ mod tests {
             generator.complexity_level,
             ComplexityLevel::SignRealistic
         ));
-        
+
         let text = generator.generate_dialogue_text(0);
         assert!(text.contains(r"{\pos(") || text.contains(r"{\an"));
     }
@@ -721,9 +741,11 @@ mod tests {
             generator.complexity_level,
             ComplexityLevel::EducationalRealistic
         ));
-        
+
         let text = generator.generate_dialogue_text(1);
-        assert!(text.contains("Question") || text.contains("Answer") || text.contains("Definition"));
+        assert!(
+            text.contains("Question") || text.contains("Answer") || text.contains("Definition")
+        );
     }
 
     #[test]
