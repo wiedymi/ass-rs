@@ -1167,6 +1167,16 @@ impl EditorDocument {
         self.history.next_redo_description()
     }
 
+    /// Get mutable reference to the undo manager for configuration
+    pub fn undo_manager_mut(&mut self) -> &mut UndoManager {
+        &mut self.history
+    }
+
+    /// Get reference to the undo manager
+    pub fn undo_manager(&self) -> &UndoManager {
+        &self.history
+    }
+
     /// Apply a script delta for efficient incremental parsing
     #[cfg(feature = "stream")]
     fn apply_script_delta(&mut self, delta: ScriptDeltaOwned) -> Result<()> {

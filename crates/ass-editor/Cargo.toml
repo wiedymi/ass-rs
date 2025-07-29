@@ -14,32 +14,32 @@ keywords = ["ass", "subtitle", "editor", "ssa", "substation"]
 path = "lib.rs"
 
 [dependencies]
-ass-core = { path = "../ass-core", features = ["stream"] }
-thiserror = { workspace = true }
+ass-core = { path = "../ass-core", default-features = false }
+thiserror = { workspace = true, optional = true } # Only enabled with `std`
 
 # Rope data structure for text editing (feature-gated)
-ropey = { version = "1.6.1", optional = true }
+ropey = { version = "1.6.1", default-features = false, optional = true }
 
-# Arena allocator for pooling histories and deltas
-bumpalo = { version = "3.14", optional = true }
+# Arena allocator for pooling histories and deltas (feature-gated)
+bumpalo = { version = "3.14", default-features = false, optional = true }
 
-# FST-based search indexing (feature-gated)
+# FST-based search indexing (feature-gated, requires std)
 fst = { version = "0.4.7", optional = true }
 
-# For multi-threading support (feature-gated)
+# For multi-threading support (feature-gated, requires std)
 parking_lot = { version = "0.12", optional = true }
 
-# For async support (feature-gated)
+# For async support (feature-gated, requires std)
 futures = { version = "0.3", optional = true }
 tokio = { version = "1.35", features = ["sync"], optional = true }
 
-# For serialization support (feature-gated)
+# For serialization support (feature-gated, requires std)
 serde = { version = "1.0", features = ["derive"], optional = true }
 
-# For nostd support
+# For nostd support (alloc-only)
 hashbrown = { version = "0.14", optional = true }
 
-# For format conversion regex patterns
+# For format conversion regex patterns (requires std)
 regex = { version = "1.10", optional = true }
 
 [dev-dependencies]
@@ -48,43 +48,81 @@ tempfile = "3.8"
 pretty_assertions = "1.4"
 
 [features]
-default = ["std", "analysis", "plugins", "rope", "formats"]
+# Default: A fully-featured editor experience for desktop applications.
+default = ["full"]
 
-# Core features
-std = ["ass-core/std"]
+# --- Main Editor Flavors ---
+
+# Provides the absolute minimum for a functional, performant text editor.
+# This is suitable for lightweight integrations or when only core editing is needed.
+# It enables alloc-only dependencies, making it compatible with `nostd`.
+minimal = [
+    "rope",         # Rope data structure for efficient text editing
+    "arena",        # Arena allocator for pooling histories and deltas  
+    "stream",       # Essential for incremental parsing performance
+]
+
+# Provides all features for a rich, full-featured ASS subtitle editor.
+# This builds upon 'minimal' by adding advanced capabilities like analysis,
+# extensions, format conversion, advanced search, and concurrency.
+# It explicitly enables `std` and `thiserror` (which requires `std`).
+full = [
+    "minimal",      # Start with the core minimal set (which is alloc-only)
+    "std",          # Standard library support
+    "analysis",     # Script analysis and linting
+    "plugins",      # Extension system (e.g., built-in syntax highlighting, auto-complete)
+    "formats",      # Import/export format support (SRT, WebVTT)
+    "search-index", # FST-based advanced search for large documents
+    "concurrency",  # Multi-threading and async support for UI responsiveness
+    "serde",        # Serialization for editor state (e.g., saving/loading)
+    "dep:thiserror",# `thiserror` requires `std`
+]
+
+# --- Granular Features (typically enabled by 'minimal' or 'full') ---
+
+# Standard library support. Enabled by 'full'.
+# Propagates `std` to `ass-core`, and enables std for ropey and bumpalo.
+std = ["ass-core/std", "ropey/default", "bumpalo/std"]
+
+# Core parsing and analysis features from ass-core.
 analysis = ["ass-core/analysis"]
 plugins = ["ass-core/plugins"]
+stream = ["ass-core/stream"] # Essential for incremental parsing performance
 
-# Editor-specific features
-rope = ["dep:ropey"]
-arena = ["dep:bumpalo"]
-search-index = ["dep:fst"]
-serde = ["dep:serde", "ass-core/serde"]
+# Editor-specific dependencies.
+rope = ["dep:ropey"] # Rope data structure for efficient text editing
+arena = ["dep:bumpalo"] # Arena allocator for pooling histories and deltas
+formats = ["dep:regex", "std"] # `regex` and format conversion require `std`
+search-index = ["dep:fst", "std"] # `fst` requires `std`
+serde = ["dep:serde", "ass-core/serde", "std"] # `serde` requires `std`
 
-# Performance features
-simd = ["ass-core/simd"]
-simd-full = ["ass-core/simd-full"]
-
-# Threading features
+# Concurrency and asynchronous operation support.
+concurrency = ["multi-thread", "async", "std"] # Concurrency features require `std`
 multi-thread = ["dep:parking_lot", "std"]
 async = ["dep:futures", "dep:tokio", "std"]
 
-# Memory optimization
-nostd = ["hashbrown", "ass-core/nostd"]
+# --- Optional Performance Optimizations ---
 
-# Format support
-formats = ["dep:regex"]
+# SIMD acceleration features from ass-core. Enable for maximum parsing performance.
+simd = ["ass-core/simd"]
+simd-full = ["ass-core/simd-full"]
 
-# Development features
-benches = []
-stream = ["ass-core/stream"]
+# --- Specialized Build Targets ---
 
-# Undo depth configuration (default 50)
-undo-limit-10 = []
-undo-limit-25 = []
-undo-limit-50 = [] # default
-undo-limit-100 = []
-undo-limit-unlimited = []
+# No-standard library support for embedded/WASM environments.
+# This feature is mutually exclusive with 'std'.
+# To use this, you would typically build with `--no-default-features --features minimal,nostd`.
+nostd = [
+    "dep:hashbrown",
+    "ass-core/nostd",
+    # ropey and bumpalo are configured with default-features=false to work in no_std
+    # environments. `nostd` just needs to ensure `std` isn't enabled.
+]
+
+# --- Development Features ---
+
+# Features primarily used during development, such as benchmarks.
+dev-benches = []
 
 # [[bench]]
 # name = "editor_benchmarks"

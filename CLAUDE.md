@@ -51,10 +51,67 @@ ASS-RS is designed as a modular ASS (Advanced SubStation Alpha) subtitle parser 
 - **Incremental Parsing**: Editor-friendly partial re-parsing
 
 ### Feature Flags
-- **Default**: `std`, `analysis`, `plugins`
-- **Performance**: `simd`, `simd-full`, `arena`
-- **Platform**: `nostd` for embedded/WASM
-- **Development**: `serde`, `benches`, `stream`
+ASS-Editor uses a simplified two-tier feature system:
+
+#### Main Editor Flavors
+- **`default`**: Enables `full` for complete desktop functionality
+- **`minimal`**: Core editing features (rope, arena, stream) - `no_std` compatible with alloc
+- **`full`**: All features including std, analysis, plugins, formats, search, concurrency, serde
+
+#### Optional Performance & Platform Features  
+- **`simd`/`simd-full`**: SIMD acceleration for maximum parsing performance
+- **`nostd`**: No-standard library support for embedded/WASM (use with `minimal`)
+- **`dev-benches`**: Development benchmarking features
+
+#### Granular Features (enabled by `minimal`/`full`)
+- **`std`**: Standard library support (propagates to dependencies)
+- **`analysis`**: Script analysis and linting from ass-core
+- **`plugins`**: Extension system with syntax highlighting, auto-complete
+- **`formats`**: Import/export for SRT, WebVTT (requires std)
+- **`search-index`**: FST-based advanced search (requires std)  
+- **`concurrency`**: Multi-threading and async support (requires std)
+- **`serde`**: Serialization for editor state (requires std)
+- **`stream`**: Incremental parsing for performance (essential for editing)
+
+#### Usage Examples
+```bash
+# Full-featured desktop editor (default)
+cargo build
+
+# Minimal editor for lightweight integrations
+cargo build --no-default-features --features minimal
+
+# Minimal + SIMD for maximum performance
+cargo build --no-default-features --features minimal,simd
+
+# No-std embedded/WASM build
+cargo build --no-default-features --features minimal,nostd
+
+# Full editor with SIMD acceleration  
+cargo build --features simd
+```
+
+#### Programmatic Undo Limit
+The undo stack depth is now configurable at runtime via `UndoStackConfig`. You can create a custom configuration and apply it to your `EditorDocument`'s `UndoManager`:
+
+```rust
+use ass_editor::{EditorDocument, UndoStackConfig};
+
+// Create a new document
+let mut doc = EditorDocument::new();
+
+// Create a custom undo configuration
+let custom_config = UndoStackConfig {
+    max_entries: 100, // Set your desired limit
+    max_memory: 50 * 1024 * 1024, // 50MB
+    ..Default::default()
+};
+
+// Apply the custom configuration
+doc.undo_manager_mut().set_config(custom_config);
+
+// Now, operations on `doc` will respect the new undo limit.
+```
 
 ## Common Clippy Issues to Avoid
 

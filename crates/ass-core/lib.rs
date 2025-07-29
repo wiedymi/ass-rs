@@ -44,7 +44,7 @@
 //! - Memory: ~1.1x input size via zero-copy spans
 //! - Incremental: <2ms for single-event updates
 
-#![cfg_attr(not(feature = "std"), nostd)]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(clippy::all)]
 #![deny(unsafe_code)]

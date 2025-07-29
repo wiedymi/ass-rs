@@ -164,21 +164,8 @@ pub struct UndoStackConfig {
 
 impl Default for UndoStackConfig {
     fn default() -> Self {
-        // Determine limit from feature flags
-        let max_entries = if cfg!(feature = "undo-limit-10") {
-            10
-        } else if cfg!(feature = "undo-limit-25") {
-            25
-        } else if cfg!(feature = "undo-limit-100") {
-            100
-        } else if cfg!(feature = "undo-limit-unlimited") {
-            usize::MAX
-        } else {
-            50 // default undo-limit-50
-        };
-
         Self {
-            max_entries,
+            max_entries: 50, // Set a sensible default, can be overridden programmatically
             max_memory: 10 * 1024 * 1024, // 10MB default
             enable_compression: true,
             arena_reset_interval: 100, // Reset arena every 100 operations
@@ -430,6 +417,11 @@ impl UndoManager {
         }
     }
 
+    /// Update the configuration of the undo stack
+    pub fn set_config(&mut self, config: UndoStackConfig) {
+        self.stack = UndoStack::with_config(config);
+    }
+
     /// Update the current cursor position
     pub fn set_cursor(&mut self, cursor: Option<Position>) {
         self.current_cursor = cursor;
@@ -655,5 +647,125 @@ mod tests {
             new_text: "World".to_string(),
         };
         assert!(replace_op.memory_usage() >= 10);
+    }
+
+    #[test]
+    fn programmatic_undo_limit_configuration() {
+        // Test custom undo limit configuration
+        let custom_config = UndoStackConfig {
+            max_entries: 3,
+            max_memory: 1000,
+            enable_compression: false,
+            arena_reset_interval: 0,
+        };
+
+        let mut manager = UndoManager::with_config(custom_config);
+
+        // Add more operations than the limit
+        for i in 0..5 {
+            let operation = Operation::Insert {
+                position: Position::new(i * 10),
+                text: format!("test{i}"),
+            };
+            let mut result = CommandResult::success();
+            result.content_changed = true;
+            manager.record_operation(operation, format!("Insert {i}"), &result);
+        }
+
+        // Should only keep the last 3 operations due to max_entries limit
+        let stats = manager.stats();
+        assert_eq!(stats.undo_count, 3);
+
+        // Check that the correct operations are kept (most recent ones)
+        assert_eq!(manager.next_undo_description(), Some("Insert 4"));
+
+        // Test undo operations respect the limit
+        manager.pop_undo_entry();
+        assert_eq!(manager.next_undo_description(), Some("Insert 3"));
+
+        manager.pop_undo_entry();
+        assert_eq!(manager.next_undo_description(), Some("Insert 2"));
+
+        manager.pop_undo_entry();
+        assert_eq!(manager.next_undo_description(), None);
+    }
+
+    #[test]
+    fn undo_stack_config_default() {
+        // Test that default configuration is sensible
+        let default_config = UndoStackConfig::default();
+        assert_eq!(default_config.max_entries, 50);
+        assert_eq!(default_config.max_memory, 10 * 1024 * 1024); // 10MB
+        assert!(default_config.enable_compression);
+        assert_eq!(default_config.arena_reset_interval, 100);
+    }
+
+    #[test]
+    fn undo_manager_config_update() {
+        // Test that UndoManager can have its configuration updated
+        let mut manager = UndoManager::new();
+
+        // Add an operation with default config
+        let operation = Operation::Insert {
+            position: Position::new(0),
+            text: "test".to_string(),
+        };
+        let mut result = CommandResult::success();
+        result.content_changed = true;
+        manager.record_operation(operation, "Initial".to_string(), &result);
+
+        assert_eq!(manager.stats().undo_count, 1);
+
+        // Update to a more restrictive config
+        let restrictive_config = UndoStackConfig {
+            max_entries: 0, // No undo history allowed
+            max_memory: 0,
+            enable_compression: false,
+            arena_reset_interval: 0,
+        };
+
+        manager.set_config(restrictive_config);
+
+        // The stack should be recreated, so previous operations should be gone
+        assert_eq!(manager.stats().undo_count, 0);
+
+        // New operations should not be recorded due to 0 limit
+        let operation = Operation::Insert {
+            position: Position::new(5),
+            text: "test2".to_string(),
+        };
+        manager.record_operation(operation, "Should not record".to_string(), &result);
+        assert_eq!(manager.stats().undo_count, 0);
+    }
+
+    #[test]
+    fn memory_limit_enforcement() {
+        // Test that memory limits are enforced
+        let memory_limited_config = UndoStackConfig {
+            max_entries: 100, // High entry limit
+            max_memory: 50,   // Very low memory limit (50 bytes)
+            enable_compression: false,
+            arena_reset_interval: 0,
+        };
+
+        let mut manager = UndoManager::with_config(memory_limited_config);
+
+        // Add operations that exceed memory limit
+        for i in 0..5 {
+            let operation = Operation::Insert {
+                position: Position::new(i * 10),
+                text: format!(
+                    "This is a long text string for operation {i} that should consume memory"
+                ),
+            };
+            let mut result = CommandResult::success();
+            result.content_changed = true;
+            manager.record_operation(operation, format!("Long operation {i}"), &result);
+        }
+
+        // Should have fewer operations due to memory constraint
+        let stats = manager.stats();
+        assert!(stats.undo_count < 5);
+        assert!(stats.memory_usage <= 50 || stats.undo_count == 0);
     }
 }
