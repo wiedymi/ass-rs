@@ -5,7 +5,7 @@
 use crate::core::{EditorDocument, Position, Range, Result};
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::String, vec::Vec};
+use alloc::{boxed::Box, format, string::String, vec::Vec};
 
 /// A command that tracks deltas for incremental updates
 pub trait DeltaCommand {

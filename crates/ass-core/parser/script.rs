@@ -6,7 +6,7 @@
 use crate::{Result, ScriptVersion};
 #[cfg(feature = "stream")]
 use alloc::format;
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, string::String, string::ToString, vec, vec::Vec};
 #[cfg(feature = "stream")]
 use core::ops::Range;
 
@@ -2001,7 +2001,10 @@ mod tests {
 
     #[test]
     fn parse_very_long_content() {
+        #[cfg(feature = "std")]
         use std::fmt::Write;
+        #[cfg(not(feature = "std"))]
+        use alloc::fmt::Write;
 
         let mut content = String::from("[Script Info]\nTitle: Long Test\n");
         for i in 0..1000 {
@@ -2790,7 +2793,10 @@ Comment: 0,0:00:05.00,0:00:10.00,Default,This is a comment
 
     #[test]
     fn parse_large_script_comprehensive() {
+        #[cfg(feature = "std")]
         use std::fmt::Write;
+        #[cfg(not(feature = "std"))]
+        use alloc::fmt::Write;
 
         let mut content = String::from("[Script Info]\nTitle: Large Test\n");
 

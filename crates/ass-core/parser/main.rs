@@ -10,7 +10,7 @@ use crate::{
     },
     Result, ScriptVersion,
 };
-use alloc::{format, string::ToString, vec::Vec};
+use alloc::{format, string::String, string::ToString, vec::Vec};
 
 use super::{
     ast::Section,

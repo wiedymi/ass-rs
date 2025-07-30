@@ -46,7 +46,7 @@ pub use processor::LineProcessor;
 pub use state::{ParserState, SectionKind, StreamingContext};
 
 use crate::{utils::CoreError, Result, ScriptVersion};
-use alloc::{string::String, vec::Vec};
+use alloc::{format, string::{String, ToString}, vec::Vec};
 use core::ops::Range;
 
 /// Result of streaming parser containing owned sections
@@ -466,7 +466,10 @@ mod tests {
 
     #[test]
     fn streaming_large_chunk_comprehensive() {
+        #[cfg(feature = "std")]
         use std::fmt::Write;
+        #[cfg(not(feature = "std"))]
+        use alloc::fmt::Write;
 
         let mut parser = StreamingParser::new();
         // Create a large chunk

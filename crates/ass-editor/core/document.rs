@@ -14,7 +14,7 @@ use core::ops::Range as StdRange;
 use std::sync::Arc;
 
 #[cfg(not(feature = "std"))]
-use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
+use alloc::{format, string::{String, ToString}, vec::Vec};
 
 #[cfg(feature = "std")]
 use std::sync::mpsc::Sender;

@@ -11,15 +11,16 @@ extern crate alloc;
 
 use crate::core::{EditorDocument, Result};
 use crate::events::DocumentEvent;
+use core::fmt;
 
 #[cfg(feature = "std")]
 use std::collections::HashMap;
 
 #[cfg(not(feature = "std"))]
-use alloc::collections::{BTreeMap as HashMap, String, Vec};
+use alloc::collections::BTreeMap as HashMap;
 
 #[cfg(not(feature = "std"))]
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{boxed::Box, format, string::{String, ToString}, vec::Vec};
 
 #[cfg(feature = "multi-thread")]
 use std::sync::Arc;
@@ -443,8 +444,8 @@ impl Clone for ExtensionManager {
 // Note: ExtensionManager does not implement Clone without multi-thread feature
 // This is intentional - cloning requires Arc<Mutex<T>> which needs multi-thread
 
-impl std::fmt::Debug for ExtensionManager {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for ExtensionManager {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         #[cfg(feature = "multi-thread")]
         {
             let inner = self.inner.lock();
@@ -585,25 +586,27 @@ impl ExtensionManager {
         extension_name: String,
         document: Option<&'a mut EditorDocument>,
     ) -> Result<Box<dyn ExtensionContext + 'a>> {
-        // For multi-thread builds, we can clone the manager
         #[cfg(feature = "multi-thread")]
         {
-            let manager_clone = self.clone();
             Ok(Box::new(EditorContext {
                 document,
-                manager: manager_clone,
+                manager: self.clone(),
                 extension_name,
             }))
         }
-
-        // For single-thread builds, we need a different approach
-        // This is a limitation of the current design - create_context can't work properly
-        // in single-threaded mode with the unified API
+        
         #[cfg(not(feature = "multi-thread"))]
         {
-            Err(crate::core::EditorError::CommandFailed {
-                message: "create_context requires multi-thread feature in unified API".to_string(),
-            })
+            // In single-threaded mode, we share the config state via Rc<RefCell>
+            let config_clone = self.inner.borrow().config.clone();
+            let shared_config = Rc::new(RefCell::new(config_clone));
+            
+            Ok(Box::new(EditorContext {
+                document,
+                manager: self,
+                manager_mut_state: shared_config,
+                extension_name,
+            }))
         }
     }
 
@@ -854,12 +857,19 @@ pub type EventSender = Sender<DocumentEvent>;
 pub type EventSender = (); // No-op for no_std environments
 
 /// Editor context providing access to editor functionality
-/// This is designed to work with the unified ExtensionManager API
+/// Adapts to available features automatically
 pub struct EditorContext<'a> {
     /// Current document (if any)
     pub document: Option<&'a mut EditorDocument>,
     /// Reference to the extension manager
+    #[cfg(feature = "multi-thread")]
     pub manager: ExtensionManager,
+    /// Reference to the extension manager for single-threaded builds
+    #[cfg(not(feature = "multi-thread"))]
+    pub manager: &'a ExtensionManager,
+    /// Mutable state for single-threaded builds (config updates)
+    #[cfg(not(feature = "multi-thread"))]
+    pub manager_mut_state: alloc::rc::Rc<core::cell::RefCell<HashMap<String, String>>>,
     /// Name of the current extension
     pub extension_name: String,
 }
@@ -884,17 +894,32 @@ impl<'a> ExtensionContext for EditorContext<'a> {
     }
 
     fn get_config(&self, key: &str) -> Option<String> {
-        self.manager.get_config(key)
+        #[cfg(feature = "multi-thread")]
+        {
+            self.manager.get_config(key)
+        }
+        #[cfg(not(feature = "multi-thread"))]
+        {
+            self.manager.get_config(key)
+        }
     }
 
     fn set_config(&mut self, key: String, value: String) -> Result<()> {
-        self.manager.set_config(key, value);
+        #[cfg(feature = "multi-thread")]
+        {
+            self.manager.set_config(key.clone(), value.clone());
+        }
+        #[cfg(not(feature = "multi-thread"))]
+        {
+            // In single-threaded mode, update the shared config state
+            self.manager_mut_state.borrow_mut().insert(key, value);
+        }
         Ok(())
     }
 
     fn register_command(&mut self, command: ExtensionCommand) -> Result<()> {
-        // This would need to be implemented differently in the unified API
-        // For now, just acknowledge the command
+        // For now, just acknowledge the command in both modes
+        // In a real implementation, this would register with a command system
         #[cfg(feature = "std")]
         {
             eprintln!(

@@ -14,7 +14,7 @@
 //! assert_eq!(normalized, "Line 1\nLine 2\nLine 3\n");
 //! ```
 
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 
 /// Normalize line endings to Unix style (\n)
 ///

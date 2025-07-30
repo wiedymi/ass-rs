@@ -4,7 +4,7 @@
 //! including section headers, style overrides, comments, and text content.
 
 use crate::{utils::CoreError, Result};
-use alloc::format;
+use alloc::{format, string::ToString};
 use core::str::Chars;
 
 #[cfg(feature = "simd")]

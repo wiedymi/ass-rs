@@ -15,7 +15,9 @@ use crate::extensions::{
 #[cfg(not(feature = "std"))]
 use alloc::{
     collections::BTreeMap as HashMap,
+    format,
     string::{String, ToString},
+    vec,
     vec::Vec,
 };
 #[cfg(feature = "std")]

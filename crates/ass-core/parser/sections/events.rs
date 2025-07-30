@@ -10,7 +10,7 @@ use crate::parser::{
     sections::SectionParseResult,
     ParseResult,
 };
-use alloc::vec::Vec;
+use alloc::{format, vec::Vec};
 
 /// Parser for [Events] section content
 ///

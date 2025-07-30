@@ -33,7 +33,7 @@
 //! ```
 
 use super::LintRule;
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, vec, vec::Vec};
 
 pub mod accessibility;
 pub mod encoding;

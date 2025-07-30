@@ -13,6 +13,9 @@ use core::fmt;
 #[cfg(feature = "std")]
 use thiserror::Error;
 
+#[cfg(not(feature = "std"))]
+use alloc::string::{String, ToString};
+
 /// Main error type for ass-editor operations
 ///
 /// Wraps `CoreError` from ass-core and adds editor-specific error cases
@@ -313,6 +316,7 @@ impl fmt::Display for EditorError {
             }
             Self::SerializationError { message } => write!(f, "Serialization error: {message}"),
             Self::FormatLineError { message } => write!(f, "Format line error: {message}"),
+            Self::SectionNotFound { section } => write!(f, "Section not found: {section}"),
         }
     }
 }

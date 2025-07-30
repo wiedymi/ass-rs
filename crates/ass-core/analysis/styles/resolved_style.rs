@@ -19,7 +19,7 @@
 //! - Zero allocations for style name references
 
 use crate::{parser::Style, utils::CoreError, Result};
-use alloc::string::String;
+use alloc::{string::String, string::ToString};
 
 bitflags::bitflags! {
     /// Text formatting options for resolved styles

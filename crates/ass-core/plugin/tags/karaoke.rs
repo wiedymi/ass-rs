@@ -22,7 +22,7 @@
 //! ```
 
 use crate::plugin::{TagHandler, TagResult};
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{boxed::Box, string::String, vec, vec::Vec};
 
 /// Handler for basic karaoke highlight tag (`\k`)
 ///

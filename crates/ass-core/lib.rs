@@ -50,6 +50,7 @@
 #![deny(unsafe_code)]
 #![allow(clippy::negative_feature_names)]
 
+// Always make alloc available, whether in std or no_std mode
 extern crate alloc;
 
 pub mod parser;

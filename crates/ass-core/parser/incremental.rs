@@ -1,6 +1,7 @@
 //! Incremental parsing utilities for efficient text updates
 
-use std::ops::Range;
+use alloc::string::String;
+use core::ops::Range;
 
 use crate::parser::errors::ParseError;
 use crate::parser::SectionType;

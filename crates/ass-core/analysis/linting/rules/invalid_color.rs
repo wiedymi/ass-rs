@@ -12,7 +12,7 @@ use crate::{
     parser::Section,
     utils::parse_bgr_color,
 };
-use alloc::{format, string::ToString, vec::Vec};
+use alloc::{format, string::{String, ToString}, vec::Vec};
 
 /// Rule for detecting invalid color formats in styles and override tags
 ///

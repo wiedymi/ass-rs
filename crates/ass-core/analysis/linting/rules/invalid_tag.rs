@@ -11,7 +11,7 @@ use crate::{
     },
     parser::Section,
 };
-use alloc::{string::ToString, vec::Vec};
+use alloc::{format, string::ToString, vec::Vec};
 
 /// Rule for detecting invalid or malformed override tags in event text
 ///

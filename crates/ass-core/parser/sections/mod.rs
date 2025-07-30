@@ -52,6 +52,7 @@ pub use styles::StylesParser;
 
 use crate::parser::ast::{Section, SectionType};
 use crate::parser::errors::{ParseError, ParseResult};
+use alloc::vec::Vec;
 
 /// Formats detected during initial parse
 #[derive(Clone, Debug)]

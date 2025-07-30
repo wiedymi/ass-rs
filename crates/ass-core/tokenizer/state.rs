@@ -3,7 +3,7 @@
 //! Provides context tracking and error reporting for the ASS tokenizer.
 //! Maintains parsing state and accumulates issues during lexical analysis.
 
-use alloc::{string::String, vec::Vec};
+use alloc::{format, string::String, vec::Vec};
 
 /// Tokenization context for state-aware parsing
 ///

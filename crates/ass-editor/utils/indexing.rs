@@ -11,20 +11,20 @@ use crate::utils::search::{DocumentSearch, SearchOptions, SearchResult, SearchSt
 #[cfg(feature = "search-index")]
 use fst::{automaton, IntoStreamer, Set, SetBuilder, Streamer};
 
-#[cfg(all(feature = "search-index", not(feature = "nostd")))]
+#[cfg(feature = "std")]
 use std::collections::HashMap;
-
-#[cfg(all(feature = "search-index", feature = "nostd"))]
-use hashbrown::HashMap;
-
-#[cfg(all(not(feature = "search-index"), not(feature = "nostd")))]
-use std::collections::HashMap;
-
-#[cfg(all(not(feature = "search-index"), feature = "nostd"))]
-use hashbrown::HashMap;
 
 #[cfg(not(feature = "std"))]
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::collections::BTreeMap as HashMap;
+
+#[cfg(not(feature = "std"))]
+use alloc::{boxed::Box, string::{String, ToString}, vec::Vec};
+
+#[cfg(feature = "std")]
+use std::time::Instant;
+
+#[cfg(not(feature = "std"))]
+type Instant = u64;
 
 /// FST-based search index for high-performance queries
 #[cfg(feature = "search-index")]
@@ -39,7 +39,7 @@ pub struct FstSearchIndex {
     content_hash: u64,
 
     /// Index build timestamp for statistics
-    build_time: std::time::Instant,
+    build_time: Instant,
 
     /// Index size in bytes
     index_size: usize,
@@ -54,7 +54,7 @@ pub struct LinearSearchIndex {
     content_hash: u64,
 
     /// Build timestamp
-    build_time: std::time::Instant,
+    build_time: Instant,
 }
 
 /// Entry in the search index
@@ -91,7 +91,12 @@ impl FstSearchIndex {
             fst_set: None,
             position_map: HashMap::new(),
             content_hash: 0,
-            build_time: std::time::Instant::now(),
+            build_time: {
+                #[cfg(feature = "std")]
+                { Instant::now() }
+                #[cfg(not(feature = "std"))]
+                { 0 }
+            },
             index_size: 0,
         }
     }
@@ -202,7 +207,12 @@ impl DocumentSearch for FstSearchIndex {
     fn build_index(&mut self, document: &EditorDocument) -> Result<()> {
         let content = document.text();
         self.content_hash = calculate_hash(&content);
-        self.build_time = std::time::Instant::now();
+        self.build_time = {
+            #[cfg(feature = "std")]
+            { Instant::now() }
+            #[cfg(not(feature = "std"))]
+            { 0 }
+        };
 
         let words = self.extract_words(&content);
         self.build_fst(words)?;
@@ -217,7 +227,8 @@ impl DocumentSearch for FstSearchIndex {
     }
 
     fn search(&self, pattern: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
-        let _start_time = std::time::Instant::now();
+        #[cfg(feature = "std")]
+        let _start_time = Instant::now();
         let mut results = Vec::new();
 
         if let Some(ref fst_set) = self.fst_set {
@@ -289,7 +300,12 @@ impl DocumentSearch for FstSearchIndex {
     fn stats(&self) -> SearchStats {
         SearchStats {
             match_count: self.position_map.len(),
-            search_time_us: self.build_time.elapsed().as_micros() as u64,
+            search_time_us: {
+                #[cfg(feature = "std")]
+                { self.build_time.elapsed().as_micros() as u64 }
+                #[cfg(not(feature = "std"))]
+                { 0 }
+            },
             hit_limit: false,
             index_size: self.index_size,
         }
@@ -336,7 +352,12 @@ impl LinearSearchIndex {
         Self {
             word_positions: HashMap::new(),
             content_hash: 0,
-            build_time: std::time::Instant::now(),
+            build_time: {
+                #[cfg(feature = "std")]
+                { Instant::now() }
+                #[cfg(not(feature = "std"))]
+                { 0 }
+            },
         }
     }
 }
@@ -345,7 +366,12 @@ impl DocumentSearch for LinearSearchIndex {
     fn build_index(&mut self, document: &EditorDocument) -> Result<()> {
         let content = document.text();
         self.content_hash = calculate_hash(&content);
-        self.build_time = std::time::Instant::now();
+        self.build_time = {
+            #[cfg(feature = "std")]
+            { Instant::now() }
+            #[cfg(not(feature = "std"))]
+            { 0 }
+        };
 
         // Simple word extraction for linear search
         self.word_positions.clear();
@@ -419,7 +445,12 @@ impl DocumentSearch for LinearSearchIndex {
     fn stats(&self) -> SearchStats {
         SearchStats {
             match_count: self.word_positions.len(),
-            search_time_us: self.build_time.elapsed().as_micros() as u64,
+            search_time_us: {
+                #[cfg(feature = "std")]
+                { self.build_time.elapsed().as_micros() as u64 }
+                #[cfg(not(feature = "std"))]
+                { 0 }
+            },
             hit_limit: false,
             index_size: self.word_positions.len() * 64, // Rough estimate
         }

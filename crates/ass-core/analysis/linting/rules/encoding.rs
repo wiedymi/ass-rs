@@ -10,7 +10,7 @@ use crate::{
     },
     parser::Section,
 };
-use alloc::{string::ToString, vec::Vec};
+use alloc::{format, string::ToString, vec::Vec};
 
 /// Rule for detecting encoding and character issues in subtitle scripts
 ///

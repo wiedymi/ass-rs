@@ -13,10 +13,10 @@ use crate::core::{Position, Range, Result};
 use std::collections::HashMap;
 
 #[cfg(not(feature = "std"))]
-use alloc::collections::{BTreeMap as HashMap, String, Vec};
+use alloc::collections::BTreeMap as HashMap;
 
 #[cfg(not(feature = "std"))]
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{boxed::Box, format, string::{String, ToString}, vec::Vec};
 
 #[cfg(feature = "multi-thread")]
 use std::sync::{Arc, RwLock};
@@ -498,8 +498,8 @@ struct HandlerInfo {
     events_processed: usize,
 }
 
-impl std::fmt::Debug for HandlerInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for HandlerInfo {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("HandlerInfo")
             .field("id", &self.id)
             .field("filter", &self.filter)
@@ -628,6 +628,7 @@ impl EventChannel {
 
     /// Dispatch an event to all registered handlers
     pub fn dispatch(&mut self, event: DocumentEvent) -> Result<()> {
+        #[cfg(feature = "std")]
         let start_time = std::time::Instant::now();
 
         self.stats.events_dispatched += 1;
@@ -673,12 +674,15 @@ impl EventChannel {
         self.stats.events_filtered += filtered_count;
 
         // Update average processing time
-        let processing_time = start_time.elapsed().as_micros() as u64;
-        if self.stats.events_dispatched == 1 {
-            self.stats.avg_processing_time_us = processing_time;
-        } else {
-            self.stats.avg_processing_time_us =
-                (self.stats.avg_processing_time_us + processing_time) / 2;
+        #[cfg(feature = "std")]
+        {
+            let processing_time = start_time.elapsed().as_micros() as u64;
+            if self.stats.events_dispatched == 1 {
+                self.stats.avg_processing_time_us = processing_time;
+            } else {
+                self.stats.avg_processing_time_us =
+                    (self.stats.avg_processing_time_us + processing_time) / 2;
+            }
         }
 
         if self.config.enable_logging {

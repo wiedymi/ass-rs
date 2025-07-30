@@ -5,11 +5,15 @@
 //! All generators produce valid ASS format strings that can be parsed by
 //! the core parser.
 
+#[cfg(feature = "std")]
+use std::fmt::Write;
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::{String, ToString}, vec::Vec, fmt::Write};
+
 use crate::parser::{
     ast::{EventType, Span},
     Event,
 };
-use std::fmt::Write;
 
 /// Synthetic ASS script generator for benchmarking
 pub struct ScriptGenerator {
@@ -318,7 +322,10 @@ PlayResY: 1080",
 
     /// Generate karaoke-style dialogue with timing
     fn generate_karaoke_dialogue(event_index: usize, base_text: &str) -> String {
+        #[cfg(feature = "std")]
         use std::fmt::Write;
+        #[cfg(not(feature = "std"))]
+        use alloc::fmt::Write;
 
         let words: Vec<&str> = base_text.split_whitespace().collect();
         let mut karaoke_text = String::new();

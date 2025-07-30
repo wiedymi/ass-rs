@@ -17,6 +17,7 @@ use ass_core::parser::{Script, Section};
 #[cfg(not(feature = "std"))]
 use alloc::{
     collections::BTreeMap as HashMap,
+    format,
     string::{String, ToString},
     vec,
     vec::Vec,

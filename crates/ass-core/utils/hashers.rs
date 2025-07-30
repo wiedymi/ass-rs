@@ -7,21 +7,21 @@
 //!
 //! - DoS-resistant hashing via ahash with random seeds
 //! - WASM-compatible implementation
-//! - `nostd` support when needed
+//! - `no_std` support when needed
 //! - Deterministic hashing for testing when enabled
 
 use ahash::{AHasher, RandomState};
 use core::hash::{BuildHasher, Hasher};
 
-#[cfg(feature = "nostd")]
+#[cfg(not(feature = "std"))]
 use hashbrown::HashMap;
-#[cfg(not(feature = "nostd"))]
+#[cfg(feature = "std")]
 use std::collections::HashMap;
 
 /// Create a new `HashMap` with optimized hasher for ASS-RS use cases
 ///
 /// Uses ahash for consistent performance across platforms with `DoS` resistance.
-/// Automatically handles `nostd` vs std `HashMap` selection.
+/// Automatically handles `no_std` vs std `HashMap` selection.
 ///
 /// # Example
 ///
@@ -409,7 +409,7 @@ mod tests {
         assert!(first_run_hashes.iter().all(|&h| h > 0));
 
         // Test that different strings produce different hashes
-        let unique_hashes: std::collections::HashSet<_> = first_run_hashes.into_iter().collect();
+        let unique_hashes: HashSet<_> = first_run_hashes.into_iter().collect();
         assert_eq!(unique_hashes.len(), values.len());
     }
 
@@ -469,7 +469,7 @@ mod tests {
             max_u64_hash,
             negative_hash,
         ];
-        let unique_hashes: std::collections::HashSet<_> = all_hashes.iter().collect();
+        let unique_hashes: HashSet<_> = all_hashes.iter().collect();
         assert_eq!(unique_hashes.len(), all_hashes.len());
     }
 

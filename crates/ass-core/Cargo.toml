@@ -27,27 +27,57 @@ serde = { version = "1.0", optional = true, features = ["derive"] }
 criterion = { version = "0.5", optional = true, features = ["html_reports"] }
 
 [features]
-default = ["std", "analysis", "plugins"]
+# Default: Full-featured parser for desktop applications (matches ass-editor)
+default = ["full"]
+
+# --- Main Core Flavors (unified with ass-editor) ---
+
+# Provides the absolute minimum for a functional, performant parser.
+# This is suitable for lightweight integrations or when only core parsing is needed.
+# It enables alloc-only dependencies, making it compatible with `nostd`.
+minimal = [
+    "nostd",        # Use hashbrown instead of std HashMap for no_std compatibility
+    "analysis",     # Core analysis features
+    "plugins",      # Extension registry support  
+    "stream",       # Essential for incremental parsing performance
+]
+
+# Provides all features for a rich, full-featured ASS subtitle parser.
+# This includes the same core features as minimal but with std support instead of nostd,
+# plus advanced capabilities like SIMD, arena allocation, unicode support, and serialization.
+# It explicitly enables `std` support.
+full = [
+    "std",          # Standard library support (instead of nostd)
+    "analysis",     # Core analysis features
+    "plugins",      # Extension registry support
+    "stream",       # Essential for incremental parsing performance
+    "simd",         # SIMD acceleration for maximum performance
+    "arena",        # Arena allocation for reduced allocations
+    "unicode-wrap", # Unicode linebreak support for libass 0.17.4+ compatibility
+    "serde",        # Serialization support
+]
+
+# --- Granular Features (typically enabled by 'minimal' or 'full') ---
 
 # Platform support (mutually exclusive)
-std = []                  # Standard library support (default)
+std = []                  # Standard library support (enabled by 'full')
 nostd = ["dep:hashbrown"] # nostd compatibility (mutually exclusive with std)
 
-# Core functionality
+# Core functionality (enabled by 'minimal')
 analysis = []     # Enable linting and deep analysis
 plugins = []      # Extension registry support
-unicode-wrap = [] # Unicode linebreak support for libass 0.17.4+ compatibility
+stream = []       # Chunked/streaming input support
 
-# Performance optimizations
+# Advanced features (enabled by 'full')
+unicode-wrap = [] # Unicode linebreak support for libass 0.17.4+ compatibility
+serde = ["dep:serde"]       # Serialization support
+
+# Performance optimizations (enabled by 'full')
 simd = ["dep:wide"]     # SIMD-accelerated parsing
 simd-full = ["simd"]    # Extended SIMD for UUencode/hex parsing (20-40% faster)
 arena = ["dep:bumpalo"] # Arena allocation for parsing
 
-# Platform support
-stream = [] # Chunked/streaming input support
-
 # Development features
-serde = ["dep:serde"]       # Serialization support
 benches = ["dep:criterion"] # Benchmark integration
 
 [lints.rust]

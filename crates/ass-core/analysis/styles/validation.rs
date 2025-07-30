@@ -18,7 +18,7 @@
 //! - Memory: Minimal allocations via zero-copy issue references
 //! - Validation: Configurable depth limits for inheritance analysis
 
-use alloc::{format, string::String, vec::Vec};
+use alloc::{format, string::String, string::ToString, vec, vec::Vec};
 use core::fmt;
 
 /// Severity level for style validation issues
@@ -109,7 +109,7 @@ impl StyleValidationIssue {
             severity,
             message: message.to_string(),
             field: field.to_string(),
-            suggestion: suggestion.map(std::string::ToString::to_string),
+            suggestion: suggestion.map(ToString::to_string),
         }
     }
 

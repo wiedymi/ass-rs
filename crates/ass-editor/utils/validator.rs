@@ -13,7 +13,7 @@ use ass_core::analysis::{AnalysisConfig, ScriptAnalysis, ScriptAnalysisOptions};
 use ass_core::analysis::linting::IssueSeverity;
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::String, vec::Vec};
+use alloc::{format, string::{String, ToString}, vec::Vec};
 
 #[cfg(feature = "std")]
 use std::time::Instant;

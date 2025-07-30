@@ -5,7 +5,7 @@
 //! resource constraints. Focuses on preventing resource exhaustion attacks.
 
 use super::CoreError;
-use alloc::format;
+use alloc::{format, string::ToString};
 use core::fmt;
 
 /// Create memory allocation error

@@ -16,7 +16,7 @@ use ass_core::parser::ScriptDeltaOwned;
 pub use delta_commands::*;
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::String, vec::Vec};
+use alloc::{boxed::Box, format, string::{String, ToString}, vec::Vec};
 
 /// Result of executing a command
 ///

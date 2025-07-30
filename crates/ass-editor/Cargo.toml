@@ -57,6 +57,7 @@ default = ["full"]
 # This is suitable for lightweight integrations or when only core editing is needed.
 # It enables alloc-only dependencies, making it compatible with `nostd`.
 minimal = [
+    "ass-core/minimal", # Core minimal features from ass-core
     "rope",         # Rope data structure for efficient text editing
     "arena",        # Arena allocator for pooling histories and deltas  
     "stream",       # Essential for incremental parsing performance
@@ -67,6 +68,7 @@ minimal = [
 # extensions, format conversion, advanced search, and concurrency.
 # It explicitly enables `std` and `thiserror` (which requires `std`).
 full = [
+    "ass-core/full", # All ass-core features
     "minimal",      # Start with the core minimal set (which is alloc-only)
     "std",          # Standard library support
     "analysis",     # Script analysis and linting

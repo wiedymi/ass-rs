@@ -5,6 +5,10 @@
 
 use crate::core::errors::{EditorError, Result};
 use ass_core::parser::ast::EventType;
+use ass_core::ScriptVersion;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::{String, ToString}, vec::Vec};
 
 /// Builder for creating ASS events with fluent API
 #[derive(Debug, Default)]
@@ -119,8 +123,13 @@ impl EventBuilder {
     }
 
     /// Build the event (validates required fields)
-    /// TODO: Add build_with_format() method for Phase 1.1.3
     pub fn build(self) -> Result<String> {
+        // Default to v4+ format
+        self.build_with_version(ScriptVersion::AssV4)
+    }
+
+    /// Build the event with a specific format version
+    pub fn build_with_version(self, version: ScriptVersion) -> Result<String> {
         let event_type = self.event_type.unwrap_or(EventType::Dialogue);
         let start = self.start.unwrap_or_else(|| "0:00:00.00".to_string());
         let end = self.end.unwrap_or_else(|| "0:00:05.00".to_string());
@@ -133,15 +142,29 @@ impl EventBuilder {
         let margin_v = self.margin_v.unwrap_or_else(|| "0".to_string());
         let effect = self.effect.unwrap_or_default();
 
-        // Handle V4++ margin_t/margin_b fields (they override margin_v when present)
-        // Note: The actual format line would determine the field order
-        // For now, we use the standard V4+ format
-
-        // Format as ASS event line
+        // Format as ASS event line based on version
         let event_type_str = event_type.as_str();
-        let line = format!(
-            "{event_type_str}: {layer},{start},{end},{style},{name},{margin_l},{margin_r},{margin_v},{effect},{text}"
-        );
+        let line = match version {
+            ScriptVersion::SsaV4 => {
+                // SSA v4 format: no layer field, uses Marked=0 prefix
+                format!(
+                    "{event_type_str}: Marked=0,{start},{end},{style},{name},{margin_l},{margin_r},{margin_v},{effect},{text}"
+                )
+            }
+            ScriptVersion::AssV4 => {
+                // ASS v4 format: includes layer field
+                format!(
+                    "{event_type_str}: {layer},{start},{end},{style},{name},{margin_l},{margin_r},{margin_v},{effect},{text}"
+                )
+            }
+            ScriptVersion::AssV4Plus => {
+                // ASS v4++ format: can use margin_t/margin_b if specified
+                // For now, we use the same format as v4 since the builder doesn't support margin_t/margin_b yet
+                format!(
+                    "{event_type_str}: {layer},{start},{end},{style},{name},{margin_l},{margin_r},{margin_v},{effect},{text}"
+                )
+            }
+        };
 
         Ok(line)
     }
@@ -221,6 +244,7 @@ pub struct StyleBuilder {
     margin_t: Option<u32>,
     margin_b: Option<u32>,
     encoding: Option<u32>,
+    alpha_level: Option<u32>,
     relative_to: Option<String>,
 }
 
@@ -409,6 +433,12 @@ impl StyleBuilder {
         self
     }
 
+    /// Set alpha level (SSA v4) - transparency from 0-255 (0=opaque, 255=transparent)
+    pub fn alpha_level(mut self, alpha: u32) -> Self {
+        self.alpha_level = Some(alpha);
+        self
+    }
+
     /// Set positioning context (V4++)
     pub fn relative_to(mut self, relative: &str) -> Self {
         self.relative_to = Some(relative.to_string());
@@ -472,6 +502,42 @@ impl StyleBuilder {
         );
 
         Ok(line)
+    }
+
+    /// Build the style with a specific version format
+    pub fn build_with_version(self, version: ScriptVersion) -> Result<String> {
+        // Define format based on version
+        let format = match version {
+            ScriptVersion::SsaV4 => {
+                // SSA v4 has fewer fields
+                vec!["Name", "Fontname", "Fontsize", "PrimaryColour", 
+                     "SecondaryColour", "TertiaryColour", "BackColour", 
+                     "Bold", "Italic", "BorderStyle", "Outline", 
+                     "Shadow", "Alignment", "MarginL", "MarginR", 
+                     "MarginV", "AlphaLevel", "Encoding"]
+            },
+            ScriptVersion::AssV4 => {
+                // Standard ASS v4 format
+                vec!["Name", "Fontname", "Fontsize", "PrimaryColour",
+                     "SecondaryColour", "OutlineColour", "BackColour",
+                     "Bold", "Italic", "Underline", "StrikeOut",
+                     "ScaleX", "ScaleY", "Spacing", "Angle",
+                     "BorderStyle", "Outline", "Shadow", "Alignment",
+                     "MarginL", "MarginR", "MarginV", "Encoding"]
+            },
+            ScriptVersion::AssV4Plus => {
+                // ASS v4++ format with additional fields
+                vec!["Name", "Fontname", "Fontsize", "PrimaryColour",
+                     "SecondaryColour", "OutlineColour", "BackColour",
+                     "Bold", "Italic", "Underline", "StrikeOut",
+                     "ScaleX", "ScaleY", "Spacing", "Angle",
+                     "BorderStyle", "Outline", "Shadow", "Alignment",
+                     "MarginL", "MarginR", "MarginV", "MarginT", 
+                     "MarginB", "Encoding", "RelativeTo"]
+            }
+        };
+        
+        self.build_with_format(&format)
     }
 
     /// Build the style with a specific format line
@@ -545,6 +611,7 @@ impl StyleBuilder {
                 "MarginT" => self.margin_t.unwrap_or(0).to_string(),
                 "MarginB" => self.margin_b.unwrap_or(0).to_string(),
                 "Encoding" => self.encoding.unwrap_or(1).to_string(),
+                "AlphaLevel" => self.alpha_level.unwrap_or(0).to_string(),
                 "RelativeTo" => self.relative_to.clone().unwrap_or_else(|| "0".to_string()),
                 _ => {
                     return Err(EditorError::FormatLineError {
@@ -836,5 +903,48 @@ mod tests {
             .unwrap();
 
         assert_eq!(style, "Style: MinimalStyle,Arial,20");
+    }
+
+    #[test]
+    fn event_builder_with_script_version() {
+        // Test building with SSA v4 format
+        let event_ssa = EventBuilder::dialogue()
+            .text("SSA Format")
+            .start_time("0:00:01.00")
+            .end_time("0:00:03.00")
+            .build_with_version(ScriptVersion::SsaV4)
+            .unwrap();
+        assert!(event_ssa.contains("SSA Format"));
+
+        // Test building with ASS v4+ format
+        let event_ass = EventBuilder::dialogue()
+            .text("ASS Format")
+            .build_with_version(ScriptVersion::AssV4Plus)
+            .unwrap();
+        assert!(event_ass.contains("ASS Format"));
+    }
+
+    #[test]
+    fn style_builder_with_script_version() {
+        // Test building style with SSA v4 format
+        let style_ssa = StyleBuilder::new()
+            .name("TestSSA")
+            .font("Arial")
+            .size(18)
+            .build_with_version(ScriptVersion::SsaV4)
+            .unwrap();
+        // SSA v4 has TertiaryColour instead of OutlineColour
+        assert!(style_ssa.contains("TestSSA"));
+        assert!(style_ssa.contains("Arial"));
+
+        // Test building style with ASS v4+ format
+        let style_ass = StyleBuilder::new()
+            .name("TestASS")
+            .font("Verdana")
+            .size(20)
+            .build_with_version(ScriptVersion::AssV4Plus)
+            .unwrap();
+        assert!(style_ass.contains("TestASS"));
+        assert!(style_ass.contains("Verdana"));
     }
 }
