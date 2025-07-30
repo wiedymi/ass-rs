@@ -16,25 +16,23 @@
 //!
 //! # Example
 //!
-//! ```ignore
-//! use ass_editor::{EditorDocument, PositionBuilder};
+//! ```
+//! use ass_editor::{EditorDocument, Position};
 //!
-//! // Create a new document
-//! let mut doc = EditorDocument::new();
-//!
-//! // Load ASS content
-//! doc.load_from_str(ass_content)?;
+//! // Create a new document with ASS content
+//! let mut doc = EditorDocument::from_content(
+//!     "[Script Info]\nTitle: My Subtitle\n\n[Events]\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Hello World"
+//! ).unwrap();
 //!
 //! // Edit at specific position
-//! let pos = PositionBuilder::new()
-//!     .line(10)
-//!     .column(5)
-//!     .build(&doc)?;
-//!
-//! doc.at(pos).insert_text("Hello")?;
+//! let pos = Position::new(50); // Position in the text
+//! doc.insert(pos, " there").unwrap();
 //!
 //! // Undo last operation
-//! doc.undo()?;
+//! doc.undo().unwrap();
+//!
+//! assert!(doc.text().contains("Hello World"));
+//! assert!(!doc.text().contains("Hello there World"));
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -73,9 +71,10 @@ pub use events::{
     DocumentEvent, EventChannel, EventChannelConfig, EventFilter, EventHandler, EventStats,
 };
 pub use extensions::{
-    EditorExtension, ExtensionCapability, ExtensionCommand, ExtensionContext, ExtensionInfo,
-    ExtensionManager, ExtensionResult, ExtensionState, MessageLevel, SimpleExtensionContext,
+    EditorContext, EditorExtension, ExtensionCapability, ExtensionCommand, ExtensionContext,
+    ExtensionInfo, ExtensionManager, ExtensionResult, ExtensionState, MessageLevel,
 };
+
 pub use utils::{
     LazyValidator, ValidationIssue, ValidationResult, ValidationSeverity, ValidatorConfig,
 };

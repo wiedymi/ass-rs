@@ -16,6 +16,15 @@ use std::sync::Arc;
 #[cfg(not(feature = "std"))]
 use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 
+#[cfg(feature = "std")]
+use std::sync::mpsc::Sender;
+
+#[cfg(feature = "std")]
+use crate::events::DocumentEvent;
+
+#[cfg(feature = "std")]
+type EventSender = Sender<DocumentEvent>;
+
 /// Main document container for editing ASS scripts
 ///
 /// Manages both text content and parsed ASS structures with direct access to
@@ -45,6 +54,10 @@ pub struct EditorDocument {
 
     /// Undo/redo manager
     history: UndoManager,
+
+    /// Event channel for sending document events
+    #[cfg(feature = "std")]
+    event_tx: Option<EventSender>,
 }
 
 impl EditorDocument {
@@ -61,7 +74,17 @@ impl EditorDocument {
             #[cfg(feature = "plugins")]
             _registry: None,
             history: UndoManager::new(),
+            #[cfg(feature = "std")]
+            event_tx: None,
         }
+    }
+
+    /// Create a new document with event channel
+    #[cfg(feature = "std")]
+    pub fn with_event_channel(event_tx: EventSender) -> Self {
+        let mut doc = Self::new();
+        doc.event_tx = Some(event_tx);
+        doc
     }
 
     /// Create document from file path
@@ -104,6 +127,26 @@ impl EditorDocument {
         doc
     }
 
+    /// Emit an event to the event channel
+    #[cfg(feature = "std")]
+    fn emit(&mut self, event: DocumentEvent) {
+        if let Some(tx) = &mut self.event_tx {
+            let _ = tx.send(event);
+        }
+    }
+
+    /// Set the event channel for this document
+    #[cfg(feature = "std")]
+    pub fn set_event_channel(&mut self, event_tx: EventSender) {
+        self.event_tx = Some(event_tx);
+    }
+
+    /// Check if document has an event channel
+    #[cfg(feature = "std")]
+    pub fn has_event_channel(&self) -> bool {
+        self.event_tx.is_some()
+    }
+
     /// Load document from string content
     pub fn from_content(content: &str) -> Result<Self> {
         // Validate that content can be parsed
@@ -120,6 +163,8 @@ impl EditorDocument {
             #[cfg(feature = "plugins")]
             _registry: None,
             history: UndoManager::new(),
+            #[cfg(feature = "std")]
+            event_tx: None,
         })
     }
 
@@ -342,6 +387,14 @@ impl EditorDocument {
         self.history
             .record_operation(operation, command.description().to_string(), &result);
 
+        // Emit event
+        #[cfg(feature = "std")]
+        self.emit(DocumentEvent::TextInserted {
+            position: pos,
+            text: text.to_string(),
+            length: text.len(),
+        });
+
         Ok(())
     }
 
@@ -359,10 +412,17 @@ impl EditorDocument {
         // Record the operation in history
         let operation = Operation::Delete {
             range,
-            deleted_text,
+            deleted_text: deleted_text.clone(),
         };
         self.history
             .record_operation(operation, command.description().to_string(), &result);
+
+        // Emit event
+        #[cfg(feature = "std")]
+        self.emit(DocumentEvent::TextDeleted {
+            range,
+            deleted_text,
+        });
 
         Ok(())
     }
@@ -381,11 +441,19 @@ impl EditorDocument {
         // Record the operation in history
         let operation = Operation::Replace {
             range,
-            old_text,
+            old_text: old_text.clone(),
             new_text: text.to_string(),
         };
         self.history
             .record_operation(operation, command.description().to_string(), &result);
+
+        // Emit event
+        #[cfg(feature = "std")]
+        self.emit(DocumentEvent::TextReplaced {
+            range,
+            old_text,
+            new_text: text.to_string(),
+        });
 
         Ok(())
     }
@@ -1054,12 +1122,23 @@ impl EditorDocument {
                     result.new_cursor = Some(end_pos);
                 }
                 #[cfg(feature = "stream")]
-                Operation::ApplyDelta { delta: _ } => {
-                    // For delta operations, we need to apply the inverse delta
-                    // This is a complex operation that would require storing inverse deltas
-                    return Err(EditorError::HistoryError {
-                        message: "Undo of delta operations not yet implemented".to_string(),
-                    });
+                Operation::Delta { forward, undo_data } => {
+                    // Restore removed sections
+                    for (index, section_text) in undo_data.removed_sections.iter() {
+                        self.insert_section_at(*index, section_text)?;
+                    }
+
+                    // Restore modified sections
+                    for (index, original_text) in undo_data.modified_sections.iter() {
+                        self.replace_section(*index, original_text)?;
+                    }
+
+                    // Remove added sections
+                    for _ in 0..forward.added.len() {
+                        self.remove_last_section()?;
+                    }
+
+                    result.message = Some("Delta operation undone".to_string());
                 }
             }
 
@@ -1116,9 +1195,12 @@ impl EditorDocument {
                     result.new_cursor = Some(end_pos);
                 }
                 #[cfg(feature = "stream")]
-                Operation::ApplyDelta { delta } => {
+                Operation::Delta {
+                    forward,
+                    undo_data: _,
+                } => {
                     // Re-apply the delta
-                    self.apply_script_delta(delta.clone())?;
+                    self.apply_script_delta(forward.clone())?;
                     result.message = Some("Delta re-applied".to_string());
                 }
             }
@@ -1177,9 +1259,113 @@ impl EditorDocument {
         &self.history
     }
 
-    /// Apply a script delta for efficient incremental parsing
+    /// Apply a script delta and record it with undo data
     #[cfg(feature = "stream")]
-    fn apply_script_delta(&mut self, delta: ScriptDeltaOwned) -> Result<()> {
+    pub fn apply_script_delta(&mut self, delta: ScriptDeltaOwned) -> Result<()> {
+        use crate::core::history::Operation;
+
+        // Capture undo data before applying
+        let undo_data = self.capture_delta_undo_data(&delta)?;
+
+        // Apply delta
+        self.apply_script_delta_internal(delta.clone())?;
+
+        // Record with undo data
+        let operation = Operation::Delta {
+            forward: delta,
+            undo_data,
+        };
+
+        let result = CommandResult::success();
+        self.history
+            .record_operation(operation, "Apply delta".to_string(), &result);
+
+        Ok(())
+    }
+
+    /// Capture undo data before applying a delta
+    #[cfg(feature = "stream")]
+    fn capture_delta_undo_data(
+        &self,
+        delta: &ScriptDeltaOwned,
+    ) -> Result<crate::core::history::DeltaUndoData> {
+        let mut removed_sections = Vec::new();
+        let mut modified_sections = Vec::new();
+
+        // First, get the current content for section extraction
+        let content = self.text();
+
+        let _ = self.parse_script_with(|script| {
+            // Capture removed sections
+            for &index in &delta.removed {
+                if let Some(section) = script.sections().get(index) {
+                    let section_text = self.extract_section_text(&content, section)?;
+                    removed_sections.push((index, section_text));
+                }
+            }
+
+            // Capture original state of modified sections
+            for (index, _) in &delta.modified {
+                if let Some(section) = script.sections().get(*index) {
+                    let section_text = self.extract_section_text(&content, section)?;
+                    modified_sections.push((*index, section_text));
+                }
+            }
+
+            Ok::<(), EditorError>(())
+        })?;
+
+        Ok(crate::core::history::DeltaUndoData {
+            removed_sections,
+            modified_sections,
+        })
+    }
+
+    /// Extract section text from content
+    #[cfg(feature = "stream")]
+    fn extract_section_text(&self, content: &str, section: &Section) -> Result<String> {
+        let header = match section {
+            Section::ScriptInfo(_) => "[Script Info]",
+            Section::Styles(_) => "[V4+ Styles]",
+            Section::Events(_) => "[Events]",
+            Section::Fonts(_) => "[Fonts]",
+            Section::Graphics(_) => "[Graphics]",
+        };
+
+        // Find the header in the content
+        let start = content
+            .find(header)
+            .ok_or_else(|| EditorError::SectionNotFound {
+                section: header.to_string(),
+            })?;
+
+        // Find the next section header or end of document
+        let section_headers = [
+            "[Script Info]",
+            "[V4+ Styles]",
+            "[Events]",
+            "[Fonts]",
+            "[Graphics]",
+        ];
+
+        let end = content[start + header.len()..]
+            .find(|_c: char| {
+                for sh in &section_headers {
+                    if content[start + header.len()..].starts_with(sh) {
+                        return true;
+                    }
+                }
+                false
+            })
+            .map(|pos| start + header.len() + pos)
+            .unwrap_or(content.len());
+
+        Ok(content[start..end].to_string())
+    }
+
+    /// Apply a script delta for efficient incremental parsing (internal)
+    #[cfg(feature = "stream")]
+    fn apply_script_delta_internal(&mut self, delta: ScriptDeltaOwned) -> Result<()> {
         // Parse the current script to get sections
         let current_content = self.text();
         let script = Script::parse(&current_content).map_err(EditorError::from)?;
@@ -1321,6 +1507,177 @@ impl EditorDocument {
         self.insert_raw(range.start, text)?;
         Ok(())
     }
+
+    // === Delta undo/redo helper methods ===
+
+    /// Insert a section at a specific index
+    #[cfg(feature = "stream")]
+    fn insert_section_at(&mut self, index: usize, section_text: &str) -> Result<()> {
+        // Get the current sections count
+        let section_count = self.parse_script_with(|script| script.sections().len())?;
+
+        // If index is beyond current sections, append to end
+        if index >= section_count {
+            let end_pos = Position::new(self.len_bytes());
+
+            // Ensure proper newline before new section
+            if self.len_bytes() > 0 && !self.text().ends_with('\n') {
+                self.insert_raw(end_pos, "\n")?;
+            }
+
+            self.insert_raw(Position::new(self.len_bytes()), section_text)?;
+
+            // Ensure trailing newline
+            if !section_text.ends_with('\n') {
+                self.insert_raw(Position::new(self.len_bytes()), "\n")?;
+            }
+
+            return Ok(());
+        }
+
+        // Find the position where to insert the new section
+        let content = self.text();
+        let insert_pos = self.parse_script_with(|script| -> Result<usize> {
+            if let Some(section) = script.sections().get(index) {
+                // Find the start of this section to insert before it
+                let header = match section {
+                    Section::ScriptInfo(_) => "[Script Info]",
+                    Section::Styles(_) => "[V4+ Styles]",
+                    Section::Events(_) => "[Events]",
+                    Section::Fonts(_) => "[Fonts]",
+                    Section::Graphics(_) => "[Graphics]",
+                };
+
+                if let Some(pos) = content.find(header) {
+                    Ok(pos)
+                } else {
+                    Err(EditorError::SectionNotFound {
+                        section: header.to_string(),
+                    })
+                }
+            } else {
+                // Append to end if index is out of bounds
+                Ok(content.len())
+            }
+        })??;
+
+        // Insert the section at the found position
+        let mut text_to_insert = section_text.to_string();
+
+        // Ensure section ends with newline
+        if !text_to_insert.ends_with('\n') {
+            text_to_insert.push('\n');
+        }
+
+        // Add extra newline if needed to separate from next section
+        if insert_pos < content.len() {
+            text_to_insert.push('\n');
+        }
+
+        self.insert_raw(Position::new(insert_pos), &text_to_insert)?;
+
+        Ok(())
+    }
+
+    /// Replace a section at a specific index
+    #[cfg(feature = "stream")]
+    fn replace_section(&mut self, index: usize, new_text: &str) -> Result<()> {
+        // Parse to find the section and get its boundaries
+        // Get the section to replace
+        let content = self.text();
+        let section_info: Result<Option<&str>> = self.parse_script_with(|script| {
+            if let Some(section) = script.sections().get(index) {
+                let header = match section {
+                    Section::ScriptInfo(_) => "[Script Info]",
+                    Section::Styles(_) => "[V4+ Styles]",
+                    Section::Events(_) => "[Events]",
+                    Section::Fonts(_) => "[Fonts]",
+                    Section::Graphics(_) => "[Graphics]",
+                };
+                Ok(Some(header))
+            } else {
+                Ok(None)
+            }
+        })?;
+
+        if let Some(header) = section_info? {
+            let start = self.find_section_start_by_header(&content, header)?;
+            let end = self.find_section_end_from_start(&content, start)?;
+
+            self.replace_raw(
+                Range::new(Position::new(start), Position::new(end)),
+                new_text,
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// Remove the last section
+    #[cfg(feature = "stream")]
+    fn remove_last_section(&mut self) -> Result<()> {
+        // Parse to find the last section and get its boundaries
+        // Get the last section
+        let content = self.text();
+        let section_info: Result<Option<&str>> = self.parse_script_with(|script| {
+            if let Some(section) = script.sections().last() {
+                let header = match section {
+                    Section::ScriptInfo(_) => "[Script Info]",
+                    Section::Styles(_) => "[V4+ Styles]",
+                    Section::Events(_) => "[Events]",
+                    Section::Fonts(_) => "[Fonts]",
+                    Section::Graphics(_) => "[Graphics]",
+                };
+                Ok(Some(header))
+            } else {
+                Ok(None)
+            }
+        })?;
+
+        if let Some(header) = section_info? {
+            let start = self.find_section_start_by_header(&content, header)?;
+            let end = self.find_section_end_from_start(&content, start)?;
+
+            self.delete_raw(Range::new(Position::new(start), Position::new(end)))?;
+        }
+
+        Ok(())
+    }
+
+    /// Find section start by header
+    #[cfg(feature = "stream")]
+    fn find_section_start_by_header(&self, content: &str, header: &str) -> Result<usize> {
+        content
+            .find(header)
+            .ok_or_else(|| EditorError::SectionNotFound {
+                section: header.to_string(),
+            })
+    }
+
+    /// Find section end from start position
+    #[cfg(feature = "stream")]
+    fn find_section_end_from_start(&self, content: &str, start: usize) -> Result<usize> {
+        let section_headers = [
+            "[Script Info]",
+            "[V4+ Styles]",
+            "[Events]",
+            "[Fonts]",
+            "[Graphics]",
+        ];
+
+        // Find the next section header after start
+        let mut end = content.len();
+        for header in &section_headers {
+            if let Some(pos) = content[start + 1..].find(header) {
+                let actual_pos = start + 1 + pos;
+                if actual_pos < end {
+                    end = actual_pos;
+                }
+            }
+        }
+
+        Ok(end)
+    }
 }
 
 impl Default for EditorDocument {
@@ -1429,9 +1786,7 @@ mod tests {
         doc.validate().unwrap();
 
         // Parse and use script
-        let sections_count = doc
-            .parse_script_with(|script| script.sections().len())
-            .unwrap();
+        let sections_count = doc.sections_count().unwrap();
         assert!(sections_count > 0);
     }
 

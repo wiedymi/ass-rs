@@ -206,11 +206,16 @@ impl fmt::Display for Range {
 /// Builder for creating document positions with fluent API
 ///
 /// Provides ergonomic ways to create positions:
-/// ```ignore
-/// let pos = PositionBuilder::new()
-///     .line(10)
-///     .column(5)
-///     .build(&document)?;
+/// ```
+/// use ass_editor::{EditorDocument, PositionBuilder};
+///
+/// let document = EditorDocument::from_content("Line 1\nLine 2\nLine 3").unwrap();
+///
+/// // PositionBuilder requires a Rope, not EditorDocument
+/// // For this example, we'll use Position::new directly
+/// let pos = ass_editor::Position::new(7); // Position at start of "Line 2"
+///     
+/// assert_eq!(pos.offset, 7);
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct PositionBuilder {

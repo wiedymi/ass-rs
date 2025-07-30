@@ -450,9 +450,6 @@ mod fallback_tests {
     fn test_benchmark_feature_not_enabled() {
         // This test runs when the benches feature is not enabled
         // It ensures the test suite still passes
-        assert!(
-            true,
-            "Benchmark utilities not available without 'benches' feature"
-        );
+        // No assertion needed - the test passing is sufficient
     }
 }

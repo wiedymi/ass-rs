@@ -249,7 +249,7 @@ impl EditorError {
 /// Result type alias for editor operations
 pub type Result<T> = core::result::Result<T, EditorError>;
 
-/// Implement From<CoreError> for automatic conversion
+/// Implement `From<CoreError>` for automatic conversion
 impl From<CoreError> for EditorError {
     fn from(err: CoreError) -> Self {
         Self::Core(err)

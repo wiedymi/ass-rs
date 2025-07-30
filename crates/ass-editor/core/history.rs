@@ -21,6 +21,16 @@ use std::collections::VecDeque;
 #[cfg(not(feature = "std"))]
 use alloc::collections::VecDeque;
 
+/// Data needed to undo a delta operation
+#[cfg(feature = "stream")]
+#[derive(Debug, Clone)]
+pub struct DeltaUndoData {
+    /// Sections that were removed (index and content)
+    pub removed_sections: Vec<(usize, String)>,
+    /// Sections that were modified (index and original content)
+    pub modified_sections: Vec<(usize, String)>,
+}
+
 /// Represents an operation that can be undone and redone
 #[derive(Debug, Clone)]
 pub enum Operation {
@@ -36,7 +46,12 @@ pub enum Operation {
     },
     /// Delta was applied (for incremental updates)
     #[cfg(feature = "stream")]
-    ApplyDelta { delta: ScriptDeltaOwned },
+    Delta {
+        /// The forward delta to apply
+        forward: ScriptDeltaOwned,
+        /// Data needed to undo this delta
+        undo_data: DeltaUndoData,
+    },
 }
 
 impl Operation {
@@ -49,10 +64,20 @@ impl Operation {
                 old_text, new_text, ..
             } => core::mem::size_of::<Self>() + old_text.len() + new_text.len(),
             #[cfg(feature = "stream")]
-            Self::ApplyDelta { delta } => {
+            Self::Delta { forward, undo_data } => {
                 core::mem::size_of::<Self>()
-                    + delta.added.iter().map(|s| s.len()).sum::<usize>()
-                    + delta.modified.iter().map(|(_, s)| s.len()).sum::<usize>()
+                    + forward.added.iter().map(|s| s.len()).sum::<usize>()
+                    + forward.modified.iter().map(|(_, s)| s.len()).sum::<usize>()
+                    + undo_data
+                        .removed_sections
+                        .iter()
+                        .map(|(_, s)| s.len())
+                        .sum::<usize>()
+                    + undo_data
+                        .modified_sections
+                        .iter()
+                        .map(|(_, s)| s.len())
+                        .sum::<usize>()
             }
         }
     }

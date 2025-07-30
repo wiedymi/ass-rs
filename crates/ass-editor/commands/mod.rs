@@ -360,11 +360,18 @@ impl EditorCommand for BatchCommand {
 /// Fluent API builder for creating and executing commands
 ///
 /// Provides an ergonomic way to build and execute commands:
-/// ```ignore
-/// TextCommand::new(document)
+/// ```
+/// use ass_editor::{EditorDocument, Position, TextCommand};
+///
+/// let mut doc = EditorDocument::from_content("Hello world!").unwrap();
+/// let position = Position::new(5);
+///
+/// let result = TextCommand::new(&mut doc)
 ///     .at(position)
-///     .insert("Hello")
-///     .execute()?;
+///     .insert(" beautiful")
+///     .unwrap();
+///
+/// assert_eq!(doc.text(), "Hello beautiful world!");
 /// ```
 pub struct TextCommand<'a> {
     document: &'a mut EditorDocument,

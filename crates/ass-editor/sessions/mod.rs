@@ -22,7 +22,7 @@ use alloc::collections::{BTreeMap as HashMap, String, Vec};
 use alloc::{string::String, vec::Vec};
 
 #[cfg(feature = "multi-thread")]
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[cfg(all(feature = "plugins", not(feature = "multi-thread")))]
 use std::sync::Arc;
@@ -30,11 +30,8 @@ use std::sync::Arc;
 #[cfg(not(feature = "multi-thread"))]
 use core::cell::RefCell;
 
-#[cfg(all(not(feature = "multi-thread"), not(feature = "std")))]
-use alloc::rc::Rc;
-
-#[cfg(all(not(feature = "multi-thread"), feature = "std"))]
-use std::rc::Rc;
+#[cfg(feature = "multi-thread")]
+use parking_lot::Mutex;
 
 /// Configuration for session management
 #[derive(Debug, Clone)]
@@ -158,17 +155,12 @@ impl EditorSession {
 /// Manages multiple editing sessions with shared resources like extension
 /// registries and arena allocators. Provides efficient session switching
 /// and automatic resource management.
-#[derive(Debug)]
-pub struct EditorSessionManager {
+struct EditorSessionManagerInner {
     /// Configuration for this manager
     config: SessionConfig,
 
     /// Active editing sessions
-    #[cfg(feature = "multi-thread")]
-    sessions: Arc<Mutex<HashMap<String, EditorSession>>>,
-
-    #[cfg(not(feature = "multi-thread"))]
-    sessions: Rc<RefCell<HashMap<String, EditorSession>>>,
+    sessions: HashMap<String, EditorSession>,
 
     /// Currently active session ID
     active_session_id: Option<String>,
@@ -189,20 +181,58 @@ pub struct EditorSessionManager {
     ops_since_arena_reset: usize,
 }
 
-impl EditorSessionManager {
-    /// Create a new session manager
-    pub fn new() -> Self {
-        Self::with_config(SessionConfig::default())
-    }
+/// Multi-document session manager with built-in thread-safety
+pub struct EditorSessionManager {
+    #[cfg(feature = "multi-thread")]
+    inner: Arc<Mutex<EditorSessionManagerInner>>,
+    #[cfg(not(feature = "multi-thread"))]
+    inner: RefCell<EditorSessionManagerInner>,
+}
 
-    /// Create a new session manager with custom configuration
-    pub fn with_config(config: SessionConfig) -> Self {
+// EditorSessionManager is cloneable when multi-thread feature is enabled
+#[cfg(feature = "multi-thread")]
+impl Clone for EditorSessionManager {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+// Note: EditorSessionManager does not implement Clone without multi-thread feature
+// This is intentional - cloning requires Arc<Mutex<T>> which needs multi-thread
+
+impl std::fmt::Debug for EditorSessionManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        #[cfg(feature = "multi-thread")]
+        {
+            let inner = self.inner.lock();
+            f.debug_struct("EditorSessionManager")
+                .field("config", &inner.config)
+                .field("active_session_id", &inner.active_session_id)
+                .field("sessions", &inner.sessions.keys().collect::<Vec<_>>())
+                .field("stats", &inner.stats)
+                .finish()
+        }
+        #[cfg(not(feature = "multi-thread"))]
+        {
+            let inner = self.inner.borrow();
+            f.debug_struct("EditorSessionManager")
+                .field("config", &inner.config)
+                .field("active_session_id", &inner.active_session_id)
+                .field("sessions", &inner.sessions.keys().collect::<Vec<_>>())
+                .field("stats", &inner.stats)
+                .finish()
+        }
+    }
+}
+
+impl EditorSessionManagerInner {
+    /// Create a new inner session manager
+    fn new(config: SessionConfig) -> Self {
         Self {
             config,
-            #[cfg(feature = "multi-thread")]
-            sessions: Arc::new(Mutex::new(HashMap::new())),
-            #[cfg(not(feature = "multi-thread"))]
-            sessions: Rc::new(RefCell::new(HashMap::new())),
+            sessions: HashMap::new(),
             active_session_id: None,
             #[cfg(feature = "arena")]
             shared_arena: Bump::new(),
@@ -218,6 +248,69 @@ impl EditorSessionManager {
             ops_since_arena_reset: 0,
         }
     }
+}
+
+impl EditorSessionManager {
+    /// Helper method for accessing inner data mutably
+    #[cfg(feature = "multi-thread")]
+    fn with_inner_mut<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut EditorSessionManagerInner) -> R,
+    {
+        let mut inner = self.inner.lock();
+        f(&mut inner)
+    }
+
+    /// Helper method for accessing inner data immutably
+    #[cfg(feature = "multi-thread")]
+    fn with_inner<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&EditorSessionManagerInner) -> R,
+    {
+        let inner = self.inner.lock();
+        f(&inner)
+    }
+
+    /// Helper method for accessing inner data mutably
+    #[cfg(not(feature = "multi-thread"))]
+    fn with_inner_mut<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut EditorSessionManagerInner) -> R,
+    {
+        let mut inner = self.inner.borrow_mut();
+        f(&mut inner)
+    }
+
+    /// Helper method for accessing inner data immutably
+    #[cfg(not(feature = "multi-thread"))]
+    fn with_inner<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&EditorSessionManagerInner) -> R,
+    {
+        let inner = self.inner.borrow();
+        f(&inner)
+    }
+
+    /// Create a new session manager
+    pub fn new() -> Self {
+        Self::with_config(SessionConfig::default())
+    }
+
+    /// Create a new session manager with custom configuration
+    pub fn with_config(config: SessionConfig) -> Self {
+        #[cfg(feature = "multi-thread")]
+        {
+            Self {
+                inner: Arc::new(Mutex::new(EditorSessionManagerInner::new(config))),
+            }
+        }
+        #[cfg(not(feature = "multi-thread"))]
+        {
+            Self {
+                inner: RefCell::new(EditorSessionManagerInner::new(config)),
+            }
+        }
+    }
 
     /// Create a new session with an empty document
     pub fn create_session(&mut self, session_id: String) -> Result<()> {
@@ -230,93 +323,59 @@ impl EditorSessionManager {
         session_id: String,
         document: EditorDocument,
     ) -> Result<()> {
-        // Check session limits
-        #[cfg(feature = "multi-thread")]
-        let sessions_guard = self
-            .sessions
-            .lock()
-            .map_err(|_| EditorError::ThreadSafetyError {
-                message: "Failed to acquire read lock".to_string(),
-            })?;
+        self.with_inner_mut(|inner| {
+            // Check session limits
+            if inner.sessions.len() >= inner.config.max_sessions {
+                return Err(EditorError::SessionLimitExceeded {
+                    current: inner.sessions.len(),
+                    limit: inner.config.max_sessions,
+                });
+            }
 
-        #[cfg(not(feature = "multi-thread"))]
-        let sessions_guard = self.sessions.borrow();
+            // Create new session
+            let session = EditorSession::new(session_id.clone(), document);
 
-        if sessions_guard.len() >= self.config.max_sessions {
-            return Err(EditorError::SessionLimitExceeded {
-                current: sessions_guard.len(),
-                limit: self.config.max_sessions,
-            });
-        }
+            // Add to sessions map
+            inner.sessions.insert(session_id.clone(), session);
 
-        drop(sessions_guard);
+            // Update stats
+            inner.stats.active_sessions += 1;
 
-        // Create new session
-        let session = EditorSession::new(session_id.clone(), document);
+            // Set as active if it's the first session
+            if inner.active_session_id.is_none() {
+                inner.active_session_id = Some(session_id);
+            }
 
-        // Add to sessions map
-        #[cfg(feature = "multi-thread")]
-        {
-            let mut sessions_guard =
-                self.sessions
-                    .lock()
-                    .map_err(|_| EditorError::ThreadSafetyError {
-                        message: "Failed to acquire write lock".to_string(),
-                    })?;
-            sessions_guard.insert(session_id.clone(), session);
-        }
-
-        #[cfg(not(feature = "multi-thread"))]
-        {
-            let mut sessions_guard = self.sessions.borrow_mut();
-            sessions_guard.insert(session_id.clone(), session);
-        }
-
-        // Update stats
-        self.stats.active_sessions += 1;
-
-        // Set as active if it's the first session
-        if self.active_session_id.is_none() {
-            self.active_session_id = Some(session_id);
-        }
-
-        Ok(())
+            Ok(())
+        })
     }
 
     /// Switch to a different session
     pub fn switch_session(&mut self, session_id: &str) -> Result<()> {
-        // Check if session exists
-        #[cfg(feature = "multi-thread")]
-        let sessions_guard = self
-            .sessions
-            .lock()
-            .map_err(|_| EditorError::ThreadSafetyError {
-                message: "Failed to acquire read lock".to_string(),
-            })?;
+        self.with_inner_mut(|inner| {
+            // Check if session exists
+            if !inner.sessions.contains_key(session_id) {
+                return Err(EditorError::DocumentNotFound {
+                    id: session_id.to_string(),
+                });
+            }
 
-        #[cfg(not(feature = "multi-thread"))]
-        let sessions_guard = self.sessions.borrow();
+            // Switch active session
+            inner.active_session_id = Some(session_id.to_string());
 
-        if !sessions_guard.contains_key(session_id) {
-            return Err(EditorError::DocumentNotFound {
-                id: session_id.to_string(),
-            });
-        }
+            // Touch the session to update access time
+            #[cfg(feature = "std")]
+            if let Some(session) = inner.sessions.get_mut(session_id) {
+                session.touch();
+            }
 
-        drop(sessions_guard);
-
-        // Switch active session
-        self.active_session_id = Some(session_id.to_string());
-
-        // Touch the session to update access time
-        self.touch_session(session_id)?;
-
-        Ok(())
+            Ok(())
+        })
     }
 
     /// Get the currently active session
     pub fn active_session(&self) -> Result<Option<String>> {
-        Ok(self.active_session_id.clone())
+        Ok(self.with_inner(|inner| inner.active_session_id.clone()))
     }
 
     /// Execute a function with a read-only reference to a session's document
@@ -324,46 +383,15 @@ impl EditorSessionManager {
     where
         F: FnOnce(&EditorDocument) -> Result<R>,
     {
-        #[cfg(feature = "multi-thread")]
-        let sessions_guard = self
-            .sessions
-            .lock()
-            .map_err(|_| EditorError::ThreadSafetyError {
-                message: "Failed to acquire read lock".to_string(),
-            })?;
-
-        #[cfg(not(feature = "multi-thread"))]
-        let sessions_guard = self.sessions.borrow();
-
-        sessions_guard
-            .get(session_id)
-            .ok_or_else(|| EditorError::DocumentNotFound {
-                id: session_id.to_string(),
-            })
-            .and_then(|session| f(&session.document))
-    }
-
-    /// Get a mutable reference to a session's document
-    pub fn get_document_mut(&mut self, _session_id: &str) -> Result<&mut EditorDocument> {
-        #[cfg(feature = "multi-thread")]
-        {
-            // For thread-safe version, we need a different approach
-            // This is a limitation of the current design - we'd need interior mutability
-            Err(EditorError::ThreadSafetyError {
-                message: "Mutable access not supported in multi-thread mode".to_string(),
-            })
-        }
-
-        #[cfg(not(feature = "multi-thread"))]
-        {
-            // For non-multi-thread version, we can't return a mutable reference
-            // that outlives the borrow. This method is inherently problematic.
-            // Consider using with_document_mut instead.
-            Err(EditorError::ThreadSafetyError {
-                message: "Direct mutable access not supported. Use with_document_mut instead."
-                    .to_string(),
-            })
-        }
+        self.with_inner(|inner| {
+            inner
+                .sessions
+                .get(session_id)
+                .ok_or_else(|| EditorError::DocumentNotFound {
+                    id: session_id.to_string(),
+                })
+                .and_then(|session| f(&session.document))
+        })
     }
 
     /// Execute a closure with mutable access to a session's document
@@ -371,16 +399,8 @@ impl EditorSessionManager {
     where
         F: FnOnce(&mut EditorDocument) -> Result<R>,
     {
-        #[cfg(feature = "multi-thread")]
-        {
-            let mut sessions_guard =
-                self.sessions
-                    .lock()
-                    .map_err(|_| EditorError::ThreadSafetyError {
-                        message: "Failed to acquire write lock".to_string(),
-                    })?;
-
-            let session = sessions_guard.get_mut(session_id).ok_or_else(|| {
+        self.with_inner_mut(|inner| {
+            let session = inner.sessions.get_mut(session_id).ok_or_else(|| {
                 EditorError::DocumentNotFound {
                     id: session_id.to_string(),
                 }
@@ -390,142 +410,62 @@ impl EditorSessionManager {
             session.increment_operations();
 
             Ok(result)
-        }
-
-        #[cfg(not(feature = "multi-thread"))]
-        {
-            let mut sessions_guard = self.sessions.borrow_mut();
-            let session = sessions_guard.get_mut(session_id).ok_or_else(|| {
-                EditorError::DocumentNotFound {
-                    id: session_id.to_string(),
-                }
-            })?;
-
-            let result = f(&mut session.document)?;
-            session.increment_operations();
-
-            Ok(result)
-        }
+        })
     }
 
     /// Remove a session
     pub fn remove_session(&mut self, session_id: &str) -> Result<EditorSession> {
-        #[cfg(feature = "multi-thread")]
-        let mut sessions_guard =
-            self.sessions
-                .lock()
-                .map_err(|_| EditorError::ThreadSafetyError {
-                    message: "Failed to acquire write lock".to_string(),
-                })?;
+        self.with_inner_mut(|inner| {
+            let session =
+                inner
+                    .sessions
+                    .remove(session_id)
+                    .ok_or_else(|| EditorError::DocumentNotFound {
+                        id: session_id.to_string(),
+                    })?;
 
-        #[cfg(not(feature = "multi-thread"))]
-        let mut sessions_guard = self.sessions.borrow_mut();
+            // Update stats
+            inner.stats.active_sessions -= 1;
+            inner.stats.total_memory_usage -= session.memory_usage;
 
-        let session =
-            sessions_guard
-                .remove(session_id)
-                .ok_or_else(|| EditorError::DocumentNotFound {
-                    id: session_id.to_string(),
-                })?;
+            // Clear active session if it was removed
+            if inner.active_session_id.as_ref() == Some(&session_id.to_string()) {
+                inner.active_session_id = None;
+            }
 
-        // Update stats
-        self.stats.active_sessions -= 1;
-        self.stats.total_memory_usage -= session.memory_usage;
-
-        // Clear active session if it was removed
-        if self.active_session_id.as_ref() == Some(&session_id.to_string()) {
-            self.active_session_id = None;
-        }
-
-        Ok(session)
+            Ok(session)
+        })
     }
 
     /// List all session IDs
     pub fn list_sessions(&self) -> Result<Vec<String>> {
-        #[cfg(feature = "multi-thread")]
-        let sessions_guard = self
-            .sessions
-            .lock()
-            .map_err(|_| EditorError::ThreadSafetyError {
-                message: "Failed to acquire read lock".to_string(),
-            })?;
-
-        #[cfg(not(feature = "multi-thread"))]
-        let sessions_guard = self.sessions.borrow();
-
-        Ok(sessions_guard.keys().cloned().collect())
+        Ok(self.with_inner(|inner| inner.sessions.keys().cloned().collect()))
     }
 
     /// Get session statistics
-    #[must_use]
-    pub fn stats(&self) -> &SessionStats {
-        &self.stats
-    }
-
-    /// Touch a session to update its access time
-    fn touch_session(&mut self, session_id: &str) -> Result<()> {
-        #[cfg(all(feature = "multi-thread", feature = "std"))]
-        {
-            let mut sessions_guard =
-                self.sessions
-                    .lock()
-                    .map_err(|_| EditorError::ThreadSafetyError {
-                        message: "Failed to acquire write lock".to_string(),
-                    })?;
-
-            if let Some(session) = sessions_guard.get_mut(session_id) {
-                session.touch();
-            }
-        }
-
-        #[cfg(all(not(feature = "multi-thread"), feature = "std"))]
-        {
-            let mut sessions_guard = self.sessions.borrow_mut();
-            if let Some(session) = sessions_guard.get_mut(session_id) {
-                session.touch();
-            }
-        }
-
-        Ok(())
+    pub fn stats(&self) -> SessionStats {
+        self.with_inner(|inner| inner.stats.clone())
     }
 
     /// Perform cleanup of stale sessions
     #[cfg(feature = "std")]
     pub fn cleanup_stale_sessions(&mut self, max_age: std::time::Duration) -> Result<usize> {
-        if !self.config.auto_cleanup {
-            return Ok(0);
-        }
-
-        let mut removed_count = 0;
-        let mut sessions_to_remove: Vec<String> = Vec::new();
-
-        #[cfg(feature = "multi-thread")]
-        {
-            let sessions_guard =
-                self.sessions
-                    .lock()
-                    .map_err(|_| EditorError::ThreadSafetyError {
-                        message: "Failed to acquire read lock".to_string(),
-                    })?;
-
-            for (id, session) in sessions_guard.iter() {
-                if session.is_stale(max_age) {
-                    sessions_to_remove.push(id.clone());
-                }
+        // Get list of stale sessions
+        let sessions_to_remove = self.with_inner(|inner| {
+            if !inner.config.auto_cleanup {
+                return vec![];
             }
-        }
 
-        #[cfg(not(feature = "multi-thread"))]
-        {
-            let sessions_guard = self.sessions.borrow();
-            for (id, session) in sessions_guard.iter() {
-                if session.is_stale(max_age) {
-                    sessions_to_remove.push(id.clone());
-                }
-            }
-        }
+            inner
+                .sessions
+                .iter()
+                .filter(|(_, session)| session.is_stale(max_age))
+                .map(|(id, _)| id.clone())
+                .collect::<Vec<_>>()
+        });
 
         // Remove stale sessions
+        let mut removed_count = 0;
         for session_id in sessions_to_remove {
             if self.remove_session(&session_id).is_ok() {
                 removed_count += 1;
@@ -538,42 +478,26 @@ impl EditorSessionManager {
     /// Reset shared arena to reclaim memory
     #[cfg(feature = "arena")]
     pub fn reset_shared_arena(&mut self) {
-        self.shared_arena.reset();
-        self.stats.arena_resets += 1;
-        self.ops_since_arena_reset = 0;
-    }
-
-    /// Get reference to shared arena
-    #[cfg(feature = "arena")]
-    #[must_use]
-    pub fn shared_arena(&self) -> &Bump {
-        &self.shared_arena
-    }
-
-    /// Get mutable reference to shared arena
-    #[cfg(feature = "arena")]
-    pub fn shared_arena_mut(&mut self) -> &mut Bump {
-        // Check if we need to reset the arena
-        if self.config.arena_reset_interval > 0
-            && self.ops_since_arena_reset >= self.config.arena_reset_interval
-        {
-            self.reset_shared_arena();
-        }
-
-        &mut self.shared_arena
+        self.with_inner_mut(|inner| {
+            inner.shared_arena.reset();
+            inner.stats.arena_resets += 1;
+            inner.ops_since_arena_reset = 0;
+        });
     }
 
     /// Set shared extension registry
     #[cfg(feature = "plugins")]
     pub fn set_extension_registry(&mut self, registry: Arc<ass_core::plugin::ExtensionRegistry>) {
-        self.extension_registry = Some(registry);
+        self.with_inner_mut(|inner| {
+            inner.extension_registry = Some(registry);
+        });
     }
 
     /// Get shared extension registry
     #[cfg(feature = "plugins")]
     #[must_use]
-    pub fn extension_registry(&self) -> Option<&Arc<ass_core::plugin::ExtensionRegistry>> {
-        self.extension_registry.as_ref()
+    pub fn extension_registry(&self) -> Option<Arc<ass_core::plugin::ExtensionRegistry>> {
+        self.with_inner(|inner| inner.extension_registry.clone())
     }
 }
 

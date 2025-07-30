@@ -410,11 +410,9 @@ struct ExtensionManagerInner {
 
     /// Event channel for sending events
     #[cfg(feature = "std")]
-    #[allow(dead_code)]
     event_tx: EventSender,
 
     /// Message handler for user notifications
-    #[allow(dead_code)]
     message_handler: Box<dyn MessageHandler>,
 }
 
@@ -422,51 +420,25 @@ struct ExtensionManagerInner {
 #[cfg(feature = "multi-thread")]
 use parking_lot::Mutex;
 
-/// Single unified ExtensionManager that is always thread-safe when multi-thread feature is enabled
+#[cfg(feature = "multi-thread")]
 pub struct ExtensionManager {
-    #[cfg(feature = "multi-thread")]
     inner: Arc<Mutex<ExtensionManagerInner>>,
-    #[cfg(not(feature = "multi-thread"))]
+}
+
+#[cfg(not(feature = "multi-thread"))]
+pub struct ExtensionManager {
     inner: RefCell<ExtensionManagerInner>,
 }
 
-// ExtensionManager is cloneable when multi-thread feature is enabled
-#[cfg(feature = "multi-thread")]
-impl Clone for ExtensionManager {
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
-    }
-}
-
-// Note: ExtensionManager does not implement Clone without multi-thread feature
-// This is intentional - cloning requires Arc<Mutex<T>> which needs multi-thread
-
 impl std::fmt::Debug for ExtensionManager {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        #[cfg(feature = "multi-thread")]
-        {
-            let inner = self.inner.lock();
-            f.debug_struct("ExtensionManager")
-                .field("extension_states", &inner.extension_states)
-                .field("commands", &inner.commands.keys().collect::<Vec<_>>())
-                .field("config", &inner.config)
-                .field("extension_data", &inner.extension_data)
-                .field("extensions", &"<HashMap<String, Box<dyn EditorExtension>>>")
-                .finish()
-        }
-        #[cfg(not(feature = "multi-thread"))]
-        {
-            let inner = self.inner.borrow();
-            f.debug_struct("ExtensionManager")
-                .field("extension_states", &inner.extension_states)
-                .field("commands", &inner.commands.keys().collect::<Vec<_>>())
-                .field("config", &inner.config)
-                .field("extension_data", &inner.extension_data)
-                .field("extensions", &"<HashMap<String, Box<dyn EditorExtension>>>")
-                .finish()
-        }
+        f.debug_struct("ExtensionManager")
+            .field("extension_states", &self.extension_states)
+            .field("commands", &self.commands)
+            .field("config", &self.config)
+            .field("extension_data", &self.extension_data)
+            .field("extensions", &"<HashMap<String, Box<dyn EditorExtension>>>")
+            .finish()
     }
 }
 
@@ -493,46 +465,6 @@ impl ExtensionManagerInner {
 }
 
 impl ExtensionManager {
-    /// Helper method for accessing inner data mutably
-    #[cfg(feature = "multi-thread")]
-    fn with_inner_mut<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut ExtensionManagerInner) -> R,
-    {
-        let mut inner = self.inner.lock();
-        f(&mut inner)
-    }
-
-    /// Helper method for accessing inner data immutably
-    #[cfg(feature = "multi-thread")]
-    fn with_inner<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&ExtensionManagerInner) -> R,
-    {
-        let inner = self.inner.lock();
-        f(&inner)
-    }
-
-    /// Helper method for accessing inner data mutably
-    #[cfg(not(feature = "multi-thread"))]
-    fn with_inner_mut<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut ExtensionManagerInner) -> R,
-    {
-        let mut inner = self.inner.borrow_mut();
-        f(&mut inner)
-    }
-
-    /// Helper method for accessing inner data immutably
-    #[cfg(not(feature = "multi-thread"))]
-    fn with_inner<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&ExtensionManagerInner) -> R,
-    {
-        let inner = self.inner.borrow();
-        f(&inner)
-    }
-
     /// Create a new extension manager
     pub fn new() -> Self {
         #[cfg(feature = "multi-thread")]
@@ -564,7 +496,7 @@ impl ExtensionManager {
             event_tx,
             message_handler,
         };
-
+        
         #[cfg(feature = "multi-thread")]
         {
             Self {
@@ -584,60 +516,38 @@ impl ExtensionManager {
         &'a mut self,
         extension_name: String,
         document: Option<&'a mut EditorDocument>,
-    ) -> Result<Box<dyn ExtensionContext + 'a>> {
-        // For multi-thread builds, we can clone the manager
-        #[cfg(feature = "multi-thread")]
-        {
-            let manager_clone = self.clone();
-            Ok(Box::new(EditorContext {
-                document,
-                manager: manager_clone,
-                extension_name,
-            }))
-        }
-
-        // For single-thread builds, we need a different approach
-        // This is a limitation of the current design - create_context can't work properly
-        // in single-threaded mode with the unified API
-        #[cfg(not(feature = "multi-thread"))]
-        {
-            Err(crate::core::EditorError::CommandFailed {
-                message: "create_context requires multi-thread feature in unified API".to_string(),
-            })
+    ) -> EditorContext<'a> {
+        EditorContext {
+            document,
+            #[cfg(feature = "std")]
+            event_tx: &mut self.event_tx,
+            commands: &mut self.commands,
+            message_handler: &mut *self.message_handler,
+            config: &mut self.config,
+            extension_data: &mut self.extension_data,
+            extension_name,
         }
     }
 
     /// Load an extension
     pub fn load_extension(&mut self, extension: Box<dyn EditorExtension>) -> Result<()> {
         let extension_name = extension.info().name.clone();
-        let dependencies = extension.info().dependencies.clone();
 
         // Check for dependency conflicts
-        let has_deps = self.with_inner(|inner| {
-            dependencies
-                .iter()
-                .all(|dep| inner.extension_states.contains_key(dep))
-        });
+        self.check_dependencies(&extension_name, &extension.info().dependencies)?;
 
-        if !has_deps {
+        if self.extensions.contains_key(&extension_name) {
             return Err(crate::core::EditorError::CommandFailed {
-                message: format!("Extension '{extension_name}' has unmet dependencies"),
+                message: format!("Extension '{extension_name}' is already loaded"),
             });
         }
 
-        self.with_inner_mut(|inner| {
-            if inner.extensions.contains_key(&extension_name) {
-                return Err(crate::core::EditorError::CommandFailed {
-                    message: format!("Extension '{extension_name}' is already loaded"),
-                });
-            }
+        self.extensions.insert(extension_name.clone(), extension);
 
-            inner.extensions.insert(extension_name.clone(), extension);
-            inner
-                .extension_states
-                .insert(extension_name.clone(), ExtensionState::Uninitialized);
-            Ok(())
-        })
+        self.extension_states
+            .insert(extension_name.clone(), ExtensionState::Uninitialized);
+
+        Ok(())
     }
 
     /// Initialize an extension
@@ -646,40 +556,34 @@ impl ExtensionManager {
         extension_name: &str,
         context: &mut dyn ExtensionContext,
     ) -> Result<()> {
-        self.with_inner_mut(|inner| {
-            inner
-                .extension_states
-                .insert(extension_name.to_string(), ExtensionState::Initializing);
+        self.extension_states
+            .insert(extension_name.to_string(), ExtensionState::Initializing);
 
-            if let Some(extension) = inner.extensions.get_mut(extension_name) {
-                match extension.initialize(context) {
-                    Ok(()) => {
-                        inner
-                            .extension_states
-                            .insert(extension_name.to_string(), ExtensionState::Active);
+        if let Some(extension) = self.extensions.get_mut(extension_name) {
+            match extension.initialize(context) {
+                Ok(()) => {
+                    self.extension_states
+                        .insert(extension_name.to_string(), ExtensionState::Active);
 
-                        // Register commands
-                        for command in extension.commands() {
-                            inner
-                                .commands
-                                .insert(command.id.clone(), (extension_name.to_string(), command));
-                        }
-
-                        Ok(())
+                    // Register commands
+                    for command in extension.commands() {
+                        self.commands
+                            .insert(command.id.clone(), (extension_name.to_string(), command));
                     }
-                    Err(e) => {
-                        inner
-                            .extension_states
-                            .insert(extension_name.to_string(), ExtensionState::Error);
-                        Err(e)
-                    }
+
+                    Ok(())
                 }
-            } else {
-                Err(crate::core::EditorError::CommandFailed {
-                    message: format!("Extension '{extension_name}' not found"),
-                })
+                Err(e) => {
+                    self.extension_states
+                        .insert(extension_name.to_string(), ExtensionState::Error);
+                    Err(e)
+                }
             }
-        })
+        } else {
+            Err(crate::core::EditorError::CommandFailed {
+                message: format!("Extension '{extension_name}' not found"),
+            })
+        }
     }
 
     /// Unload an extension
@@ -691,19 +595,17 @@ impl ExtensionManager {
         // Shutdown the extension first
         self.shutdown_extension(extension_name, context)?;
 
-        self.with_inner_mut(|inner| {
-            // Remove the extension
-            inner.extensions.remove(extension_name);
-            inner.extension_states.remove(extension_name);
+        // Remove the extension
+        self.extensions.remove(extension_name);
 
-            // Remove commands
-            inner
-                .commands
-                .retain(|_, (ext_name, _)| ext_name != extension_name);
+        self.extension_states.remove(extension_name);
 
-            // Remove extension data
-            inner.extension_data.remove(extension_name);
-        });
+        // Remove commands
+        self.commands
+            .retain(|_, (ext_name, _)| ext_name != extension_name);
+
+        // Remove extension data
+        self.extension_data.remove(extension_name);
 
         Ok(())
     }
@@ -714,19 +616,16 @@ impl ExtensionManager {
         extension_name: &str,
         context: &mut dyn ExtensionContext,
     ) -> Result<()> {
-        self.with_inner_mut(|inner| {
-            inner
-                .extension_states
-                .insert(extension_name.to_string(), ExtensionState::ShuttingDown);
+        self.extension_states
+            .insert(extension_name.to_string(), ExtensionState::ShuttingDown);
 
-            if let Some(extension) = inner.extensions.get_mut(extension_name) {
-                extension.shutdown(context)?;
-                inner
-                    .extension_states
-                    .insert(extension_name.to_string(), ExtensionState::Shutdown);
-            }
-            Ok(())
-        })
+        if let Some(extension) = self.extensions.get_mut(extension_name) {
+            extension.shutdown(context)?;
+            self.extension_states
+                .insert(extension_name.to_string(), ExtensionState::Shutdown);
+        }
+
+        Ok(())
     }
 
     /// Execute a command from an extension
@@ -736,71 +635,124 @@ impl ExtensionManager {
         args: &HashMap<String, String>,
         context: &mut dyn ExtensionContext,
     ) -> Result<ExtensionResult> {
-        let extension_name = self
-            .with_inner(|inner| inner.commands.get(command_id).map(|(name, _)| name.clone()))
+        let (extension_name, _command) = self
+            .commands
+            .get(command_id)
             .ok_or_else(|| crate::core::EditorError::CommandFailed {
                 message: format!("Command '{command_id}' not found"),
-            })?;
+            })?
+            .clone();
 
-        self.with_inner_mut(|inner| {
-            if let Some(extension) = inner.extensions.get_mut(&extension_name) {
-                extension.execute_command(command_id, args, context)
-            } else {
-                Err(crate::core::EditorError::CommandFailed {
-                    message: format!("Extension '{extension_name}' not found"),
-                })
-            }
-        })
+        if let Some(extension) = self.extensions.get_mut(&extension_name) {
+            extension.execute_command(command_id, args, context)
+        } else {
+            Err(crate::core::EditorError::CommandFailed {
+                message: format!("Extension '{extension_name}' not found"),
+            })
+        }
     }
 
     /// Get list of loaded extensions
     pub fn list_extensions(&self) -> Vec<String> {
-        self.with_inner(|inner| inner.extensions.keys().cloned().collect())
+        self.extensions.keys().cloned().collect()
     }
 
     /// Get extension state
     pub fn get_extension_state(&self, extension_name: &str) -> Option<ExtensionState> {
-        self.with_inner(|inner| inner.extension_states.get(extension_name).copied())
+        self.extension_states.get(extension_name).copied()
     }
 
     /// Get all available commands
     pub fn list_commands(&self) -> Vec<String> {
-        self.with_inner(|inner| inner.commands.keys().cloned().collect())
+        self.commands.keys().cloned().collect()
+    }
+
+    /// Check dependencies for an extension
+    fn check_dependencies(&self, extension_name: &str, dependencies: &[String]) -> Result<()> {
+        for dependency in dependencies {
+            if !self.extension_states.contains_key(dependency) {
+                return Err(crate::core::EditorError::CommandFailed {
+                    message: format!(
+                        "Extension '{extension_name}' depends on '{dependency}' which is not loaded"
+                    ),
+                });
+            }
+        }
+        Ok(())
     }
 
     /// Get configuration value
-    pub fn get_config(&self, key: &str) -> Option<String> {
-        self.with_inner(|inner| inner.config.get(key).cloned())
+    pub fn get_config(&self, key: &str) -> Option<&str> {
+        self.config.get(key).map(|s| s.as_str())
     }
 
     /// Set configuration value
     pub fn set_config(&mut self, key: String, value: String) {
-        self.with_inner_mut(|inner| {
-            inner.config.insert(key, value);
-        });
+        self.config.insert(key, value);
     }
 
     /// Get extension data
-    pub fn get_extension_data(&self, extension_name: &str, key: &str) -> Option<String> {
-        self.with_inner(|inner| {
-            inner
-                .extension_data
-                .get(extension_name)
-                .and_then(|data| data.get(key))
-                .cloned()
-        })
+    pub fn get_extension_data(&self, extension_name: &str, key: &str) -> Option<&str> {
+        self.extension_data
+            .get(extension_name)
+            .and_then(|data| data.get(key))
+            .map(|s| s.as_str())
     }
 
     /// Set extension data
     pub fn set_extension_data(&mut self, extension_name: String, key: String, value: String) {
-        self.with_inner_mut(|inner| {
-            inner
-                .extension_data
-                .entry(extension_name)
-                .or_default()
-                .insert(key, value);
-        });
+        self.extension_data
+            .entry(extension_name)
+            .or_default()
+            .insert(key, value);
     }
+}
+
+/// Extension manager thread-safe helper functions
+#[cfg(feature = "multi-thread")]
+pub trait ThreadSafeExtensionManagerExt {
+    /// Execute a closure with exclusive access to the manager
+    fn with_manager<F, R>(&self, f: F) -> Result<R>
+    where
+        F: FnOnce(&mut ExtensionManager) -> Result<R>;
+
+    /// Execute a closure with read-only access to the manager
+    fn with_manager_ref<F, R>(&self, f: F) -> Result<R>
+    where
+        F: FnOnce(&ExtensionManager) -> R;
+}
+
+#[cfg(feature = "multi-thread")]
+impl ThreadSafeExtensionManagerExt for ThreadSafeExtensionManager {
+    fn with_manager<F, R>(&self, f: F) -> Result<R>
+    where
+        F: FnOnce(&mut ExtensionManager) -> Result<R>,
+    {
+        let mut manager = self
+            .lock()
+            .map_err(|_| crate::core::EditorError::ThreadSafetyError {
+                message: "Failed to acquire lock on extension manager".to_string(),
+            })?;
+        f(&mut manager)
+    }
+
+    fn with_manager_ref<F, R>(&self, f: F) -> Result<R>
+    where
+        F: FnOnce(&ExtensionManager) -> R,
+    {
+        let manager = self
+            .lock()
+            .map_err(|_| crate::core::EditorError::ThreadSafetyError {
+                message: "Failed to acquire lock on extension manager".to_string(),
+            })?;
+        Ok(f(&manager))
+    }
+}
+
+/// Create a new thread-safe extension manager
+#[cfg(feature = "multi-thread")]
+pub fn new_thread_safe_manager() -> ThreadSafeExtensionManager {
+    Arc::new(Mutex::new(ExtensionManager::new()))
 }
 
 impl Default for ExtensionManager {
@@ -854,12 +806,20 @@ pub type EventSender = Sender<DocumentEvent>;
 pub type EventSender = (); // No-op for no_std environments
 
 /// Editor context providing access to editor functionality
-/// This is designed to work with the unified ExtensionManager API
 pub struct EditorContext<'a> {
     /// Current document (if any)
     pub document: Option<&'a mut EditorDocument>,
-    /// Reference to the extension manager
-    pub manager: ExtensionManager,
+    /// Event channel for sending events
+    #[cfg(feature = "std")]
+    pub event_tx: &'a mut EventSender,
+    /// Command registry
+    pub commands: &'a mut HashMap<String, (String, ExtensionCommand)>,
+    /// Message handler for user notifications
+    pub message_handler: &'a mut dyn MessageHandler,
+    /// Configuration storage
+    pub config: &'a mut HashMap<String, String>,
+    /// Extension data storage
+    pub extension_data: &'a mut HashMap<String, HashMap<String, String>>,
     /// Name of the current extension
     pub extension_name: String,
 }
@@ -874,60 +834,52 @@ impl<'a> ExtensionContext for EditorContext<'a> {
     }
 
     fn send_event(&mut self, event: DocumentEvent) -> Result<()> {
-        // For now, we'll just log the event
-        // In a real implementation, this would use the event system
         #[cfg(feature = "std")]
         {
-            eprintln!("Extension {} sent event: {:?}", self.extension_name, event);
+            self.event_tx
+                .send(event)
+                .map_err(|_| crate::core::EditorError::CommandFailed {
+                    message: "Failed to send event".to_string(),
+                })
         }
-        Ok(())
+        #[cfg(not(feature = "std"))]
+        {
+            let _ = event;
+            Ok(())
+        }
     }
 
     fn get_config(&self, key: &str) -> Option<String> {
-        self.manager.get_config(key)
+        self.config.get(key).cloned()
     }
 
     fn set_config(&mut self, key: String, value: String) -> Result<()> {
-        self.manager.set_config(key, value);
+        self.config.insert(key, value);
         Ok(())
     }
 
     fn register_command(&mut self, command: ExtensionCommand) -> Result<()> {
-        // This would need to be implemented differently in the unified API
-        // For now, just acknowledge the command
-        #[cfg(feature = "std")]
-        {
-            eprintln!(
-                "Extension {} registered command: {}",
-                self.extension_name, command.id
-            );
-        }
+        self.commands
+            .insert(command.id.clone(), (self.extension_name.clone(), command));
         Ok(())
     }
 
     fn show_message(&mut self, message: &str, level: MessageLevel) -> Result<()> {
-        // Simple console output for now
-        #[cfg(feature = "std")]
-        {
-            match level {
-                MessageLevel::Info => eprintln!("[INFO] {}: {}", self.extension_name, message),
-                MessageLevel::Warning => eprintln!("[WARN] {}: {}", self.extension_name, message),
-                MessageLevel::Error => eprintln!("[ERROR] {}: {}", self.extension_name, message),
-                MessageLevel::Success => {
-                    eprintln!("[SUCCESS] {}: {}", self.extension_name, message)
-                }
-            }
-        }
-        Ok(())
+        self.message_handler.show(message, level)
     }
 
     fn get_extension_data(&self, extension_name: &str, key: &str) -> Option<String> {
-        self.manager.get_extension_data(extension_name, key)
+        self.extension_data
+            .get(extension_name)
+            .and_then(|data| data.get(key))
+            .cloned()
     }
 
     fn set_extension_data(&mut self, key: String, value: String) -> Result<()> {
-        self.manager
-            .set_extension_data(self.extension_name.clone(), key, value);
+        self.extension_data
+            .entry(self.extension_name.clone())
+            .or_default()
+            .insert(key, value);
         Ok(())
     }
 }
@@ -1022,10 +974,7 @@ mod tests {
         let mut manager = ExtensionManager::new();
 
         manager.set_config("test_key".to_string(), "test_value".to_string());
-        assert_eq!(
-            manager.get_config("test_key"),
-            Some("test_value".to_string())
-        );
+        assert_eq!(manager.get_config("test_key"), Some("test_value"));
         assert_eq!(manager.get_config("nonexistent"), None);
     }
 
@@ -1034,10 +983,7 @@ mod tests {
         let mut manager = ExtensionManager::new();
 
         manager.set_extension_data("ext1".to_string(), "key".to_string(), "value".to_string());
-        assert_eq!(
-            manager.get_extension_data("ext1", "key"),
-            Some("value".to_string())
-        );
+        assert_eq!(manager.get_extension_data("ext1", "key"), Some("value"));
         assert_eq!(manager.get_extension_data("ext1", "nonexistent"), None);
         assert_eq!(manager.get_extension_data("ext2", "key"), None);
     }
@@ -1142,16 +1088,22 @@ mod tests {
     #[test]
     fn editor_context() {
         let mut manager = ExtensionManager::new();
+        let mut doc = EditorDocument::new();
 
         // Test config through manager first
         manager.set_config("test".to_string(), "value".to_string());
-        assert_eq!(manager.get_config("test"), Some("value".to_string()));
+        assert_eq!(manager.get_config("test"), Some("value"));
 
         // Test extension data through manager
         manager.set_extension_data("default".to_string(), "key".to_string(), "data".to_string());
-        assert_eq!(
-            manager.get_extension_data("default", "key"),
-            Some("data".to_string())
-        );
+        assert_eq!(manager.get_extension_data("default", "key"), Some("data"));
+
+        // Test context creation and document access
+        let mut context = manager.create_context("test-extension".to_string(), Some(&mut doc));
+        assert!(context.current_document().is_some());
+        assert!(context.current_document_mut().is_some());
+
+        // Test config access through context
+        assert_eq!(context.get_config("test"), Some("value".to_string()));
     }
 }

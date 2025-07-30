@@ -1,7 +1,7 @@
 //! Built-in syntax highlighting extension for ASS/SSA files
 //!
 //! Provides syntax highlighting for ASS subtitle format, including:
-//! - Section headers ([Script Info], [Styles], [Events])
+//! - Section headers (\\[Script Info\\], \\[Styles\\], \\[Events\\])
 //! - Field names and values
 //! - Override tags and their parameters
 //! - Comments and special formatting
