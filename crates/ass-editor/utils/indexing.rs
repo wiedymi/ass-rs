@@ -12,10 +12,10 @@ use crate::utils::search::{DocumentSearch, SearchOptions, SearchResult, SearchSt
 use fst::{automaton, IntoStreamer, Set, SetBuilder, Streamer};
 
 #[cfg(feature = "std")]
-use std::collections::HashMap;
+use std::{collections::HashMap, borrow::Cow};
 
 #[cfg(not(feature = "std"))]
-use alloc::collections::BTreeMap as HashMap;
+use alloc::{collections::BTreeMap as HashMap, borrow::Cow};
 
 #[cfg(not(feature = "std"))]
 use alloc::{boxed::Box, string::{String, ToString}, vec::Vec};
@@ -257,8 +257,8 @@ impl DocumentSearch for FstSearchIndex {
                             results.push(SearchResult {
                                 start: entry.position,
                                 end: Position::new(entry.position.offset + pattern.len()),
-                                text: pattern.to_string(),
-                                context: entry.context.clone(),
+                                text: std::borrow::Cow::Owned(pattern.to_string()),
+                                context: std::borrow::Cow::Owned(entry.context.clone()),
                                 line: entry.line,
                                 column: entry.column,
                             });
@@ -413,8 +413,8 @@ impl DocumentSearch for LinearSearchIndex {
                     results.push(SearchResult {
                         start: entry.position,
                         end: Position::new(entry.position.offset + pattern.len()),
-                        text: pattern.to_string(),
-                        context: entry.context.clone(),
+                        text: Cow::Owned(pattern.to_string()),
+                        context: Cow::Owned(entry.context.clone()),
                         line: entry.line,
                         column: entry.column,
                     });

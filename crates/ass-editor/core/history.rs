@@ -452,6 +452,12 @@ impl UndoManager {
         self.current_cursor = cursor;
     }
 
+    /// Get the current cursor position
+    #[must_use]
+    pub fn cursor_position(&self) -> Option<Position> {
+        self.current_cursor
+    }
+
     /// Record an operation for undo purposes
     ///
     /// Stores the operation data in the history stack.

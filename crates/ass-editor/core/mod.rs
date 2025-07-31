@@ -9,12 +9,26 @@
 pub mod builders;
 pub mod document;
 pub mod errors;
+pub mod fluent;
 pub mod history;
+#[cfg(feature = "stream")]
+pub mod incremental;
 pub mod position;
+
+#[cfg(feature = "concurrency")]
+pub mod thread_safety;
 
 // Re-export commonly used types
 pub use builders::{EventBuilder, StyleBuilder};
 pub use document::{DocumentPosition, EditorDocument};
 pub use errors::{EditorError, Result};
+pub use fluent::{AtPosition, SelectRange};
 pub use history::{HistoryEntry, HistoryStats, UndoManager, UndoStack, UndoStackConfig};
+#[cfg(feature = "stream")]
+pub use incremental::{DocumentChange, IncrementalParser};
 pub use position::{LineColumn, Position, PositionBuilder, Range, Selection};
+
+#[cfg(feature = "concurrency")]
+pub use thread_safety::{
+    SyncDocument, DocumentPool, ScopedDocumentLock,
+};

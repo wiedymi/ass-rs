@@ -42,10 +42,38 @@ hashbrown = { version = "0.14", optional = true }
 # For format conversion regex patterns (requires std)
 regex = { version = "1.10", optional = true }
 
+# For compile-time assertions
+static_assertions = { version = "1.1", optional = true }
+
+# WASM compatibility override  
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
 tempfile = "3.8"
 pretty_assertions = "1.4"
+proptest = "1.4"
+
+[[bench]]
+name = "incremental_parsing"
+harness = false
+required-features = ["stream"]
+
+[[bench]]
+name = "editor_commands"
+harness = false
+required-features = ["full"]
+
+[[bench]]
+name = "search_performance"
+harness = false
+required-features = ["full"]
+
+[[bench]]
+name = "memory_performance"
+harness = false
+required-features = ["full"]
 
 [features]
 # Default: A fully-featured editor experience for desktop applications.
@@ -61,6 +89,7 @@ minimal = [
     "rope",         # Rope data structure for efficient text editing
     "arena",        # Arena allocator for pooling histories and deltas  
     "stream",       # Essential for incremental parsing performance
+    "dep:hashbrown",    # HashMap support for no_std environments
 ]
 
 # Provides all features for a rich, full-featured ASS subtitle editor.
@@ -99,7 +128,7 @@ search-index = ["dep:fst", "std"] # `fst` requires `std`
 serde = ["dep:serde", "ass-core/serde", "std"] # `serde` requires `std`
 
 # Concurrency and asynchronous operation support.
-concurrency = ["multi-thread", "async", "std"] # Concurrency features require `std`
+concurrency = ["multi-thread", "async", "std", "dep:static_assertions"] # Concurrency features require `std`
 multi-thread = ["dep:parking_lot", "std"]
 async = ["dep:futures", "dep:tokio", "std"]
 

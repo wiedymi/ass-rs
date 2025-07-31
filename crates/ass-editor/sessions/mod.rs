@@ -16,10 +16,10 @@ use bumpalo::Bump;
 use std::collections::HashMap;
 
 #[cfg(not(feature = "std"))]
-use alloc::collections::{BTreeMap as HashMap, String, Vec};
+use alloc::collections::BTreeMap as HashMap;
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::String, vec::Vec};
+use alloc::{string::{String, ToString}, vec::Vec};
 
 #[cfg(feature = "multi-thread")]
 use std::sync::Arc;

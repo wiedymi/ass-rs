@@ -7,28 +7,59 @@ use crate::core::errors::{EditorError, Result};
 use ass_core::parser::ast::EventType;
 use ass_core::ScriptVersion;
 
+#[cfg(feature = "std")]
+use std::borrow::Cow;
+
+#[cfg(not(feature = "std"))]
+use alloc::{borrow::Cow, vec};
+
 #[cfg(not(feature = "std"))]
 use alloc::{format, string::{String, ToString}, vec::Vec};
 
 /// Builder for creating ASS events with fluent API
+///
+/// Provides an ergonomic way to construct ASS events with method chaining.
+/// Supports all event types and automatically handles format validation.
+///
+/// # Examples
+///
+/// ```
+/// use ass_editor::{EventBuilder, EditorDocument};
+///
+/// let mut doc = EditorDocument::new();
+///
+/// // Create a dialogue event
+/// let event_line = EventBuilder::dialogue()
+///     .start_time("0:00:00.00")
+///     .end_time("0:00:05.00")
+///     .style("Default")
+///     .speaker("Character")
+///     .text("Hello, world!")
+///     .layer(0)
+///     .build()
+///     .unwrap();
+///
+/// // Add to document
+/// doc.add_event_line(&event_line).unwrap();
+/// ```
 #[derive(Debug, Default)]
-pub struct EventBuilder {
+pub struct EventBuilder<'a> {
     event_type: Option<EventType>,
-    start: Option<String>,
-    end: Option<String>,
-    style: Option<String>,
-    name: Option<String>,
-    text: Option<String>,
-    layer: Option<String>,
-    margin_l: Option<String>,
-    margin_r: Option<String>,
-    margin_v: Option<String>,
-    margin_t: Option<String>,
-    margin_b: Option<String>,
-    effect: Option<String>,
+    start: Option<Cow<'a, str>>,
+    end: Option<Cow<'a, str>>,
+    style: Option<Cow<'a, str>>,
+    name: Option<Cow<'a, str>>,
+    text: Option<Cow<'a, str>>,
+    layer: Option<Cow<'a, str>>,
+    margin_l: Option<Cow<'a, str>>,
+    margin_r: Option<Cow<'a, str>>,
+    margin_v: Option<Cow<'a, str>>,
+    margin_t: Option<Cow<'a, str>>,
+    margin_b: Option<Cow<'a, str>>,
+    effect: Option<Cow<'a, str>>,
 }
 
-impl EventBuilder {
+impl<'a> EventBuilder<'a> {
     /// Create a new event builder
     pub fn new() -> Self {
         Self::default()
@@ -51,74 +82,74 @@ impl EventBuilder {
     }
 
     /// Set start time (e.g., "0:00:05.00")
-    pub fn start_time(mut self, time: &str) -> Self {
-        self.start = Some(time.to_string());
+    pub fn start_time<S: Into<Cow<'a, str>>>(mut self, time: S) -> Self {
+        self.start = Some(time.into());
         self
     }
 
     /// Set end time (e.g., "0:00:10.00")
-    pub fn end_time(mut self, time: &str) -> Self {
-        self.end = Some(time.to_string());
+    pub fn end_time<S: Into<Cow<'a, str>>>(mut self, time: S) -> Self {
+        self.end = Some(time.into());
         self
     }
 
     /// Set speaker/character name
-    pub fn speaker(mut self, name: &str) -> Self {
-        self.name = Some(name.to_string());
+    pub fn speaker<S: Into<Cow<'a, str>>>(mut self, name: S) -> Self {
+        self.name = Some(name.into());
         self
     }
 
     /// Set dialogue text
-    pub fn text(mut self, text: &str) -> Self {
-        self.text = Some(text.to_string());
+    pub fn text<S: Into<Cow<'a, str>>>(mut self, text: S) -> Self {
+        self.text = Some(text.into());
         self
     }
 
     /// Set style name
-    pub fn style(mut self, style: &str) -> Self {
-        self.style = Some(style.to_string());
+    pub fn style<S: Into<Cow<'a, str>>>(mut self, style: S) -> Self {
+        self.style = Some(style.into());
         self
     }
 
     /// Set layer (higher layers render on top)
     pub fn layer(mut self, layer: u32) -> Self {
-        self.layer = Some(layer.to_string());
+        self.layer = Some(Cow::Owned(layer.to_string()));
         self
     }
 
     /// Set left margin
     pub fn margin_left(mut self, margin: u32) -> Self {
-        self.margin_l = Some(margin.to_string());
+        self.margin_l = Some(Cow::Owned(margin.to_string()));
         self
     }
 
     /// Set right margin
     pub fn margin_right(mut self, margin: u32) -> Self {
-        self.margin_r = Some(margin.to_string());
+        self.margin_r = Some(Cow::Owned(margin.to_string()));
         self
     }
 
     /// Set vertical margin  
     pub fn margin_vertical(mut self, margin: u32) -> Self {
-        self.margin_v = Some(margin.to_string());
+        self.margin_v = Some(Cow::Owned(margin.to_string()));
         self
     }
 
     /// Set top margin (V4++)
     pub fn margin_top(mut self, margin: u32) -> Self {
-        self.margin_t = Some(margin.to_string());
+        self.margin_t = Some(Cow::Owned(margin.to_string()));
         self
     }
 
     /// Set bottom margin (V4++)
     pub fn margin_bottom(mut self, margin: u32) -> Self {
-        self.margin_b = Some(margin.to_string());
+        self.margin_b = Some(Cow::Owned(margin.to_string()));
         self
     }
 
     /// Set effect
-    pub fn effect(mut self, effect: &str) -> Self {
-        self.effect = Some(effect.to_string());
+    pub fn effect<S: Into<Cow<'a, str>>>(mut self, effect: S) -> Self {
+        self.effect = Some(effect.into());
         self
     }
 
@@ -131,16 +162,16 @@ impl EventBuilder {
     /// Build the event with a specific format version
     pub fn build_with_version(self, version: ScriptVersion) -> Result<String> {
         let event_type = self.event_type.unwrap_or(EventType::Dialogue);
-        let start = self.start.unwrap_or_else(|| "0:00:00.00".to_string());
-        let end = self.end.unwrap_or_else(|| "0:00:05.00".to_string());
-        let style = self.style.unwrap_or_else(|| "Default".to_string());
-        let name = self.name.unwrap_or_default();
-        let text = self.text.unwrap_or_default();
-        let layer = self.layer.unwrap_or_else(|| "0".to_string());
-        let margin_l = self.margin_l.unwrap_or_else(|| "0".to_string());
-        let margin_r = self.margin_r.unwrap_or_else(|| "0".to_string());
-        let margin_v = self.margin_v.unwrap_or_else(|| "0".to_string());
-        let effect = self.effect.unwrap_or_default();
+        let start = self.start.unwrap_or(Cow::Borrowed("0:00:00.00"));
+        let end = self.end.unwrap_or(Cow::Borrowed("0:00:05.00"));
+        let style = self.style.unwrap_or(Cow::Borrowed("Default"));
+        let name = self.name.unwrap_or(Cow::Borrowed(""));
+        let text = self.text.unwrap_or(Cow::Borrowed(""));
+        let layer = self.layer.unwrap_or(Cow::Borrowed("0"));
+        let margin_l = self.margin_l.unwrap_or(Cow::Borrowed("0"));
+        let margin_r = self.margin_r.unwrap_or(Cow::Borrowed("0"));
+        let margin_v = self.margin_v.unwrap_or(Cow::Borrowed("0"));
+        let effect = self.effect.unwrap_or(Cow::Borrowed(""));
 
         // Format as ASS event line based on version
         let event_type_str = event_type.as_str();
@@ -186,28 +217,29 @@ impl EventBuilder {
 
         for field in format {
             let value = match *field {
-                "Layer" => self.layer.clone().unwrap_or_else(|| "0".to_string()),
+                "Layer" => self.layer.as_ref().map(|c| c.as_ref()).unwrap_or("0"),
                 "Start" => self
                     .start
-                    .clone()
-                    .unwrap_or_else(|| "0:00:00.00".to_string()),
-                "End" => self.end.clone().unwrap_or_else(|| "0:00:05.00".to_string()),
-                "Style" => self.style.clone().unwrap_or_else(|| "Default".to_string()),
-                "Name" | "Actor" => self.name.clone().unwrap_or_default(),
-                "MarginL" => self.margin_l.clone().unwrap_or_else(|| "0".to_string()),
-                "MarginR" => self.margin_r.clone().unwrap_or_else(|| "0".to_string()),
-                "MarginV" => self.margin_v.clone().unwrap_or_else(|| "0".to_string()),
-                "MarginT" => self.margin_t.clone().unwrap_or_else(|| "0".to_string()),
-                "MarginB" => self.margin_b.clone().unwrap_or_else(|| "0".to_string()),
-                "Effect" => self.effect.clone().unwrap_or_default(),
-                "Text" => self.text.clone().unwrap_or_default(),
+                    .as_ref()
+                    .map(|c| c.as_ref())
+                    .unwrap_or("0:00:00.00"),
+                "End" => self.end.as_ref().map(|c| c.as_ref()).unwrap_or("0:00:05.00"),
+                "Style" => self.style.as_ref().map(|c| c.as_ref()).unwrap_or("Default"),
+                "Name" | "Actor" => self.name.as_ref().map(|c| c.as_ref()).unwrap_or(""),
+                "MarginL" => self.margin_l.as_ref().map(|c| c.as_ref()).unwrap_or("0"),
+                "MarginR" => self.margin_r.as_ref().map(|c| c.as_ref()).unwrap_or("0"),
+                "MarginV" => self.margin_v.as_ref().map(|c| c.as_ref()).unwrap_or("0"),
+                "MarginT" => self.margin_t.as_ref().map(|c| c.as_ref()).unwrap_or("0"),
+                "MarginB" => self.margin_b.as_ref().map(|c| c.as_ref()).unwrap_or("0"),
+                "Effect" => self.effect.as_ref().map(|c| c.as_ref()).unwrap_or(""),
+                "Text" => self.text.as_ref().map(|c| c.as_ref()).unwrap_or(""),
                 _ => {
                     return Err(EditorError::FormatLineError {
                         message: format!("Unknown event field: {field}"),
                     })
                 }
             };
-            field_values.push(value);
+            field_values.push(value.to_string());
         }
 
         // Build the event line
@@ -217,7 +249,7 @@ impl EventBuilder {
 }
 
 /// Builder for creating ASS styles with fluent API
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct StyleBuilder {
     name: Option<String>,
     fontname: Option<String>,

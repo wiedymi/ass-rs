@@ -5,15 +5,23 @@
 //! and can be undone/redone efficiently.
 
 pub mod delta_commands;
+pub mod event_commands;
+pub mod karaoke_commands;
 pub mod macros;
+pub mod style_commands;
+pub mod tag_commands;
 
 use crate::core::{EditorDocument, EditorError, Position, Range, Result};
 
 #[cfg(feature = "stream")]
 use ass_core::parser::ScriptDeltaOwned;
 
-// Re-export delta commands
+// Re-export delta commands, event commands, karaoke commands, style commands, and tag commands
 pub use delta_commands::*;
+pub use event_commands::*;
+pub use karaoke_commands::*;
+pub use style_commands::*;
+pub use tag_commands::*;
 
 #[cfg(not(feature = "std"))]
 use alloc::{boxed::Box, format, string::{String, ToString}, vec::Vec};
@@ -104,6 +112,40 @@ impl CommandResult {
 ///
 /// All commands implement this trait to provide a consistent interface
 /// for execution, undo/redo, and introspection.
+///
+/// # Examples
+///
+/// Creating a custom command:
+///
+/// ```
+/// use ass_editor::{EditorCommand, EditorDocument, CommandResult, Result, Position, Range};
+///
+/// #[derive(Debug)]
+/// struct UppercaseCommand {
+///     description: String,
+/// }
+///
+/// impl UppercaseCommand {
+///     fn new() -> Self {
+///         Self {
+///             description: "Convert to uppercase".to_string(),
+///         }
+///     }
+/// }
+///
+/// impl EditorCommand for UppercaseCommand {
+///     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
+///         let text = document.text().to_uppercase();
+///         let range = Range::new(Position::new(0), Position::new(document.len()));
+///         document.replace(range, &text)?;
+///         Ok(CommandResult::success().with_message("Text converted to uppercase".to_string()))
+///     }
+///
+///     fn description(&self) -> &str {
+///         &self.description
+///     }
+/// }
+/// ```
 pub trait EditorCommand: core::fmt::Debug + Send + Sync {
     /// Execute the command on the given document
     ///
@@ -144,6 +186,19 @@ pub struct InsertTextCommand {
 
 impl InsertTextCommand {
     /// Create a new insert text command
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ass_editor::{InsertTextCommand, EditorDocument, Position, EditorCommand};
+    ///
+    /// let mut doc = EditorDocument::new();
+    /// let command = InsertTextCommand::new(Position::new(0), "Hello World".to_string());
+    /// 
+    /// let result = command.execute(&mut doc).unwrap();
+    /// assert!(result.success);
+    /// assert_eq!(doc.text(), "Hello World");
+    /// ```
     pub fn new(position: Position, text: String) -> Self {
         Self {
             position,
@@ -283,6 +338,22 @@ pub struct BatchCommand {
 
 impl BatchCommand {
     /// Create a new batch command
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ass_editor::{BatchCommand, InsertTextCommand, DeleteTextCommand, Position, Range, EditorDocument, EditorCommand};
+    ///
+    /// let mut doc = EditorDocument::from_content("Hello World").unwrap();
+    /// 
+    /// let batch = BatchCommand::new("Multiple operations".to_string())
+    ///     .add_command(Box::new(InsertTextCommand::new(Position::new(5), " beautiful".to_string())))
+    ///     .add_command(Box::new(DeleteTextCommand::new(Range::new(Position::new(15), Position::new(21)))));
+    /// 
+    /// let result = batch.execute(&mut doc).unwrap();
+    /// assert!(result.success);
+    /// assert_eq!(doc.text(), "Hello beautiful");
+    /// ```
     pub fn new(description: String) -> Self {
         Self {
             commands: Vec::new(),

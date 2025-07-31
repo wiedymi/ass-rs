@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.dependencies]
 # Shared dependencies with pinned versions for security and reproducibility
 thiserror = "1.0.63"
-ahash = "0.8.11"
+ahash = { version = "0.8.11", default-features = false, features = ["std"] }
 bitflags = "2.4.1"
 
 [workspace.package]
@@ -34,3 +34,4 @@ strip = true
 inherits = "release"
 debug = true
 strip = false
+

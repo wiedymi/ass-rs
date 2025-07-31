@@ -16,10 +16,10 @@ use crate::events::DocumentEvent;
 use std::collections::HashMap;
 
 #[cfg(not(feature = "std"))]
-use alloc::collections::{BTreeMap as HashMap, String, Vec};
+use alloc::collections::BTreeMap as HashMap;
 
 #[cfg(not(feature = "std"))]
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{boxed::Box, string::{String, ToString}, vec::Vec};
 
 #[cfg(feature = "multi-thread")]
 use std::sync::Arc;

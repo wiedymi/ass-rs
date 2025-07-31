@@ -7,6 +7,9 @@ pub mod indexing;
 pub mod search;
 pub mod validator;
 
+#[cfg(feature = "formats")]
+pub mod formats;
+
 // Re-export commonly used types
 pub use validator::{
     LazyValidator, ValidationIssue, ValidationResult, ValidationSeverity, ValidatorConfig,
@@ -20,3 +23,9 @@ pub use indexing::FstSearchIndex;
 
 #[cfg(not(feature = "search-index"))]
 pub use indexing::LinearSearchIndex;
+
+#[cfg(feature = "formats")]
+pub use formats::{
+    ConversionOptions, FormatConverter, FormatOptions, SubtitleFormat,
+    export_to_file, import_from_file,
+};

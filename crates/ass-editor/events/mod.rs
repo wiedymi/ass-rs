@@ -634,6 +634,7 @@ impl EventChannel {
         self.stats.events_dispatched += 1;
 
         let mut filtered_count = 0;
+        #[allow(unused_variables, unused_assignments)]
         let mut processed_count = 0;
 
         #[cfg(feature = "multi-thread")]

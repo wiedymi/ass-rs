@@ -12,6 +12,26 @@ use core::fmt;
 ///
 /// This is the primary position representation used internally
 /// for efficiency. Can be converted to/from line/column positions.
+///
+/// # Examples
+///
+/// ```
+/// use ass_editor::{Position, EditorDocument};
+///
+/// let doc = EditorDocument::from_content("Hello World").unwrap();
+/// let pos = Position::new(6); // Position before "World"
+/// 
+/// // Basic operations
+/// assert_eq!(pos.offset, 6);
+/// assert!(!pos.is_start());
+/// 
+/// // Position arithmetic  
+/// let advanced = pos.advance(5);
+/// assert_eq!(advanced.offset, 11);
+/// 
+/// let retreated = pos.retreat(3);
+/// assert_eq!(retreated.offset, 3);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Position {
     /// Byte offset from the beginning of the document
@@ -104,6 +124,32 @@ impl fmt::Display for LineColumn {
 }
 
 /// A range in a document represented by start and end positions
+///
+/// Ranges are half-open intervals [start, end) where start is inclusive
+/// and end is exclusive. This matches standard text editor conventions.
+///
+/// # Examples
+///
+/// ```
+/// use ass_editor::{Position, Range, EditorDocument};
+///
+/// let doc = EditorDocument::from_content("Hello World").unwrap();
+/// let range = Range::new(Position::new(0), Position::new(5)); // "Hello"
+/// 
+/// // Basic properties
+/// assert_eq!(range.len(), 5);
+/// assert!(!range.is_empty());
+/// assert!(range.contains(Position::new(2)));
+/// assert!(!range.contains(Position::new(5))); // End is exclusive
+/// 
+/// // Range operations
+/// let other = Range::new(Position::new(3), Position::new(8)); // "lo Wo"
+/// assert!(range.overlaps(&other));
+/// 
+/// let union = range.union(&other);
+/// assert_eq!(union.start.offset, 0);
+/// assert_eq!(union.end.offset, 8);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Range {
     /// Start position (inclusive)
@@ -256,6 +302,32 @@ impl PositionBuilder {
         self
     }
 
+    /// Build position at the start of a line
+    #[must_use]
+    pub const fn at_line_start(mut self, line: usize) -> Self {
+        self.line = Some(line);
+        self.column = Some(1);
+        self
+    }
+
+    /// Build position at the end of a line
+    #[must_use]
+    pub const fn at_line_end(mut self, line: usize) -> Self {
+        self.line = Some(line);
+        self.column = None; // Will be calculated
+        self
+    }
+
+    /// Build position at the start of the document
+    #[must_use]
+    pub const fn at_start() -> Self {
+        Self {
+            line: Some(1),
+            column: Some(1),
+            offset: Some(0),
+        }
+    }
+
     /// Build position using rope for line/column conversion
     ///
     /// If offset is provided, uses that directly.
@@ -270,40 +342,50 @@ impl PositionBuilder {
                 });
             }
             Ok(Position::new(offset))
-        } else if let (Some(line), Some(column)) = (self.line, self.column) {
-            LineColumn::new(line, column)?;
-
+        } else if let Some(line) = self.line {
             // Convert to 0-indexed
             let line_idx = line.saturating_sub(1);
-            let col_idx = column.saturating_sub(1);
-
+            
             if line_idx >= rope.len_lines() {
-                return Err(EditorError::InvalidPosition { line, column });
+                return Err(EditorError::InvalidPosition { line, column: 1 });
             }
 
             let line_start = rope.line_to_byte(line_idx);
-            let line = rope.line(line_idx);
+            
+            if let Some(column) = self.column {
+                LineColumn::new(line, column)?;
+                let col_idx = column.saturating_sub(1);
+                let line = rope.line(line_idx);
 
-            // Find the byte position of the column
-            let mut byte_pos = 0;
-            let mut char_pos = 0;
+                // Find the byte position of the column
+                let mut byte_pos = 0;
+                let mut char_pos = 0;
 
-            for ch in line.chars() {
-                if char_pos == col_idx {
-                    break;
+                for ch in line.chars() {
+                    if char_pos == col_idx {
+                        break;
+                    }
+                    byte_pos += ch.len_utf8();
+                    char_pos += 1;
                 }
-                byte_pos += ch.len_utf8();
-                char_pos += 1;
-            }
 
-            if char_pos < col_idx {
-                return Err(EditorError::InvalidPosition {
-                    line: self.line.unwrap_or(0),
-                    column,
-                });
-            }
+                if char_pos < col_idx {
+                    return Err(EditorError::InvalidPosition {
+                        line: self.line.unwrap_or(0),
+                        column,
+                    });
+                }
 
-            Ok(Position::new(line_start + byte_pos))
+                Ok(Position::new(line_start + byte_pos))
+            } else {
+                // No column specified - go to end of line
+                let line_end = if line_idx + 1 < rope.len_lines() {
+                    rope.line_to_byte(line_idx + 1).saturating_sub(1)
+                } else {
+                    rope.len_bytes()
+                };
+                Ok(Position::new(line_end))
+            }
         } else {
             // Default to start if nothing specified
             Ok(Position::start())

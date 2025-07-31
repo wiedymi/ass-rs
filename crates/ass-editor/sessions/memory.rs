@@ -8,7 +8,7 @@
 use bumpalo::Bump;
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::String, vec::Vec};
+use alloc::{string::{String, ToString}, vec::Vec};
 
 #[cfg(feature = "std")]
 use std::time::{Duration, Instant};

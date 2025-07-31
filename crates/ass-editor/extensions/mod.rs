@@ -5,6 +5,7 @@
 //! operations, lifecycle management, and inter-extension communication.
 
 pub mod builtin;
+pub mod registry_integration;
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -866,7 +867,7 @@ pub struct EditorContext<'a> {
     pub manager: ExtensionManager,
     /// Reference to the extension manager for single-threaded builds
     #[cfg(not(feature = "multi-thread"))]
-    pub manager: &'a ExtensionManager,
+    pub manager: &'a mut ExtensionManager,
     /// Mutable state for single-threaded builds (config updates)
     #[cfg(not(feature = "multi-thread"))]
     pub manager_mut_state: alloc::rc::Rc<core::cell::RefCell<HashMap<String, String>>>,

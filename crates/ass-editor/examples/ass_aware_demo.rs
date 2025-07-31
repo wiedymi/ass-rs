@@ -38,8 +38,8 @@ Comment: 0,0:00:20.00,0:00:25.00,Default,,0,0,0,,This is a comment
     // Direct access to ASS structures - no manual parsing!
     println!("let mut doc = EditorDocument::from_content(content)?;");
 
-    let events_count = document.events()?;
-    println!("let events_count = doc.events()?;             // {events_count} events found!");
+    let events_count = document.events_count()?;
+    println!("let events_count = doc.events_count()?;       // {events_count} events found!");
 
     let styles_count = document.styles_count()?;
     println!("let styles_count = doc.styles_count()?;       // {styles_count} styles found!");
