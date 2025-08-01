@@ -232,6 +232,7 @@ impl EditorDocument {
         }
     }
 
+
     /// Validate the document content can be parsed as valid ASS
     /// This is the basic validation that just checks parsing
     pub fn validate(&self) -> Result<()> {

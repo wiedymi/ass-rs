@@ -22,7 +22,10 @@ pub mod thread_safety;
 pub use builders::{EventBuilder, StyleBuilder};
 pub use document::{DocumentPosition, EditorDocument};
 pub use errors::{EditorError, Result};
-pub use fluent::{AtPosition, SelectRange};
+pub use fluent::{
+    AtPosition, SelectRange, EventInfo, EventFilter, EventSortCriteria, 
+    EventSortOptions, EventAccessor, EventQuery, OwnedEvent
+};
 pub use history::{HistoryEntry, HistoryStats, UndoManager, UndoStack, UndoStackConfig};
 #[cfg(feature = "stream")]
 pub use incremental::{DocumentChange, IncrementalParser};

@@ -21,12 +21,151 @@ use crate::commands::{
     KaraokeType,
     EditorCommand
 };
+use ass_core::parser::ast::{Event, Section, EventType};
+use core::cmp::Ordering;
 
 #[cfg(not(feature = "std"))]
 use alloc::{string::{String, ToString}, vec, vec::Vec};
 
 #[cfg(feature = "std")]
 use std::vec;
+
+// ============================================================================
+// Event Query and Filtering Types
+// ============================================================================
+
+/// Event information with index for filtering/sorting results
+#[derive(Debug, Clone, PartialEq)]
+pub struct EventInfo {
+    /// Zero-based index in the document
+    pub index: usize,
+    /// Owned copy of the event data
+    pub event: OwnedEvent,
+    /// Line number in the document (1-based)
+    pub line_number: usize,
+    /// Character position range in document
+    pub range: Range,
+}
+
+/// Owned version of Event for use in EventInfo
+#[derive(Debug, Clone, PartialEq)]
+pub struct OwnedEvent {
+    /// Event type (Dialogue, Comment, etc.)
+    pub event_type: EventType,
+    /// Layer for drawing order (higher layers drawn on top)
+    pub layer: String,
+    /// Start time in ASS time format (H:MM:SS.CS)
+    pub start: String,
+    /// End time in ASS time format (H:MM:SS.CS)
+    pub end: String,
+    /// Style name reference
+    pub style: String,
+    /// Character name or speaker
+    pub name: String,
+    /// Left margin override (pixels)
+    pub margin_l: String,
+    /// Right margin override (pixels)
+    pub margin_r: String,
+    /// Vertical margin override (pixels) (V4+)
+    pub margin_v: String,
+    /// Top margin override (pixels) (V4++) - optional
+    pub margin_t: Option<String>,
+    /// Bottom margin override (pixels) (V4++) - optional
+    pub margin_b: Option<String>,
+    /// Effect specification for special rendering
+    pub effect: String,
+    /// Text content with possible style overrides
+    pub text: String,
+}
+
+impl<'a> From<&Event<'a>> for OwnedEvent {
+    fn from(event: &Event<'a>) -> Self {
+        Self {
+            event_type: event.event_type,
+            layer: event.layer.to_string(),
+            start: event.start.to_string(),
+            end: event.end.to_string(),
+            style: event.style.to_string(),
+            name: event.name.to_string(),
+            margin_l: event.margin_l.to_string(),
+            margin_r: event.margin_r.to_string(),
+            margin_v: event.margin_v.to_string(),
+            margin_t: event.margin_t.map(|s| s.to_string()),
+            margin_b: event.margin_b.map(|s| s.to_string()),
+            effect: event.effect.to_string(),
+            text: event.text.to_string(),
+        }
+    }
+}
+
+/// Filter criteria for events
+#[derive(Debug, Clone, Default)]
+pub struct EventFilter {
+    /// Filter by event type (Dialogue, Comment)
+    pub event_type: Option<EventType>,
+    /// Filter by style name pattern
+    pub style_pattern: Option<String>,
+    /// Filter by speaker/actor name pattern  
+    pub speaker_pattern: Option<String>,
+    /// Filter by text content pattern
+    pub text_pattern: Option<String>,
+    /// Filter by time range (start_cs, end_cs)
+    pub time_range: Option<(u32, u32)>,
+    /// Filter by layer
+    pub layer: Option<u32>,
+    /// Filter by effect presence/pattern
+    pub effect_pattern: Option<String>,
+    /// Use regex for pattern matching
+    pub use_regex: bool,
+    /// Case sensitive matching
+    pub case_sensitive: bool,
+}
+
+/// Sort criteria for events
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EventSortCriteria {
+    /// Sort by start time (default)
+    StartTime,
+    /// Sort by end time
+    EndTime,
+    /// Sort by duration (end - start)
+    Duration,
+    /// Sort by style name
+    Style,
+    /// Sort by speaker/actor name
+    Speaker,
+    /// Sort by layer
+    Layer,
+    /// Sort by document order (original index)
+    Index,
+    /// Sort by text content (alphabetical)
+    Text,
+}
+
+/// Sort options
+#[derive(Debug, Clone)]
+pub struct EventSortOptions {
+    /// Primary sort criteria
+    pub criteria: EventSortCriteria,
+    /// Secondary sort criteria (for ties)
+    pub secondary: Option<EventSortCriteria>,
+    /// Sort in ascending order (default true)
+    pub ascending: bool,
+}
+
+impl Default for EventSortOptions {
+    fn default() -> Self {
+        Self {
+            criteria: EventSortCriteria::Index,
+            secondary: None,
+            ascending: true,
+        }
+    }
+}
+
+// ============================================================================
+// Existing Fluent API Types
+// ============================================================================
 
 /// Fluent API builder for document operations at a specific position
 pub struct AtPosition<'a> {
@@ -408,6 +547,118 @@ impl<'a> EventOps<'a> {
     /// Modify event effects
     pub fn effects(self) -> EventEffector<'a> {
         EventEffector::new(self.document)
+    }
+
+    // ============================================================================
+    // Direct Event Access Methods (NEW!)
+    // ============================================================================
+    
+    /// Get event information by index
+    pub fn get(self, index: usize) -> Result<Option<EventInfo>> {
+        self.document.parse_script_with(|script| -> Result<Option<EventInfo>> {
+            let mut current_index = 0;
+            
+            for section in script.sections() {
+                if let Section::Events(events) = section {
+                    for event in events {
+                        if current_index == index {
+                            let event_info = EventInfo {
+                                index,
+                                event: OwnedEvent::from(event),
+                                line_number: self.find_line_number_for_event(event)?,
+                                range: self.find_range_for_event(event)?,
+                            };
+                            return Ok(Some(event_info));
+                        }
+                        current_index += 1;
+                    }
+                }
+            }
+            
+            Ok(None)
+        })?
+    }
+
+    /// Get event by index with fluent access to properties
+    pub fn event(self, index: usize) -> EventAccessor<'a> {
+        EventAccessor::new(self.document, index)
+    }
+
+    /// Get all events as a vector
+    pub fn all(self) -> Result<Vec<EventInfo>> {
+        EventQuery::new(self.document).execute()
+    }
+
+    /// Get event count
+    pub fn count(self) -> Result<usize> {
+        self.document.parse_script_with(|script| {
+            let mut count = 0;
+            
+            for section in script.sections() {
+                if let Section::Events(events) = section {
+                    count += events.len();
+                }
+            }
+            
+            count
+        })
+    }
+
+    // ============================================================================
+    // Query and Filtering Methods (NEW!)
+    // ============================================================================
+    
+    /// Start a query chain for filtering and sorting events
+    pub fn query(self) -> EventQuery<'a> {
+        EventQuery::new(self.document)
+    }
+
+    /// Shorthand for common filters
+    pub fn dialogues(self) -> EventQuery<'a> {
+        EventQuery::new(self.document).filter_by_type(EventType::Dialogue)
+    }
+
+    pub fn comments(self) -> EventQuery<'a> {
+        EventQuery::new(self.document).filter_by_type(EventType::Comment)
+    }
+
+    pub fn in_time_range(self, start_cs: u32, end_cs: u32) -> EventQuery<'a> {
+        EventQuery::new(self.document).filter_by_time_range(start_cs, end_cs)
+    }
+
+    pub fn with_style(self, pattern: &str) -> EventQuery<'a> {
+        EventQuery::new(self.document).filter_by_style(pattern)
+    }
+
+    /// Find events by text pattern
+    pub fn containing(self, text: &str) -> EventQuery<'a> {
+        EventQuery::new(self.document).filter_by_text(text)
+    }
+
+    /// Get events in order they appear in document
+    pub fn in_order(self) -> EventQuery<'a> {
+        EventQuery::new(self.document).sort(EventSortCriteria::Index)
+    }
+
+    /// Get events sorted by time
+    pub fn by_time(self) -> EventQuery<'a> {
+        EventQuery::new(self.document).sort_by_time()
+    }
+
+    // ============================================================================
+    // Helper Methods
+    // ============================================================================
+
+    fn find_line_number_for_event(&self, _event: &Event) -> Result<usize> {
+        // For now, return a placeholder. This would need to be implemented
+        // by tracking line numbers during parsing or using rope byte-to-line conversion
+        Ok(1)
+    }
+
+    fn find_range_for_event(&self, _event: &Event) -> Result<Range> {
+        // For now, return a placeholder range. This would need to be implemented
+        // by using the event's span information from the parser
+        Ok(Range::new(Position::new(0), Position::new(0)))
     }
 }
 
@@ -1052,6 +1303,489 @@ impl EditorDocument {
             .line(line)
             .column(column)
             .build(self.rope())
+    }
+}
+
+// ============================================================================
+// Event Accessor for Individual Event Operations (NEW!)
+// ============================================================================
+
+/// Fluent accessor for individual event properties and operations
+pub struct EventAccessor<'a> {
+    document: &'a mut EditorDocument,
+    index: usize,
+}
+
+impl<'a> EventAccessor<'a> {
+    pub(crate) fn new(document: &'a mut EditorDocument, index: usize) -> Self {
+        Self { document, index }
+    }
+
+    /// Get the full event information
+    pub fn get(self) -> Result<Option<EventInfo>> {
+        EventOps::new(self.document).get(self.index)
+    }
+
+    /// Get just the event text
+    pub fn text(self) -> Result<Option<String>> {
+        Ok(self.get()?.map(|info| info.event.text))
+    }
+
+    /// Get event style name
+    pub fn style(self) -> Result<Option<String>> {
+        Ok(self.get()?.map(|info| info.event.style))
+    }
+
+    /// Get event speaker/actor name
+    pub fn speaker(self) -> Result<Option<String>> {
+        Ok(self.get()?.map(|info| info.event.name))
+    }
+
+    /// Get event timing as (start, end) in centiseconds
+    pub fn timing(self) -> Result<Option<(String, String)>> {
+        Ok(self.get()?.map(|info| (info.event.start, info.event.end)))
+    }
+
+    /// Get event start time
+    pub fn start_time(self) -> Result<Option<String>> {
+        Ok(self.get()?.map(|info| info.event.start))
+    }
+
+    /// Get event end time  
+    pub fn end_time(self) -> Result<Option<String>> {
+        Ok(self.get()?.map(|info| info.event.end))
+    }
+
+    /// Get event layer
+    pub fn layer(self) -> Result<Option<String>> {
+        Ok(self.get()?.map(|info| info.event.layer))
+    }
+
+    /// Get event effect
+    pub fn effect(self) -> Result<Option<String>> {
+        Ok(self.get()?.map(|info| info.event.effect))
+    }
+
+    /// Get event type (Dialogue/Comment)
+    pub fn event_type(self) -> Result<Option<EventType>> {
+        Ok(self.get()?.map(|info| info.event.event_type))
+    }
+
+    /// Check if event exists
+    pub fn exists(self) -> Result<bool> {
+        Ok(self.get()?.is_some())
+    }
+
+    /// Get event margins as (left, right, vertical)
+    pub fn margins(self) -> Result<Option<(String, String, String)>> {
+        Ok(self.get()?.map(|info| (
+            info.event.margin_l,
+            info.event.margin_r, 
+            info.event.margin_v
+        )))
+    }
+
+    /// Convert to timing operations for this specific event
+    pub fn timing_ops(self) -> EventTimer<'a> {
+        EventTimer::new(self.document).event(self.index)
+    }
+
+    /// Convert to toggle operations for this specific event
+    pub fn toggle_ops(self) -> EventToggler<'a> {
+        EventToggler::new(self.document).event(self.index)
+    }
+
+    /// Convert to effect operations for this specific event
+    pub fn effect_ops(self) -> EventEffector<'a> {
+        EventEffector::new(self.document).event(self.index)
+    }
+}
+
+// ============================================================================
+// Event Query Builder for Filtering and Sorting (NEW!)
+// ============================================================================
+
+/// Main query builder for filtering and sorting events
+pub struct EventQuery<'a> {
+    document: &'a mut EditorDocument,
+    filters: EventFilter,
+    sort_options: Option<EventSortOptions>,
+    limit: Option<usize>,
+}
+
+impl<'a> EventQuery<'a> {
+    pub(crate) fn new(document: &'a mut EditorDocument) -> Self {
+        Self {
+            document,
+            filters: EventFilter::default(),
+            sort_options: None,
+            limit: None,
+        }
+    }
+
+    // Filter methods
+    pub fn filter(mut self, filter: EventFilter) -> Self {
+        self.filters = filter;
+        self
+    }
+
+    pub fn filter_by_type(mut self, event_type: EventType) -> Self {
+        self.filters.event_type = Some(event_type);
+        self
+    }
+
+    pub fn filter_by_style(mut self, pattern: &str) -> Self {
+        self.filters.style_pattern = Some(pattern.to_string());
+        self
+    }
+
+    pub fn filter_by_speaker(mut self, pattern: &str) -> Self {
+        self.filters.speaker_pattern = Some(pattern.to_string());
+        self
+    }
+
+    pub fn filter_by_text(mut self, pattern: &str) -> Self {
+        self.filters.text_pattern = Some(pattern.to_string());
+        self
+    }
+
+    pub fn filter_by_time_range(mut self, start_cs: u32, end_cs: u32) -> Self {
+        self.filters.time_range = Some((start_cs, end_cs));
+        self
+    }
+
+    pub fn filter_by_layer(mut self, layer: u32) -> Self {
+        self.filters.layer = Some(layer);
+        self
+    }
+
+    pub fn filter_by_effect(mut self, pattern: &str) -> Self {
+        self.filters.effect_pattern = Some(pattern.to_string());
+        self
+    }
+
+    pub fn with_regex(mut self, use_regex: bool) -> Self {
+        self.filters.use_regex = use_regex;
+        self
+    }
+
+    pub fn case_sensitive(mut self, case_sensitive: bool) -> Self {
+        self.filters.case_sensitive = case_sensitive;
+        self
+    }
+
+    // Sort methods
+    pub fn sort(mut self, criteria: EventSortCriteria) -> Self {
+        self.sort_options = Some(EventSortOptions {
+            criteria,
+            secondary: None,
+            ascending: true,
+        });
+        self
+    }
+
+    pub fn sort_by(mut self, options: EventSortOptions) -> Self {
+        self.sort_options = Some(options);
+        self
+    }
+
+    pub fn sort_by_time(self) -> Self {
+        self.sort(EventSortCriteria::StartTime)
+    }
+
+    pub fn sort_by_style(self) -> Self {
+        self.sort(EventSortCriteria::Style)
+    }
+
+    pub fn sort_by_duration(self) -> Self {
+        self.sort(EventSortCriteria::Duration)
+    }
+
+    pub fn descending(mut self) -> Self {
+        if let Some(ref mut options) = self.sort_options {
+            options.ascending = false;
+        }
+        self
+    }
+
+    pub fn then_by(mut self, criteria: EventSortCriteria) -> Self {
+        if let Some(ref mut options) = self.sort_options {
+            options.secondary = Some(criteria);
+        }
+        self
+    }
+
+    // Limit results
+    pub fn limit(mut self, count: usize) -> Self {
+        self.limit = Some(count);
+        self
+    }
+
+    pub fn take(self, count: usize) -> Self {
+        self.limit(count)
+    }
+
+    // Execution methods
+    pub fn execute(self) -> Result<Vec<EventInfo>> {
+        let mut results = self.collect_events()?;
+        
+        // Apply filters
+        results = self.apply_filters(results)?;
+        
+        // Apply sorting
+        if let Some(ref sort_options) = self.sort_options {
+            self.apply_sort(&mut results, sort_options);
+        }
+        
+        // Apply limit
+        if let Some(limit) = self.limit {
+            results.truncate(limit);
+        }
+        
+        Ok(results)
+    }
+
+    /// Execute and return only the indices
+    pub fn indices(self) -> Result<Vec<usize>> {
+        Ok(self.execute()?.into_iter().map(|info| info.index).collect())
+    }
+
+    /// Execute and return events with their indices as tuples
+    pub fn with_indices(self) -> Result<Vec<(usize, OwnedEvent)>> {
+        Ok(self.execute()?.into_iter().map(|info| (info.index, info.event)).collect())
+    }
+
+    /// Execute and get the first matching event
+    pub fn first(self) -> Result<Option<EventInfo>> {
+        let mut results = self.limit(1).execute()?;
+        Ok(results.pop())
+    }
+
+    /// Execute and get count of matching events
+    pub fn count(self) -> Result<usize> {
+        Ok(self.execute()?.len())
+    }
+
+    /// Chain with existing fluent operations
+    pub fn timing(self) -> Result<EventTimer<'a>> {
+        let _indices: Vec<usize> = self.execute()?.into_iter().map(|info| info.index).collect();
+        // Need to create a new EventQuery to get document reference since self is consumed
+        // This is a limitation of the current API design
+        Err(EditorError::command_failed("Cannot chain timing operations after query execution - use indices() first"))
+    }
+
+    pub fn toggle_type(self) -> Result<EventToggler<'a>> {
+        let _indices: Vec<usize> = self.execute()?.into_iter().map(|info| info.index).collect();
+        Err(EditorError::command_failed("Cannot chain toggle operations after query execution - use indices() first"))
+    }
+
+    pub fn effects(self) -> Result<EventEffector<'a>> {
+        let _indices: Vec<usize> = self.execute()?.into_iter().map(|info| info.index).collect();
+        Err(EditorError::command_failed("Cannot chain effect operations after query execution - use indices() first"))
+    }
+
+    // ============================================================================
+    // Implementation Details
+    // ============================================================================
+
+    fn collect_events(&self) -> Result<Vec<EventInfo>> {
+        self.document.parse_script_with(|script| -> Result<Vec<EventInfo>> {
+            let mut events = Vec::new();
+            let mut event_index = 0;
+            
+            for section in script.sections() {
+                if let Section::Events(section_events) = section {
+                    for event in section_events {
+                        // Build EventInfo with position tracking
+                        let event_info = EventInfo {
+                            index: event_index,
+                            event: OwnedEvent::from(event),
+                            line_number: self.find_line_number(event)?,
+                            range: self.find_event_range(event)?,
+                        };
+                        events.push(event_info);
+                        event_index += 1;
+                    }
+                }
+            }
+            
+            Ok(events)
+        })?
+    }
+
+    fn apply_filters(&self, events: Vec<EventInfo>) -> Result<Vec<EventInfo>> {
+        let mut filtered = Vec::new();
+        
+        for event_info in events {
+            if self.matches_filter(&event_info)? {
+                filtered.push(event_info);
+            }
+        }
+        
+        Ok(filtered)
+    }
+
+    fn matches_filter(&self, event_info: &EventInfo) -> Result<bool> {
+        // Apply each filter criteria
+        if let Some(event_type) = self.filters.event_type {
+            if event_info.event.event_type != event_type {
+                return Ok(false);
+            }
+        }
+
+        if let Some(ref pattern) = self.filters.style_pattern {
+            if !self.matches_pattern(&event_info.event.style, pattern)? {
+                return Ok(false);
+            }
+        }
+
+        if let Some(ref pattern) = self.filters.text_pattern {
+            if !self.matches_pattern(&event_info.event.text, pattern)? {
+                return Ok(false);
+            }
+        }
+
+        if let Some(ref pattern) = self.filters.speaker_pattern {
+            if !self.matches_pattern(&event_info.event.name, pattern)? {
+                return Ok(false);
+            }
+        }
+
+        if let Some(ref pattern) = self.filters.effect_pattern {
+            if !self.matches_pattern(&event_info.event.effect, pattern)? {
+                return Ok(false);
+            }
+        }
+
+        if let Some(layer) = self.filters.layer {
+            if let Ok(event_layer) = event_info.event.layer.parse::<u32>() {
+                if event_layer != layer {
+                    return Ok(false);
+                }
+            } else {
+                return Ok(false);
+            }
+        }
+
+        if let Some((start_cs, end_cs)) = self.filters.time_range {
+            // Parse timing - this is a simplified implementation
+            // In practice, you'd want proper time parsing from ass_core
+            if let (Ok(event_start), Ok(event_end)) = (
+                self.parse_time_to_cs(&event_info.event.start),
+                self.parse_time_to_cs(&event_info.event.end)
+            ) {
+                if event_start < start_cs || event_end > end_cs {
+                    return Ok(false);
+                }
+            } else {
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
+    }
+
+    fn matches_pattern(&self, text: &str, pattern: &str) -> Result<bool> {
+        if self.filters.use_regex {
+            // For now, just do simple string matching
+            // In a full implementation, you'd use regex crate
+            Ok(if self.filters.case_sensitive {
+                text.contains(pattern)
+            } else {
+                text.to_lowercase().contains(&pattern.to_lowercase())
+            })
+        } else {
+            Ok(if self.filters.case_sensitive {
+                text.contains(pattern)
+            } else {
+                text.to_lowercase().contains(&pattern.to_lowercase())
+            })
+        }
+    }
+
+    fn parse_time_to_cs(&self, time_str: &str) -> Result<u32> {
+        // Simplified time parsing - in practice use ass_core utilities
+        // Format: H:MM:SS.CS
+        let parts: Vec<&str> = time_str.split(':').collect();
+        if parts.len() != 3 {
+            return Err(EditorError::command_failed("Invalid time format"));
+        }
+
+        let hours: u32 = parts[0].parse().map_err(|_| EditorError::command_failed("Invalid hours"))?;
+        let minutes: u32 = parts[1].parse().map_err(|_| EditorError::command_failed("Invalid minutes"))?;
+        
+        let sec_cs_parts: Vec<&str> = parts[2].split('.').collect();
+        if sec_cs_parts.len() != 2 {
+            return Err(EditorError::command_failed("Invalid seconds format"));
+        }
+
+        let seconds: u32 = sec_cs_parts[0].parse().map_err(|_| EditorError::command_failed("Invalid seconds"))?;
+        let centiseconds: u32 = sec_cs_parts[1].parse().map_err(|_| EditorError::command_failed("Invalid centiseconds"))?;
+
+        Ok(hours * 360000 + minutes * 6000 + seconds * 100 + centiseconds)
+    }
+
+    fn apply_sort(&self, events: &mut [EventInfo], options: &EventSortOptions) {
+        events.sort_by(|a, b| {
+            let primary_cmp = self.compare_by_criteria(a, b, &options.criteria);
+            
+            match primary_cmp {
+                Ordering::Equal => {
+                    if let Some(secondary) = &options.secondary {
+                        let secondary_cmp = self.compare_by_criteria(a, b, secondary);
+                        if options.ascending { secondary_cmp } else { secondary_cmp.reverse() }
+                    } else {
+                        Ordering::Equal
+                    }
+                }
+                other => if options.ascending { other } else { other.reverse() }
+            }
+        });
+    }
+
+    fn compare_by_criteria(&self, a: &EventInfo, b: &EventInfo, criteria: &EventSortCriteria) -> Ordering {
+        match criteria {
+            EventSortCriteria::StartTime => {
+                let a_time = self.parse_time_to_cs(&a.event.start).unwrap_or(0);
+                let b_time = self.parse_time_to_cs(&b.event.start).unwrap_or(0);
+                a_time.cmp(&b_time)
+            }
+            EventSortCriteria::EndTime => {
+                let a_time = self.parse_time_to_cs(&a.event.end).unwrap_or(0);
+                let b_time = self.parse_time_to_cs(&b.event.end).unwrap_or(0);
+                a_time.cmp(&b_time)
+            }
+            EventSortCriteria::Duration => {
+                let a_start = self.parse_time_to_cs(&a.event.start).unwrap_or(0);
+                let a_end = self.parse_time_to_cs(&a.event.end).unwrap_or(0);
+                let b_start = self.parse_time_to_cs(&b.event.start).unwrap_or(0);
+                let b_end = self.parse_time_to_cs(&b.event.end).unwrap_or(0);
+                let a_duration = a_end.saturating_sub(a_start);
+                let b_duration = b_end.saturating_sub(b_start);
+                a_duration.cmp(&b_duration)
+            }
+            EventSortCriteria::Style => a.event.style.cmp(&b.event.style),
+            EventSortCriteria::Speaker => a.event.name.cmp(&b.event.name),
+            EventSortCriteria::Layer => {
+                let a_layer = a.event.layer.parse::<u32>().unwrap_or(0);
+                let b_layer = b.event.layer.parse::<u32>().unwrap_or(0);
+                a_layer.cmp(&b_layer)
+            }
+            EventSortCriteria::Index => a.index.cmp(&b.index),
+            EventSortCriteria::Text => a.event.text.cmp(&b.event.text),
+        }
+    }
+
+    fn find_line_number(&self, _event: &Event) -> Result<usize> {
+        // For now, return a placeholder. This would need to be implemented
+        // by tracking line numbers during parsing or using rope byte-to-line conversion
+        Ok(1)
+    }
+
+    fn find_event_range(&self, _event: &Event) -> Result<Range> {
+        // For now, return a placeholder range. This would need to be implemented
+        // by using the event's span information from the parser
+        Ok(Range::new(Position::new(0), Position::new(0)))
     }
 }
 
@@ -1914,6 +2648,190 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
         
         assert!(doc2.text().contains("\\k25"));
         assert!(doc2.text().contains("A"));
+    }
+
+    #[test]
+    fn test_new_event_api_direct_access() {
+        const TEST_CONTENT: &str = r#"[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,First event
+Dialogue: 0,0:00:05.00,0:00:10.00,Default,Speaker,0,0,0,,Second event
+Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Third event
+"#;
+
+        let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
+        
+        // Test direct event access
+        let event_info = doc.events().get(0).unwrap();
+        assert!(event_info.is_some());
+        let info = event_info.unwrap();
+        assert_eq!(info.index, 0);
+        assert_eq!(info.event.text, "First event");
+        assert_eq!(info.event.event_type, EventType::Dialogue);
+        
+        // Test event count
+        let count = doc.events().count().unwrap();
+        assert_eq!(count, 3);
+        
+        // Test fluent accessor
+        let text = doc.events().event(1).text().unwrap();
+        assert_eq!(text, Some("Second event".to_string()));
+        
+        let style = doc.events().event(1).style().unwrap();
+        assert_eq!(style, Some("Default".to_string()));
+        
+        let exists = doc.events().event(5).exists().unwrap();
+        assert!(!exists);
+    }
+
+    #[test]
+    fn test_new_event_api_filtering() {
+        const TEST_CONTENT: &str = r#"[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,First dialogue
+Dialogue: 0,0:00:05.00,0:00:10.00,Default,Speaker,0,0,0,,Second dialogue
+Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,First comment
+Comment: 0,0:00:15.00,0:00:20.00,Default,Speaker,0,0,0,,Second comment
+"#;
+
+        let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
+        
+        // Test filtering by type
+        let dialogues = doc.events().dialogues().execute().unwrap();
+        assert_eq!(dialogues.len(), 2);
+        assert!(dialogues.iter().all(|info| info.event.event_type == EventType::Dialogue));
+        
+        let comments = doc.events().comments().execute().unwrap();
+        assert_eq!(comments.len(), 2);
+        assert!(comments.iter().all(|info| info.event.event_type == EventType::Comment));
+        
+        // Test text filtering
+        let with_first = doc.events()
+            .query()
+            .filter_by_text("First")
+            .execute()
+            .unwrap();
+        assert_eq!(with_first.len(), 2);
+        assert!(with_first[0].event.text.contains("First"));
+        assert!(with_first[1].event.text.contains("First"));
+        
+        // Test case insensitive filtering
+        let with_first_insensitive = doc.events()
+            .query()
+            .filter_by_text("first")
+            .case_sensitive(false)
+            .execute()
+            .unwrap();
+        assert_eq!(with_first_insensitive.len(), 2);
+    }
+
+    #[test]
+    fn test_new_event_api_sorting() {
+        const TEST_CONTENT: &str = r#"[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Third by time
+Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,First by time
+Dialogue: 0,0:00:05.00,0:00:10.00,Default,Speaker,0,0,0,,Second by time
+"#;
+
+        let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
+        
+        // Test sorting by time (should reorder events)
+        let by_time = doc.events().by_time().execute().unwrap();
+        assert_eq!(by_time.len(), 3);
+        assert_eq!(by_time[0].event.text, "First by time");
+        assert_eq!(by_time[1].event.text, "Second by time");
+        assert_eq!(by_time[2].event.text, "Third by time");
+        
+        // Test original order
+        let in_order = doc.events().in_order().execute().unwrap();
+        assert_eq!(in_order.len(), 3);
+        assert_eq!(in_order[0].event.text, "Third by time");
+        assert_eq!(in_order[1].event.text, "First by time");
+        assert_eq!(in_order[2].event.text, "Second by time");
+        
+        // Test descending sort
+        let by_time_desc = doc.events()
+            .query()
+            .sort_by_time()
+            .descending()
+            .execute()
+            .unwrap();
+        assert_eq!(by_time_desc[0].event.text, "Third by time");
+        assert_eq!(by_time_desc[1].event.text, "Second by time");
+        assert_eq!(by_time_desc[2].event.text, "First by time");
+    }
+
+    #[test]
+    fn test_new_event_api_combined_operations() {
+        const TEST_CONTENT: &str = r#"[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Important dialogue
+Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,Another dialogue
+Comment: 0,0:00:05.00,0:00:10.00,Default,Speaker,0,0,0,,Important comment
+Dialogue: 0,0:00:15.00,0:00:20.00,Default,Speaker,0,0,0,,Final dialogue
+"#;
+
+        let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
+        
+        // Test combined filtering and sorting with limit
+        let important_dialogues = doc.events()
+            .query()
+            .filter_by_type(EventType::Dialogue)
+            .filter_by_text("Important")
+            .sort_by_time()
+            .limit(1)
+            .execute()
+            .unwrap();
+        
+        assert_eq!(important_dialogues.len(), 1);
+        assert_eq!(important_dialogues[0].event.text, "Important dialogue");
+        assert_eq!(important_dialogues[0].event.event_type, EventType::Dialogue);
+        
+        // Test getting indices only
+        let dialogue_indices = doc.events()
+            .dialogues()
+            .sort_by_time()
+            .indices()
+            .unwrap();
+        
+        assert_eq!(dialogue_indices.len(), 3);
+        // Should be indices in time order: 1, 0, 3 (based on start times)
+        assert_eq!(dialogue_indices, vec![1, 0, 3]);
+        
+        // Test count
+        let dialogue_count = doc.events()
+            .dialogues()
+            .count()
+            .unwrap();
+        assert_eq!(dialogue_count, 3);
+        
+        // Test first
+        let first_dialogue = doc.events()
+            .dialogues()
+            .sort_by_time()
+            .first()
+            .unwrap();
+        
+        assert!(first_dialogue.is_some());
+        let first = first_dialogue.unwrap();
+        assert_eq!(first.event.text, "Another dialogue");
     }
 
     #[test]

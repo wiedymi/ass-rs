@@ -179,10 +179,15 @@ pub use commands::{
 pub use core::{
     DocumentPosition, EditorDocument, EditorError, EventBuilder, HistoryEntry, HistoryStats,
     Position, PositionBuilder, Range, Result, Selection, StyleBuilder, UndoManager, UndoStack,
-    UndoStackConfig,
+    UndoStackConfig, EventInfo, EventSortCriteria, EventSortOptions, EventAccessor, 
+    EventQuery, OwnedEvent,
 };
+// Re-export the fluent EventFilter directly
+pub use core::fluent::EventFilter;
+// Re-export the events EventFilter with a specific name to avoid conflict  
 pub use events::{
-    DocumentEvent, EventChannel, EventChannelConfig, EventFilter, EventHandler, EventStats,
+    DocumentEvent, EventChannel, EventChannelConfig, EventFilter as DocumentEventFilter, 
+    EventHandler, EventStats,
 };
 pub use extensions::{
     EditorContext, EditorExtension, ExtensionCapability, ExtensionCommand, ExtensionContext,
