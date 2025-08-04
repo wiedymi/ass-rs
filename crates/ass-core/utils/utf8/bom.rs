@@ -18,8 +18,6 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
-
-
 /// Byte Order Mark (BOM) signatures for common encodings
 ///
 /// Represents the different types of BOMs that can appear at the beginning
@@ -401,10 +399,10 @@ mod tests {
 
     #[test]
     fn bom_type_hash() {
-        #[cfg(feature = "std")]
-        use std::collections::HashSet;
         #[cfg(not(feature = "std"))]
         use hashbrown::HashSet;
+        #[cfg(feature = "std")]
+        use std::collections::HashSet;
         let mut set = HashSet::new();
         set.insert(BomType::Utf8);
         set.insert(BomType::Utf16Le);

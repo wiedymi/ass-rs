@@ -10,7 +10,7 @@ use crate::parser::SectionType;
 extern crate alloc;
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::ToString};
+use alloc::string::ToString;
 
 /// Represents a text change in the source
 #[derive(Debug, Clone)]

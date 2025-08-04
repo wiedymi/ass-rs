@@ -30,7 +30,7 @@ use alloc::vec::Vec;
 extern crate alloc;
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::ToString};
+use alloc::string::ToString;
 
 pub mod scanner;
 #[cfg(feature = "simd")]

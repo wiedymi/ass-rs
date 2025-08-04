@@ -2,14 +2,12 @@
 //!
 //! Measures memory consumption patterns to validate the <1.1x input size target.
 
-
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::ToString};
+use alloc::string::ToString;
 #[allow(clippy::missing_docs_in_private_items, clippy::cast_precision_loss)]
-
 use ass_core::{parser::Script, utils::ScriptGenerator};
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 

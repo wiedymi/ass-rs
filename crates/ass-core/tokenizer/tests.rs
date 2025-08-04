@@ -6,7 +6,7 @@ use super::*;
 extern crate alloc;
 
 #[cfg(not(feature = "std"))]
-use alloc::{format, vec, string::ToString};
+use alloc::{format, string::ToString, vec};
 
 #[test]
 fn tokenizer_new_without_bom() {

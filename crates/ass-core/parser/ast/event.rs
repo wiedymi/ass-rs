@@ -3,7 +3,6 @@
 //! Contains the Event struct and `EventType` enum representing events from the
 //! [Events] section with zero-copy design and time parsing utilities.
 
-
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 

@@ -3,14 +3,12 @@
 //! Analyzes criterion benchmark results to detect performance regressions
 //! and ensure performance targets are maintained.
 
-
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
 #[cfg(not(feature = "std"))]
 use alloc::{format, string::ToString};
 #[allow(clippy::missing_docs_in_private_items)]
-
 use std::{
     collections::HashMap,
     env,

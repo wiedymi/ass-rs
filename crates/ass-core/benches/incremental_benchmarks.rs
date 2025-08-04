@@ -7,7 +7,6 @@
 //!
 //! Includes real-world editing scenarios and stress testing.
 
-
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
@@ -19,7 +18,6 @@ use alloc::{format, string::ToString};
     clippy::range_plus_one,
     clippy::cast_precision_loss
 )]
-
 use ass_core::{
     parser::{incremental::TextChange, Script},
     utils::ScriptGenerator,

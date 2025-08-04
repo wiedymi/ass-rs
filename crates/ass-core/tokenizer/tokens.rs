@@ -31,7 +31,7 @@ use core::fmt;
 extern crate alloc;
 
 #[cfg(not(feature = "std"))]
-use alloc::{format};
+use alloc::format;
 
 /// Token produced by ASS tokenizer with zero-copy span
 ///

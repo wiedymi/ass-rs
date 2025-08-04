@@ -25,12 +25,11 @@
 //! assert!(color_err.suggestion().is_some());
 //! ```
 
-
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
 #[cfg(not(feature = "std"))]
-use alloc::{format, vec, string::ToString};
+use alloc::{format, string::ToString, vec};
 mod category;
 mod core;
 pub mod encoding;

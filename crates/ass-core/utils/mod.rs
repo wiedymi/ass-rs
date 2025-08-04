@@ -23,9 +23,9 @@
 #[cfg(not(feature = "std"))]
 use alloc::{format, string::String, vec, vec::Vec};
 
+use core::{fmt, ops::Range};
 #[cfg(feature = "std")]
 use std::{format, string::String, vec::Vec};
-use core::{fmt, ops::Range};
 
 pub mod benchmark_generators;
 pub mod errors;

@@ -11,7 +11,7 @@ use core::str::Chars;
 extern crate alloc;
 
 #[cfg(not(feature = "std"))]
-use alloc::{format, vec, string::ToString};
+use alloc::{format, string::ToString, vec};
 
 #[cfg(feature = "simd")]
 use super::simd;

@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 extern crate alloc;
 
 #[cfg(not(feature = "std"))]
-use alloc::{vec};
+use alloc::vec;
 #[cfg(debug_assertions)]
 use core::ops::Range;
 

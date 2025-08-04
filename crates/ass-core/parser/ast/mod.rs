@@ -33,12 +33,11 @@
 //! };
 //! ```
 
-
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
 #[cfg(not(feature = "std"))]
-use alloc::{vec};
+use alloc::vec;
 mod event;
 mod media;
 mod script_info;

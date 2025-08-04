@@ -364,10 +364,10 @@ mod tests {
 
     #[test]
     fn all_error_categories_hash() {
-        #[cfg(feature = "std")]
-        use std::collections::HashSet;
         #[cfg(not(feature = "std"))]
         use hashbrown::HashSet;
+        #[cfg(feature = "std")]
+        use std::collections::HashSet;
 
         let categories = [
             ErrorCategory::Parsing,
