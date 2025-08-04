@@ -3,6 +3,12 @@
 use super::*;
 use alloc::{format, string::String, vec::Vec};
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec};
+
 #[test]
 fn time_parsing_valid_formats() {
     // Test standard H:MM:SS.CC format

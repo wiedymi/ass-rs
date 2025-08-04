@@ -25,7 +25,7 @@
 /// ```rust
 /// use ass_core::parser::sections::{ScriptInfoParser, StylesParser, EventsParser};
 ///
-/// let source = "[Script Info]\nTitle: Test\n\n[V4+ Styles]\nFormat: Name, Fontname\nStyle: Default,Arial\n\n`[Events\]`\nFormat: Layer, Start, End, Text\nDialogue: 0,0:00:00.00,0:00:05.00,Hello";
+/// let source = "[Script Info]\nTitle: Test\n\n[V4+ Styles]\nFormat: Name, Fontname\nStyle: Default,Arial\n\n[Events]\nFormat: Layer, Start, End, Text\nDialogue: 0,0:00:00.00,0:00:05.00,Hello";
 /// let start_pos = 0;
 /// let start_line = 1;
 ///

@@ -29,13 +29,19 @@
 //! let chunk1 = b"[Script Info]\nTitle: Example\n";
 //! let deltas1 = parser.feed_chunk(chunk1)?;
 //!
-//! let chunk2 = b"[Events\]\nFormat: Layer, Start, End\n";
+//! let chunk2 = b"[Events]\nFormat: Layer, Start, End\n";
 //! let deltas2 = parser.feed_chunk(chunk2)?;
 //!
 //! let result = parser.finish()?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec, string::ToString};
 mod delta;
 mod processor;
 mod state;

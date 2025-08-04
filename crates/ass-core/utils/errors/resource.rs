@@ -8,6 +8,12 @@ use super::CoreError;
 use alloc::{format, string::ToString};
 use core::fmt;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::ToString};
+
 /// Create memory allocation error
 ///
 /// Generates a `CoreError::OutOfMemory` with descriptive context about

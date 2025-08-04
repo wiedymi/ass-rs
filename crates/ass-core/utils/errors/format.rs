@@ -8,6 +8,12 @@ use super::CoreError;
 use alloc::format;
 use core::fmt;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format};
+
 /// Create color format error with detailed context
 ///
 /// Generates a `CoreError::InvalidColor` with descriptive message about

@@ -4,6 +4,12 @@
 //! while maintaining zero-copy semantics through lifetime-generic spans.
 
 use crate::{Result, ScriptVersion};
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec, string::ToString};
 #[cfg(feature = "stream")]
 use alloc::format;
 use alloc::{boxed::Box, string::String, string::ToString, vec, vec::Vec};

@@ -1,6 +1,6 @@
 //! Events section parser for ASS scripts.
 //!
-//! Handles parsing of the [Events] section which contains dialogue, comments,
+//! Handles parsing of the `[Events]` section which contains dialogue, comments,
 //! and other timed events with format specifications and event entries.
 
 use crate::parser::{

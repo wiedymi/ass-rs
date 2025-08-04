@@ -17,6 +17,12 @@
 
 use crate::utils::CoreError;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec};
+
 #[cfg(feature = "simd")]
 use wide::u8x16;
 

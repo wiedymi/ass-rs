@@ -20,7 +20,11 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-use alloc::{format, string::String, vec::Vec};
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::String, vec, vec::Vec};
+
+#[cfg(feature = "std")]
+use std::{format, string::String, vec::Vec};
 use core::{fmt, ops::Range};
 
 pub mod benchmark_generators;

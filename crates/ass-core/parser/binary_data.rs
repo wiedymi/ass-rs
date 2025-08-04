@@ -1,4 +1,4 @@
-//! Binary data parsing for [Fonts] and [Graphics] sections
+//! Binary data parsing for `[Fonts]` and `[Graphics]` sections
 //!
 //! Handles UU-encoded font and graphic data embedded in ASS scripts.
 //! Both sections use similar structure: filename declaration followed by

@@ -7,6 +7,12 @@
 use super::CoreError;
 use core::fmt;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::ToString};
+
 /// Error category for filtering and user interface organization
 ///
 /// Provides a way to group related errors for better organization in user
@@ -358,7 +364,10 @@ mod tests {
 
     #[test]
     fn all_error_categories_hash() {
+        #[cfg(feature = "std")]
         use std::collections::HashSet;
+        #[cfg(not(feature = "std"))]
+        use hashbrown::HashSet;
 
         let categories = [
             ErrorCategory::Parsing,

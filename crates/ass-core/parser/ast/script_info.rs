@@ -5,6 +5,12 @@
 //! for common metadata fields.
 
 use alloc::vec::Vec;
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{vec};
 #[cfg(debug_assertions)]
 use core::ops::Range;
 

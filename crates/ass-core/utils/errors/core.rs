@@ -14,6 +14,12 @@
 use alloc::{format, string::String};
 use core::fmt;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format};
+
 #[cfg(feature = "std")]
 use thiserror::Error;
 

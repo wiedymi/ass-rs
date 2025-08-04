@@ -2,6 +2,12 @@
 
 use super::*;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec, string::ToString};
+
 #[test]
 fn tokenizer_new_without_bom() {
     let tokenizer = AssTokenizer::new("Hello World");

@@ -6,6 +6,12 @@ use core::ops::Range;
 use crate::parser::errors::ParseError;
 use crate::parser::SectionType;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{string::ToString};
+
 /// Represents a text change in the source
 #[derive(Debug, Clone)]
 pub struct TextChange {

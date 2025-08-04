@@ -3,6 +3,12 @@
 //! Contains the Style struct representing style definitions from the
 //! [V4+ Styles] section with zero-copy design and style property accessors.
 
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec};
 #[cfg(debug_assertions)]
 use core::ops::Range;
 

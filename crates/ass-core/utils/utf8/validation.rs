@@ -22,6 +22,12 @@ use crate::utils::CoreError;
 use alloc::{format, string::String, string::ToString};
 use core::str;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::ToString};
+
 /// Validate UTF-8 with detailed error information
 ///
 /// Provides more detailed error reporting than standard UTF-8 validation,

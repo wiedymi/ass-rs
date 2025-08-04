@@ -320,7 +320,10 @@ impl LazyValidator {
         let issues = self.validate_with_core(&content, document)?;
 
         // Update cache
+        #[cfg(feature = "std")]
         let mut result = ValidationResult::new(issues);
+        #[cfg(not(feature = "std"))]
+        let result = ValidationResult::new(issues);
 
         #[cfg(feature = "std")]
         {

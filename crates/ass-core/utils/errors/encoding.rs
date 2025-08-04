@@ -8,6 +8,12 @@ use super::CoreError;
 use alloc::{format, string::String};
 use core::fmt;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::ToString};
+
 /// Create UTF-8 encoding error with position information
 ///
 /// Generates a `CoreError::Utf8Error` with detailed position and context

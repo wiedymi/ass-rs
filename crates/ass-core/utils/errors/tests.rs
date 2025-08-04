@@ -4,6 +4,12 @@ use super::core::*;
 use crate::parser::ParseError;
 use alloc::format;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::ToString};
+
 #[test]
 fn core_error_parse_creation() {
     let error = CoreError::parse("test parse error");

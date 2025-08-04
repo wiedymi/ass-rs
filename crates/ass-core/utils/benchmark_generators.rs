@@ -5,6 +5,12 @@
 //! All generators produce valid ASS format strings that can be parsed by
 //! the core parser.
 
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::ToString};
 #[cfg(not(feature = "std"))]
 use alloc::{
     fmt::Write,

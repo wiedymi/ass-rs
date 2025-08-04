@@ -7,6 +7,12 @@ use crate::{utils::CoreError, Result};
 use alloc::{format, string::ToString};
 use core::str::Chars;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec, string::ToString};
+
 #[cfg(feature = "simd")]
 use super::simd;
 use super::{state::TokenContext, tokens::TokenType};
