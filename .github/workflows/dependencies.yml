@@ -1,0 +1,56 @@
+name: Dependencies
+
+on:
+  schedule:
+    # Run every Monday at 8am UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+jobs:
+  update:
+    name: Update Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Update dependencies
+        run: |
+          cargo update
+          cargo upgrade --workspace --skip-compatible
+          
+      - name: Check for changes
+        id: changes
+        run: |
+          if [[ -n $(git status -s) ]]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Run tests
+        if: steps.changes.outputs.changes == 'true'
+        run: |
+          cargo test --workspace --all-features
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
+          
+      - name: Create Pull Request
+        if: steps.changes.outputs.changes == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: Update dependencies'
+          title: 'chore: Update dependencies'
+          body: |
+            ## Automated Dependency Updates
+            
+            This PR updates the workspace dependencies to their latest compatible versions.
+            
+            ### Checklist
+            - [ ] All tests pass
+            - [ ] No new clippy warnings
+            - [ ] Review security advisories
+            - [ ] Check for breaking changes in dependencies
+          branch: update-dependencies
+          delete-branch: true

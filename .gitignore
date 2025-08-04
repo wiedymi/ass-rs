@@ -1,4 +1,5 @@
 .*
+!.github
 target
 *.profraw
 cobertura.xml

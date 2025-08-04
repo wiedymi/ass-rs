@@ -1,0 +1,123 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.*'
+      - 'ass-core-v[0-9]+.*'
+      - 'ass-editor-v[0-9]+.*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Create GitHub release
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.release.outputs.upload_url }}
+      release_version: ${{ env.RELEASE_VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get version
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+      - name: Create GitHub Release
+        id: release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.RELEASE_VERSION }}
+          release_name: ${{ env.RELEASE_VERSION }}
+          draft: true
+          prerelease: false
+
+  # Build and upload release artifacts
+  build-release:
+    name: Build Release
+    needs: ['create-release']
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      
+      - name: Build release binaries
+        run: cargo build --release --target ${{ matrix.target }} --all-features
+
+  # Publish to crates.io
+  publish-crates:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    needs: ['create-release']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      
+      - name: Check crate publishing order
+        id: check
+        run: |
+          if [[ "${{ needs.create-release.outputs.release_version }}" == ass-core-v* ]]; then
+            echo "PUBLISH_CRATE=ass-core" >> $GITHUB_ENV
+          elif [[ "${{ needs.create-release.outputs.release_version }}" == ass-editor-v* ]]; then
+            echo "PUBLISH_CRATE=ass-editor" >> $GITHUB_ENV
+          elif [[ "${{ needs.create-release.outputs.release_version }}" == v* ]]; then
+            echo "PUBLISH_CRATE=workspace" >> $GITHUB_ENV
+          fi
+      
+      - name: Publish ass-core
+        if: env.PUBLISH_CRATE == 'ass-core' || env.PUBLISH_CRATE == 'workspace'
+        run: |
+          cargo publish -p ass-core --token ${{ secrets.CRATES_IO_TOKEN }}
+          
+      - name: Wait for ass-core to be available
+        if: env.PUBLISH_CRATE == 'workspace'
+        run: |
+          for i in {1..60}; do
+            if cargo search ass-core | grep -q "ass-core ="; then
+              echo "ass-core is now available on crates.io"
+              break
+            fi
+            echo "Waiting for ass-core to be available... ($i/60)"
+            sleep 10
+          done
+          
+      - name: Publish ass-editor
+        if: env.PUBLISH_CRATE == 'ass-editor' || env.PUBLISH_CRATE == 'workspace'
+        run: |
+          cargo publish -p ass-editor --token ${{ secrets.CRATES_IO_TOKEN }}
+
+  # Generate and upload documentation
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    needs: ['publish-crates']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      
+      - name: Build documentation
+        run: cargo doc --workspace --all-features --no-deps
+        
+      - name: Upload to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./target/doc
