@@ -9,7 +9,6 @@
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
-
 #[cfg(not(feature = "std"))]
 use alloc::{format, string::ToString};
 #[allow(
@@ -24,7 +23,6 @@ use ass_core::{
 };
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::{hint::black_box as std_black_box, time::Instant};
-
 /// Check if running in quick mode (for CI or quick tests)
 fn is_quick_bench() -> bool {
     std::env::var("QUICK_BENCH").is_ok()

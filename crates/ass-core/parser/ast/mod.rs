@@ -36,14 +36,11 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
-#[cfg(not(feature = "std"))]
-use alloc::vec;
 mod event;
 mod media;
 mod script_info;
 mod section;
 mod style;
-
 // Re-export all public types to maintain API compatibility
 pub use event::{Event, EventType};
 pub use media::{Font, Graphic};
@@ -103,7 +100,7 @@ impl Span {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::vec;
+    
 
     #[test]
     fn test_span_creation() {

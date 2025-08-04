@@ -38,9 +38,6 @@
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
-
-#[cfg(not(feature = "std"))]
-use alloc::{format, string::ToString, vec};
 mod delta;
 mod processor;
 mod state;
@@ -51,11 +48,7 @@ pub use processor::LineProcessor;
 pub use state::{ParserState, SectionKind, StreamingContext};
 
 use crate::{utils::CoreError, Result, ScriptVersion};
-use alloc::{
-    format,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{format, string::{String, ToString}, vec::Vec};
 use core::ops::Range;
 
 /// Result of streaming parser containing owned sections

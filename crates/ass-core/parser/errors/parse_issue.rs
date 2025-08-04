@@ -9,10 +9,6 @@ use core::fmt;
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
-
-#[cfg(not(feature = "std"))]
-use alloc::{format, string::ToString};
-
 /// Parse issue severity levels for partial recovery
 ///
 /// Determines how serious an issue is and whether it should block processing.

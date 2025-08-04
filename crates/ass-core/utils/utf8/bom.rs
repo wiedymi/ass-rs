@@ -17,7 +17,6 @@
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
-
 /// Byte Order Mark (BOM) signatures for common encodings
 ///
 /// Represents the different types of BOMs that can appear at the beginning

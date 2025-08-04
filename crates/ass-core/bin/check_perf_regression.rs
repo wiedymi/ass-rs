@@ -5,7 +5,6 @@
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
-
 #[cfg(not(feature = "std"))]
 use alloc::{format, string::ToString};
 #[allow(clippy::missing_docs_in_private_items)]
@@ -17,7 +16,6 @@ use std::{
     path::Path,
     process,
 };
-
 /// Performance regression threshold percentage
 const REGRESSION_THRESHOLD_PERCENT: f64 = 10.0;
 /// Incremental parsing target in milliseconds

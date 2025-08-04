@@ -15,12 +15,10 @@ use core::hash::{BuildHasher, Hasher};
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
-
 #[cfg(not(feature = "std"))]
 use hashbrown::HashMap;
 #[cfg(feature = "std")]
 use std::collections::HashMap;
-
 /// Create a new `HashMap` with optimized hasher for ASS-RS use cases
 ///
 /// Uses ahash for consistent performance across platforms with `DoS` resistance.

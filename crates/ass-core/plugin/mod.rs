@@ -42,7 +42,6 @@ use std::collections::HashMap;
 
 #[cfg(not(feature = "std"))]
 use hashbrown::HashMap;
-
 pub mod sections;
 pub mod tags;
 

@@ -7,10 +7,6 @@ use alloc::{format, string::String, vec::Vec};
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
-
-#[cfg(not(feature = "std"))]
-use alloc::{format, string::ToString};
-
 /// Tokenization context for state-aware parsing
 ///
 /// Tracks current parsing context to enable context-sensitive tokenization

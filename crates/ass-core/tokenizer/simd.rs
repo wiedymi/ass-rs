@@ -16,12 +16,11 @@
 //! `wide` crate. No unsafe code is used in this module.
 
 use crate::utils::CoreError;
+use wide::u8x16;
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
-
 #[cfg(not(feature = "std"))]
-use alloc::{format, vec};
 
 #[cfg(feature = "simd")]
 use wide::u8x16;
