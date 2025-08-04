@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/ass-core.svg)](https://crates.io/crates/ass-core)
 [![Documentation](https://docs.rs/ass-core/badge.svg)](https://docs.rs/ass-core)
-[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](../../../LICENSE-MIT)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
 
 High-performance ASS (Advanced SubStation Alpha) subtitle format parser and analyzer for Rust.
 
@@ -176,12 +176,7 @@ If you see warnings about unable to complete samples:
 
 ## License
 
-Licensed under either of
-
-- Apache License, Version 2.0 ([LICENSE-APACHE](../../../LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-- MIT license ([LICENSE-MIT](../../../LICENSE-MIT) or http://opensource.org/licenses/MIT)
-
-at your option.
+Licensed under the [MIT license](../../LICENSE).
 
 ## Contributing
 
