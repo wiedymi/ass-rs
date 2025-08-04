@@ -189,7 +189,7 @@ fn escape_sequence_parsing() {
     assert_eq!(parse_escape_sequence("\\n"), Some('\n'));
     assert_eq!(parse_escape_sequence("\\r"), Some('\r'));
     assert_eq!(parse_escape_sequence("\\t"), Some('\t'));
-    assert_eq!(parse_escape_sequence("\\\\"), Some('\\'));
+    assert_eq!(parse_escape_sequence("`[Events]`"), Some('\\'));
     assert_eq!(parse_escape_sequence("\\{"), Some('{'));
     assert_eq!(parse_escape_sequence("\\}"), Some('}'));
 }

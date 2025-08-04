@@ -64,7 +64,7 @@ impl<'a> ScriptInfo<'a> {
         self.fields.iter().find(|(k, _)| *k == key).map(|(_, v)| *v)
     }
 
-    /// Get script title, defaulting to "<untitled>"
+    /// Get script title, defaulting to `<untitled>`
     ///
     /// Returns the "Title" field value or a default if not specified.
     /// This is a convenience method for the most commonly accessed field.

@@ -7,10 +7,10 @@
 //! - Memory cleanup and garbage collection
 
 use ass_editor::{
-    core::{EditorDocument, Position, Range, UndoStackConfig},
     commands::*,
+    core::{EditorDocument, Position, Range, UndoStackConfig},
 };
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
 /// Generate a very large ASS script
 fn generate_large_script(events: usize, styles: usize) -> String {
@@ -74,19 +74,25 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
         let layer = i % 3;
         let style = format!("Style{}", i % styles);
         let start_seconds = i * 2;
-        let start_time = format!("0:{:02}:{:02}.{:02}", 
-            start_seconds / 3600, 
-            (start_seconds % 3600) / 60, 
+        let start_time = format!(
+            "0:{:02}:{:02}.{:02}",
+            start_seconds / 3600,
+            (start_seconds % 3600) / 60,
             (start_seconds % 60)
         );
-        let end_time = format!("0:{:02}:{:02}.{:02}", 
-            (start_seconds + 5) / 3600, 
-            ((start_seconds + 5) % 3600) / 60, 
+        let end_time = format!(
+            "0:{:02}:{:02}.{:02}",
+            (start_seconds + 5) / 3600,
+            ((start_seconds + 5) % 3600) / 60,
             ((start_seconds + 5) % 60)
         );
         let text = &complex_texts[i % complex_texts.len()];
-        let actor = if i % 5 == 0 { format!("Actor{}", i % 10) } else { String::new() };
-        
+        let actor = if i % 5 == 0 {
+            format!("Actor{}", i % 10)
+        } else {
+            String::new()
+        };
+
         script.push_str(&format!(
             "Dialogue: {layer},{start_time},{end_time},{style},{actor},0,0,0,,{text} [Event #{i}]\n"
         ));
@@ -98,41 +104,29 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
 /// Benchmark large document creation and parsing
 fn bench_large_document_ops(c: &mut Criterion) {
     let mut group = c.benchmark_group("large_document_ops");
-    
+
     for size in [1000, 5000, 10000].iter() {
         let script = generate_large_script(*size, 50);
         let script_size = script.len();
-        
+
         group.throughput(Throughput::Bytes(script_size as u64));
-        group.bench_with_input(
-            BenchmarkId::new("parse", size),
-            size,
-            |b, _| {
-                b.iter(|| {
-                    black_box(EditorDocument::from_content(&script).unwrap())
-                });
-            },
-        );
-        
-        group.bench_with_input(
-            BenchmarkId::new("clone", size),
-            size,
-            |b, _| {
-                let doc = EditorDocument::from_content(&script).unwrap();
-                b.iter(|| {
-                    black_box(EditorDocument::from_content(&doc.text()).unwrap())
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("parse", size), size, |b, _| {
+            b.iter(|| black_box(EditorDocument::from_content(&script).unwrap()));
+        });
+
+        group.bench_with_input(BenchmarkId::new("clone", size), size, |b, _| {
+            let doc = EditorDocument::from_content(&script).unwrap();
+            b.iter(|| black_box(EditorDocument::from_content(&doc.text()).unwrap()));
+        });
     }
-    
+
     group.finish();
 }
 
 /// Benchmark undo/redo stack operations
 fn bench_undo_redo_stack(c: &mut Criterion) {
     let mut group = c.benchmark_group("undo_redo_stack");
-    
+
     // Test with different stack depths
     for max_entries in [50, 100, 500].iter() {
         group.bench_with_input(
@@ -141,7 +135,8 @@ fn bench_undo_redo_stack(c: &mut Criterion) {
             |b, &max| {
                 b.iter_batched(
                     || {
-                        let mut doc = EditorDocument::from_content(&generate_large_script(100, 10)).unwrap();
+                        let mut doc =
+                            EditorDocument::from_content(&generate_large_script(100, 10)).unwrap();
                         let config = UndoStackConfig {
                             max_entries: max,
                             max_memory: 100 * 1024 * 1024, // 100MB
@@ -162,21 +157,22 @@ fn bench_undo_redo_stack(c: &mut Criterion) {
                 );
             },
         );
-        
+
         group.bench_with_input(
             BenchmarkId::new("undo_operations", max_entries),
             max_entries,
             |b, &max| {
                 b.iter_batched(
                     || {
-                        let mut doc = EditorDocument::from_content(&generate_large_script(100, 10)).unwrap();
+                        let mut doc =
+                            EditorDocument::from_content(&generate_large_script(100, 10)).unwrap();
                         let config = UndoStackConfig {
                             max_entries: max,
                             max_memory: 100 * 1024 * 1024,
                             ..Default::default()
                         };
                         doc.undo_manager_mut().set_config(config);
-                        
+
                         // Fill with operations
                         for i in 0..30 {
                             let pos = Position::new(1000 + i * 10);
@@ -196,7 +192,7 @@ fn bench_undo_redo_stack(c: &mut Criterion) {
             },
         );
     }
-    
+
     group.finish();
 }
 
@@ -204,24 +200,25 @@ fn bench_undo_redo_stack(c: &mut Criterion) {
 #[cfg(feature = "arena")]
 fn bench_arena_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("arena_operations");
-    
+
     // Test arena reset after many operations
     group.bench_function("arena_reset_efficiency", |b| {
         b.iter_batched(
             || {
-                let mut doc = EditorDocument::from_content(&generate_large_script(500, 20)).unwrap();
-                
+                let mut doc =
+                    EditorDocument::from_content(&generate_large_script(500, 20)).unwrap();
+
                 // Perform many operations to fill arena
                 for i in 0..100 {
                     let pos = Position::new(1000 + i * 5);
                     doc.insert(pos, "TEST").unwrap();
                 }
-                
+
                 // Undo half
                 for _ in 0..50 {
                     doc.undo().unwrap();
                 }
-                
+
                 doc
             },
             |mut doc| {
@@ -232,7 +229,7 @@ fn bench_arena_operations(c: &mut Criterion) {
             criterion::BatchSize::SmallInput,
         );
     });
-    
+
     // Test memory efficiency with repeated operations
     group.bench_function("repeated_ops_memory", |b| {
         b.iter_batched(
@@ -249,16 +246,16 @@ fn bench_arena_operations(c: &mut Criterion) {
             criterion::BatchSize::SmallInput,
         );
     });
-    
+
     group.finish();
 }
 
 /// Benchmark batch operations on large documents
 fn bench_batch_large_ops(c: &mut Criterion) {
     let mut group = c.benchmark_group("batch_large_ops");
-    
+
     let script = generate_large_script(5000, 50);
-    
+
     // Batch style changes
     group.bench_function("batch_style_changes", |b| {
         b.iter_batched(
@@ -268,85 +265,81 @@ fn bench_batch_large_ops(c: &mut Criterion) {
                     .add_command(Box::new(
                         EditStyleCommand::new("Style1".to_string())
                             .set_size(24)
-                            .set_bold(true)
+                            .set_bold(true),
                     ))
                     .add_command(Box::new(
-                        EditStyleCommand::new("Style5".to_string())
-                            .set_font("Helvetica")
+                        EditStyleCommand::new("Style5".to_string()).set_font("Helvetica"),
                     ))
                     .add_command(Box::new(
-                        EditStyleCommand::new("Style10".to_string())
-                            .set_color("&H00FF00FF")
+                        EditStyleCommand::new("Style10".to_string()).set_color("&H00FF00FF"),
                     ));
-                
+
                 black_box(batch.execute(&mut doc).unwrap())
             },
             criterion::BatchSize::SmallInput,
         );
     });
-    
+
     // Batch tag operations
     group.bench_function("batch_tag_ops", |b| {
         b.iter_batched(
             || EditorDocument::from_content(&script).unwrap(),
             |mut doc| {
                 let batch = BatchCommand::new("Batch tag update".to_string())
+                    .add_command(Box::new(ReplaceTagCommand::new(
+                        Range::new(Position::new(0), Position::new(10000)),
+                        "\\pos(960,540)".to_string(),
+                        "\\pos(640,360)".to_string(),
+                    )))
                     .add_command(Box::new(
-                        ReplaceTagCommand::new(Range::new(Position::new(0), Position::new(10000)), "\\pos(960,540)".to_string(), "\\pos(640,360)".to_string())
+                        RemoveTagCommand::new(Range::new(Position::new(0), Position::new(10000)))
+                            .pattern("\\be1".to_string()),
                     ))
-                    .add_command(Box::new(
-                        RemoveTagCommand::new(Range::new(Position::new(0), Position::new(10000))).pattern("\\be1".to_string())
-                    ))
-                    .add_command(Box::new(
-                        InsertTagCommand::new(Position::new(1000), "\\fade(255,0)".to_string())
-                    ));
-                
+                    .add_command(Box::new(InsertTagCommand::new(
+                        Position::new(1000),
+                        "\\fade(255,0)".to_string(),
+                    )));
+
                 black_box(batch.execute(&mut doc).unwrap())
             },
             criterion::BatchSize::SmallInput,
         );
     });
-    
+
     group.finish();
 }
 
 /// Benchmark validation on large documents
 fn bench_large_validation(c: &mut Criterion) {
     let mut group = c.benchmark_group("large_validation");
-    
+
     for size in [1000, 5000, 10000].iter() {
         let script = generate_large_script(*size, 50);
-        
-        group.bench_with_input(
-            BenchmarkId::new("validate_basic", size),
-            size,
-            |b, _| {
-                b.iter_batched(
-                    || EditorDocument::from_content(&script).unwrap(),
-                    |doc| {
-                        doc.validate().unwrap();
-                        black_box(())
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
-        
+
+        group.bench_with_input(BenchmarkId::new("validate_basic", size), size, |b, _| {
+            b.iter_batched(
+                || EditorDocument::from_content(&script).unwrap(),
+                |doc| {
+                    doc.validate().unwrap();
+                    black_box(())
+                },
+                criterion::BatchSize::SmallInput,
+            );
+        });
+
         group.bench_with_input(
             BenchmarkId::new("validate_comprehensive", size),
             size,
             |b, _| {
                 b.iter_batched(
                     || EditorDocument::from_content(&script).unwrap(),
-                    |mut doc| {
-                        black_box(doc.validate_comprehensive().unwrap())
-                    },
+                    |mut doc| black_box(doc.validate_comprehensive().unwrap()),
                     criterion::BatchSize::SmallInput,
                 );
             },
         );
     }
-    
+
     group.finish();
 }
 

@@ -296,16 +296,15 @@ Dialogue: 0,0:00:05.00,0:00:10.00,Default,John,0,0,0,,Hello, world!"#;
         assert!(doc.text().contains("Hello, ASS-RS!"));
     }
 
-    #[test] 
+    #[test]
     fn test_delta_batch_command() {
         let mut doc = EditorDocument::from_content("[Script Info]\nTitle: Test").unwrap();
 
         // Simple single command batch to test the infrastructure without complex position calculations
-        let batch = DeltaBatchCommand::new()
-            .add_command(IncrementalInsertCommand::new(
-                Position::new(doc.len_bytes()),
-                "\nAuthor: Test".to_string(),
-            ));
+        let batch = DeltaBatchCommand::new().add_command(IncrementalInsertCommand::new(
+            Position::new(doc.len_bytes()),
+            "\nAuthor: Test".to_string(),
+        ));
 
         let results = batch.execute_batch(&mut doc).unwrap();
         assert_eq!(results.len(), 1);

@@ -171,7 +171,9 @@ mod tests {
         let mut ext = SyntaxHighlightExtension::new();
         let mut manager = ExtensionManager::new();
         let mut doc = EditorDocument::new();
-        let mut context = manager.create_context("test".to_string(), Some(&mut doc)).unwrap();
+        let mut context = manager
+            .create_context("test".to_string(), Some(&mut doc))
+            .unwrap();
 
         // Initialize
         assert_eq!(ext.state(), ExtensionState::Uninitialized);
@@ -199,7 +201,9 @@ mod tests {
         manager.set_config("syntax.max_tokens".to_string(), "5000".to_string());
 
         let mut doc = EditorDocument::new();
-        let mut context = manager.create_context("test".to_string(), Some(&mut doc)).unwrap();
+        let mut context = manager
+            .create_context("test".to_string(), Some(&mut doc))
+            .unwrap();
 
         // Initialize should load config
         ext.initialize(&mut *context).unwrap();

@@ -75,7 +75,7 @@ Title: Test
 [Malformed Section
 This section has no closing bracket
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -131,12 +131,12 @@ Title: Test
 [Script Info]
 Title: Test
 
-[Fonts]
+[Fonts\]
 fontname: Arial
 0
 M 0 0 L 100 100
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -157,12 +157,12 @@ Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 [Script Info]
 Title: Test
 
-[Graphics]
+[Graphics\]
 filename: logo.png
 0
 89504E470D0A1A0A
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -211,7 +211,7 @@ Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 [Unknown Section]
 Style: Default,Arial,20,&Hffffff,&H0,&H0,&H0,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -296,7 +296,7 @@ More content
 [Unknown3]
 Even more content
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -323,7 +323,7 @@ Dialogue: 0:00:00.00,0:00:05.00,Default,Test
         let empty_content = r"
 [Script Info]
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";

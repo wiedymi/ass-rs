@@ -15,9 +15,13 @@ use alloc::borrow::Cow;
 #[cfg(feature = "std")]
 use std::collections::HashMap;
 
-
 #[cfg(not(feature = "std"))]
-use alloc::{boxed::Box, string::{String, ToString}, vec::Vec, format};
+use alloc::{
+    boxed::Box,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 #[cfg(not(feature = "std"))]
 use hashbrown::HashMap;
@@ -176,7 +180,11 @@ pub trait DocumentSearch {
     fn update_index(&mut self, document: &EditorDocument, changes: &[Range]) -> Result<()>;
 
     /// Search for a pattern in the document
-    fn search<'a>(&'a self, pattern: &str, options: &SearchOptions) -> Result<Vec<SearchResult<'a>>>;
+    fn search<'a>(
+        &'a self,
+        pattern: &str,
+        options: &SearchOptions,
+    ) -> Result<Vec<SearchResult<'a>>>;
 
     /// Find and replace text in the document
     fn find_replace<'a>(
@@ -216,7 +224,7 @@ pub struct DocumentSearchImpl {
 
     /// Search statistics
     stats: SearchStats,
-    
+
     /// Cached document text for regex and basic searches
     cached_text: String,
 }
@@ -282,7 +290,7 @@ impl DocumentSearchImpl {
                         } else {
                             Cow::Owned(current_word.to_lowercase())
                         };
-                        
+
                         words
                             .entry(word_key)
                             .or_default()
@@ -303,7 +311,7 @@ impl DocumentSearchImpl {
                 } else {
                     Cow::Owned(current_word.to_lowercase())
                 };
-                
+
                 words
                     .entry(word_key)
                     .or_default()
@@ -361,9 +369,13 @@ impl DocumentSearchImpl {
             options.scope
         )
     }
-    
+
     /// Perform basic text search without FST indexing
-    fn basic_search(&self, pattern: &str, options: &SearchOptions) -> Result<Vec<SearchResult<'static>>> {
+    fn basic_search(
+        &self,
+        pattern: &str,
+        options: &SearchOptions,
+    ) -> Result<Vec<SearchResult<'static>>> {
         let mut results = Vec::new();
         let search_pattern = if options.case_sensitive {
             pattern.to_string()
@@ -380,13 +392,15 @@ impl DocumentSearchImpl {
         // Apply search scope
         let (search_start, search_end) = match &options.scope {
             SearchScope::All => (0, search_text.len()),
-            SearchScope::Range(range) => (range.start.offset, range.end.offset.min(search_text.len())),
+            SearchScope::Range(range) => {
+                (range.start.offset, range.end.offset.min(search_text.len()))
+            }
             SearchScope::Lines { start, end } => {
                 // Calculate byte offsets for line range
                 let mut line_num = 0;
                 let mut start_offset = 0;
                 let mut end_offset = search_text.len();
-                
+
                 for (i, ch) in search_text.char_indices() {
                     if line_num == *start && start_offset == 0 {
                         start_offset = i;
@@ -410,7 +424,7 @@ impl DocumentSearchImpl {
 
         let search_region = &search_text[search_start..search_end];
         let mut region_offset = 0;
-        
+
         while let Some(match_idx) = search_region[region_offset..].find(&search_pattern) {
             let absolute_idx = search_start + region_offset + match_idx;
             let match_end = absolute_idx + search_pattern.len();
@@ -457,26 +471,30 @@ impl DocumentSearchImpl {
 
         Ok(results)
     }
-    
+
     /// Perform regex-based search
     #[cfg(all(feature = "formats", feature = "std"))]
-    fn regex_search(&self, pattern: &str, options: &SearchOptions) -> Result<Vec<SearchResult<'static>>> {
+    fn regex_search(
+        &self,
+        pattern: &str,
+        options: &SearchOptions,
+    ) -> Result<Vec<SearchResult<'static>>> {
         use crate::core::EditorError;
-        
+
         // Compile regex
         let regex_pattern = if options.case_sensitive {
             Regex::new(pattern)
         } else {
             Regex::new(&format!("(?i){pattern}"))
         };
-        
+
         let regex = regex_pattern.map_err(|e| EditorError::CommandFailed {
             message: format!("Invalid regex pattern: {e}"),
         })?;
-        
+
         let mut results = Vec::new();
         let text = &self.cached_text;
-        
+
         // Apply search scope
         let (search_start, search_end) = match &options.scope {
             SearchScope::All => (0, text.len()),
@@ -486,7 +504,7 @@ impl DocumentSearchImpl {
                 let mut line_num = 0;
                 let mut start_offset = 0;
                 let mut end_offset = text.len();
-                
+
                 for (i, ch) in text.char_indices() {
                     if line_num == *start && start_offset == 0 {
                         start_offset = i;
@@ -507,14 +525,14 @@ impl DocumentSearchImpl {
                 (0, text.len())
             }
         };
-        
+
         let search_text = &text[search_start..search_end];
-        
+
         // Find all matches
         for mat in regex.find_iter(search_text) {
             let match_start = search_start + mat.start();
             let match_end = search_start + mat.end();
-            
+
             // Calculate line and column
             let mut line = 0;
             let mut line_start = 0;
@@ -525,14 +543,15 @@ impl DocumentSearchImpl {
                 }
             }
             let column = match_start - line_start;
-            
+
             // Extract context (line containing the match)
             let context_start = text[..match_start].rfind('\n').map(|i| i + 1).unwrap_or(0);
-            let context_end = text[match_start..].find('\n')
+            let context_end = text[match_start..]
+                .find('\n')
                 .map(|i| match_start + i)
                 .unwrap_or(text.len());
             let context = text[context_start..context_end].to_string();
-            
+
             results.push(SearchResult {
                 start: Position::new(match_start),
                 end: Position::new(match_end),
@@ -541,15 +560,14 @@ impl DocumentSearchImpl {
                 line,
                 column,
             });
-            
+
             if options.max_results > 0 && results.len() >= options.max_results {
                 break;
             }
         }
-        
+
         Ok(results)
     }
-    
 }
 
 impl Default for DocumentSearchImpl {
@@ -565,7 +583,7 @@ impl DocumentSearch for DocumentSearchImpl {
 
         let text = document.text();
         self.cached_text = text.clone(); // Cache for regex and basic searches
-        
+
         #[cfg(feature = "search-index")]
         {
             let words = self.extract_words(&text);
@@ -583,12 +601,12 @@ impl DocumentSearch for DocumentSearchImpl {
             // Update statistics
             self.stats.index_size = self.word_positions.len() * 50; // Rough estimate
         }
-        
+
         #[cfg(not(feature = "search-index"))]
         {
             self.stats.index_size = self.cached_text.len();
         }
-        
+
         self.document_version += 1; // Simple increment for cache invalidation
 
         // Clear cache since index changed
@@ -610,59 +628,68 @@ impl DocumentSearch for DocumentSearchImpl {
         {
             self.document_version += 1;
             self.result_cache.clear();
-            return Ok(());
+            Ok(())
         }
-        
+
         // For FST search, perform incremental updates
         #[cfg(feature = "search-index")]
         {
             // Calculate total change size
-            let total_change_size: usize = changes.iter()
+            let total_change_size: usize = changes
+                .iter()
                 .map(|r| r.end.offset.saturating_sub(r.start.offset))
                 .sum();
-            
+
             // If too many changes or large changes, rebuild entirely
             if changes.len() > 10 || total_change_size > 1000 {
                 return self.build_index(document);
             }
-            
+
             // Sort changes by position to process them in order
             let mut sorted_changes = changes.to_vec();
             sorted_changes.sort_by_key(|r| r.start.offset);
-            
+
             // Calculate cumulative offset adjustments
             let mut offset_adjustments: Vec<(usize, isize)> = Vec::new();
             let mut cumulative_adjustment = 0isize;
-            
+
             for change in &sorted_changes {
                 let old_len = change.end.offset - change.start.offset;
                 // Find the actual new text in this region
-                let new_text_region = &self.cached_text[change.start.offset.saturating_add_signed(cumulative_adjustment)..];
-                
+                let new_text_region = &self.cached_text[change
+                    .start
+                    .offset
+                    .saturating_add_signed(cumulative_adjustment)..];
+
                 // Estimate new length by finding next unchanged content
-                let new_len = if let Some(next_change) = sorted_changes.iter().find(|c| c.start.offset > change.end.offset) {
+                let new_len = if let Some(next_change) = sorted_changes
+                    .iter()
+                    .find(|c| c.start.offset > change.end.offset)
+                {
                     let expected_gap = next_change.start.offset - change.end.offset;
                     new_text_region.len().min(expected_gap)
                 } else {
                     // No more changes, estimate based on word boundaries
-                    new_text_region.find(['\n', '\r']).unwrap_or(new_text_region.len().min(old_len * 2))
+                    new_text_region
+                        .find(['\n', '\r'])
+                        .unwrap_or(new_text_region.len().min(old_len * 2))
                 };
-                
+
                 let adjustment = new_len as isize - old_len as isize;
                 offset_adjustments.push((change.start.offset, adjustment));
                 cumulative_adjustment += adjustment;
             }
-            
+
             // Update word positions
             let mut updated_positions = HashMap::new();
-            
+
             for (word, positions) in &self.word_positions {
                 let mut new_positions = Vec::new();
-                
+
                 for &pos in positions {
                     let mut adjusted_offset = pos.offset;
                     let mut should_remove = false;
-                    
+
                     // Check each change to see how it affects this position
                     for (i, change) in sorted_changes.iter().enumerate() {
                         if pos.offset >= change.start.offset && pos.offset < change.end.offset {
@@ -675,30 +702,31 @@ impl DocumentSearch for DocumentSearchImpl {
                             adjusted_offset = adjusted_offset.saturating_add_signed(adjustment);
                         }
                     }
-                    
+
                     if !should_remove {
                         new_positions.push(Position::new(adjusted_offset));
                     }
                 }
-                
+
                 if !new_positions.is_empty() {
                     updated_positions.insert(word.clone(), new_positions);
                 }
             }
-            
+
             // Extract new words from changed regions
             for (i, change) in sorted_changes.iter().enumerate() {
-                let start_adjustment: isize = offset_adjustments[..i].iter().map(|(_, adj)| adj).sum();
+                let start_adjustment: isize =
+                    offset_adjustments[..i].iter().map(|(_, adj)| adj).sum();
                 let adjusted_start = change.start.offset.saturating_add_signed(start_adjustment);
-                
+
                 // Get text around the change
                 let extract_start = adjusted_start.saturating_sub(50);
                 let extract_end = (adjusted_start + 100).min(self.cached_text.len());
-                
+
                 if extract_start < extract_end {
                     let region_text = &self.cached_text[extract_start..extract_end];
                     let new_words = self.extract_words(region_text);
-                    
+
                     // Add new words with adjusted positions
                     for (word, positions) in new_words {
                         let entry = updated_positions.entry(word.into_owned()).or_default();
@@ -712,13 +740,14 @@ impl DocumentSearch for DocumentSearchImpl {
                     }
                 }
             }
-            
+
             // Update the word positions
             self.word_positions = updated_positions;
-            
+
             // Rebuild FST with updated word list
             if !self.word_positions.is_empty() {
-                let words: Vec<(Cow<str>, Vec<Position>)> = self.word_positions
+                let words: Vec<(Cow<str>, Vec<Position>)> = self
+                    .word_positions
                     .iter()
                     .map(|(k, v)| (Cow::Borrowed(k.as_str()), v.clone()))
                     .collect();
@@ -726,12 +755,12 @@ impl DocumentSearch for DocumentSearchImpl {
             } else {
                 self.word_index = None;
             }
-            
+
             // Update statistics
             self.stats.index_size = self.word_positions.len() * 50;
             self.document_version += 1;
             self.result_cache.clear();
-            
+
             Ok(())
         }
     }
@@ -755,7 +784,8 @@ impl DocumentSearch for DocumentSearchImpl {
             #[cfg(not(all(feature = "formats", feature = "std")))]
             {
                 return Err(crate::core::EditorError::CommandFailed {
-                    message: "Regex search requires the 'formats' feature to be enabled".to_string(),
+                    message: "Regex search requires the 'formats' feature to be enabled"
+                        .to_string(),
                 });
             }
         } else {
@@ -785,7 +815,10 @@ impl DocumentSearch for DocumentSearchImpl {
                                     start: pos,
                                     end: Position::new(pos.offset + pattern.len()),
                                     text: std::borrow::Cow::Owned(pattern.to_string()),
-                                    context: std::borrow::Cow::Owned(format!("Offset {}", pos.offset)),
+                                    context: std::borrow::Cow::Owned(format!(
+                                        "Offset {}",
+                                        pos.offset
+                                    )),
                                     line: 0, // Would need document context to calculate actual line
                                     column: pos.offset,
                                 });
@@ -859,7 +892,6 @@ impl DocumentSearch for DocumentSearchImpl {
         self.stats.index_size = 0;
     }
 }
-
 
 /// Factory function to create a document search implementation
 pub fn create_search() -> Box<dyn DocumentSearch> {
@@ -936,38 +968,35 @@ mod tests {
     #[cfg(feature = "search-index")]
     fn test_incremental_index_updates() {
         use crate::core::{EditorDocument, Range};
-        
+
         // Create a document with initial content
         let mut doc = EditorDocument::from_content(
             "[Script Info]\nTitle: Test Search\n\n[Events]\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Hello world"
         ).unwrap();
-        
+
         // Create a search index and build initial index
         let mut search = DocumentSearchImpl::new();
         search.build_index(&doc).unwrap();
-        
+
         // Search for "hello" - should find it
         let results = search.search("hello", &SearchOptions::default()).unwrap();
         assert_eq!(results.len(), 1);
-        
+
         // Actually modify the document - change "Hello" to "Goodbye"
         let hello_pos = doc.text().find("Hello").unwrap();
-        let change_range = Range::new(
-            Position::new(hello_pos),
-            Position::new(hello_pos + 5)
-        );
-        
+        let change_range = Range::new(Position::new(hello_pos), Position::new(hello_pos + 5));
+
         // Delete "Hello" and insert "Goodbye"
         doc.delete(change_range).unwrap();
         doc.insert(Position::new(hello_pos), "Goodbye").unwrap();
-        
+
         // Update the index incrementally with the change
         search.update_index(&doc, &[change_range]).unwrap();
-        
+
         // Search for "hello" - should not find it anymore
         let results = search.search("hello", &SearchOptions::default()).unwrap();
         assert_eq!(results.len(), 0);
-        
+
         // Search for "goodbye" - should find it
         let results = search.search("goodbye", &SearchOptions::default()).unwrap();
         assert_eq!(results.len(), 1);
@@ -976,153 +1005,152 @@ mod tests {
     #[test]
     fn test_simple_document_search_rebuild() {
         use crate::core::{EditorDocument, Range};
-        
-        let mut doc = EditorDocument::from_content(
-            "The quick brown fox jumps over the lazy dog."
-        ).unwrap();
-        
+
+        let mut doc =
+            EditorDocument::from_content("The quick brown fox jumps over the lazy dog.").unwrap();
+
         let mut search = DocumentSearchImpl::new();
         search.build_index(&doc).unwrap();
-        
+
         // Verify initial search works
         let results = search.search("fox", &SearchOptions::default()).unwrap();
         assert_eq!(results.len(), 1);
-        
+
         // Modify document
         let fox_pos = doc.text().find("fox").unwrap();
         let change_range = Range::new(Position::new(fox_pos), Position::new(fox_pos + 3));
         doc.replace(change_range, "cat").unwrap();
-        
+
         // Update index with the change
         search.update_index(&doc, &[change_range]).unwrap();
-        
+
         // Now search for "fox" should find nothing
         let results = search.search("fox", &SearchOptions::default()).unwrap();
         assert_eq!(results.len(), 0);
-        
+
         // And "cat" should be found
         let results = search.search("cat", &SearchOptions::default()).unwrap();
         assert_eq!(results.len(), 1);
     }
-    
+
     #[test]
     #[cfg(all(feature = "formats", feature = "std"))]
     fn test_regex_search_basic() {
         use crate::core::EditorDocument;
-        
+
         let doc = EditorDocument::from_content(
-            "[Script Info]\nTitle: Test123\nPlayResX: 1920\nPlayResY: 1080"
-        ).unwrap();
-        
+            "[Script Info]\nTitle: Test123\nPlayResX: 1920\nPlayResY: 1080",
+        )
+        .unwrap();
+
         let mut search = DocumentSearchImpl::new();
         search.build_index(&doc).unwrap();
-        
+
         // Test basic regex pattern
         let options = SearchOptions {
             use_regex: true,
             ..Default::default()
         };
-        
+
         // Search for numbers
         let results = search.search(r"\d+", &options).unwrap();
         assert_eq!(results.len(), 3); // 123, 1920, 1080
-        
+
         // Search for "Play" followed by any word characters
         let results = search.search(r"Play\w+", &options).unwrap();
         assert_eq!(results.len(), 2); // PlayResX, PlayResY
     }
-    
+
     #[test]
     #[cfg(all(feature = "formats", feature = "std"))]
     fn test_regex_search_case_insensitive() {
         use crate::core::EditorDocument;
-        
-        let doc = EditorDocument::from_content(
-            "Hello WORLD\nhello world\nHeLLo WoRlD"
-        ).unwrap();
-        
+
+        let doc = EditorDocument::from_content("Hello WORLD\nhello world\nHeLLo WoRlD").unwrap();
+
         let mut search = DocumentSearchImpl::new();
         search.build_index(&doc).unwrap();
-        
+
         let options = SearchOptions {
             use_regex: true,
             case_sensitive: false,
             ..Default::default()
         };
-        
+
         // Case-insensitive regex search
         let results = search.search(r"hello\s+world", &options).unwrap();
         assert_eq!(results.len(), 3);
     }
-    
+
     #[test]
     #[cfg(all(feature = "formats", feature = "std", feature = "search-index"))]
     fn test_fst_regex_search() {
         use crate::core::EditorDocument;
-        
+
         let doc = EditorDocument::from_content(
-            "[Events]\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Test dialogue"
-        ).unwrap();
-        
+            "[Events]\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Test dialogue",
+        )
+        .unwrap();
+
         let mut search = DocumentSearchImpl::new();
         search.build_index(&doc).unwrap();
-        
+
         let options = SearchOptions {
             use_regex: true,
             ..Default::default()
         };
-        
+
         // Search for time codes pattern
         let results = search.search(r"\d:\d{2}:\d{2}\.\d{2}", &options).unwrap();
         assert_eq!(results.len(), 2); // Two time codes
-        
+
         // Verify the matches are correct
         assert_eq!(results[0].text, "0:00:00.00");
         assert_eq!(results[1].text, "0:00:05.00");
     }
-    
+
     #[test]
     #[cfg(all(feature = "formats", feature = "std"))]
     fn test_regex_search_with_scope() {
         use crate::core::EditorDocument;
-        
-        let doc = EditorDocument::from_content(
-            "Line 1: ABC\nLine 2: DEF\nLine 3: ABC\nLine 4: GHI"
-        ).unwrap();
-        
+
+        let doc =
+            EditorDocument::from_content("Line 1: ABC\nLine 2: DEF\nLine 3: ABC\nLine 4: GHI")
+                .unwrap();
+
         let mut search = DocumentSearchImpl::new();
         search.build_index(&doc).unwrap();
-        
+
         let options = SearchOptions {
             use_regex: true,
             scope: SearchScope::Lines { start: 1, end: 2 },
             ..Default::default()
         };
-        
+
         // Search for ABC in lines 1-2 only (0-based: lines at index 1 and 2)
         let results = search.search("ABC", &options).unwrap();
         assert_eq!(results.len(), 1); // ABC is on line 3 (index 2)
-        
+
         // Search for DEF in lines 1-2
         let results = search.search("DEF", &options).unwrap();
         assert_eq!(results.len(), 1); // DEF is on line 2 (index 1)
     }
-    
+
     #[test]
     #[cfg(not(all(feature = "formats", feature = "std")))]
     fn test_regex_search_feature_disabled() {
         use crate::core::EditorDocument;
-        
+
         let doc = EditorDocument::from_content("Test content").unwrap();
-        
+
         let mut search = DocumentSearchImpl::new();
         search.build_index(&doc).unwrap();
-        
+
         let options = SearchOptions {
             use_regex: true,
             ..Default::default()
         };
-        
+
         // Should return error when regex feature is not enabled
         let result = search.search("test", &options);
         assert!(result.is_err());

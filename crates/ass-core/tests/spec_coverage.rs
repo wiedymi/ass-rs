@@ -38,7 +38,7 @@ Style: Default,Arial,50,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,
 Style: Title,Impact,72,&H00FFD700,&H000000FF,&H00000000,&H80000000,1,0,0,0,120,120,2,0,1,3,3,2,0,0,0,1
 Style: Subtitle,Calibri,45,&H00E6E6FA,&H000000FF,&H00404040,&H80000000,0,1,0,0,95,95,1,0,1,1,1,8,20,20,20,1
 
-[Events]
+[Events\]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 ; Basic dialogue event
@@ -113,7 +113,7 @@ Command: 0,0:01:50.00,0:01:55.00,Default,,0,0,0,,{\c&H00FF00&}Special command ev
 Comment: 0,0:00:00.00,0:00:00.00,Default,,0,0,0,,This is a comment that should be ignored in rendering.
 Comment: 0,0:00:00.00,0:00:00.00,Default,,0,0,0,,{\b1}Comments can also contain formatting codes.
 
-[Fonts]
+[Fonts\]
 fontname: CustomFont.ttf
 M3%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J
 M<C%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J<C%J
@@ -293,7 +293,7 @@ fn test_drawing_commands_parsing() {
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
 
-[Events]
+[Events\]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{\p1}m 0 0 l 100 0 100 100 0 100{\p0}Square drawn.
 Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,{\p2}m 50 50 b 50 25 75 25 100 50 b 100 75 75 75 50 50{\p0}Bezier curve.
@@ -329,7 +329,7 @@ fn test_all_event_types_parsing() {
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
 
-[Events]
+[Events\]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Normal dialogue line.
 Comment: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,This is a comment.
@@ -362,11 +362,11 @@ fn test_embedded_media_integration() {
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
 
-[Events]
+[Events\]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Test with embedded media.
 
-[Fonts]
+[Fonts\]
 fontname: test.ttf
 #0V%T
 `
@@ -472,7 +472,7 @@ fn test_malformed_script_resilience() {
 Format: Name, Fontname
 Style: Incomplete
 
-[Events]
+[Events\]
 Format: Layer, Start, End, Text
 Dialogue: 0,invalid_time,another_invalid,Malformed event
 ";
@@ -496,7 +496,7 @@ fn test_large_script_handling() {
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
 
-[Events]
+[Events\]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 ",
     );
@@ -536,7 +536,7 @@ fn test_style_override_comprehensive() {
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
 
-[Events]
+[Events\]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 ; Basic text formatting
@@ -640,7 +640,7 @@ fn test_text_analysis_edge_cases() {
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
 
-[Events]
+[Events\]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 ; Empty and whitespace-only events
@@ -738,7 +738,7 @@ Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,
 Style: Incomplete,Arial,20  // Missing fields should be handled
 Style: ,,,,,,,,,,,,,,,,,,,,,,   // Empty fields
 
-[Events]
+[Events\]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 ; Valid events
@@ -821,7 +821,7 @@ fn test_performance_edge_cases() {
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
 
-[Events]
+[Events\]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 ",
     );
@@ -871,7 +871,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
 
-[Events]
+[Events\]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 {nested_overrides}
 "

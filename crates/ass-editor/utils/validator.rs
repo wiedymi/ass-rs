@@ -4,7 +4,7 @@
 //! wrapping ass-core's analysis capabilities with caching and
 //! incremental update support for better editor performance.
 
-use crate::core::{EditorDocument, Result, errors::EditorError};
+use crate::core::{errors::EditorError, EditorDocument, Result};
 
 #[cfg(feature = "analysis")]
 use ass_core::analysis::{AnalysisConfig, ScriptAnalysis, ScriptAnalysisOptions};
@@ -13,7 +13,11 @@ use ass_core::analysis::{AnalysisConfig, ScriptAnalysis, ScriptAnalysisOptions};
 use ass_core::analysis::linting::IssueSeverity;
 
 #[cfg(not(feature = "std"))]
-use alloc::{format, string::{String, ToString}, vec::Vec};
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 #[cfg(feature = "std")]
 use std::time::Instant;
@@ -302,8 +306,11 @@ impl LazyValidator {
 
         // Check if we can use cached result
         if self.should_use_cache(content_hash) {
-            return self.cached_result.as_ref()
-                .ok_or_else(|| EditorError::command_failed("Cache validation inconsistency: cached result expected but not found"));
+            return self.cached_result.as_ref().ok_or_else(|| {
+                EditorError::command_failed(
+                    "Cache validation inconsistency: cached result expected but not found",
+                )
+            });
         }
 
         #[cfg(feature = "std")]
@@ -328,8 +335,9 @@ impl LazyValidator {
             self.last_validation = Some(Instant::now());
         }
 
-        self.cached_result.as_ref()
-            .ok_or_else(|| EditorError::command_failed("Validation completed but cached result is missing"))
+        self.cached_result.as_ref().ok_or_else(|| {
+            EditorError::command_failed("Validation completed but cached result is missing")
+        })
     }
 
     /// Force validation even if cached result exists

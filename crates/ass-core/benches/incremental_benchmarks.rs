@@ -580,7 +580,7 @@ fn create_malformed_change(script_text: &str) -> TextChange {
     let mid = script_text.len() / 2;
     TextChange {
         range: mid..mid + 10,
-        new_text: "{\\\\ malformed {\\tag} content \\}".to_string(),
+        new_text: "{`[Events]` malformed {\\tag} content \\}".to_string(),
         line_range: 5..6,
     }
 }

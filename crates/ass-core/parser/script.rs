@@ -195,7 +195,7 @@ pub struct Script<'a> {
     /// Format fields for [V4+ Styles] section
     styles_format: Option<Vec<&'a str>>,
 
-    /// Format fields for [Events] section
+    /// Format fields for `[Events\]` section
     events_format: Option<Vec<&'a str>>,
 
     /// Change tracker for incremental updates
@@ -354,7 +354,7 @@ impl<'a> Script<'a> {
         self.styles_format.as_deref()
     }
 
-    /// Get format fields for [Events] section
+    /// Get format fields for `[Events\]` section
     #[must_use]
     pub fn events_format(&self) -> Option<&[&'a str]> {
         self.events_format.as_deref()
@@ -415,7 +415,7 @@ impl<'a> Script<'a> {
 
     /// Parse an event line with context from the script
     ///
-    /// Uses the script's stored format for [Events] section if available,
+    /// Uses the script's stored format for `[Events\]` section if available,
     /// otherwise falls back to default format.
     ///
     /// # Arguments
@@ -759,7 +759,7 @@ impl<'a> Script<'a> {
         }
     }
 
-    /// Add an event to the [Events] section
+    /// Add an event to the `[Events\]` section
     ///
     /// Creates the section if it doesn't exist.
     ///
@@ -2001,10 +2001,10 @@ mod tests {
 
     #[test]
     fn parse_very_long_content() {
-        #[cfg(feature = "std")]
-        use std::fmt::Write;
         #[cfg(not(feature = "std"))]
         use alloc::fmt::Write;
+        #[cfg(feature = "std")]
+        use std::fmt::Write;
 
         let mut content = String::from("[Script Info]\nTitle: Long Test\n");
         for i in 0..1000 {
@@ -2793,10 +2793,10 @@ Comment: 0,0:00:05.00,0:00:10.00,Default,This is a comment
 
     #[test]
     fn parse_large_script_comprehensive() {
-        #[cfg(feature = "std")]
-        use std::fmt::Write;
         #[cfg(not(feature = "std"))]
         use alloc::fmt::Write;
+        #[cfg(feature = "std")]
+        use std::fmt::Write;
 
         let mut content = String::from("[Script Info]\nTitle: Large Test\n");
 

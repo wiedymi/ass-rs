@@ -3,8 +3,8 @@
 //! Handles incremental processing of individual lines during streaming parsing,
 //! with context-aware processing based on current parser state.
 
-use alloc::string::ToString;
 use crate::Result;
+use alloc::string::ToString;
 
 use super::{
     delta::DeltaBatch,

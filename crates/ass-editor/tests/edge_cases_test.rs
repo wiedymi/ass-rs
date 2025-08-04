@@ -406,7 +406,7 @@ mod concurrent_tests {
     #[test]
     fn test_concurrent_config_access() {
         use std::sync::Arc;
-        
+
         // Use Arc to share the manager instead of cloning
         let manager = Arc::new(ExtensionManager::new());
         let barrier = Arc::new(Barrier::new(10));
@@ -435,7 +435,8 @@ mod concurrent_tests {
         // Set up test data first
         // Since we can't get mutable access through Arc, pre-populate
         for i in 0..10 {
-            for j in 0..10 { // Reduce to avoid too many keys
+            for j in 0..10 {
+                // Reduce to avoid too many keys
                 let _key = format!("thread_{i}_key_{j}");
                 // Note: We can't actually set config through Arc<ExtensionManager>
                 // This test is mainly to verify the manager doesn't panic under concurrent read access
@@ -459,8 +460,8 @@ mod concurrent_tests {
         let counter = Arc::new(AtomicUsize::new(0));
         let mut handles = vec![];
 
-        // Create sessions concurrently  
-        // Note: This test demonstrates the design limitation - 
+        // Create sessions concurrently
+        // Note: This test demonstrates the design limitation -
         // we can't easily share a mutable session manager across threads
         // without the Clone trait. This suggests the API needs improvement.
         for i in 0..5 {
@@ -469,7 +470,7 @@ mod concurrent_tests {
             let handle = thread::spawn(move || {
                 // Each thread creates its own manager since we can't clone
                 let mut local_manager = EditorSessionManager::new();
-                
+
                 for j in 0..20 {
                     let session_name = format!("session_{i}_{j}");
                     let result = local_manager.create_session(session_name.clone());
@@ -499,7 +500,7 @@ mod concurrent_tests {
         // Verify sessions were created in each thread
         let created_count = counter.load(Ordering::Relaxed);
         assert!(created_count > 0); // Should create some sessions across all threads
-        
+
         // Note: Since each thread uses its own manager, we can't verify
         // the sessions on the original manager. This test mainly verifies
         // that concurrent session creation doesn't panic or deadlock.

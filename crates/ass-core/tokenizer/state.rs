@@ -18,7 +18,7 @@ pub enum TokenContext {
     /// top-level document structure.
     Document,
 
-    /// Inside section header like [Events]
+    /// Inside section header like `[Events]`
     ///
     /// Special tokenization rules for section names within square brackets.
     SectionHeader,

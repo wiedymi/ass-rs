@@ -3,37 +3,39 @@
 //! Provides commands for splitting, merging, timing adjustments, toggling event types,
 //! and effect modifications with proper validation and delta tracking.
 
-use crate::core::{EditorDocument, EditorError, Position, Range, Result};
 use super::{CommandResult, EditorCommand};
-use ass_core::utils::{parse_ass_time, format_ass_time};
+use crate::core::{EditorDocument, EditorError, Position, Range, Result};
 use ass_core::parser::ast::{Event, EventType, Span};
-
+use ass_core::utils::{format_ass_time, parse_ass_time};
 
 /// Helper function to parse an ASS event line with proper comma handling
 /// Returns parsed Event struct or error if parsing fails
 fn parse_event_line(line: &str) -> core::result::Result<Event, EditorError> {
     // Extract event type
-    let colon_pos = line.find(':').ok_or_else(|| 
-        EditorError::command_failed("Invalid event format: missing colon"))?;
+    let colon_pos = line
+        .find(':')
+        .ok_or_else(|| EditorError::command_failed("Invalid event format: missing colon"))?;
     let event_type_str = &line[..colon_pos];
     let fields_part = line[colon_pos + 1..].trim();
-    
+
     let event_type = match event_type_str {
         "Dialogue" => EventType::Dialogue,
         "Comment" => EventType::Comment,
         _ => return Err(EditorError::command_failed("Unknown event type")),
     };
-    
+
     // Parse fields carefully - Effect field can contain commas, so we need special handling
     // Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     let parts: Vec<&str> = fields_part.splitn(10, ',').collect();
     if parts.len() < 10 {
-        return Err(EditorError::command_failed("Invalid event format: insufficient fields"));
+        return Err(EditorError::command_failed(
+            "Invalid event format: insufficient fields",
+        ));
     }
-    
+
     // The issue is that parts[8] (Effect) and parts[9] (Text) might be incorrectly split
     // if Effect contains commas. We need to rejoin them properly.
-    
+
     // First 8 fields are safe (no commas expected)
     let layer = parts[0].trim();
     let start = parts[1].trim();
@@ -43,19 +45,19 @@ fn parse_event_line(line: &str) -> core::result::Result<Event, EditorError> {
     let margin_l = parts[5].trim();
     let margin_r = parts[6].trim();
     let margin_v = parts[7].trim();
-    
+
     // For Effect and Text, we need to find the correct comma that separates them
     // Effect can contain commas, but Text is the final field
-    
+
     // Calculate where effect+text starts in the original string
     let prefix_len = parts[0..8].iter().map(|s| s.len()).sum::<usize>() + 8; // +8 for commas
     let remaining = &fields_part[prefix_len..];
-    
+
     // Find the last comma that's not inside parentheses
     let mut split_point = None;
     let chars: Vec<char> = remaining.chars().collect();
     let mut paren_depth = 0;
-    
+
     for (i, &ch) in chars.iter().enumerate().rev() {
         match ch {
             ')' => paren_depth += 1,
@@ -67,7 +69,7 @@ fn parse_event_line(line: &str) -> core::result::Result<Event, EditorError> {
             _ => {}
         }
     }
-    
+
     let (effect, text) = if let Some(split) = split_point {
         let effect_part = remaining[..split].trim();
         let text_part = remaining[split + 1..].trim();
@@ -76,7 +78,7 @@ fn parse_event_line(line: &str) -> core::result::Result<Event, EditorError> {
         // No comma found outside parentheses, treat entire remaining as effect
         (remaining.trim(), "")
     };
-    
+
     Ok(Event {
         event_type,
         layer,
@@ -96,9 +98,12 @@ fn parse_event_line(line: &str) -> core::result::Result<Event, EditorError> {
 }
 
 #[cfg(not(feature = "std"))]
-use alloc::{format, string::{String, ToString}, vec, vec::Vec};
-
-
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 
 /// Command to split an event at a specific time
 #[derive(Debug, Clone)]
@@ -129,19 +134,23 @@ impl SplitEventCommand {
 impl EditorCommand for SplitEventCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         // Parse split time to validate it
-        let split_time_cs = parse_ass_time(&self.split_time)
-            .map_err(|_| EditorError::command_failed(format!("Invalid time format: {}", self.split_time)))?;
+        let split_time_cs = parse_ass_time(&self.split_time).map_err(|_| {
+            EditorError::command_failed(format!("Invalid time format: {}", self.split_time))
+        })?;
 
         // Find the event to split
         let content = document.text();
-        let events_start = content.find("[Events]")
+        let events_start = content
+            .find("[Events]")
             .ok_or_else(|| EditorError::command_failed("Events section not found"))?;
 
         // Skip to first event after format line
         let events_content = &content[events_start..];
-        let format_line_end = events_content.find("Format:")
+        let format_line_end = events_content
+            .find("Format:")
             .and_then(|format_pos| {
-                events_content[format_pos..].find('\n')
+                events_content[format_pos..]
+                    .find('\n')
                     .map(|newline_pos| events_start + format_pos + newline_pos + 1)
             })
             .ok_or_else(|| EditorError::command_failed("Invalid events section format"))?;
@@ -149,9 +158,10 @@ impl EditorCommand for SplitEventCommand {
         // Find the event at the specified index
         let mut current_index = 0;
         let mut event_start = format_line_end;
-        
+
         while event_start < content.len() {
-            let line_end = content[event_start..].find('\n')
+            let line_end = content[event_start..]
+                .find('\n')
                 .map(|pos| event_start + pos)
                 .unwrap_or(content.len());
 
@@ -160,7 +170,7 @@ impl EditorCommand for SplitEventCommand {
             }
 
             let line = &content[event_start..line_end];
-            
+
             // Check if this is an event line
             if line.starts_with("Dialogue:") || line.starts_with("Comment:") {
                 if current_index == self.event_index {
@@ -168,14 +178,16 @@ impl EditorCommand for SplitEventCommand {
                     let event = parse_event_line(line)?;
 
                     // Validate split time is within event bounds
-                    let start_time_cs = event.start_time_cs()
+                    let start_time_cs = event
+                        .start_time_cs()
                         .map_err(|_| EditorError::command_failed("Invalid start time in event"))?;
-                    let end_time_cs = event.end_time_cs()
+                    let end_time_cs = event
+                        .end_time_cs()
                         .map_err(|_| EditorError::command_failed("Invalid end time in event"))?;
 
                     if split_time_cs <= start_time_cs || split_time_cs >= end_time_cs {
                         return Err(EditorError::command_failed(
-                            "Split time must be between event start and end times"
+                            "Split time must be between event start and end times",
                         ));
                     }
 
@@ -187,14 +199,32 @@ impl EditorCommand for SplitEventCommand {
                     };
                     let first_event = format!(
                         "{}: {},{},{},{},{},{},{},{},{},{}",
-                        event_type_str, event.layer, event.start, self.split_time, event.style, event.name,
-                        event.margin_l, event.margin_r, event.margin_v, event.effect, event.text
+                        event_type_str,
+                        event.layer,
+                        event.start,
+                        self.split_time,
+                        event.style,
+                        event.name,
+                        event.margin_l,
+                        event.margin_r,
+                        event.margin_v,
+                        event.effect,
+                        event.text
                     );
 
                     let second_event = format!(
                         "{}: {},{},{},{},{},{},{},{},{},{}",
-                        event_type_str, event.layer, self.split_time, event.end, event.style, event.name,
-                        event.margin_l, event.margin_r, event.margin_v, event.effect, event.text
+                        event_type_str,
+                        event.layer,
+                        self.split_time,
+                        event.end,
+                        event.style,
+                        event.name,
+                        event.margin_l,
+                        event.margin_r,
+                        event.margin_v,
+                        event.effect,
+                        event.text
                     );
 
                     // Replace the original event with the two new events
@@ -206,8 +236,10 @@ impl EditorCommand for SplitEventCommand {
                     return Ok(CommandResult::success_with_change(
                         Range::new(Position::new(event_start), end_pos),
                         end_pos,
-                    ).with_message(format!(
-                        "Split event {} at time {}", self.event_index, self.split_time
+                    )
+                    .with_message(format!(
+                        "Split event {} at time {}",
+                        self.event_index, self.split_time
                     )));
                 }
                 current_index += 1;
@@ -219,7 +251,10 @@ impl EditorCommand for SplitEventCommand {
             event_start = line_end + 1;
         }
 
-        Err(EditorError::command_failed(format!("Event index {} not found", self.event_index)))
+        Err(EditorError::command_failed(format!(
+            "Event index {} not found",
+            self.event_index
+        )))
     }
 
     fn description(&self) -> &str {
@@ -270,18 +305,23 @@ impl MergeEventsCommand {
 impl EditorCommand for MergeEventsCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         if self.first_event_index >= self.second_event_index {
-            return Err(EditorError::command_failed("First event index must be less than second event index"));
+            return Err(EditorError::command_failed(
+                "First event index must be less than second event index",
+            ));
         }
 
         let content = document.text();
-        let events_start = content.find("[Events]")
+        let events_start = content
+            .find("[Events]")
             .ok_or_else(|| EditorError::command_failed("Events section not found"))?;
 
         // Skip to first event after format line
         let events_content = &content[events_start..];
-        let format_line_end = events_content.find("Format:")
+        let format_line_end = events_content
+            .find("Format:")
             .and_then(|format_pos| {
-                events_content[format_pos..].find('\n')
+                events_content[format_pos..]
+                    .find('\n')
                     .map(|newline_pos| events_start + format_pos + newline_pos + 1)
             })
             .ok_or_else(|| EditorError::command_failed("Invalid events section format"))?;
@@ -292,7 +332,8 @@ impl EditorCommand for MergeEventsCommand {
         let mut event_start = format_line_end;
 
         while event_start < content.len() {
-            let line_end = content[event_start..].find('\n')
+            let line_end = content[event_start..]
+                .find('\n')
                 .map(|pos| event_start + pos)
                 .unwrap_or(content.len());
 
@@ -301,9 +342,11 @@ impl EditorCommand for MergeEventsCommand {
             }
 
             let line = &content[event_start..line_end];
-            
+
             if line.starts_with("Dialogue:") || line.starts_with("Comment:") {
-                if current_index == self.first_event_index || current_index == self.second_event_index {
+                if current_index == self.first_event_index
+                    || current_index == self.second_event_index
+                {
                     events.push((current_index, event_start, line_end, line.to_string()));
                 }
                 current_index += 1;
@@ -315,7 +358,9 @@ impl EditorCommand for MergeEventsCommand {
         }
 
         if events.len() != 2 {
-            return Err(EditorError::command_failed("Could not find both events to merge"));
+            return Err(EditorError::command_failed(
+                "Could not find both events to merge",
+            ));
         }
 
         // Parse both events using ass-core's parser
@@ -326,7 +371,10 @@ impl EditorCommand for MergeEventsCommand {
         let second_event = parse_event_line(second_event_line)?;
 
         // Use first event's properties, second event's end time, merged text
-        let merged_text = format!("{}{}{}", first_event.text, self.merge_text_separator, second_event.text);
+        let merged_text = format!(
+            "{}{}{}",
+            first_event.text, self.merge_text_separator, second_event.text
+        );
 
         // Create merged event
         let event_type_str = match first_event.event_type {
@@ -336,8 +384,17 @@ impl EditorCommand for MergeEventsCommand {
         };
         let merged_event = format!(
             "{}: {},{},{},{},{},{},{},{},{},{}",
-            event_type_str, first_event.layer, first_event.start, second_event.end, first_event.style, first_event.name,
-            first_event.margin_l, first_event.margin_r, first_event.margin_v, first_event.effect, merged_text
+            event_type_str,
+            first_event.layer,
+            first_event.start,
+            second_event.end,
+            first_event.style,
+            first_event.name,
+            first_event.margin_l,
+            first_event.margin_r,
+            first_event.margin_v,
+            first_event.effect,
+            merged_text
         );
 
         // Replace both events with the merged one
@@ -345,15 +402,17 @@ impl EditorCommand for MergeEventsCommand {
         let second_end = events[1].2 + 1; // Include newline
         let range = Range::new(Position::new(first_start), Position::new(second_end));
         let replacement = format!("{merged_event}\n");
-        
+
         document.replace(range, &replacement)?;
 
         let end_pos = Position::new(first_start + replacement.len());
         Ok(CommandResult::success_with_change(
             Range::new(Position::new(first_start), end_pos),
             end_pos,
-        ).with_message(format!(
-            "Merged events {} and {}", self.first_event_index, self.second_event_index
+        )
+        .with_message(format!(
+            "Merged events {} and {}",
+            self.first_event_index, self.second_event_index
         )))
     }
 
@@ -426,13 +485,16 @@ impl TimingAdjustCommand {
 impl EditorCommand for TimingAdjustCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         let mut content = document.text();
-        let events_start = content.find("[Events]")
+        let events_start = content
+            .find("[Events]")
             .ok_or_else(|| EditorError::command_failed("Events section not found"))?;
 
         let events_content = &content[events_start..];
-        let format_line_end = events_content.find("Format:")
+        let format_line_end = events_content
+            .find("Format:")
             .and_then(|format_pos| {
-                events_content[format_pos..].find('\n')
+                events_content[format_pos..]
+                    .find('\n')
                     .map(|newline_pos| events_start + format_pos + newline_pos + 1)
             })
             .ok_or_else(|| EditorError::command_failed("Invalid events section format"))?;
@@ -443,7 +505,8 @@ impl EditorCommand for TimingAdjustCommand {
         let mut total_range: Option<Range> = None;
 
         while event_start < content.len() {
-            let line_end = content[event_start..].find('\n')
+            let line_end = content[event_start..]
+                .find('\n')
                 .map(|pos| event_start + pos)
                 .unwrap_or(content.len());
 
@@ -452,21 +515,21 @@ impl EditorCommand for TimingAdjustCommand {
             }
 
             let line = &content[event_start..line_end];
-            
+
             if line.starts_with("Dialogue:") || line.starts_with("Comment:") {
-                let should_adjust = self.event_indices.is_empty() || 
-                                  self.event_indices.contains(&current_index);
+                let should_adjust =
+                    self.event_indices.is_empty() || self.event_indices.contains(&current_index);
 
                 if should_adjust {
                     // Parse event line using ass-core's parser
                     if let Ok(event) = parse_event_line(line) {
-                        
                         // Parse current times using Event methods
-                        if let (Ok(start_cs), Ok(end_cs)) = 
-                            (event.start_time_cs(), event.end_time_cs()) {
-                            
+                        if let (Ok(start_cs), Ok(end_cs)) =
+                            (event.start_time_cs(), event.end_time_cs())
+                        {
                             // Apply offsets
-                            let new_start_cs = (start_cs as i32 + self.start_offset_cs).max(0) as u32;
+                            let new_start_cs =
+                                (start_cs as i32 + self.start_offset_cs).max(0) as u32;
                             let new_end_cs = (end_cs as i32 + self.end_offset_cs).max(0) as u32;
 
                             // Ensure end time is after start time
@@ -483,12 +546,22 @@ impl EditorCommand for TimingAdjustCommand {
                             };
                             let new_line = format!(
                                 "{}: {},{},{},{},{},{},{},{},{},{}",
-                                event_type_str, event.layer, new_start_time, new_end_time, event.style, event.name,
-                                event.margin_l, event.margin_r, event.margin_v, event.effect, event.text
+                                event_type_str,
+                                event.layer,
+                                new_start_time,
+                                new_end_time,
+                                event.style,
+                                event.name,
+                                event.margin_l,
+                                event.margin_r,
+                                event.margin_v,
+                                event.effect,
+                                event.text
                             );
 
                             // Replace the line
-                            let range = Range::new(Position::new(event_start), Position::new(line_end));
+                            let range =
+                                Range::new(Position::new(event_start), Position::new(line_end));
                             document.replace(range, &new_line)?;
 
                             // Update content for next iteration
@@ -496,8 +569,8 @@ impl EditorCommand for TimingAdjustCommand {
 
                             // Track overall range
                             let change_range = Range::new(
-                                Position::new(event_start), 
-                                Position::new(event_start + new_line.len())
+                                Position::new(event_start),
+                                Position::new(event_start + new_line.len()),
                             );
                             total_range = Some(match total_range {
                                 Some(existing) => existing.union(&change_range),
@@ -520,7 +593,8 @@ impl EditorCommand for TimingAdjustCommand {
             Ok(CommandResult::success_with_change(
                 total_range.unwrap_or(Range::new(Position::new(0), Position::new(0))),
                 Position::new(content.len()),
-            ).with_message(format!("Adjusted timing for {changes_made} events")))
+            )
+            .with_message(format!("Adjusted timing for {changes_made} events")))
         } else {
             Ok(CommandResult::success().with_message("No events were adjusted".to_string()))
         }
@@ -574,13 +648,16 @@ impl ToggleEventTypeCommand {
 impl EditorCommand for ToggleEventTypeCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         let mut content = document.text();
-        let events_start = content.find("[Events]")
+        let events_start = content
+            .find("[Events]")
             .ok_or_else(|| EditorError::command_failed("Events section not found"))?;
 
         let events_content = &content[events_start..];
-        let format_line_end = events_content.find("Format:")
+        let format_line_end = events_content
+            .find("Format:")
             .and_then(|format_pos| {
-                events_content[format_pos..].find('\n')
+                events_content[format_pos..]
+                    .find('\n')
                     .map(|newline_pos| events_start + format_pos + newline_pos + 1)
             })
             .ok_or_else(|| EditorError::command_failed("Invalid events section format"))?;
@@ -591,7 +668,8 @@ impl EditorCommand for ToggleEventTypeCommand {
         let mut total_range: Option<Range> = None;
 
         while event_start < content.len() {
-            let line_end = content[event_start..].find('\n')
+            let line_end = content[event_start..]
+                .find('\n')
                 .map(|pos| event_start + pos)
                 .unwrap_or(content.len());
 
@@ -600,10 +678,10 @@ impl EditorCommand for ToggleEventTypeCommand {
             }
 
             let line = &content[event_start..line_end];
-            
+
             if line.starts_with("Dialogue:") || line.starts_with("Comment:") {
-                let should_toggle = self.event_indices.is_empty() || 
-                                  self.event_indices.contains(&current_index);
+                let should_toggle =
+                    self.event_indices.is_empty() || self.event_indices.contains(&current_index);
 
                 if should_toggle {
                     let new_line = if line.starts_with("Dialogue:") {
@@ -620,8 +698,8 @@ impl EditorCommand for ToggleEventTypeCommand {
 
                     // Track overall range
                     let change_range = Range::new(
-                        Position::new(event_start), 
-                        Position::new(event_start + new_line.len())
+                        Position::new(event_start),
+                        Position::new(event_start + new_line.len()),
                     );
                     total_range = Some(match total_range {
                         Some(existing) => existing.union(&change_range),
@@ -642,7 +720,8 @@ impl EditorCommand for ToggleEventTypeCommand {
             Ok(CommandResult::success_with_change(
                 total_range.unwrap_or(Range::new(Position::new(0), Position::new(0))),
                 Position::new(content.len()),
-            ).with_message(format!("Toggled type for {changes_made} events")))
+            )
+            .with_message(format!("Toggled type for {changes_made} events")))
         } else {
             Ok(CommandResult::success().with_message("No events were toggled".to_string()))
         }
@@ -670,10 +749,10 @@ pub struct EventEffectCommand {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EffectOperation {
-    Set,      // Replace current effect
-    Append,   // Add to existing effect
-    Prepend,  // Add before existing effect
-    Clear,    // Remove all effects
+    Set,     // Replace current effect
+    Append,  // Add to existing effect
+    Prepend, // Add before existing effect
+    Clear,   // Remove all effects
 }
 
 impl EventEffectCommand {
@@ -713,13 +792,16 @@ impl EventEffectCommand {
 impl EditorCommand for EventEffectCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         let mut content = document.text();
-        let events_start = content.find("[Events]")
+        let events_start = content
+            .find("[Events]")
             .ok_or_else(|| EditorError::command_failed("Events section not found"))?;
 
         let events_content = &content[events_start..];
-        let format_line_end = events_content.find("Format:")
+        let format_line_end = events_content
+            .find("Format:")
             .and_then(|format_pos| {
-                events_content[format_pos..].find('\n')
+                events_content[format_pos..]
+                    .find('\n')
                     .map(|newline_pos| events_start + format_pos + newline_pos + 1)
             })
             .ok_or_else(|| EditorError::command_failed("Invalid events section format"))?;
@@ -730,7 +812,8 @@ impl EditorCommand for EventEffectCommand {
         let mut total_range: Option<Range> = None;
 
         while event_start < content.len() {
-            let line_end = content[event_start..].find('\n')
+            let line_end = content[event_start..]
+                .find('\n')
                 .map(|pos| event_start + pos)
                 .unwrap_or(content.len());
 
@@ -739,15 +822,14 @@ impl EditorCommand for EventEffectCommand {
             }
 
             let line = &content[event_start..line_end];
-            
+
             if line.starts_with("Dialogue:") || line.starts_with("Comment:") {
-                let should_modify = self.event_indices.is_empty() || 
-                                  self.event_indices.contains(&current_index);
+                let should_modify =
+                    self.event_indices.is_empty() || self.event_indices.contains(&current_index);
 
                 if should_modify {
-                    // Parse event line using helper function  
+                    // Parse event line using helper function
                     if let Ok(event) = parse_event_line(line) {
-                        
                         let new_effect = match self.operation {
                             EffectOperation::Set => self.effect.clone(),
                             EffectOperation::Clear => String::new(),
@@ -757,14 +839,14 @@ impl EditorCommand for EventEffectCommand {
                                 } else {
                                     format!("{} {}", event.effect, self.effect)
                                 }
-                            },
+                            }
                             EffectOperation::Prepend => {
                                 if event.effect.is_empty() {
                                     self.effect.clone()
                                 } else {
                                     format!("{} {}", self.effect, event.effect)
                                 }
-                            },
+                            }
                         };
 
                         // Build new event line
@@ -775,8 +857,17 @@ impl EditorCommand for EventEffectCommand {
                         };
                         let new_line = format!(
                             "{}: {},{},{},{},{},{},{},{},{},{}",
-                            event_type_str, event.layer, event.start, event.end, event.style, event.name,
-                            event.margin_l, event.margin_r, event.margin_v, new_effect, event.text
+                            event_type_str,
+                            event.layer,
+                            event.start,
+                            event.end,
+                            event.style,
+                            event.name,
+                            event.margin_l,
+                            event.margin_r,
+                            event.margin_v,
+                            new_effect,
+                            event.text
                         );
 
                         let range = Range::new(Position::new(event_start), Position::new(line_end));
@@ -787,8 +878,8 @@ impl EditorCommand for EventEffectCommand {
 
                         // Track overall range
                         let change_range = Range::new(
-                            Position::new(event_start), 
-                            Position::new(event_start + new_line.len())
+                            Position::new(event_start),
+                            Position::new(event_start + new_line.len()),
                         );
                         total_range = Some(match total_range {
                             Some(existing) => existing.union(&change_range),
@@ -813,11 +904,12 @@ impl EditorCommand for EventEffectCommand {
                 EffectOperation::Append => "appended",
                 EffectOperation::Prepend => "prepended",
             };
-            
+
             Ok(CommandResult::success_with_change(
                 total_range.unwrap_or(Range::new(Position::new(0), Position::new(0))),
                 Position::new(content.len()),
-            ).with_message(format!("Effect {operation_name} for {changes_made} events")))
+            )
+            .with_message(format!("Effect {operation_name} for {changes_made} events")))
         } else {
             Ok(CommandResult::success().with_message("No events were modified".to_string()))
         }
@@ -857,19 +949,21 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Third event
     #[test]
     fn test_split_event_command() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         let command = SplitEventCommand::new(0, "0:00:03.00".to_string());
         let result = command.execute(&mut doc).unwrap();
-        
+
         assert!(result.success);
         assert!(result.content_changed);
-        
+
         // Should now have 4 events total (1 split into 2)
-        let events_count = doc.text().lines()
+        let events_count = doc
+            .text()
+            .lines()
             .filter(|line| line.starts_with("Dialogue:") || line.starts_with("Comment:"))
             .count();
         assert_eq!(events_count, 4);
-        
+
         // Check split times
         assert!(doc.text().contains("0:00:01.00,0:00:03.00"));
         assert!(doc.text().contains("0:00:03.00,0:00:05.00"));
@@ -878,20 +972,21 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Third event
     #[test]
     fn test_merge_events_command() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
-        let command = MergeEventsCommand::new(0, 1)
-            .with_separator(" | ".to_string());
+
+        let command = MergeEventsCommand::new(0, 1).with_separator(" | ".to_string());
         let result = command.execute(&mut doc).unwrap();
-        
+
         assert!(result.success);
         assert!(result.content_changed);
-        
+
         // Should now have 2 events total (2 merged into 1)
-        let events_count = doc.text().lines()
+        let events_count = doc
+            .text()
+            .lines()
             .filter(|line| line.starts_with("Dialogue:") || line.starts_with("Comment:"))
             .count();
         assert_eq!(events_count, 2);
-        
+
         // Check merged text and timing
         assert!(doc.text().contains("First event | Second event"));
         assert!(doc.text().contains("0:00:01.00,0:00:10.00")); // Start of first, end of second
@@ -900,14 +995,14 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Third event
     #[test]
     fn test_timing_adjust_command() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Shift all events forward by 2 seconds (200 centiseconds)
         let command = TimingAdjustCommand::all_events(200, 200);
         let result = command.execute(&mut doc).unwrap();
-        
+
         assert!(result.success);
         assert!(result.content_changed);
-        
+
         // Check that times were adjusted
         assert!(doc.text().contains("0:00:03.00,0:00:07.00")); // First event shifted
         assert!(doc.text().contains("0:00:07.00,0:00:12.00")); // Second event shifted
@@ -917,21 +1012,22 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Third event
     #[test]
     fn test_toggle_event_type_command() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         let command = ToggleEventTypeCommand::single(0);
         let result = command.execute(&mut doc).unwrap();
-        
+
         assert!(result.success);
         assert!(result.content_changed);
-        
+
         // First event should now be Comment, others unchanged
         let text = doc.text();
         let lines: Vec<&str> = text.lines().collect();
-        let event_lines: Vec<&str> = lines.iter()
+        let event_lines: Vec<&str> = lines
+            .iter()
             .filter(|line| line.starts_with("Dialogue:") || line.starts_with("Comment:"))
             .copied()
             .collect();
-        
+
         assert_eq!(event_lines.len(), 3);
         assert!(event_lines[0].starts_with("Comment:")); // Was Dialogue, now Comment
         assert!(event_lines[1].starts_with("Dialogue:")); // Unchanged
@@ -941,21 +1037,22 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Third event
     #[test]
     fn test_event_effect_command() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         let command = EventEffectCommand::set_effect(vec![0, 1], "Fade(255,0)".to_string());
         let result = command.execute(&mut doc).unwrap();
-        
+
         assert!(result.success);
         assert!(result.content_changed);
-        
+
         // Check that effects were set for first two events
         let content = doc.text();
         let lines: Vec<&str> = content.lines().collect();
-        let event_lines: Vec<&str> = lines.iter()
+        let event_lines: Vec<&str> = lines
+            .iter()
             .filter(|line| line.starts_with("Dialogue:") || line.starts_with("Comment:"))
             .copied()
             .collect();
-        
+
         assert!(event_lines[0].contains("Fade(255,0)"));
         assert!(event_lines[1].contains("Fade(255,0)"));
         assert!(!event_lines[2].contains("Fade(255,0)")); // Third event unchanged
@@ -964,35 +1061,35 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Third event
     #[test]
     fn test_split_event_invalid_time() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Try to split outside event bounds
         let command = SplitEventCommand::new(0, "0:00:00.50".to_string()); // Before event start
         let result = command.execute(&mut doc);
-        
+
         assert!(result.is_err());
     }
 
     #[test]
     fn test_merge_events_invalid_indices() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Try to merge with invalid order
         let command = MergeEventsCommand::new(1, 0); // Second before first
         let result = command.execute(&mut doc);
-        
+
         assert!(result.is_err());
     }
 
     #[test]
     fn test_timing_adjust_with_specific_events() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Adjust only first event
         let command = TimingAdjustCommand::new(vec![0], 100, 100); // +1 second
         let result = command.execute(&mut doc).unwrap();
-        
+
         assert!(result.success);
-        
+
         // Only first event should be changed
         assert!(doc.text().contains("0:00:02.00,0:00:06.00")); // First event adjusted
         assert!(doc.text().contains("0:00:05.00,0:00:10.00")); // Second event unchanged
@@ -1001,27 +1098,30 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Third event
     #[test]
     fn test_effect_operations() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // First set an effect
         let set_cmd = EventEffectCommand::set_effect(vec![0], "Fade(255,0)".to_string());
         set_cmd.execute(&mut doc).unwrap();
-        
+
         // Then append to it
         let append_cmd = EventEffectCommand::append_effect(vec![0], "Move(100,200)".to_string());
         append_cmd.execute(&mut doc).unwrap();
-        
+
         // Check that both effects are present
         println!("Document after append: {}", doc.text());
         assert!(doc.text().contains("Fade(255,0) Move(100,200)"));
-        
+
         // Clear the effect
         let clear_cmd = EventEffectCommand::clear_effect(vec![0]);
         clear_cmd.execute(&mut doc).unwrap();
-        
+
         // Check that effect field is empty (has the right number of commas)
         let text = doc.text();
         let lines: Vec<&str> = text.lines().collect();
-        let first_event = lines.iter().find(|line| line.starts_with("Dialogue:")).unwrap();
+        let first_event = lines
+            .iter()
+            .find(|line| line.starts_with("Dialogue:"))
+            .unwrap();
         let parts: Vec<&str> = first_event.split(',').collect();
         assert_eq!(parts[8].trim(), ""); // Effect field should be empty
     }

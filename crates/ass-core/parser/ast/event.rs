@@ -8,7 +8,7 @@ use core::ops::Range;
 
 use super::Span;
 
-/// Event from [Events] section (dialogue, comments, etc.)
+/// Event from `[Events\]` section (dialogue, comments, etc.)
 ///
 /// Represents a single event in the subtitle timeline. Events can be dialogue
 /// lines, comments, or other commands with associated timing and styling.

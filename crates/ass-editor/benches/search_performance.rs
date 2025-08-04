@@ -10,7 +10,7 @@ use ass_editor::{
     core::{EditorDocument, Position},
     utils::search::{DocumentSearch, DocumentSearchImpl, SearchOptions, SearchScope},
 };
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 /// Generate a large script with varied content for search testing
 fn generate_search_script(events: usize) -> String {
@@ -58,7 +58,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         let dialogue = &dialogues[i % dialogues.len()];
         let start_time = format!("0:{:02}:{:02}.00", i / 60, i % 60);
         let end_time = format!("0:{:02}:{:02}.00", (i + 5) / 60, (i + 5) % 60);
-        
+
         script.push_str(&format!(
             "Dialogue: 0,{start_time},{end_time},{style},,0,0,0,,{dialogue}\n"
         ));
@@ -70,10 +70,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 /// Benchmark simple text search
 fn bench_simple_search(c: &mut Criterion) {
     let mut group = c.benchmark_group("simple_search");
-    
+
     for doc_size in [50, 200, 1000].iter() {
         let script = generate_search_script(*doc_size);
-        
+
         group.bench_with_input(
             BenchmarkId::new("case_sensitive", doc_size),
             doc_size,
@@ -90,15 +90,15 @@ fn bench_simple_search(c: &mut Criterion) {
                             scope: SearchScope::All,
                             max_results: 100,
                         };
-                        
+
                         let results = search.search("text", &options).unwrap();
-                black_box(results.len())
+                        black_box(results.len())
                     },
                     criterion::BatchSize::SmallInput,
                 );
             },
         );
-        
+
         group.bench_with_input(
             BenchmarkId::new("case_insensitive", doc_size),
             doc_size,
@@ -115,15 +115,15 @@ fn bench_simple_search(c: &mut Criterion) {
                             scope: SearchScope::All,
                             max_results: 100,
                         };
-                        
+
                         let results = search.search("TEXT", &options).unwrap();
-                black_box(results.len())
+                        black_box(results.len())
                     },
                     criterion::BatchSize::SmallInput,
                 );
             },
         );
-        
+
         group.bench_with_input(
             BenchmarkId::new("whole_words", doc_size),
             doc_size,
@@ -140,16 +140,16 @@ fn bench_simple_search(c: &mut Criterion) {
                             scope: SearchScope::All,
                             max_results: 100,
                         };
-                        
+
                         let results = search.search("test", &options).unwrap();
-                black_box(results.len())
+                        black_box(results.len())
                     },
                     criterion::BatchSize::SmallInput,
                 );
             },
         );
     }
-    
+
     group.finish();
 }
 
@@ -157,9 +157,9 @@ fn bench_simple_search(c: &mut Criterion) {
 #[cfg(feature = "formats")]
 fn bench_regex_search(c: &mut Criterion) {
     let mut group = c.benchmark_group("regex_search");
-    
+
     let script = generate_search_script(500);
-    
+
     // Simple regex
     group.bench_function("simple_pattern", |b| {
         b.iter_batched(
@@ -174,14 +174,14 @@ fn bench_regex_search(c: &mut Criterion) {
                     scope: SearchScope::All,
                     max_results: 100,
                 };
-                
+
                 let results = search.search(r"\b\w{5}\b", &options).unwrap();
                 black_box(results.len())
             },
             criterion::BatchSize::SmallInput,
         );
     });
-    
+
     // Complex regex
     group.bench_function("complex_pattern", |b| {
         b.iter_batched(
@@ -196,7 +196,7 @@ fn bench_regex_search(c: &mut Criterion) {
                     scope: SearchScope::All,
                     max_results: 100,
                 };
-                
+
                 // Match ASS tags
                 let results = search.search(r"\{\\[^}]+\}", &options).unwrap();
                 black_box(results.len())
@@ -204,16 +204,16 @@ fn bench_regex_search(c: &mut Criterion) {
             criterion::BatchSize::SmallInput,
         );
     });
-    
+
     group.finish();
 }
 
 /// Benchmark search with different scopes
 fn bench_search_scopes(c: &mut Criterion) {
     let mut group = c.benchmark_group("search_scopes");
-    
+
     let script = generate_search_script(500);
-    
+
     // Search entire document
     group.bench_function("scope_all", |b| {
         b.iter_batched(
@@ -228,14 +228,14 @@ fn bench_search_scopes(c: &mut Criterion) {
                     scope: SearchScope::All,
                     max_results: 100,
                 };
-                
+
                 let results = search.search("dialogue", &options).unwrap();
                 black_box(results.len())
             },
             criterion::BatchSize::SmallInput,
         );
     });
-    
+
     // Search specific lines
     group.bench_function("scope_lines", |b| {
         b.iter_batched(
@@ -247,17 +247,20 @@ fn bench_search_scopes(c: &mut Criterion) {
                     case_sensitive: false,
                     whole_words: false,
                     use_regex: false,
-                    scope: SearchScope::Lines { start: 50, end: 150 },
+                    scope: SearchScope::Lines {
+                        start: 50,
+                        end: 150,
+                    },
                     max_results: 100,
                 };
-                
+
                 let results = search.search("dialogue", &options).unwrap();
                 black_box(results.len())
             },
             criterion::BatchSize::SmallInput,
         );
     });
-    
+
     // Search specific sections
     group.bench_function("scope_sections", |b| {
         b.iter_batched(
@@ -272,14 +275,14 @@ fn bench_search_scopes(c: &mut Criterion) {
                     scope: SearchScope::Sections(vec!["Events".to_string()]),
                     max_results: 100,
                 };
-                
+
                 let results = search.search("Style", &options).unwrap();
                 black_box(results.len())
             },
             criterion::BatchSize::SmallInput,
         );
     });
-    
+
     group.finish();
 }
 
@@ -287,37 +290,33 @@ fn bench_search_scopes(c: &mut Criterion) {
 #[cfg(feature = "search-index")]
 fn bench_index_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("index_operations");
-    
+
     // Initial index build
     for size in [100, 500, 1000].iter() {
         let script = generate_search_script(*size);
-        
-        group.bench_with_input(
-            BenchmarkId::new("build_index", size),
-            size,
-            |b, _| {
-                b.iter_batched(
-                    || EditorDocument::from_content(&script).unwrap(),
-                    |doc| {
-                        let mut search = DocumentSearchImpl::new();
-                        search.build_index(&doc).unwrap();
-                        let options = SearchOptions {
-                            case_sensitive: false,
-                            whole_words: false,
-                            use_regex: false,
-                            scope: SearchScope::All,
-                            max_results: 100,
-                        };
-                        // Trigger index use
-                        let results = search.search("test", &options).unwrap();
-                black_box(results.len())
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
+
+        group.bench_with_input(BenchmarkId::new("build_index", size), size, |b, _| {
+            b.iter_batched(
+                || EditorDocument::from_content(&script).unwrap(),
+                |doc| {
+                    let mut search = DocumentSearchImpl::new();
+                    search.build_index(&doc).unwrap();
+                    let options = SearchOptions {
+                        case_sensitive: false,
+                        whole_words: false,
+                        use_regex: false,
+                        scope: SearchScope::All,
+                        max_results: 100,
+                    };
+                    // Trigger index use
+                    let results = search.search("test", &options).unwrap();
+                    black_box(results.len())
+                },
+                criterion::BatchSize::SmallInput,
+            );
+        });
     }
-    
+
     // Incremental updates - search after edits
     group.bench_function("search_after_edit", |b| {
         b.iter_batched(
@@ -326,7 +325,7 @@ fn bench_index_operations(c: &mut Criterion) {
                 // Make an edit
                 let pos = Position::new(1000);
                 doc.insert(pos, "NEW TEXT").unwrap();
-                
+
                 // Search to test incremental update
                 let options = SearchOptions {
                     case_sensitive: false,
@@ -335,7 +334,7 @@ fn bench_index_operations(c: &mut Criterion) {
                     scope: SearchScope::All,
                     max_results: 100,
                 };
-                
+
                 let mut search = DocumentSearchImpl::new();
                 search.build_index(&doc).unwrap();
                 let results = search.search("NEW", &options).unwrap();
@@ -344,16 +343,16 @@ fn bench_index_operations(c: &mut Criterion) {
             criterion::BatchSize::SmallInput,
         );
     });
-    
+
     group.finish();
 }
 
 /// Benchmark search result retrieval
 fn bench_result_retrieval(c: &mut Criterion) {
     let mut group = c.benchmark_group("result_retrieval");
-    
+
     let script = generate_search_script(1000);
-    
+
     // Limited results
     group.bench_function("max_10_results", |b| {
         b.iter_batched(
@@ -368,14 +367,14 @@ fn bench_result_retrieval(c: &mut Criterion) {
                     scope: SearchScope::All,
                     max_results: 10,
                 };
-                
+
                 let results = search.search("the", &options).unwrap();
                 black_box(results.len())
             },
             criterion::BatchSize::SmallInput,
         );
     });
-    
+
     // Many results
     group.bench_function("max_1000_results", |b| {
         b.iter_batched(
@@ -390,14 +389,14 @@ fn bench_result_retrieval(c: &mut Criterion) {
                     scope: SearchScope::All,
                     max_results: 1000,
                 };
-                
+
                 let results = search.search("e", &options).unwrap();
                 black_box(results.len())
             },
             criterion::BatchSize::SmallInput,
         );
     });
-    
+
     group.finish();
 }
 

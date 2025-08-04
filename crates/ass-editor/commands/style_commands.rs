@@ -3,11 +3,15 @@
 //! Provides commands for creating, editing, deleting, cloning, and applying styles
 //! with proper validation and delta tracking.
 
-use crate::core::{EditorDocument, EditorError, Position, Range, Result, StyleBuilder};
 use super::{CommandResult, EditorCommand};
+use crate::core::{EditorDocument, EditorError, Position, Range, Result, StyleBuilder};
 
 #[cfg(not(feature = "std"))]
-use alloc::{format, string::{String, ToString}, vec::Vec};
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 #[cfg(feature = "std")]
 use std::collections::HashMap;
@@ -47,7 +51,7 @@ impl EditorCommand for CreateStyleCommand {
         let mut builder = self.style_builder.clone();
         builder = builder.name(&self.style_name);
         let style_line = builder.build()?;
-        
+
         // Find the styles section or create one
         let content = document.text();
         let styles_section_pos = content
@@ -60,26 +64,28 @@ impl EditorCommand for CreateStyleCommand {
             let section_content = &content[section_start..];
             if let Some(format_line_end) = section_content.find('\n') {
                 let format_end_pos = section_start + format_line_end + 1;
-                
+
                 // Find next format line or end of section
-                let insert_pos = if let Some(next_line_start) = content[format_end_pos..].find('\n') {
+                let insert_pos = if let Some(next_line_start) = content[format_end_pos..].find('\n')
+                {
                     format_end_pos + next_line_start + 1
                 } else {
                     format_end_pos
                 };
-                
+
                 // Insert the new style
                 let insert_text = format!("{style_line}\n");
                 document.insert(Position::new(insert_pos), &insert_text)?;
-                
+
                 let end_pos = Position::new(insert_pos + insert_text.len());
                 return Ok(CommandResult::success_with_change(
                     Range::new(Position::new(insert_pos), end_pos),
                     end_pos,
-                ).with_message(format!("Created style '{}'", self.style_name)));
+                )
+                .with_message(format!("Created style '{}'", self.style_name)));
             }
         }
-        
+
         // No styles section found, create one
         let styles_section = format!(
             "\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n{style_line}\n"
@@ -93,12 +99,16 @@ impl EditorCommand for CreateStyleCommand {
         };
 
         document.insert(Position::new(insert_pos), &styles_section)?;
-        
+
         let end_pos = Position::new(insert_pos + styles_section.len());
         Ok(CommandResult::success_with_change(
             Range::new(Position::new(insert_pos), end_pos),
             end_pos,
-        ).with_message(format!("Created styles section and style '{}'", self.style_name)))
+        )
+        .with_message(format!(
+            "Created styles section and style '{}'",
+            self.style_name
+        )))
     }
 
     fn description(&self) -> &str {
@@ -106,7 +116,7 @@ impl EditorCommand for CreateStyleCommand {
     }
 
     fn memory_usage(&self) -> usize {
-        core::mem::size_of::<Self>() 
+        core::mem::size_of::<Self>()
             + self.style_name.len()
             + self.description.as_ref().map_or(0, |d| d.len())
             + 200 // Estimated StyleBuilder size
@@ -179,42 +189,55 @@ impl EditorCommand for EditStyleCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         let content = document.text();
         let style_pattern = format!("Style: {}", self.style_name);
-        
+
         if let Some(style_start) = content.find(&style_pattern) {
             // Find the end of the style line
-            let line_start = content[..style_start].rfind('\n').map(|pos| pos + 1).unwrap_or(0);
-            let line_end = content[style_start..].find('\n').map(|pos| style_start + pos).unwrap_or(content.len());
-            
+            let line_start = content[..style_start]
+                .rfind('\n')
+                .map(|pos| pos + 1)
+                .unwrap_or(0);
+            let line_end = content[style_start..]
+                .find('\n')
+                .map(|pos| style_start + pos)
+                .unwrap_or(content.len());
+
             let style_line = &content[line_start..line_end];
             let fields: Vec<&str> = style_line.split(',').collect();
-            
+
             if fields.len() < 2 {
                 return Err(EditorError::command_failed("Invalid style format"));
             }
 
             // Find format line to determine field order
-            let styles_section_start = content[..line_start].rfind("[V4+ Styles]")
+            let styles_section_start = content[..line_start]
+                .rfind("[V4+ Styles]")
                 .or_else(|| content[..line_start].rfind("[V4 Styles]"))
                 .or_else(|| content[..line_start].rfind("[Styles]"))
                 .ok_or_else(|| EditorError::command_failed("Could not find styles section"))?;
 
-            let format_line_start = content[styles_section_start..].find("Format:")
+            let format_line_start = content[styles_section_start..]
+                .find("Format:")
                 .map(|pos| styles_section_start + pos)
                 .ok_or_else(|| EditorError::command_failed("Could not find format line"))?;
 
-            let format_line_end = content[format_line_start..].find('\n')
+            let format_line_end = content[format_line_start..]
+                .find('\n')
                 .map(|pos| format_line_start + pos)
                 .unwrap_or(content.len());
 
             let format_line = &content[format_line_start..format_line_end];
-            let format_fields: Vec<&str> = format_line.strip_prefix("Format: ")
+            let format_fields: Vec<&str> = format_line
+                .strip_prefix("Format: ")
                 .unwrap_or(format_line)
                 .split(", ")
                 .collect();
 
             // Build updated style line
-            let mut updated_fields = fields.iter().map(|f| f.to_string()).collect::<Vec<String>>();
-            
+            let mut updated_fields = fields
+                .iter()
+                .map(|f| f.to_string())
+                .collect::<Vec<String>>();
+
             for (field_name, new_value) in &self.field_updates {
                 if let Some(field_index) = format_fields.iter().position(|f| f == field_name) {
                     if field_index < updated_fields.len() {
@@ -225,16 +248,20 @@ impl EditorCommand for EditStyleCommand {
 
             let new_style_line = updated_fields.join(",");
             let range = Range::new(Position::new(line_start), Position::new(line_end));
-            
+
             document.replace(range, &new_style_line)?;
-            
+
             let end_pos = Position::new(line_start + new_style_line.len());
             Ok(CommandResult::success_with_change(
                 Range::new(Position::new(line_start), end_pos),
                 end_pos,
-            ).with_message(format!("Updated style '{}'", self.style_name)))
+            )
+            .with_message(format!("Updated style '{}'", self.style_name)))
         } else {
-            Err(EditorError::command_failed(format!("Style '{}' not found", self.style_name)))
+            Err(EditorError::command_failed(format!(
+                "Style '{}' not found",
+                self.style_name
+            )))
         }
     }
 
@@ -245,7 +272,11 @@ impl EditorCommand for EditStyleCommand {
     fn memory_usage(&self) -> usize {
         core::mem::size_of::<Self>()
             + self.style_name.len()
-            + self.field_updates.iter().map(|(k, v)| k.len() + v.len()).sum::<usize>()
+            + self
+                .field_updates
+                .iter()
+                .map(|(k, v)| k.len() + v.len())
+                .sum::<usize>()
             + self.description.as_ref().map_or(0, |d| d.len())
     }
 }
@@ -278,23 +309,31 @@ impl EditorCommand for DeleteStyleCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         let content = document.text();
         let style_pattern = format!("Style: {}", self.style_name);
-        
+
         if let Some(style_start) = content.find(&style_pattern) {
             // Find the complete line including the newline
-            let line_start = content[..style_start].rfind('\n').map(|pos| pos + 1).unwrap_or(0);
-            let line_end = content[style_start..].find('\n')
+            let line_start = content[..style_start]
+                .rfind('\n')
+                .map(|pos| pos + 1)
+                .unwrap_or(0);
+            let line_end = content[style_start..]
+                .find('\n')
                 .map(|pos| style_start + pos + 1) // Include the newline
                 .unwrap_or(content.len());
-            
+
             let range = Range::new(Position::new(line_start), Position::new(line_end));
             document.delete(range)?;
-            
+
             Ok(CommandResult::success_with_change(
                 Range::new(Position::new(line_start), Position::new(line_start)),
                 Position::new(line_start),
-            ).with_message(format!("Deleted style '{}'", self.style_name)))
+            )
+            .with_message(format!("Deleted style '{}'", self.style_name)))
         } else {
-            Err(EditorError::command_failed(format!("Style '{}' not found", self.style_name)))
+            Err(EditorError::command_failed(format!(
+                "Style '{}' not found",
+                self.style_name
+            )))
         }
     }
 
@@ -310,7 +349,7 @@ impl EditorCommand for DeleteStyleCommand {
 }
 
 /// Command to clone an existing style with a new name
-#[derive(Debug, Clone)]  
+#[derive(Debug, Clone)]
 pub struct CloneStyleCommand {
     pub source_style: String,
     pub target_style: String,
@@ -339,36 +378,55 @@ impl EditorCommand for CloneStyleCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         let content = document.text();
         let source_pattern = format!("Style: {}", self.source_style);
-        
+
         // Check if target style already exists
         let target_pattern = format!("Style: {}", self.target_style);
         if content.contains(&target_pattern) {
-            return Err(EditorError::command_failed(format!("Style '{}' already exists", self.target_style)));
+            return Err(EditorError::command_failed(format!(
+                "Style '{}' already exists",
+                self.target_style
+            )));
         }
-        
+
         if let Some(source_start) = content.find(&source_pattern) {
             // Find the complete source style line
-            let line_start = content[..source_start].rfind('\n').map(|pos| pos + 1).unwrap_or(0);
-            let line_end = content[source_start..].find('\n').map(|pos| source_start + pos).unwrap_or(content.len());
-            
+            let line_start = content[..source_start]
+                .rfind('\n')
+                .map(|pos| pos + 1)
+                .unwrap_or(0);
+            let line_end = content[source_start..]
+                .find('\n')
+                .map(|pos| source_start + pos)
+                .unwrap_or(content.len());
+
             let source_line = &content[line_start..line_end];
-            
+
             // Replace the style name in the cloned line
-            let cloned_line = source_line.replace(&format!("Style: {}", self.source_style), &format!("Style: {}", self.target_style));
-            
+            let cloned_line = source_line.replace(
+                &format!("Style: {}", self.source_style),
+                &format!("Style: {}", self.target_style),
+            );
+
             // Find where to insert the new style (after the source style)
             let insert_pos = line_end;
             let insert_text = format!("\n{cloned_line}");
-            
+
             document.insert(Position::new(insert_pos), &insert_text)?;
-            
+
             let end_pos = Position::new(insert_pos + insert_text.len());
             Ok(CommandResult::success_with_change(
                 Range::new(Position::new(insert_pos), end_pos),
                 end_pos,
-            ).with_message(format!("Cloned style '{}' to '{}'", self.source_style, self.target_style)))
+            )
+            .with_message(format!(
+                "Cloned style '{}' to '{}'",
+                self.source_style, self.target_style
+            )))
         } else {
-            Err(EditorError::command_failed(format!("Source style '{}' not found", self.source_style)))
+            Err(EditorError::command_failed(format!(
+                "Source style '{}' not found",
+                self.source_style
+            )))
         }
     }
 
@@ -423,40 +481,44 @@ impl EditorCommand for ApplyStyleCommand {
         let mut content = document.text();
         let mut changes_made = 0;
         let mut total_range: Option<Range> = None;
-        
+
         // Find events section
-        let events_start = content.find("[Events]")
+        let events_start = content
+            .find("[Events]")
             .ok_or_else(|| EditorError::command_failed("Events section not found"))?;
-        
+
         // Skip format line
-        let events_content_start = content[events_start..].find('\n')
+        let events_content_start = content[events_start..]
+            .find('\n')
             .map(|pos| events_start + pos + 1)
             .ok_or_else(|| EditorError::command_failed("Invalid events section format"))?;
-        
+
         // Skip format line again (Format: ...)
-        let first_event_start = content[events_content_start..].find('\n')
+        let first_event_start = content[events_content_start..]
+            .find('\n')
             .map(|pos| events_content_start + pos + 1)
             .unwrap_or(events_content_start);
-        
+
         let mut search_pos = first_event_start;
-        
+
         while search_pos < content.len() {
             // Find next event line
             let line_start = search_pos;
-            let line_end = content[line_start..].find('\n')
+            let line_end = content[line_start..]
+                .find('\n')
                 .map(|pos| line_start + pos)
                 .unwrap_or(content.len());
-            
+
             if line_start >= line_end {
                 break;
             }
-            
+
             let line = &content[line_start..line_end];
-            
+
             // Check if this is an event line
             if line.starts_with("Dialogue:") || line.starts_with("Comment:") {
                 let parts: Vec<&str> = line.split(',').collect();
-                
+
                 // Check if this event uses the old style (typically 4th field after event type)
                 if parts.len() > 4 && parts[3].trim() == self.old_style {
                     // Apply filter if specified
@@ -465,25 +527,31 @@ impl EditorCommand for ApplyStyleCommand {
                     } else {
                         true
                     };
-                    
+
                     if should_update {
                         // Replace the old style with new style
-                        let updated_line = line.replace(&format!(",{},", self.old_style), &format!(",{},", self.new_style));
-                        
+                        let updated_line = line.replace(
+                            &format!(",{},", self.old_style),
+                            &format!(",{},", self.new_style),
+                        );
+
                         // Update the document
                         let range = Range::new(Position::new(line_start), Position::new(line_end));
                         document.replace(range, &updated_line)?;
-                        
+
                         // Update content for next iteration (this is inefficient but correct)
                         content = document.text();
-                        
+
                         // Track overall range
-                        let change_range = Range::new(Position::new(line_start), Position::new(line_start + updated_line.len()));
+                        let change_range = Range::new(
+                            Position::new(line_start),
+                            Position::new(line_start + updated_line.len()),
+                        );
                         total_range = Some(match total_range {
                             Some(existing) => existing.union(&change_range),
                             None => change_range,
                         });
-                        
+
                         changes_made += 1;
                     }
                 }
@@ -491,22 +559,29 @@ impl EditorCommand for ApplyStyleCommand {
                 // Stop at next section
                 break;
             }
-            
+
             search_pos = line_end + 1;
         }
-        
+
         if changes_made > 0 {
             Ok(CommandResult::success_with_change(
                 total_range.unwrap_or(Range::new(Position::new(0), Position::new(0))),
                 Position::new(content.len()),
-            ).with_message(format!("Applied style '{}' to {} events", self.new_style, changes_made)))
+            )
+            .with_message(format!(
+                "Applied style '{}' to {} events",
+                self.new_style, changes_made
+            )))
         } else {
-            Ok(CommandResult::success().with_message("No events found matching the criteria".to_string()))
+            Ok(CommandResult::success()
+                .with_message("No events found matching the criteria".to_string()))
         }
     }
 
     fn description(&self) -> &str {
-        self.description.as_deref().unwrap_or("Apply style to events")
+        self.description
+            .as_deref()
+            .unwrap_or("Apply style to events")
     }
 
     fn memory_usage(&self) -> usize {
@@ -538,15 +613,15 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,Hello world!
     #[test]
     fn test_create_style_command() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         let style_builder = StyleBuilder::new()
             .font("Comic Sans MS")
             .size(24)
             .bold(true);
-        
+
         let command = CreateStyleCommand::new("NewStyle".to_string(), style_builder);
         let result = command.execute(&mut doc).unwrap();
-        
+
         assert!(result.success);
         assert!(result.content_changed);
         assert!(doc.text().contains("Style: NewStyle"));
@@ -556,14 +631,14 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,Hello world!
     #[test]
     fn test_edit_style_command() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         let command = EditStyleCommand::new("Default".to_string())
             .set_font("Helvetica")
             .set_size(24)
             .set_bold(true);
-        
+
         let result = command.execute(&mut doc).unwrap();
-        
+
         assert!(result.success);
         assert!(result.content_changed);
         assert!(doc.text().contains("Helvetica"));
@@ -574,10 +649,10 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,Hello world!
     #[test]
     fn test_delete_style_command() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         let command = DeleteStyleCommand::new("Default".to_string());
         let result = command.execute(&mut doc).unwrap();
-        
+
         assert!(result.success);
         assert!(result.content_changed);
         assert!(!doc.text().contains("Style: Default"));
@@ -586,10 +661,10 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,Hello world!
     #[test]
     fn test_clone_style_command() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         let command = CloneStyleCommand::new("Default".to_string(), "DefaultCopy".to_string());
         let result = command.execute(&mut doc).unwrap();
-        
+
         assert!(result.success);
         assert!(result.content_changed);
         assert!(doc.text().contains("Style: Default")); // Original should still exist
@@ -599,18 +674,18 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,Hello world!
     #[test]
     fn test_apply_style_command() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // First create a new style to apply
         let create_cmd = CreateStyleCommand::new(
             "NewStyle".to_string(),
-            StyleBuilder::new().font("Verdana").size(18)
+            StyleBuilder::new().font("Verdana").size(18),
         );
         create_cmd.execute(&mut doc).unwrap();
-        
+
         // Now apply the new style to events
         let command = ApplyStyleCommand::new("Default".to_string(), "NewStyle".to_string());
         let result = command.execute(&mut doc).unwrap();
-        
+
         assert!(result.success);
         assert!(result.content_changed);
         assert!(doc.text().contains("NewStyle")); // Event should now use NewStyle
@@ -619,20 +694,20 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,Hello world!
     #[test]
     fn test_apply_style_with_filter() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Create a new style
         let create_cmd = CreateStyleCommand::new(
             "FilteredStyle".to_string(),
-            StyleBuilder::new().font("Times").size(22)
+            StyleBuilder::new().font("Times").size(22),
         );
         create_cmd.execute(&mut doc).unwrap();
-        
+
         // Apply style only to events containing "Hello"
         let command = ApplyStyleCommand::new("Default".to_string(), "FilteredStyle".to_string())
             .with_filter("Hello".to_string());
-        
+
         let result = command.execute(&mut doc).unwrap();
-        
+
         assert!(result.success);
         assert!(result.content_changed);
         assert!(doc.text().contains("FilteredStyle"));
@@ -641,10 +716,9 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,Hello world!
     #[test]
     fn test_edit_nonexistent_style() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
-        let command = EditStyleCommand::new("NonExistent".to_string())
-            .set_font("Arial");
-        
+
+        let command = EditStyleCommand::new("NonExistent".to_string()).set_font("Arial");
+
         let result = command.execute(&mut doc);
         assert!(result.is_err());
     }
@@ -652,10 +726,10 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,Hello world!
     #[test]
     fn test_clone_to_existing_style() {
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         let command = CloneStyleCommand::new("Default".to_string(), "Default".to_string());
         let result = command.execute(&mut doc);
-        
+
         assert!(result.is_err());
     }
 }

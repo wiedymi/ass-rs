@@ -9,7 +9,7 @@ use core::ops::Range;
 
 use super::Span;
 
-/// Embedded font from [Fonts] section
+/// Embedded font from `[Fonts\]` section
 ///
 /// Represents a font file embedded in the ASS script using UU-encoding.
 /// Provides lazy decoding to avoid processing overhead unless the font
@@ -32,7 +32,7 @@ use super::Span;
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Font<'a> {
-    /// Font filename as it appears in the [Fonts] section
+    /// Font filename as it appears in the `[Fonts\]` section
     pub filename: &'a str,
 
     /// UU-encoded font data lines as zero-copy spans
@@ -72,7 +72,7 @@ impl Font<'_> {
 
     /// Convert font to ASS string representation
     ///
-    /// Generates the font entry as it appears in the [Fonts] section.
+    /// Generates the font entry as it appears in the `[Fonts\]` section.
     ///
     /// # Examples
     ///
@@ -121,7 +121,7 @@ impl Font<'_> {
     }
 }
 
-/// Embedded graphic from [Graphics] section
+/// Embedded graphic from `[Graphics\]` section
 ///
 /// Represents an image file embedded in the ASS script using UU-encoding.
 /// Commonly used for logos, textures, and other graphical elements.
@@ -143,7 +143,7 @@ impl Font<'_> {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Graphic<'a> {
-    /// Graphic filename as it appears in the [Graphics] section
+    /// Graphic filename as it appears in the `[Graphics\]` section
     pub filename: &'a str,
 
     /// UU-encoded graphic data lines as zero-copy spans
@@ -172,7 +172,7 @@ impl Graphic<'_> {
 
     /// Convert graphic to ASS string representation
     ///
-    /// Generates the graphic entry as it appears in the [Graphics] section.
+    /// Generates the graphic entry as it appears in the `[Graphics\]` section.
     ///
     /// # Examples
     ///

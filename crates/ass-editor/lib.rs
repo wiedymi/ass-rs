@@ -177,16 +177,16 @@ pub use commands::{
     InsertTextCommand, ReplaceTextCommand, TextCommand,
 };
 pub use core::{
-    DocumentPosition, EditorDocument, EditorError, EventBuilder, HistoryEntry, HistoryStats,
+    DocumentPosition, EditorDocument, EditorError, EventAccessor, EventBuilder, EventInfo,
+    EventQuery, EventSortCriteria, EventSortOptions, HistoryEntry, HistoryStats, OwnedEvent,
     Position, PositionBuilder, Range, Result, Selection, StyleBuilder, UndoManager, UndoStack,
-    UndoStackConfig, EventInfo, EventSortCriteria, EventSortOptions, EventAccessor, 
-    EventQuery, OwnedEvent,
+    UndoStackConfig,
 };
 // Re-export the fluent EventFilter directly
 pub use core::fluent::EventFilter;
-// Re-export the events EventFilter with a specific name to avoid conflict  
+// Re-export the events EventFilter with a specific name to avoid conflict
 pub use events::{
-    DocumentEvent, EventChannel, EventChannelConfig, EventFilter as DocumentEventFilter, 
+    DocumentEvent, EventChannel, EventChannelConfig, EventFilter as DocumentEventFilter,
     EventHandler, EventStats,
 };
 pub use extensions::{

@@ -29,7 +29,7 @@
 //! let chunk1 = b"[Script Info]\nTitle: Example\n";
 //! let deltas1 = parser.feed_chunk(chunk1)?;
 //!
-//! let chunk2 = b"[Events]\nFormat: Layer, Start, End\n";
+//! let chunk2 = b"[Events\]\nFormat: Layer, Start, End\n";
 //! let deltas2 = parser.feed_chunk(chunk2)?;
 //!
 //! let result = parser.finish()?;
@@ -46,7 +46,11 @@ pub use processor::LineProcessor;
 pub use state::{ParserState, SectionKind, StreamingContext};
 
 use crate::{utils::CoreError, Result, ScriptVersion};
-use alloc::{format, string::{String, ToString}, vec::Vec};
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::ops::Range;
 
 /// Result of streaming parser containing owned sections
@@ -466,10 +470,10 @@ mod tests {
 
     #[test]
     fn streaming_large_chunk_comprehensive() {
-        #[cfg(feature = "std")]
-        use std::fmt::Write;
         #[cfg(not(feature = "std"))]
         use alloc::fmt::Write;
+        #[cfg(feature = "std")]
+        use std::fmt::Write;
 
         let mut parser = StreamingParser::new();
         // Create a large chunk

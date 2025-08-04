@@ -168,10 +168,10 @@ impl HashConfig {
 mod tests {
     use super::*;
     use core::hash::Hash;
-    
+
     #[cfg(feature = "std")]
     use std::collections::HashSet;
-    
+
     #[cfg(not(feature = "std"))]
     use hashbrown::HashSet;
 

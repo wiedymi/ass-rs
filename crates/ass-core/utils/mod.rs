@@ -348,7 +348,7 @@ pub fn validate_ass_name(name: &str) -> bool {
         && name.chars().all(|c| !c.is_control() || c == '\t')
 }
 
-/// Decode UU-encoded data commonly found in ASS [Fonts] and [Graphics] sections
+/// Decode UU-encoded data commonly found in ASS `[Fonts]` and `[Graphics]` sections
 ///
 /// UU-encoding (Unix-to-Unix encoding) embeds binary data as ASCII text.
 /// Each line starts with a length character followed by encoded data.

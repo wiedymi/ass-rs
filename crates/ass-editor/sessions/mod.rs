@@ -19,7 +19,10 @@ use std::collections::HashMap;
 use alloc::collections::BTreeMap as HashMap;
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 #[cfg(feature = "multi-thread")]
 use std::sync::Arc;

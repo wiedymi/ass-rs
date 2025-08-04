@@ -12,7 +12,7 @@ use crate::parser::{
 };
 use alloc::{format, vec::Vec};
 
-/// Parser for [Events] section content
+/// Parser for `[Events]` section content
 ///
 /// Parses format definitions and event entries from the events section.
 /// Uses format mapping to handle different field orderings and event types.

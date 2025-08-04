@@ -242,7 +242,9 @@ mod tests {
         let mut ext = AutoCompleteExtension::new();
         let mut manager = ExtensionManager::new();
         let mut doc = EditorDocument::new();
-        let mut context = manager.create_context("test".to_string(), Some(&mut doc)).unwrap();
+        let mut context = manager
+            .create_context("test".to_string(), Some(&mut doc))
+            .unwrap();
 
         // Initialize
         assert_eq!(ext.state(), ExtensionState::Uninitialized);
@@ -275,7 +277,9 @@ mod tests {
         manager.set_config("autocomplete.max_suggestions".to_string(), "10".to_string());
 
         let mut doc = EditorDocument::new();
-        let mut context = manager.create_context("test".to_string(), Some(&mut doc)).unwrap();
+        let mut context = manager
+            .create_context("test".to_string(), Some(&mut doc))
+            .unwrap();
 
         // Initialize should load config
         ext.initialize(&mut *context).unwrap();
@@ -325,7 +329,9 @@ mod tests {
             "[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: MyStyle,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,2,10,10,10,1",
         )
         .unwrap();
-        let mut context = manager.create_context("test".to_string(), Some(&mut doc)).unwrap();
+        let mut context = manager
+            .create_context("test".to_string(), Some(&mut doc))
+            .unwrap();
 
         ext.initialize(&mut *context).unwrap();
 
@@ -342,7 +348,9 @@ mod tests {
         let mut ext = AutoCompleteExtension::new();
         let mut manager = ExtensionManager::new();
         let mut doc = EditorDocument::new();
-        let mut context = manager.create_context("test".to_string(), Some(&mut doc)).unwrap();
+        let mut context = manager
+            .create_context("test".to_string(), Some(&mut doc))
+            .unwrap();
 
         let result = ext
             .execute_command("unknown.command", &HashMap::new(), &mut *context)
