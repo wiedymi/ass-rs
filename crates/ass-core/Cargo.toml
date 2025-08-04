@@ -7,6 +7,8 @@ license.workspace = true
 repository.workspace = true
 readme = "README.md"
 description = "High-performance ASS subtitle format parser and analyzer"
+homepage = "https://github.com/wiedymi/ass-rs"
+documentation = "https://docs.rs/ass-core"
 keywords = ["subtitle", "ass", "ssa", "parser", "aegisub"]
 categories = ["parsing", "multimedia", "text-processing"]
 

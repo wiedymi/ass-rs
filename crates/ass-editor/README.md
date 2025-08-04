@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/ass-editor.svg)](https://crates.io/crates/ass-editor)  
 [![Documentation](https://docs.rs/ass-editor/badge.svg)](https://docs.rs/ass-editor)  
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
 
 A high-performance, ergonomic editor layer for ASS (Advanced SubStation Alpha) subtitles, built on top of `ass-core`. Designed for interactive subtitle editing with zero-copy efficiency, incremental updates, and comprehensive command support.
 
@@ -337,7 +337,7 @@ Contributions are welcome! Please see the main [CONTRIBUTING.md](../../CONTRIBUT
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/ass-rs.git
+git clone https://github.com/wiedymi/ass-rs.git
 cd ass-rs/crates/ass-editor
 
 # Run tests
@@ -353,7 +353,7 @@ cargo fmt --all -- --check
 
 ## 📄 License
 
-Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option.
+Licensed under the [MIT license](../../LICENSE).
 
 ## 🔗 Related Crates
 
