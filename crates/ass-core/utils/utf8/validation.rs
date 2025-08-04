@@ -19,9 +19,11 @@
 //! ```
 
 use crate::utils::CoreError;
-use alloc::{format, string::{String, ToString}};
+use alloc::{
+    format,
+    string::{String, ToString},
+};
 use core::str;
-
 
 /// Validate UTF-8 with detailed error information
 ///

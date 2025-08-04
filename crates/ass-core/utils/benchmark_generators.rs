@@ -7,6 +7,10 @@
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
+use crate::parser::{
+    ast::{EventType, Span},
+    Event,
+};
 #[cfg(not(feature = "std"))]
 use alloc::{
     fmt::Write,
@@ -16,10 +20,6 @@ use alloc::{
 };
 #[cfg(feature = "std")]
 use std::fmt::Write;
-use crate::parser::{
-    ast::{EventType, Span},
-    Event,
-};
 
 /// Synthetic ASS script generator for benchmarking
 pub struct ScriptGenerator {

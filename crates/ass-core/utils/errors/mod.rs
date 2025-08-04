@@ -48,8 +48,6 @@ pub use resource::{
     check_memory_limit, feature_not_supported, out_of_memory, resource_limit_exceeded,
 };
 
-
-
 impl CoreError {
     /// Create color error from invalid format
     pub fn invalid_color<T: ::core::fmt::Display>(format: T) -> Self {

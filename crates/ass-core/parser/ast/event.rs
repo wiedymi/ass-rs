@@ -6,9 +6,9 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
+use super::Span;
 #[cfg(debug_assertions)]
 use core::ops::Range;
-use super::Span;
 
 /// Event from `[Events\]` section (dialogue, comments, etc.)
 ///

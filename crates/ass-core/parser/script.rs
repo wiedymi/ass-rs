@@ -9,7 +9,12 @@ use crate::{Result, ScriptVersion};
 extern crate alloc;
 #[cfg(feature = "stream")]
 use alloc::format;
-use alloc::{boxed::Box, string::{String, ToString}, vec, vec::Vec};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 #[cfg(feature = "stream")]
 use core::ops::Range;
 

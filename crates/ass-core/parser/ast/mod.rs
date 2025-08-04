@@ -100,7 +100,6 @@ impl Span {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn test_span_creation() {

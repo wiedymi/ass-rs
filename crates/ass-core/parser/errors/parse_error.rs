@@ -7,7 +7,6 @@
 use alloc::string::String;
 use core::fmt;
 
-
 #[cfg(feature = "std")]
 use thiserror::Error;
 
@@ -280,4 +279,3 @@ impl fmt::Display for ParseError {
             .or_else(|_| self.fmt_system(f))
     }
 }
-

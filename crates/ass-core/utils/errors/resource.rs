@@ -8,7 +8,6 @@ use super::CoreError;
 use alloc::{format, string::ToString};
 use core::fmt;
 
-
 /// Create memory allocation error
 ///
 /// Generates a `CoreError::OutOfMemory` with descriptive context about

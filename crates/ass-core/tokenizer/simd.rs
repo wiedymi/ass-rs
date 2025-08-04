@@ -21,7 +21,6 @@ use wide::u8x16;
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 #[cfg(not(feature = "std"))]
-
 #[cfg(feature = "simd")]
 use wide::u8x16;
 

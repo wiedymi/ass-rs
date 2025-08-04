@@ -8,7 +8,6 @@ use super::CoreError;
 use alloc::{format, string::String};
 use core::fmt;
 
-
 /// Create UTF-8 encoding error with position information
 ///
 /// Generates a `CoreError::Utf8Error` with detailed position and context
