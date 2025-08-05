@@ -184,6 +184,8 @@ pub fn validate_bom_handling(bytes: &[u8]) -> Result<(), CoreError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn utf8_error_creation() {

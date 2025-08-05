@@ -13,6 +13,7 @@
 //!
 //! ```rust
 //! use ass_core::parser::Script;
+//! use ass_core::CoreError;
 //!
 //! let script_text = r#"
 //! [Script Info]
@@ -26,7 +27,7 @@
 //!
 //! let script = Script::parse(script_text)?;
 //! assert_eq!(script.sections().len(), 2);
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! # Ok::<(), CoreError>(())
 //! ```
 
 pub mod ast;

@@ -5,8 +5,11 @@
 //! - <1.1x input memory ratio
 //! - Consistent performance across different subtitle types
 
-#![allow(clippy::missing_docs_in_private_items)]
-
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::ToString};
+#[allow(clippy::missing_docs_in_private_items)]
 use std::{
     env,
     fs::File,
@@ -14,7 +17,6 @@ use std::{
     path::Path,
     process,
 };
-
 /// Performance targets for validation
 #[derive(Debug)]
 struct PerformanceTargets {

@@ -1,6 +1,6 @@
 //! Events section parser for ASS scripts.
 //!
-//! Handles parsing of the [Events] section which contains dialogue, comments,
+//! Handles parsing of the `[Events]` section which contains dialogue, comments,
 //! and other timed events with format specifications and event entries.
 
 use crate::parser::{
@@ -12,7 +12,7 @@ use crate::parser::{
 };
 use alloc::{format, vec::Vec};
 
-/// Parser for [Events] section content
+/// Parser for `[Events]` section content
 ///
 /// Parses format definitions and event entries from the events section.
 /// Uses format mapping to handle different field orderings and event types.
@@ -404,6 +404,8 @@ impl<'a> EventsParser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn parse_empty_section() {

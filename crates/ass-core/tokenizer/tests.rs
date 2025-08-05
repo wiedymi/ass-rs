@@ -2,6 +2,14 @@
 
 use super::*;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::ToString, vec};
+#[cfg(not(feature = "std"))]
+use hashbrown::HashSet;
+#[cfg(feature = "std")]
+use std::collections::HashSet;
 #[test]
 fn tokenizer_new_without_bom() {
     let tokenizer = AssTokenizer::new("Hello World");
@@ -546,7 +554,7 @@ fn alternating_contexts() {
     assert!(tokens.len() >= 8);
 
     // Verify we have different token types
-    let token_types: std::collections::HashSet<_> = tokens.iter().map(|t| &t.token_type).collect();
+    let token_types: HashSet<_> = tokens.iter().map(|t| &t.token_type).collect();
     assert!(token_types.len() >= 4); // At least 4 different token types
 }
 
@@ -910,7 +918,7 @@ fn mixed_delimiters_and_text() {
     let tokens = tokenizer.tokenize_all().unwrap();
 
     // Should have variety of token types
-    let types: std::collections::HashSet<_> = tokens.iter().map(|t| &t.token_type).collect();
+    let types: HashSet<_> = tokens.iter().map(|t| &t.token_type).collect();
     assert!(types.len() > 1);
 }
 
@@ -1066,7 +1074,7 @@ fn tokenizer_scanner_methods_coverage() {
     let tokens = tokenizer.tokenize_all().unwrap();
 
     // Should exercise different scanner methods
-    let token_types: std::collections::HashSet<_> = tokens.iter().map(|t| &t.token_type).collect();
+    let token_types: HashSet<_> = tokens.iter().map(|t| &t.token_type).collect();
     assert!(token_types.len() > 3);
 }
 

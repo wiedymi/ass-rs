@@ -2,6 +2,8 @@
 
 use super::*;
 use alloc::boxed::Box;
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec};
 
 /// Mock tag handler for testing
 struct MockTagHandler {

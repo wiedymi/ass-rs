@@ -646,6 +646,8 @@ impl EditorExtension for AutoCompleteExtension {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn test_completion_item() {

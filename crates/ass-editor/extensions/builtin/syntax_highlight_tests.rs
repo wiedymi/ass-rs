@@ -1,10 +1,18 @@
 //! Extended tests for syntax highlighting extension
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
 #[cfg(test)]
 mod tests {
     use crate::core::EditorDocument;
     use crate::extensions::builtin::syntax_highlight::{SyntaxHighlightExtension, TokenType};
     use crate::extensions::{EditorExtension, ExtensionManager, ExtensionState};
+    #[cfg(not(feature = "std"))]
+    use alloc::collections::BTreeMap as HashMap;
+    #[cfg(not(feature = "std"))]
+    use alloc::{string::ToString, vec::Vec};
+    #[cfg(feature = "std")]
     use std::collections::HashMap;
 
     #[test]
@@ -171,7 +179,9 @@ mod tests {
         let mut ext = SyntaxHighlightExtension::new();
         let mut manager = ExtensionManager::new();
         let mut doc = EditorDocument::new();
-        let mut context = manager.create_context("test".to_string(), Some(&mut doc)).unwrap();
+        let mut context = manager
+            .create_context("test".to_string(), Some(&mut doc))
+            .unwrap();
 
         // Initialize
         assert_eq!(ext.state(), ExtensionState::Uninitialized);
@@ -199,7 +209,9 @@ mod tests {
         manager.set_config("syntax.max_tokens".to_string(), "5000".to_string());
 
         let mut doc = EditorDocument::new();
-        let mut context = manager.create_context("test".to_string(), Some(&mut doc)).unwrap();
+        let mut context = manager
+            .create_context("test".to_string(), Some(&mut doc))
+            .unwrap();
 
         // Initialize should load config
         ext.initialize(&mut *context).unwrap();

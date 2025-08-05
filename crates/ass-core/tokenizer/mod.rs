@@ -26,6 +26,8 @@
 use crate::Result;
 use alloc::vec::Vec;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 pub mod scanner;
 #[cfg(feature = "simd")]
 pub mod simd;
@@ -245,6 +247,12 @@ mod tests;
 #[cfg(test)]
 mod inline_tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use hashbrown::HashSet;
+    #[cfg(feature = "std")]
+    use std::collections::HashSet;
 
     #[test]
     fn tokenize_section_header() {
@@ -573,7 +581,7 @@ mod inline_tests {
         let tokens = tokenizer.tokenize_all().unwrap();
 
         // Should have various token types
-        let types: std::collections::HashSet<_> = tokens.iter().map(|t| &t.token_type).collect();
+        let types: HashSet<_> = tokens.iter().map(|t| &t.token_type).collect();
 
         // Should include multiple different types
         assert!(types.len() > 1);

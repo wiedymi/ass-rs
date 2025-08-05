@@ -138,9 +138,7 @@ fn test_color_format_variations() {
     ];
 
     for color in colors {
-        let content = format!(
-            "[V4+ Styles]\nFormat: Name, PrimaryColour\nStyle: Test,{color}"
-        );
+        let content = format!("[V4+ Styles]\nFormat: Name, PrimaryColour\nStyle: Test,{color}");
 
         let result = EditorDocument::from_content(&content);
         if let Ok(doc) = result {

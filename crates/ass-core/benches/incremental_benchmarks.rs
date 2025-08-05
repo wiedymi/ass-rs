@@ -7,20 +7,22 @@
 //!
 //! Includes real-world editing scenarios and stress testing.
 
-#![allow(
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::ToString};
+#[allow(
     clippy::missing_docs_in_private_items,
     clippy::option_if_let_else,
     clippy::range_plus_one,
     clippy::cast_precision_loss
 )]
-
 use ass_core::{
     parser::{incremental::TextChange, Script},
     utils::ScriptGenerator,
 };
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::{hint::black_box as std_black_box, time::Instant};
-
 /// Check if running in quick mode (for CI or quick tests)
 fn is_quick_bench() -> bool {
     std::env::var("QUICK_BENCH").is_ok()
@@ -580,7 +582,7 @@ fn create_malformed_change(script_text: &str) -> TextChange {
     let mid = script_text.len() / 2;
     TextChange {
         range: mid..mid + 10,
-        new_text: "{\\\\ malformed {\\tag} content \\}".to_string(),
+        new_text: "{`[Events]` malformed {\\tag} content \\}".to_string(),
         line_range: 5..6,
     }
 }

@@ -3,10 +3,14 @@
 //! Contains the Style struct representing style definitions from the
 //! [V4+ Styles] section with zero-copy design and style property accessors.
 
-#[cfg(debug_assertions)]
-use core::ops::Range;
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec::Vec};
 
 use super::Span;
+#[cfg(debug_assertions)]
+use core::ops::Range;
 
 /// Style definition from [V4+ Styles] section
 ///
@@ -137,8 +141,6 @@ impl Style<'_> {
     /// ```
     #[must_use]
     pub fn to_ass_string(&self) -> alloc::string::String {
-        use alloc::format;
-
         // Use standard V4+ format by default
         // TODO: Support custom format lines
         format!(
@@ -196,8 +198,6 @@ impl Style<'_> {
     /// ```
     #[must_use]
     pub fn to_ass_string_with_format(&self, format: &[&str]) -> alloc::string::String {
-        use alloc::{format, vec::Vec};
-
         let mut field_values = Vec::with_capacity(format.len());
 
         for field in format {
@@ -322,6 +322,10 @@ impl Default for Style<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::String;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn style_default_values() {

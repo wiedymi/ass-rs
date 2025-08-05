@@ -16,7 +16,12 @@ use std::collections::HashMap;
 use alloc::collections::BTreeMap as HashMap;
 
 #[cfg(not(feature = "std"))]
-use alloc::{boxed::Box, format, string::{String, ToString}, vec::Vec};
+use alloc::{
+    boxed::Box,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 #[cfg(feature = "multi-thread")]
 use std::sync::{Arc, RwLock};
@@ -838,6 +843,8 @@ impl DocumentEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{string::ToString, vec};
 
     #[test]
     fn document_event_creation() {

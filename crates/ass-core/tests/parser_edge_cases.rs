@@ -9,9 +9,14 @@ use ass_core::{
     Script, Section,
 };
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::String;
 
     /// Test input size limit exceeded error path (L90-L96)
     #[test]

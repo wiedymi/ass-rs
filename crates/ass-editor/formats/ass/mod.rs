@@ -140,11 +140,23 @@ impl FormatExporter for AssFormat {
     }
 }
 
-impl Format for AssFormat {}
+impl Format for AssFormat {
+    fn as_importer(&self) -> &dyn FormatImporter {
+        self
+    }
+
+    fn as_exporter(&self) -> &dyn FormatExporter {
+        self
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::String, vec};
     use std::io::Cursor;
 
     const SAMPLE_ASS: &str = r#"[Script Info]

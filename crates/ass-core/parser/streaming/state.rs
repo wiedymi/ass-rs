@@ -70,11 +70,11 @@ pub enum SectionKind {
     ScriptInfo,
     /// [V4+ Styles] or [V4 Styles] section
     Styles,
-    /// [Events] section with dialogue/timing
+    /// `[Events\]` section with dialogue/timing
     Events,
-    /// [Fonts] section with embedded fonts
+    /// `[Fonts\]` section with embedded fonts
     Fonts,
-    /// [Graphics] section with embedded images
+    /// `[Graphics\]` section with embedded images
     Graphics,
     /// Unknown or unsupported section
     Unknown,
@@ -196,6 +196,8 @@ impl Default for StreamingContext {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::ToString};
 
     #[test]
     fn parser_state_transitions() {

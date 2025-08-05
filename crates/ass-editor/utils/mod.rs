@@ -26,6 +26,6 @@ pub use indexing::LinearSearchIndex;
 
 #[cfg(feature = "formats")]
 pub use formats::{
-    ConversionOptions, FormatConverter, FormatOptions, SubtitleFormat,
-    export_to_file, import_from_file,
+    export_to_file, import_from_file, ConversionOptions, FormatConverter, FormatOptions,
+    SubtitleFormat,
 };

@@ -39,7 +39,7 @@ pub(super) struct Parser<'a> {
     issues: Vec<ParseIssue>,
     /// Format fields for [V4+ Styles] section
     styles_format: Option<Vec<&'a str>>,
-    /// Format fields for [Events] section
+    /// Format fields for `[Events\]` section
     events_format: Option<Vec<&'a str>>,
     /// Extension registry for custom tag handlers and section processors
     #[cfg(feature = "plugins")]

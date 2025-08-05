@@ -20,15 +20,15 @@ use core::fmt;
 ///
 /// let doc = EditorDocument::from_content("Hello World").unwrap();
 /// let pos = Position::new(6); // Position before "World"
-/// 
+///
 /// // Basic operations
 /// assert_eq!(pos.offset, 6);
 /// assert!(!pos.is_start());
-/// 
+///
 /// // Position arithmetic  
 /// let advanced = pos.advance(5);
 /// assert_eq!(advanced.offset, 11);
-/// 
+///
 /// let retreated = pos.retreat(3);
 /// assert_eq!(retreated.offset, 3);
 /// ```
@@ -135,17 +135,17 @@ impl fmt::Display for LineColumn {
 ///
 /// let doc = EditorDocument::from_content("Hello World").unwrap();
 /// let range = Range::new(Position::new(0), Position::new(5)); // "Hello"
-/// 
+///
 /// // Basic properties
 /// assert_eq!(range.len(), 5);
 /// assert!(!range.is_empty());
 /// assert!(range.contains(Position::new(2)));
 /// assert!(!range.contains(Position::new(5))); // End is exclusive
-/// 
+///
 /// // Range operations
 /// let other = Range::new(Position::new(3), Position::new(8)); // "lo Wo"
 /// assert!(range.overlaps(&other));
-/// 
+///
 /// let union = range.union(&other);
 /// assert_eq!(union.start.offset, 0);
 /// assert_eq!(union.end.offset, 8);
@@ -345,13 +345,13 @@ impl PositionBuilder {
         } else if let Some(line) = self.line {
             // Convert to 0-indexed
             let line_idx = line.saturating_sub(1);
-            
+
             if line_idx >= rope.len_lines() {
                 return Err(EditorError::InvalidPosition { line, column: 1 });
             }
 
             let line_start = rope.line_to_byte(line_idx);
-            
+
             if let Some(column) = self.column {
                 LineColumn::new(line, column)?;
                 let col_idx = column.saturating_sub(1);

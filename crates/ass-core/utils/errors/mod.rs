@@ -25,6 +25,10 @@
 //! assert!(color_err.suggestion().is_some());
 //! ```
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(not(feature = "std"))]
+use alloc::format;
 mod category;
 mod core;
 pub mod encoding;
@@ -43,8 +47,6 @@ pub use format::{invalid_color, invalid_numeric, invalid_time, validate_color_fo
 pub use resource::{
     check_memory_limit, feature_not_supported, out_of_memory, resource_limit_exceeded,
 };
-
-use alloc::format;
 
 impl CoreError {
     /// Create color error from invalid format
@@ -126,6 +128,8 @@ mod tests;
 #[cfg(test)]
 mod inline_tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::ToString, vec};
 
     #[test]
     fn error_creation_methods() {

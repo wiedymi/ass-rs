@@ -11,10 +11,10 @@ use ass_core::ScriptVersion;
 use std::borrow::Cow;
 
 #[cfg(not(feature = "std"))]
-use alloc::{borrow::Cow, vec};
+use alloc::{borrow::Cow, format, string::ToString, vec};
 
 #[cfg(not(feature = "std"))]
-use alloc::{format, string::{String, ToString}, vec::Vec};
+use alloc::{string::String, vec::Vec};
 
 /// Builder for creating ASS events with fluent API
 ///
@@ -223,7 +223,11 @@ impl<'a> EventBuilder<'a> {
                     .as_ref()
                     .map(|c| c.as_ref())
                     .unwrap_or("0:00:00.00"),
-                "End" => self.end.as_ref().map(|c| c.as_ref()).unwrap_or("0:00:05.00"),
+                "End" => self
+                    .end
+                    .as_ref()
+                    .map(|c| c.as_ref())
+                    .unwrap_or("0:00:05.00"),
                 "Style" => self.style.as_ref().map(|c| c.as_ref()).unwrap_or("Default"),
                 "Name" | "Actor" => self.name.as_ref().map(|c| c.as_ref()).unwrap_or(""),
                 "MarginL" => self.margin_l.as_ref().map(|c| c.as_ref()).unwrap_or("0"),
@@ -542,33 +546,88 @@ impl StyleBuilder {
         let format = match version {
             ScriptVersion::SsaV4 => {
                 // SSA v4 has fewer fields
-                vec!["Name", "Fontname", "Fontsize", "PrimaryColour", 
-                     "SecondaryColour", "TertiaryColour", "BackColour", 
-                     "Bold", "Italic", "BorderStyle", "Outline", 
-                     "Shadow", "Alignment", "MarginL", "MarginR", 
-                     "MarginV", "AlphaLevel", "Encoding"]
-            },
+                vec![
+                    "Name",
+                    "Fontname",
+                    "Fontsize",
+                    "PrimaryColour",
+                    "SecondaryColour",
+                    "TertiaryColour",
+                    "BackColour",
+                    "Bold",
+                    "Italic",
+                    "BorderStyle",
+                    "Outline",
+                    "Shadow",
+                    "Alignment",
+                    "MarginL",
+                    "MarginR",
+                    "MarginV",
+                    "AlphaLevel",
+                    "Encoding",
+                ]
+            }
             ScriptVersion::AssV4 => {
                 // Standard ASS v4 format
-                vec!["Name", "Fontname", "Fontsize", "PrimaryColour",
-                     "SecondaryColour", "OutlineColour", "BackColour",
-                     "Bold", "Italic", "Underline", "StrikeOut",
-                     "ScaleX", "ScaleY", "Spacing", "Angle",
-                     "BorderStyle", "Outline", "Shadow", "Alignment",
-                     "MarginL", "MarginR", "MarginV", "Encoding"]
-            },
+                vec![
+                    "Name",
+                    "Fontname",
+                    "Fontsize",
+                    "PrimaryColour",
+                    "SecondaryColour",
+                    "OutlineColour",
+                    "BackColour",
+                    "Bold",
+                    "Italic",
+                    "Underline",
+                    "StrikeOut",
+                    "ScaleX",
+                    "ScaleY",
+                    "Spacing",
+                    "Angle",
+                    "BorderStyle",
+                    "Outline",
+                    "Shadow",
+                    "Alignment",
+                    "MarginL",
+                    "MarginR",
+                    "MarginV",
+                    "Encoding",
+                ]
+            }
             ScriptVersion::AssV4Plus => {
                 // ASS v4++ format with additional fields
-                vec!["Name", "Fontname", "Fontsize", "PrimaryColour",
-                     "SecondaryColour", "OutlineColour", "BackColour",
-                     "Bold", "Italic", "Underline", "StrikeOut",
-                     "ScaleX", "ScaleY", "Spacing", "Angle",
-                     "BorderStyle", "Outline", "Shadow", "Alignment",
-                     "MarginL", "MarginR", "MarginV", "MarginT", 
-                     "MarginB", "Encoding", "RelativeTo"]
+                vec![
+                    "Name",
+                    "Fontname",
+                    "Fontsize",
+                    "PrimaryColour",
+                    "SecondaryColour",
+                    "OutlineColour",
+                    "BackColour",
+                    "Bold",
+                    "Italic",
+                    "Underline",
+                    "StrikeOut",
+                    "ScaleX",
+                    "ScaleY",
+                    "Spacing",
+                    "Angle",
+                    "BorderStyle",
+                    "Outline",
+                    "Shadow",
+                    "Alignment",
+                    "MarginL",
+                    "MarginR",
+                    "MarginV",
+                    "MarginT",
+                    "MarginB",
+                    "Encoding",
+                    "RelativeTo",
+                ]
             }
         };
-        
+
         self.build_with_format(&format)
     }
 
@@ -663,6 +722,8 @@ impl StyleBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn event_builder_dialogue() {

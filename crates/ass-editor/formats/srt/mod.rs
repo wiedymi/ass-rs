@@ -448,11 +448,23 @@ impl FormatExporter for SrtFormat {
     }
 }
 
-impl Format for SrtFormat {}
+impl Format for SrtFormat {
+    fn as_importer(&self) -> &dyn FormatImporter {
+        self
+    }
+
+    fn as_exporter(&self) -> &dyn FormatExporter {
+        self
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::String, vec};
 
     const SAMPLE_SRT: &str = "1\n00:00:00,000 --> 00:00:05,000\n<b>Hello</b> <i>World</i>!\n\n2\n00:00:06,000 --> 00:00:10,000\nThis is a <u>subtitle</u> with <font color=\"#FF0000\">red text</font>.\n\n3\n00:00:12,500 --> 00:00:15,750\nMultiple\nlines\nhere\n\n";
 

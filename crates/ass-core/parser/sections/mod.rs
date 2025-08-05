@@ -24,6 +24,7 @@
 //!
 /// ```rust
 /// use ass_core::parser::sections::{ScriptInfoParser, StylesParser, EventsParser};
+/// use ass_core::CoreError;
 ///
 /// let source = "[Script Info]\nTitle: Test\n\n[V4+ Styles]\nFormat: Name, Fontname\nStyle: Default,Arial\n\n[Events]\nFormat: Layer, Start, End, Text\nDialogue: 0,0:00:00.00,0:00:05.00,Hello";
 /// let start_pos = 0;
@@ -40,7 +41,7 @@
 /// // Parse events section
 /// let events_parser = EventsParser::new(source, start_pos, start_line);
 /// let (section, format, issues, pos, line) = events_parser.parse()?;
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok::<(), CoreError>(())
 /// ```
 pub mod events;
 pub mod script_info;

@@ -12,20 +12,23 @@
 //! ```
 
 use super::{EditorDocument, Position, Range, Result, StyleBuilder};
-use crate::core::errors::EditorError;
 use crate::commands::{
-    CreateStyleCommand, EditStyleCommand, DeleteStyleCommand, CloneStyleCommand, ApplyStyleCommand,
-    SplitEventCommand, MergeEventsCommand, TimingAdjustCommand, ToggleEventTypeCommand, EventEffectCommand, EffectOperation,
-    InsertTagCommand, RemoveTagCommand, ReplaceTagCommand, WrapTagCommand, ParseTagCommand, ParsedTag,
-    GenerateKaraokeCommand, SplitKaraokeCommand, AdjustKaraokeCommand, ApplyKaraokeCommand,
-    KaraokeType,
-    EditorCommand
+    AdjustKaraokeCommand, ApplyKaraokeCommand, ApplyStyleCommand, CloneStyleCommand,
+    CreateStyleCommand, DeleteStyleCommand, EditStyleCommand, EditorCommand, EffectOperation,
+    EventEffectCommand, GenerateKaraokeCommand, InsertTagCommand, KaraokeType, MergeEventsCommand,
+    ParseTagCommand, ParsedTag, RemoveTagCommand, ReplaceTagCommand, SplitEventCommand,
+    SplitKaraokeCommand, TimingAdjustCommand, ToggleEventTypeCommand, WrapTagCommand,
 };
-use ass_core::parser::ast::{Event, Section, EventType};
+use crate::core::errors::EditorError;
+use ass_core::parser::ast::{Event, EventType, Section};
 use core::cmp::Ordering;
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::{String, ToString}, vec, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 
 #[cfg(feature = "std")]
 use std::vec;
@@ -222,7 +225,7 @@ impl<'a> AtPosition<'a> {
             self.document.replace(range, text)?;
             Ok(self.document)
         }
-        
+
         #[cfg(not(feature = "rope"))]
         {
             Err(EditorError::FeatureNotEnabled {
@@ -244,12 +247,12 @@ impl<'a> AtPosition<'a> {
         let line_idx = rope.byte_to_line(self.position.offset);
         let line_start = rope.line_to_byte(line_idx);
         let col_offset = self.position.offset - line_start;
-        
+
         // Convert byte offset to character offset
         let line = rope.line(line_idx);
         let mut char_col = 0;
         let mut byte_count = 0;
-        
+
         for ch in line.chars() {
             if byte_count >= col_offset {
                 break;
@@ -257,7 +260,7 @@ impl<'a> AtPosition<'a> {
             byte_count += ch.len_utf8();
             char_col += 1;
         }
-        
+
         Ok((line_idx + 1, char_col + 1)) // Convert to 1-indexed
     }
 }
@@ -289,12 +292,16 @@ impl<'a> SelectRange<'a> {
     /// Wrap the selection with ASS tags
     pub fn wrap_with_tag(self, open_tag: &str, close_tag: &str) -> Result<&'a mut EditorDocument> {
         // Get the selected text
-        let selected = self.document.rope().byte_slice(self.range.start.offset..self.range.end.offset);
-        let mut wrapped = String::with_capacity(open_tag.len() + selected.len_bytes() + close_tag.len());
+        let selected = self
+            .document
+            .rope()
+            .byte_slice(self.range.start.offset..self.range.end.offset);
+        let mut wrapped =
+            String::with_capacity(open_tag.len() + selected.len_bytes() + close_tag.len());
         wrapped.push_str(open_tag);
         wrapped.push_str(&selected.to_string());
         wrapped.push_str(close_tag);
-        
+
         self.document.replace(self.range, &wrapped)?;
         Ok(self.document)
     }
@@ -306,21 +313,21 @@ impl<'a> SelectRange<'a> {
         let start_line = self.document.rope().byte_to_line(self.range.start.offset);
         let end_line = self.document.rope().byte_to_line(self.range.end.offset);
         let indent = " ".repeat(spaces);
-        
+
         // Collect line positions
         let mut line_positions = Vec::new();
         for line_idx in (start_line..=end_line).rev() {
             let line_start = self.document.rope().line_to_byte(line_idx);
             line_positions.push(line_start);
         }
-        
+
         // Apply indentation
         for line_start in line_positions {
             let pos = Position::new(line_start);
             let range = Range::empty(pos);
             self.document.replace(range, &indent)?;
         }
-        
+
         Ok(self.document)
     }
 
@@ -330,13 +337,13 @@ impl<'a> SelectRange<'a> {
         // Get line information before mutating
         let start_line = self.document.rope().byte_to_line(self.range.start.offset);
         let end_line = self.document.rope().byte_to_line(self.range.end.offset);
-        
+
         // Collect unindent operations
         let mut unindent_ops = Vec::new();
         for line_idx in (start_line..=end_line).rev() {
             let line_start = self.document.rope().line_to_byte(line_idx);
             let line = self.document.rope().line(line_idx);
-            
+
             // Count spaces to remove
             let mut space_count = 0;
             for ch in line.chars().take(spaces) {
@@ -346,27 +353,28 @@ impl<'a> SelectRange<'a> {
                     break;
                 }
             }
-            
+
             if space_count > 0 {
                 unindent_ops.push((line_start, space_count));
             }
         }
-        
+
         // Apply unindent operations
         for (line_start, space_count) in unindent_ops {
             let range = Range::new(
                 Position::new(line_start),
-                Position::new(line_start + space_count)
+                Position::new(line_start + space_count),
             );
             self.document.delete(range)?;
         }
-        
+
         Ok(self.document)
     }
 
     /// Get the selected text
     pub fn text(&self) -> String {
-        self.document.rope()
+        self.document
+            .rope()
             .byte_slice(self.range.start.offset..self.range.end.offset)
             .to_string()
     }
@@ -430,10 +438,7 @@ impl<'a> StyleEditor<'a> {
     /// Create a new style editor
     pub(crate) fn new(document: &'a mut EditorDocument, style_name: String) -> Self {
         let command = EditStyleCommand::new(style_name);
-        Self {
-            document,
-            command,
-        }
+        Self { document, command }
     }
 
     /// Set font name
@@ -493,7 +498,11 @@ pub struct StyleApplicator<'a> {
 
 impl<'a> StyleApplicator<'a> {
     /// Create a new style applicator
-    pub(crate) fn new(document: &'a mut EditorDocument, old_style: String, new_style: String) -> Self {
+    pub(crate) fn new(
+        document: &'a mut EditorDocument,
+        old_style: String,
+        new_style: String,
+    ) -> Self {
         let command = ApplyStyleCommand::new(old_style, new_style);
         Self { document, command }
     }
@@ -552,31 +561,32 @@ impl<'a> EventOps<'a> {
     // ============================================================================
     // Direct Event Access Methods (NEW!)
     // ============================================================================
-    
+
     /// Get event information by index
     pub fn get(self, index: usize) -> Result<Option<EventInfo>> {
-        self.document.parse_script_with(|script| -> Result<Option<EventInfo>> {
-            let mut current_index = 0;
-            
-            for section in script.sections() {
-                if let Section::Events(events) = section {
-                    for event in events {
-                        if current_index == index {
-                            let event_info = EventInfo {
-                                index,
-                                event: OwnedEvent::from(event),
-                                line_number: self.find_line_number_for_event(event)?,
-                                range: self.find_range_for_event(event)?,
-                            };
-                            return Ok(Some(event_info));
+        self.document
+            .parse_script_with(|script| -> Result<Option<EventInfo>> {
+                let mut current_index = 0;
+
+                for section in script.sections() {
+                    if let Section::Events(events) = section {
+                        for event in events {
+                            if current_index == index {
+                                let event_info = EventInfo {
+                                    index,
+                                    event: OwnedEvent::from(event),
+                                    line_number: self.find_line_number_for_event(event)?,
+                                    range: self.find_range_for_event(event)?,
+                                };
+                                return Ok(Some(event_info));
+                            }
+                            current_index += 1;
                         }
-                        current_index += 1;
                     }
                 }
-            }
-            
-            Ok(None)
-        })?
+
+                Ok(None)
+            })?
     }
 
     /// Get event by index with fluent access to properties
@@ -593,13 +603,13 @@ impl<'a> EventOps<'a> {
     pub fn count(self) -> Result<usize> {
         self.document.parse_script_with(|script| {
             let mut count = 0;
-            
+
             for section in script.sections() {
                 if let Section::Events(events) = section {
                     count += events.len();
                 }
             }
-            
+
             count
         })
     }
@@ -607,7 +617,7 @@ impl<'a> EventOps<'a> {
     // ============================================================================
     // Query and Filtering Methods (NEW!)
     // ============================================================================
-    
+
     /// Start a query chain for filtering and sorting events
     pub fn query(self) -> EventQuery<'a> {
         EventQuery::new(self.document)
@@ -672,7 +682,11 @@ pub struct EventMerger<'a> {
 
 impl<'a> EventMerger<'a> {
     /// Create a new event merger
-    pub(crate) fn new(document: &'a mut EditorDocument, first_index: usize, second_index: usize) -> Self {
+    pub(crate) fn new(
+        document: &'a mut EditorDocument,
+        first_index: usize,
+        second_index: usize,
+    ) -> Self {
         Self {
             document,
             first_index,
@@ -752,7 +766,11 @@ impl<'a> EventTimer<'a> {
     }
 
     /// Custom start and end offsets
-    pub fn adjust(self, start_offset_cs: i32, end_offset_cs: i32) -> Result<&'a mut EditorDocument> {
+    pub fn adjust(
+        self,
+        start_offset_cs: i32,
+        end_offset_cs: i32,
+    ) -> Result<&'a mut EditorDocument> {
         let command = TimingAdjustCommand::new(self.event_indices, start_offset_cs, end_offset_cs);
         command.execute(self.document)?;
         Ok(self.document)
@@ -844,7 +862,11 @@ impl<'a> EventEffector<'a> {
 
     /// Prepend to existing effect
     pub fn prepend(self, effect: &str) -> Result<&'a mut EditorDocument> {
-        let command = EventEffectCommand::new(self.event_indices, effect.to_string(), EffectOperation::Prepend);
+        let command = EventEffectCommand::new(
+            self.event_indices,
+            effect.to_string(),
+            EffectOperation::Prepend,
+        );
         command.execute(self.document)?;
         Ok(self.document)
     }
@@ -883,9 +905,9 @@ impl<'a> TagOps<'a> {
 
     /// Insert ASS override tag at position
     pub fn insert(self, tag: &str) -> Result<&'a mut EditorDocument> {
-        let position = self.position.ok_or_else(|| {
-            EditorError::command_failed("Position required for tag insertion")
-        })?;
+        let position = self
+            .position
+            .ok_or_else(|| EditorError::command_failed("Position required for tag insertion"))?;
 
         let command = InsertTagCommand::new(position, tag.to_string());
         command.execute(self.document)?;
@@ -894,9 +916,9 @@ impl<'a> TagOps<'a> {
 
     /// Insert tag without auto-wrapping in {}
     pub fn insert_raw(self, tag: &str) -> Result<&'a mut EditorDocument> {
-        let position = self.position.ok_or_else(|| {
-            EditorError::command_failed("Position required for tag insertion")
-        })?;
+        let position = self
+            .position
+            .ok_or_else(|| EditorError::command_failed("Position required for tag insertion"))?;
 
         let command = InsertTagCommand::new(position, tag.to_string()).no_auto_wrap();
         command.execute(self.document)?;
@@ -905,9 +927,9 @@ impl<'a> TagOps<'a> {
 
     /// Remove all tags from range
     pub fn remove_all(self) -> Result<&'a mut EditorDocument> {
-        let range = self.range.ok_or_else(|| {
-            EditorError::command_failed("Range required for tag removal")
-        })?;
+        let range = self
+            .range
+            .ok_or_else(|| EditorError::command_failed("Range required for tag removal"))?;
 
         let command = RemoveTagCommand::new(range);
         command.execute(self.document)?;
@@ -916,9 +938,9 @@ impl<'a> TagOps<'a> {
 
     /// Remove specific tag pattern from range
     pub fn remove_pattern(self, pattern: &str) -> Result<&'a mut EditorDocument> {
-        let range = self.range.ok_or_else(|| {
-            EditorError::command_failed("Range required for tag removal")
-        })?;
+        let range = self
+            .range
+            .ok_or_else(|| EditorError::command_failed("Range required for tag removal"))?;
 
         let command = RemoveTagCommand::new(range).pattern(pattern.to_string());
         command.execute(self.document)?;
@@ -927,31 +949,37 @@ impl<'a> TagOps<'a> {
 
     /// Replace tag pattern with another tag
     pub fn replace(self, find_pattern: &str, replace_with: &str) -> Result<&'a mut EditorDocument> {
-        let range = self.range.ok_or_else(|| {
-            EditorError::command_failed("Range required for tag replacement")
-        })?;
+        let range = self
+            .range
+            .ok_or_else(|| EditorError::command_failed("Range required for tag replacement"))?;
 
-        let command = ReplaceTagCommand::new(range, find_pattern.to_string(), replace_with.to_string());
+        let command =
+            ReplaceTagCommand::new(range, find_pattern.to_string(), replace_with.to_string());
         command.execute(self.document)?;
         Ok(self.document)
     }
 
     /// Replace all occurrences of tag pattern
-    pub fn replace_all(self, find_pattern: &str, replace_with: &str) -> Result<&'a mut EditorDocument> {
-        let range = self.range.ok_or_else(|| {
-            EditorError::command_failed("Range required for tag replacement")
-        })?;
+    pub fn replace_all(
+        self,
+        find_pattern: &str,
+        replace_with: &str,
+    ) -> Result<&'a mut EditorDocument> {
+        let range = self
+            .range
+            .ok_or_else(|| EditorError::command_failed("Range required for tag replacement"))?;
 
-        let command = ReplaceTagCommand::new(range, find_pattern.to_string(), replace_with.to_string()).all();
+        let command =
+            ReplaceTagCommand::new(range, find_pattern.to_string(), replace_with.to_string()).all();
         command.execute(self.document)?;
         Ok(self.document)
     }
 
     /// Wrap range with opening and closing tags
     pub fn wrap(self, opening_tag: &str) -> Result<&'a mut EditorDocument> {
-        let range = self.range.ok_or_else(|| {
-            EditorError::command_failed("Range required for tag wrapping")
-        })?;
+        let range = self
+            .range
+            .ok_or_else(|| EditorError::command_failed("Range required for tag wrapping"))?;
 
         let command = WrapTagCommand::new(range, opening_tag.to_string());
         command.execute(self.document)?;
@@ -960,9 +988,9 @@ impl<'a> TagOps<'a> {
 
     /// Wrap range with explicit opening and closing tags
     pub fn wrap_with(self, opening_tag: &str, closing_tag: &str) -> Result<&'a mut EditorDocument> {
-        let range = self.range.ok_or_else(|| {
-            EditorError::command_failed("Range required for tag wrapping")
-        })?;
+        let range = self
+            .range
+            .ok_or_else(|| EditorError::command_failed("Range required for tag wrapping"))?;
 
         let command = WrapTagCommand::new(range, opening_tag.to_string())
             .closing_tag(closing_tag.to_string());
@@ -1012,7 +1040,7 @@ impl<'a> KaraokeOps<'a> {
         } else {
             Range::new(Position::new(0), Position::new(0)) // Placeholder, won't be used
         };
-        
+
         KaraokeGenerator {
             document: self.document,
             range: self.range.unwrap_or(default_range),
@@ -1030,7 +1058,7 @@ impl<'a> KaraokeOps<'a> {
         } else {
             Range::new(Position::new(0), Position::new(0)) // Placeholder
         };
-        
+
         KaraokeSplitter {
             document: self.document,
             range: self.range.unwrap_or(default_range),
@@ -1047,7 +1075,7 @@ impl<'a> KaraokeOps<'a> {
         } else {
             Range::new(Position::new(0), Position::new(0)) // Placeholder
         };
-        
+
         KaraokeAdjuster {
             document: self.document,
             range: self.range.unwrap_or(default_range),
@@ -1062,7 +1090,7 @@ impl<'a> KaraokeOps<'a> {
         } else {
             Range::new(Position::new(0), Position::new(0)) // Placeholder
         };
-        
+
         KaraokeApplicator {
             document: self.document,
             range: self.range.unwrap_or(default_range),
@@ -1098,11 +1126,11 @@ impl<'a> KaraokeGenerator<'a> {
     pub fn execute(self) -> Result<&'a mut EditorDocument> {
         let mut command = GenerateKaraokeCommand::new(self.range, self.default_duration)
             .karaoke_type(self.karaoke_type);
-        
+
         if !self.auto_detect_syllables {
             command = command.manual_syllables();
         }
-        
+
         command.execute(self.document)?;
         Ok(self.document)
     }
@@ -1127,11 +1155,11 @@ impl<'a> KaraokeSplitter<'a> {
     /// Execute the split
     pub fn execute(self) -> Result<&'a mut EditorDocument> {
         let mut command = SplitKaraokeCommand::new(self.range, self.split_positions);
-        
+
         if let Some(duration) = self.new_duration {
             command = command.duration(duration);
         }
-        
+
         command.execute(self.document)?;
         Ok(self.document)
     }
@@ -1188,14 +1216,23 @@ impl<'a> KaraokeApplicator<'a> {
     }
 
     /// Apply beat-based timing
-    pub fn beat(self, bpm: u32, beats_per_syllable: f32, karaoke_type: KaraokeType) -> Result<&'a mut EditorDocument> {
+    pub fn beat(
+        self,
+        bpm: u32,
+        beats_per_syllable: f32,
+        karaoke_type: KaraokeType,
+    ) -> Result<&'a mut EditorDocument> {
         let command = ApplyKaraokeCommand::beat(self.range, bpm, beats_per_syllable, karaoke_type);
         command.execute(self.document)?;
         Ok(self.document)
     }
 
     /// Apply pattern-based timing
-    pub fn pattern(self, durations: Vec<u32>, karaoke_type: KaraokeType) -> Result<&'a mut EditorDocument> {
+    pub fn pattern(
+        self,
+        durations: Vec<u32>,
+        karaoke_type: KaraokeType,
+    ) -> Result<&'a mut EditorDocument> {
         let command = ApplyKaraokeCommand::pattern(self.range, durations, karaoke_type);
         command.execute(self.document)?;
         Ok(self.document)
@@ -1223,7 +1260,7 @@ impl EditorDocument {
         if line_idx >= self.rope().len_lines() {
             return Err(EditorError::InvalidPosition { line, column: 1 });
         }
-        
+
         let byte_pos = self.rope().line_to_byte(line_idx);
         Ok(AtPosition::new(self, Position::new(byte_pos)))
     }
@@ -1277,12 +1314,12 @@ impl EditorDocument {
         let line_idx = self.rope().byte_to_line(pos.offset);
         let line_start = self.rope().line_to_byte(line_idx);
         let col_offset = pos.offset - line_start;
-        
+
         // Convert byte offset to character offset
         let line = self.rope().line(line_idx);
         let mut char_col = 0;
         let mut byte_count = 0;
-        
+
         for ch in line.chars() {
             if byte_count >= col_offset {
                 break;
@@ -1290,7 +1327,7 @@ impl EditorDocument {
             byte_count += ch.len_utf8();
             char_col += 1;
         }
-        
+
         Ok((line_idx + 1, char_col + 1)) // Convert to 1-indexed
     }
 
@@ -1298,7 +1335,7 @@ impl EditorDocument {
     #[cfg(feature = "rope")]
     pub fn line_column_to_position(&self, line: usize, column: usize) -> Result<Position> {
         use super::PositionBuilder;
-        
+
         PositionBuilder::new()
             .line(line)
             .column(column)
@@ -1378,11 +1415,13 @@ impl<'a> EventAccessor<'a> {
 
     /// Get event margins as (left, right, vertical)
     pub fn margins(self) -> Result<Option<(String, String, String)>> {
-        Ok(self.get()?.map(|info| (
-            info.event.margin_l,
-            info.event.margin_r, 
-            info.event.margin_v
-        )))
+        Ok(self.get()?.map(|info| {
+            (
+                info.event.margin_l,
+                info.event.margin_r,
+                info.event.margin_v,
+            )
+        }))
     }
 
     /// Convert to timing operations for this specific event
@@ -1528,20 +1567,20 @@ impl<'a> EventQuery<'a> {
     // Execution methods
     pub fn execute(self) -> Result<Vec<EventInfo>> {
         let mut results = self.collect_events()?;
-        
+
         // Apply filters
         results = self.apply_filters(results)?;
-        
+
         // Apply sorting
         if let Some(ref sort_options) = self.sort_options {
             self.apply_sort(&mut results, sort_options);
         }
-        
+
         // Apply limit
         if let Some(limit) = self.limit {
             results.truncate(limit);
         }
-        
+
         Ok(results)
     }
 
@@ -1552,7 +1591,11 @@ impl<'a> EventQuery<'a> {
 
     /// Execute and return events with their indices as tuples
     pub fn with_indices(self) -> Result<Vec<(usize, OwnedEvent)>> {
-        Ok(self.execute()?.into_iter().map(|info| (info.index, info.event)).collect())
+        Ok(self
+            .execute()?
+            .into_iter()
+            .map(|info| (info.index, info.event))
+            .collect())
     }
 
     /// Execute and get the first matching event
@@ -1571,17 +1614,23 @@ impl<'a> EventQuery<'a> {
         let _indices: Vec<usize> = self.execute()?.into_iter().map(|info| info.index).collect();
         // Need to create a new EventQuery to get document reference since self is consumed
         // This is a limitation of the current API design
-        Err(EditorError::command_failed("Cannot chain timing operations after query execution - use indices() first"))
+        Err(EditorError::command_failed(
+            "Cannot chain timing operations after query execution - use indices() first",
+        ))
     }
 
     pub fn toggle_type(self) -> Result<EventToggler<'a>> {
         let _indices: Vec<usize> = self.execute()?.into_iter().map(|info| info.index).collect();
-        Err(EditorError::command_failed("Cannot chain toggle operations after query execution - use indices() first"))
+        Err(EditorError::command_failed(
+            "Cannot chain toggle operations after query execution - use indices() first",
+        ))
     }
 
     pub fn effects(self) -> Result<EventEffector<'a>> {
         let _indices: Vec<usize> = self.execute()?.into_iter().map(|info| info.index).collect();
-        Err(EditorError::command_failed("Cannot chain effect operations after query execution - use indices() first"))
+        Err(EditorError::command_failed(
+            "Cannot chain effect operations after query execution - use indices() first",
+        ))
     }
 
     // ============================================================================
@@ -1589,39 +1638,40 @@ impl<'a> EventQuery<'a> {
     // ============================================================================
 
     fn collect_events(&self) -> Result<Vec<EventInfo>> {
-        self.document.parse_script_with(|script| -> Result<Vec<EventInfo>> {
-            let mut events = Vec::new();
-            let mut event_index = 0;
-            
-            for section in script.sections() {
-                if let Section::Events(section_events) = section {
-                    for event in section_events {
-                        // Build EventInfo with position tracking
-                        let event_info = EventInfo {
-                            index: event_index,
-                            event: OwnedEvent::from(event),
-                            line_number: self.find_line_number(event)?,
-                            range: self.find_event_range(event)?,
-                        };
-                        events.push(event_info);
-                        event_index += 1;
+        self.document
+            .parse_script_with(|script| -> Result<Vec<EventInfo>> {
+                let mut events = Vec::new();
+                let mut event_index = 0;
+
+                for section in script.sections() {
+                    if let Section::Events(section_events) = section {
+                        for event in section_events {
+                            // Build EventInfo with position tracking
+                            let event_info = EventInfo {
+                                index: event_index,
+                                event: OwnedEvent::from(event),
+                                line_number: self.find_line_number(event)?,
+                                range: self.find_event_range(event)?,
+                            };
+                            events.push(event_info);
+                            event_index += 1;
+                        }
                     }
                 }
-            }
-            
-            Ok(events)
-        })?
+
+                Ok(events)
+            })?
     }
 
     fn apply_filters(&self, events: Vec<EventInfo>) -> Result<Vec<EventInfo>> {
         let mut filtered = Vec::new();
-        
+
         for event_info in events {
             if self.matches_filter(&event_info)? {
                 filtered.push(event_info);
             }
         }
-        
+
         Ok(filtered)
     }
 
@@ -1672,7 +1722,7 @@ impl<'a> EventQuery<'a> {
             // In practice, you'd want proper time parsing from ass_core
             if let (Ok(event_start), Ok(event_end)) = (
                 self.parse_time_to_cs(&event_info.event.start),
-                self.parse_time_to_cs(&event_info.event.end)
+                self.parse_time_to_cs(&event_info.event.end),
             ) {
                 if event_start < start_cs || event_end > end_cs {
                     return Ok(false);
@@ -1711,16 +1761,24 @@ impl<'a> EventQuery<'a> {
             return Err(EditorError::command_failed("Invalid time format"));
         }
 
-        let hours: u32 = parts[0].parse().map_err(|_| EditorError::command_failed("Invalid hours"))?;
-        let minutes: u32 = parts[1].parse().map_err(|_| EditorError::command_failed("Invalid minutes"))?;
-        
+        let hours: u32 = parts[0]
+            .parse()
+            .map_err(|_| EditorError::command_failed("Invalid hours"))?;
+        let minutes: u32 = parts[1]
+            .parse()
+            .map_err(|_| EditorError::command_failed("Invalid minutes"))?;
+
         let sec_cs_parts: Vec<&str> = parts[2].split('.').collect();
         if sec_cs_parts.len() != 2 {
             return Err(EditorError::command_failed("Invalid seconds format"));
         }
 
-        let seconds: u32 = sec_cs_parts[0].parse().map_err(|_| EditorError::command_failed("Invalid seconds"))?;
-        let centiseconds: u32 = sec_cs_parts[1].parse().map_err(|_| EditorError::command_failed("Invalid centiseconds"))?;
+        let seconds: u32 = sec_cs_parts[0]
+            .parse()
+            .map_err(|_| EditorError::command_failed("Invalid seconds"))?;
+        let centiseconds: u32 = sec_cs_parts[1]
+            .parse()
+            .map_err(|_| EditorError::command_failed("Invalid centiseconds"))?;
 
         Ok(hours * 360000 + minutes * 6000 + seconds * 100 + centiseconds)
     }
@@ -1728,22 +1786,37 @@ impl<'a> EventQuery<'a> {
     fn apply_sort(&self, events: &mut [EventInfo], options: &EventSortOptions) {
         events.sort_by(|a, b| {
             let primary_cmp = self.compare_by_criteria(a, b, &options.criteria);
-            
+
             match primary_cmp {
                 Ordering::Equal => {
                     if let Some(secondary) = &options.secondary {
                         let secondary_cmp = self.compare_by_criteria(a, b, secondary);
-                        if options.ascending { secondary_cmp } else { secondary_cmp.reverse() }
+                        if options.ascending {
+                            secondary_cmp
+                        } else {
+                            secondary_cmp.reverse()
+                        }
                     } else {
                         Ordering::Equal
                     }
                 }
-                other => if options.ascending { other } else { other.reverse() }
+                other => {
+                    if options.ascending {
+                        other
+                    } else {
+                        other.reverse()
+                    }
+                }
             }
         });
     }
 
-    fn compare_by_criteria(&self, a: &EventInfo, b: &EventInfo, criteria: &EventSortCriteria) -> Ordering {
+    fn compare_by_criteria(
+        &self,
+        a: &EventInfo,
+        b: &EventInfo,
+        criteria: &EventSortCriteria,
+    ) -> Ordering {
         match criteria {
             EventSortCriteria::StartTime => {
                 let a_time = self.parse_time_to_cs(&a.event.start).unwrap_or(0);
@@ -1792,6 +1865,10 @@ impl<'a> EventQuery<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     #[cfg(feature = "rope")]
@@ -1799,7 +1876,7 @@ mod tests {
         let mut doc = EditorDocument::new();
         doc.at_start().insert_text("Hello, ").unwrap();
         doc.at_end().insert_text("World!").unwrap();
-        
+
         assert_eq!(doc.text(), "Hello, World!");
     }
 
@@ -1807,14 +1884,16 @@ mod tests {
     #[cfg(feature = "rope")]
     fn test_fluent_line_operations() {
         let mut doc = EditorDocument::from_content("Line 1\nLine 2\nLine 3").unwrap();
-        
+
         // Insert at beginning of line 2
         doc.at_line(2).unwrap().insert_text("Start: ").unwrap();
         assert_eq!(doc.text(), "Line 1\nStart: Line 2\nLine 3");
-        
+
         // Replace to end of line
-        doc.at_line(2).unwrap()
-            .replace_to_line_end("New Line 2").unwrap();
+        doc.at_line(2)
+            .unwrap()
+            .replace_to_line_end("New Line 2")
+            .unwrap();
         assert_eq!(doc.text(), "Line 1\nNew Line 2\nLine 3");
     }
 
@@ -1822,11 +1901,11 @@ mod tests {
     #[cfg(feature = "rope")]
     fn test_fluent_selection() {
         let mut doc = EditorDocument::from_content("Hello World").unwrap();
-        
+
         let range = Range::new(Position::new(6), Position::new(11));
         doc.select(range).replace_with("Rust").unwrap();
         assert_eq!(doc.text(), "Hello Rust");
-        
+
         // Test wrapping
         let range = Range::new(Position::new(6), Position::new(10));
         doc.select(range).wrap_with_tag("{\\b1}", "{\\b0}").unwrap();
@@ -1837,12 +1916,12 @@ mod tests {
     #[cfg(feature = "rope")]
     fn test_position_conversion() {
         let doc = EditorDocument::from_content("Line 1\nLine 2\nLine 3").unwrap();
-        
+
         // Test position to line/column
         let pos = Position::new(7); // Start of "Line 2"
         let (line, col) = doc.position_to_line_col(pos).unwrap();
         assert_eq!((line, col), (2, 1));
-        
+
         // Test line/column to position
         let pos2 = doc.line_column_to_position(2, 1).unwrap();
         assert_eq!(pos2.offset, 7);
@@ -1852,12 +1931,12 @@ mod tests {
     #[cfg(feature = "rope")]
     fn test_indent_unindent() {
         let mut doc = EditorDocument::from_content("Line 1\nLine 2\nLine 3").unwrap();
-        
+
         // Select all and indent
         let range = Range::new(Position::start(), Position::new(doc.len()));
         doc.select(range).indent(2).unwrap();
         assert_eq!(doc.text(), "  Line 1\n  Line 2\n  Line 3");
-        
+
         // Unindent
         let range = Range::new(Position::start(), Position::new(doc.len()));
         doc.select(range).unindent(2).unwrap();
@@ -1876,15 +1955,21 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,Hello world!
 "#;
 
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Test create style
         doc.styles()
-            .create("NewStyle", StyleBuilder::new().font("Comic Sans MS").size(24).bold(true))
+            .create(
+                "NewStyle",
+                StyleBuilder::new()
+                    .font("Comic Sans MS")
+                    .size(24)
+                    .bold(true),
+            )
             .unwrap();
-        
+
         assert!(doc.text().contains("Style: NewStyle"));
         assert!(doc.text().contains("Comic Sans MS"));
-        
+
         // Test edit style
         doc.styles()
             .edit("Default")
@@ -1893,23 +1978,18 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,Hello world!
             .bold(true)
             .apply()
             .unwrap();
-            
+
         assert!(doc.text().contains("Helvetica"));
         assert!(doc.text().contains("18"));
-        
+
         // Test clone style
-        doc.styles()
-            .clone("Default", "DefaultCopy")
-            .unwrap();
-            
+        doc.styles().clone("Default", "DefaultCopy").unwrap();
+
         assert!(doc.text().contains("Style: DefaultCopy"));
-        
+
         // Test apply style to events
-        doc.styles()
-            .apply("Default", "NewStyle")
-            .apply()
-            .unwrap();
-            
+        doc.styles().apply("Default", "NewStyle").apply().unwrap();
+
         // The dialogue event should now use NewStyle
         let text = doc.text();
         let events_section = text.split("[Events]").nth(1).unwrap();
@@ -1925,13 +2005,13 @@ Style: ToDelete,Times,22,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100
 "#;
 
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Verify style exists
         assert!(doc.text().contains("Style: ToDelete"));
-        
+
         // Delete the style
         doc.styles().delete("ToDelete").unwrap();
-        
+
         // Verify style is gone
         assert!(!doc.text().contains("Style: ToDelete"));
         assert!(doc.text().contains("Style: Default")); // Other styles should remain
@@ -1951,21 +2031,21 @@ Dialogue: 0,0:00:06.00,0:00:10.00,Default,Speaker,0,0,0,,Goodbye world!
 "#;
 
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Apply style only to events containing "Hello"
         doc.styles()
             .apply("Default", "FilterStyle")
             .with_filter("Hello")
             .apply()
             .unwrap();
-        
+
         let content = doc.text();
         let lines: Vec<&str> = content.lines().collect();
-        
+
         // Find the dialogue lines
         let hello_line = lines.iter().find(|line| line.contains("Hello")).unwrap();
         let goodbye_line = lines.iter().find(|line| line.contains("Goodbye")).unwrap();
-        
+
         // Only the "Hello" line should use FilterStyle
         assert!(hello_line.contains("FilterStyle"));
         assert!(goodbye_line.contains("Default")); // Should still use Default
@@ -1985,12 +2065,14 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Third event
 "#;
 
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Test split event
         doc.events().split(0, "0:00:03.00").unwrap();
-        
+
         // Should now have 4 events (first split into 2)
-        let events_count = doc.text().lines()
+        let events_count = doc
+            .text()
+            .lines()
             .filter(|line| line.starts_with("Dialogue:") || line.starts_with("Comment:"))
             .count();
         assert_eq!(events_count, 4);
@@ -2008,16 +2090,18 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Third event
 "#;
 
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Test merge events with custom separator
         doc.events()
             .merge(0, 1)
             .with_separator(" | ")
             .apply()
             .unwrap();
-        
+
         // Should now have 2 events (first two merged)
-        let events_count = doc.text().lines()
+        let events_count = doc
+            .text()
+            .lines()
             .filter(|line| line.starts_with("Dialogue:") || line.starts_with("Comment:"))
             .count();
         assert_eq!(events_count, 2);
@@ -2034,13 +2118,10 @@ Dialogue: 0,0:00:05.00,0:00:10.00,Default,Speaker,0,0,0,,Second event
 "#;
 
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Test shifting all events by 2 seconds (200 centiseconds)
-        doc.events()
-            .timing()
-            .shift(200)
-            .unwrap();
-        
+        doc.events().timing().shift(200).unwrap();
+
         assert!(doc.text().contains("0:00:03.00,0:00:07.00")); // First event shifted
         assert!(doc.text().contains("0:00:07.00,0:00:12.00")); // Second event shifted
     }
@@ -2054,14 +2135,14 @@ Dialogue: 0,0:00:05.00,0:00:10.00,Default,Speaker,0,0,0,,Second event
 "#;
 
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Test adjusting only first event
         doc.events()
             .timing()
             .event(0)
             .shift_start(100) // +1 second to start only
             .unwrap();
-        
+
         // Only first event should change
         assert!(doc.text().contains("0:00:02.00,0:00:05.00")); // First event start shifted
         assert!(doc.text().contains("0:00:05.00,0:00:10.00")); // Second event unchanged
@@ -2076,21 +2157,18 @@ Comment: 0,0:00:05.00,0:00:10.00,Default,Speaker,0,0,0,,Second event
 "#;
 
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Test toggling first event type
-        doc.events()
-            .toggle_type()
-            .event(0)
-            .apply()
-            .unwrap();
-        
+        doc.events().toggle_type().event(0).apply().unwrap();
+
         let text = doc.text();
         let lines: Vec<&str> = text.lines().collect();
-        let event_lines: Vec<&str> = lines.iter()
+        let event_lines: Vec<&str> = lines
+            .iter()
             .filter(|line| line.starts_with("Dialogue:") || line.starts_with("Comment:"))
             .copied()
             .collect();
-        
+
         // First event should now be Comment (was Dialogue)
         assert_eq!(event_lines.len(), 2);
         assert!(event_lines[0].starts_with("Comment:"));
@@ -2106,20 +2184,21 @@ Dialogue: 0,0:00:05.00,0:00:10.00,Default,Speaker,0,0,0,,Second event
 "#;
 
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Test setting effects
         doc.events()
             .effects()
             .events(vec![0, 1])
             .set("Fade(255,0)")
             .unwrap();
-        
+
         // Both events should have the effect
         let text = doc.text();
-        let event_lines: Vec<&str> = text.lines()
+        let event_lines: Vec<&str> = text
+            .lines()
             .filter(|line| line.starts_with("Dialogue:") || line.starts_with("Comment:"))
             .collect();
-        
+
         assert!(event_lines[0].contains("Fade(255,0)"));
         assert!(event_lines[1].contains("Fade(255,0)"));
     }
@@ -2132,33 +2211,26 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,First event
 "#;
 
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Test effect chaining: set, then append
-        doc.events()
-            .effects()
-            .event(0)
-            .set("Fade(255,0)")
-            .unwrap();
-        
+        doc.events().effects().event(0).set("Fade(255,0)").unwrap();
+
         doc.events()
             .effects()
             .event(0)
             .append("Move(100,200)")
             .unwrap();
-        
+
         // Should have both effects
         assert!(doc.text().contains("Fade(255,0) Move(100,200)"));
-        
+
         // Test clearing
-        doc.events()
-            .effects()
-            .event(0)
-            .clear()
-            .unwrap();
-        
+        doc.events().effects().event(0).clear().unwrap();
+
         // Effect field should be empty
         let text = doc.text();
-        let event_line = text.lines()
+        let event_line = text
+            .lines()
             .find(|line| line.starts_with("Dialogue:"))
             .unwrap();
         let parts: Vec<&str> = event_line.split(',').collect();
@@ -2175,50 +2247,44 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
 "#;
 
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Complex workflow: split, adjust timing, toggle type, add effects
-        
+
         // 1. Split the first event
         doc.events().split(0, "0:00:03.00").unwrap();
-        
+
         // Now we have 4 events: split first, original second, original comment
-        
+
         // 2. Shift all events forward by 1 second
         doc.events()
             .timing()
             .shift(100) // 1 second
             .unwrap();
-        
+
         // 3. Toggle the comment (now at index 3) to dialogue
-        doc.events()
-            .toggle_type()
-            .event(3)
-            .apply()
-            .unwrap();
-        
+        doc.events().toggle_type().event(3).apply().unwrap();
+
         // 4. Add fade effect to all events
-        doc.events()
-            .effects()
-            .set("Fade(255,0)")
-            .unwrap();
-        
+        doc.events().effects().set("Fade(255,0)").unwrap();
+
         let content = doc.text();
-        
+
         // Verify results
-        let event_lines: Vec<&str> = content.lines()
+        let event_lines: Vec<&str> = content
+            .lines()
             .filter(|line| line.starts_with("Dialogue:") || line.starts_with("Comment:"))
             .collect();
-        
+
         // Should have 4 events, all Dialogue (comment was toggled)
         assert_eq!(event_lines.len(), 4);
         assert!(event_lines.iter().all(|line| line.starts_with("Dialogue:")));
-        
+
         // All should have timing shifted by 1 second
         assert!(content.contains("0:00:02.00,0:00:04.00")); // First part of split
         assert!(content.contains("0:00:04.00,0:00:06.00")); // Second part of split
         assert!(content.contains("0:00:06.00,0:00:08.00")); // Original second event
         assert!(content.contains("0:00:11.00,0:00:16.00")); // Original comment (now dialogue)
-        
+
         // All should have fade effect
         assert!(event_lines.iter().all(|line| line.contains("Fade(255,0)")));
     }
@@ -2226,11 +2292,11 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
     #[test]
     fn tag_operations() {
         let mut doc = EditorDocument::from_content("Hello World").unwrap();
-        
+
         // Test tag insertion
         doc.tags().at(Position::new(5)).insert("\\b1").unwrap();
         assert_eq!(doc.text(), "Hello{\\b1} World");
-        
+
         // Test raw tag insertion - need to account for the inserted tag
         doc.tags().at(Position::new(12)).insert_raw("\\i1").unwrap();
         assert_eq!(doc.text(), "Hello{\\b1} W\\i1orld");
@@ -2238,13 +2304,14 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
 
     #[test]
     fn tag_removal() {
-        let mut doc = EditorDocument::from_content("Hello {\\b1\\i1}World{\\c&H00FF00&} test").unwrap();
+        let mut doc =
+            EditorDocument::from_content("Hello {\\b1\\i1}World{\\c&H00FF00&} test").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         // Remove specific pattern
         doc.tags().in_range(range).remove_pattern("\\b").unwrap();
         assert_eq!(doc.text(), "Hello {\\i1}World{\\c&H00FF00&} test");
-        
+
         // Remove all tags
         let full_range = Range::new(Position::new(0), Position::new(doc.text().len()));
         doc.tags().in_range(full_range).remove_all().unwrap();
@@ -2255,9 +2322,12 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
     fn tag_replacement() {
         let mut doc = EditorDocument::from_content("Hello {\\b1}World{\\b1} test").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         // Replace all bold tags with italic
-        doc.tags().in_range(range).replace_all("\\b1", "\\i1").unwrap();
+        doc.tags()
+            .in_range(range)
+            .replace_all("\\b1", "\\i1")
+            .unwrap();
         assert_eq!(doc.text(), "Hello {\\i1}World{\\i1} test");
     }
 
@@ -2265,25 +2335,29 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
     fn tag_wrapping() {
         let mut doc = EditorDocument::from_content("Hello World").unwrap();
         let range = Range::new(Position::new(6), Position::new(11));
-        
+
         // Wrap with bold tags
         doc.tags().in_range(range).wrap("\\b1").unwrap();
         assert_eq!(doc.text(), "Hello {\\b1}World{\\b0}");
-        
+
         // Test explicit closing tag
         let mut doc2 = EditorDocument::from_content("Hello World").unwrap();
         let range2 = Range::new(Position::new(6), Position::new(11));
-        doc2.tags().in_range(range2).wrap_with("\\c&HFF0000&", "\\c").unwrap();
+        doc2.tags()
+            .in_range(range2)
+            .wrap_with("\\c&HFF0000&", "\\c")
+            .unwrap();
         assert_eq!(doc2.text(), "Hello {\\c&HFF0000&}World{\\c}");
     }
 
     #[test]
     fn tag_parsing() {
-        let mut doc = EditorDocument::from_content("Hello {\\b1\\c&H00FF00&\\pos(100,200)}World").unwrap();
+        let mut doc =
+            EditorDocument::from_content("Hello {\\b1\\c&H00FF00&\\pos(100,200)}World").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         let parsed_tags = doc.tags().in_range(range).parse().unwrap();
-        
+
         assert_eq!(parsed_tags.len(), 3);
         assert_eq!(parsed_tags[0].tag, "\\b1");
         assert_eq!(parsed_tags[1].tag, "\\c&H00FF00&");
@@ -2297,7 +2371,7 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
     fn karaoke_generate() {
         let mut doc = EditorDocument::from_content("Hello World Test").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         // Test basic karaoke generation with manual syllables to preserve text
         doc.karaoke()
             .in_range(range)
@@ -2305,7 +2379,7 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
             .manual_syllables()
             .execute()
             .unwrap();
-        
+
         let text = doc.text();
         assert!(text.contains("\\k50"));
         // With manual syllables, the entire text should be preserved
@@ -2316,7 +2390,7 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
     fn karaoke_generate_with_types() {
         let mut doc = EditorDocument::from_content("Test Text").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         // Test with fill karaoke
         doc.karaoke()
             .in_range(range)
@@ -2324,20 +2398,20 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
             .karaoke_type(KaraokeType::Fill)
             .execute()
             .unwrap();
-        
+
         assert!(doc.text().contains("\\kf40"));
-        
+
         // Test with outline karaoke
         let mut doc2 = EditorDocument::from_content("Test Text").unwrap();
         let range2 = Range::new(Position::new(0), Position::new(doc2.text().len()));
-        
+
         doc2.karaoke()
             .in_range(range2)
             .generate(30)
             .karaoke_type(KaraokeType::Outline)
             .execute()
             .unwrap();
-        
+
         assert!(doc2.text().contains("\\ko30"));
     }
 
@@ -2345,7 +2419,7 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
     fn karaoke_generate_manual_syllables() {
         let mut doc = EditorDocument::from_content("Syllable Test").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         // Test with manual syllable detection disabled
         doc.karaoke()
             .in_range(range)
@@ -2353,7 +2427,7 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
             .manual_syllables()
             .execute()
             .unwrap();
-        
+
         let text = doc.text();
         assert!(text.contains("\\k60"));
         assert!(text.contains("Syllable Test"));
@@ -2363,7 +2437,7 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
     fn karaoke_split() {
         let mut doc = EditorDocument::from_content("{\\k100}Hello World").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         // Split at position 5 (between "Hello" and " World")
         doc.karaoke()
             .in_range(range)
@@ -2371,7 +2445,7 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
             .duration(25)
             .execute()
             .unwrap();
-        
+
         let text = doc.text();
         assert!(text.contains("\\k25"));
     }
@@ -2380,31 +2454,23 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
     fn karaoke_adjust_scale() {
         let mut doc = EditorDocument::from_content("{\\k50}Hello {\\k30}World").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         // Scale timing by 2.0
-        doc.karaoke()
-            .in_range(range)
-            .adjust()
-            .scale(2.0)
-            .unwrap();
-        
+        doc.karaoke().in_range(range).adjust().scale(2.0).unwrap();
+
         let text = doc.text();
         assert!(text.contains("\\k100")); // 50 * 2.0
-        assert!(text.contains("\\k60"));   // 30 * 2.0
+        assert!(text.contains("\\k60")); // 30 * 2.0
     }
 
     #[test]
     fn karaoke_adjust_offset() {
         let mut doc = EditorDocument::from_content("{\\k50}Hello {\\k30}World").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         // Add 20 centiseconds to all timings
-        doc.karaoke()
-            .in_range(range)
-            .adjust()
-            .offset(20)
-            .unwrap();
-        
+        doc.karaoke().in_range(range).adjust().offset(20).unwrap();
+
         let text = doc.text();
         assert!(text.contains("\\k70")); // 50 + 20
         assert!(text.contains("\\k50")); // 30 + 20
@@ -2414,14 +2480,10 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
     fn karaoke_adjust_set_all() {
         let mut doc = EditorDocument::from_content("{\\k50}Hello {\\k30}World").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         // Set all timings to 45 centiseconds
-        doc.karaoke()
-            .in_range(range)
-            .adjust()
-            .set_all(45)
-            .unwrap();
-        
+        doc.karaoke().in_range(range).adjust().set_all(45).unwrap();
+
         let text = doc.text();
         assert!(text.contains("\\k45"));
         // Should contain exactly two instances of \\k45
@@ -2432,14 +2494,14 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
     fn karaoke_adjust_custom() {
         let mut doc = EditorDocument::from_content("{\\k50}Hello {\\k30}World").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         // Apply custom timings: 80cs for first, 40cs for second
         doc.karaoke()
             .in_range(range)
             .adjust()
             .custom(vec![80, 40])
             .unwrap();
-        
+
         let text = doc.text();
         assert!(text.contains("\\k80"));
         assert!(text.contains("\\k40"));
@@ -2449,14 +2511,14 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
     fn karaoke_apply_equal() {
         let mut doc = EditorDocument::from_content("Hello World Test").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         // Apply equal timing of 35cs with fill karaoke
         doc.karaoke()
             .in_range(range)
             .apply()
             .equal(35, KaraokeType::Fill)
             .unwrap();
-        
+
         let text = doc.text();
         assert!(text.contains("\\kf35"));
         assert!(text.contains("Hello"));
@@ -2468,7 +2530,7 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
     fn karaoke_apply_beat() {
         let mut doc = EditorDocument::from_content("Hello World").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         // Apply beat-based timing: 120 BPM, 0.5 beats per syllable
         // Expected duration: (60/120) * 0.5 * 100 = 25 centiseconds
         doc.karaoke()
@@ -2476,7 +2538,7 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
             .apply()
             .beat(120, 0.5, KaraokeType::Standard)
             .unwrap();
-        
+
         let text = doc.text();
         assert!(text.contains("\\k25"));
     }
@@ -2485,14 +2547,14 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
     fn karaoke_apply_pattern() {
         let mut doc = EditorDocument::from_content("Hello World Test").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         // Apply pattern-based timing: 40cs, 60cs, repeating
         doc.karaoke()
             .in_range(range)
             .apply()
             .pattern(vec![40, 60], KaraokeType::Outline)
             .unwrap();
-        
+
         let text = doc.text();
         assert!(text.contains("\\ko40"));
         assert!(text.contains("\\ko60"));
@@ -2502,23 +2564,24 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
     fn karaoke_apply_import() {
         let mut doc = EditorDocument::from_content("Source text for import").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         // Apply import timing (simplified test - would import from event 0)
         doc.karaoke()
             .in_range(range)
             .apply()
             .import_from(0)
             .unwrap();
-        
+
         // Since import is simplified and returns original text, verify no crash
         assert!(doc.text().contains("Source text for import"));
     }
 
     #[test]
     fn karaoke_complex_workflow() {
-        let mut doc = EditorDocument::from_content("Complex karaoke test with multiple words").unwrap();
+        let mut doc =
+            EditorDocument::from_content("Complex karaoke test with multiple words").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
+
         // 1. Generate initial karaoke with standard timing and manual syllables
         doc.karaoke()
             .in_range(range)
@@ -2527,10 +2590,10 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
             .manual_syllables()
             .execute()
             .unwrap();
-        
+
         let mut text = doc.text();
         assert!(text.contains("\\k50"));
-        
+
         // 2. Scale the timing by 1.5
         let current_range = Range::new(Position::new(0), Position::new(doc.text().len()));
         doc.karaoke()
@@ -2538,10 +2601,10 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
             .adjust()
             .scale(1.5)
             .unwrap();
-        
+
         text = doc.text();
         assert!(text.contains("\\k75")); // 50 * 1.5
-        
+
         // 3. Add 10cs offset
         let final_range = Range::new(Position::new(0), Position::new(doc.text().len()));
         doc.karaoke()
@@ -2549,10 +2612,10 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
             .adjust()
             .offset(10)
             .unwrap();
-        
+
         text = doc.text();
         assert!(text.contains("\\k85")); // 75 + 10
-        
+
         // With manual syllables, the entire original text is preserved
         assert!(text.contains("Complex karaoke test with multiple words"));
     }
@@ -2561,7 +2624,7 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
     fn karaoke_different_types_workflow() {
         // Test all karaoke types in sequence
         let test_text = "Test karaoke types";
-        
+
         // Standard karaoke
         let mut doc1 = EditorDocument::from_content(test_text).unwrap();
         let range1 = Range::new(Position::new(0), Position::new(doc1.text().len()));
@@ -2572,7 +2635,7 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
             .execute()
             .unwrap();
         assert!(doc1.text().contains("\\k30"));
-        
+
         // Fill karaoke
         let mut doc2 = EditorDocument::from_content(test_text).unwrap();
         let range2 = Range::new(Position::new(0), Position::new(doc2.text().len()));
@@ -2583,7 +2646,7 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
             .execute()
             .unwrap();
         assert!(doc2.text().contains("\\kf40"));
-        
+
         // Outline karaoke
         let mut doc3 = EditorDocument::from_content(test_text).unwrap();
         let range3 = Range::new(Position::new(0), Position::new(doc3.text().len()));
@@ -2594,7 +2657,7 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
             .execute()
             .unwrap();
         assert!(doc3.text().contains("\\ko50"));
-        
+
         // Transition karaoke
         let mut doc4 = EditorDocument::from_content(test_text).unwrap();
         let range4 = Range::new(Position::new(0), Position::new(doc4.text().len()));
@@ -2612,12 +2675,9 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
         // Test with text containing override blocks (should fail)
         let mut doc = EditorDocument::from_content("Hello {\\b1}World{\\b0}").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        
-        let result = doc.karaoke()
-            .in_range(range)
-            .generate(50)
-            .execute();
-        
+
+        let result = doc.karaoke().in_range(range).generate(50).execute();
+
         // Should fail because text contains override blocks
         assert!(result.is_err());
     }
@@ -2627,25 +2687,22 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Comment to toggle
         // Test with empty text
         let mut doc = EditorDocument::from_content("").unwrap();
         let range = Range::new(Position::new(0), Position::new(0));
-        
-        let result = doc.karaoke()
-            .in_range(range)
-            .generate(50)
-            .execute();
-        
+
+        let result = doc.karaoke().in_range(range).generate(50).execute();
+
         // Should handle empty text gracefully
         assert!(result.is_ok());
-        
+
         // Test with single character
         let mut doc2 = EditorDocument::from_content("A").unwrap();
         let range2 = Range::new(Position::new(0), Position::new(1));
-        
+
         doc2.karaoke()
             .in_range(range2)
             .generate(25)
             .execute()
             .unwrap();
-        
+
         assert!(doc2.text().contains("\\k25"));
         assert!(doc2.text().contains("A"));
     }
@@ -2664,7 +2721,7 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Third event
 "#;
 
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Test direct event access
         let event_info = doc.events().get(0).unwrap();
         assert!(event_info.is_some());
@@ -2672,18 +2729,18 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Third event
         assert_eq!(info.index, 0);
         assert_eq!(info.event.text, "First event");
         assert_eq!(info.event.event_type, EventType::Dialogue);
-        
+
         // Test event count
         let count = doc.events().count().unwrap();
         assert_eq!(count, 3);
-        
+
         // Test fluent accessor
         let text = doc.events().event(1).text().unwrap();
         assert_eq!(text, Some("Second event".to_string()));
-        
+
         let style = doc.events().event(1).style().unwrap();
         assert_eq!(style, Some("Default".to_string()));
-        
+
         let exists = doc.events().event(5).exists().unwrap();
         assert!(!exists);
     }
@@ -2703,18 +2760,23 @@ Comment: 0,0:00:15.00,0:00:20.00,Default,Speaker,0,0,0,,Second comment
 "#;
 
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Test filtering by type
         let dialogues = doc.events().dialogues().execute().unwrap();
         assert_eq!(dialogues.len(), 2);
-        assert!(dialogues.iter().all(|info| info.event.event_type == EventType::Dialogue));
-        
+        assert!(dialogues
+            .iter()
+            .all(|info| info.event.event_type == EventType::Dialogue));
+
         let comments = doc.events().comments().execute().unwrap();
         assert_eq!(comments.len(), 2);
-        assert!(comments.iter().all(|info| info.event.event_type == EventType::Comment));
-        
+        assert!(comments
+            .iter()
+            .all(|info| info.event.event_type == EventType::Comment));
+
         // Test text filtering
-        let with_first = doc.events()
+        let with_first = doc
+            .events()
             .query()
             .filter_by_text("First")
             .execute()
@@ -2722,9 +2784,10 @@ Comment: 0,0:00:15.00,0:00:20.00,Default,Speaker,0,0,0,,Second comment
         assert_eq!(with_first.len(), 2);
         assert!(with_first[0].event.text.contains("First"));
         assert!(with_first[1].event.text.contains("First"));
-        
+
         // Test case insensitive filtering
-        let with_first_insensitive = doc.events()
+        let with_first_insensitive = doc
+            .events()
             .query()
             .filter_by_text("first")
             .case_sensitive(false)
@@ -2747,23 +2810,24 @@ Dialogue: 0,0:00:05.00,0:00:10.00,Default,Speaker,0,0,0,,Second by time
 "#;
 
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Test sorting by time (should reorder events)
         let by_time = doc.events().by_time().execute().unwrap();
         assert_eq!(by_time.len(), 3);
         assert_eq!(by_time[0].event.text, "First by time");
         assert_eq!(by_time[1].event.text, "Second by time");
         assert_eq!(by_time[2].event.text, "Third by time");
-        
+
         // Test original order
         let in_order = doc.events().in_order().execute().unwrap();
         assert_eq!(in_order.len(), 3);
         assert_eq!(in_order[0].event.text, "Third by time");
         assert_eq!(in_order[1].event.text, "First by time");
         assert_eq!(in_order[2].event.text, "Second by time");
-        
+
         // Test descending sort
-        let by_time_desc = doc.events()
+        let by_time_desc = doc
+            .events()
             .query()
             .sort_by_time()
             .descending()
@@ -2789,9 +2853,10 @@ Dialogue: 0,0:00:15.00,0:00:20.00,Default,Speaker,0,0,0,,Final dialogue
 "#;
 
         let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
-        
+
         // Test combined filtering and sorting with limit
-        let important_dialogues = doc.events()
+        let important_dialogues = doc
+            .events()
             .query()
             .filter_by_type(EventType::Dialogue)
             .filter_by_text("Important")
@@ -2799,36 +2864,25 @@ Dialogue: 0,0:00:15.00,0:00:20.00,Default,Speaker,0,0,0,,Final dialogue
             .limit(1)
             .execute()
             .unwrap();
-        
+
         assert_eq!(important_dialogues.len(), 1);
         assert_eq!(important_dialogues[0].event.text, "Important dialogue");
         assert_eq!(important_dialogues[0].event.event_type, EventType::Dialogue);
-        
+
         // Test getting indices only
-        let dialogue_indices = doc.events()
-            .dialogues()
-            .sort_by_time()
-            .indices()
-            .unwrap();
-        
+        let dialogue_indices = doc.events().dialogues().sort_by_time().indices().unwrap();
+
         assert_eq!(dialogue_indices.len(), 3);
         // Should be indices in time order: 1, 0, 3 (based on start times)
         assert_eq!(dialogue_indices, vec![1, 0, 3]);
-        
+
         // Test count
-        let dialogue_count = doc.events()
-            .dialogues()
-            .count()
-            .unwrap();
+        let dialogue_count = doc.events().dialogues().count().unwrap();
         assert_eq!(dialogue_count, 3);
-        
+
         // Test first
-        let first_dialogue = doc.events()
-            .dialogues()
-            .sort_by_time()
-            .first()
-            .unwrap();
-        
+        let first_dialogue = doc.events().dialogues().sort_by_time().first().unwrap();
+
         assert!(first_dialogue.is_some());
         let first = first_dialogue.unwrap();
         assert_eq!(first.event.text, "Another dialogue");
@@ -2837,14 +2891,14 @@ Dialogue: 0,0:00:15.00,0:00:20.00,Default,Speaker,0,0,0,,Final dialogue
     #[test]
     fn karaoke_chaining_operations() {
         let mut doc = EditorDocument::from_content("Chain test").unwrap();
-        
+
         // Test that karaoke operations can be chained with other fluent operations
         doc.at_pos(Position::new(0))
             .insert_text("Prefix: ")
             .unwrap();
-        
+
         assert_eq!(doc.text(), "Prefix: Chain test");
-        
+
         // Now apply karaoke to the appended part with manual syllables
         let karaoke_range = Range::new(Position::new(8), Position::new(doc.text().len()));
         doc.karaoke()
@@ -2853,7 +2907,7 @@ Dialogue: 0,0:00:15.00,0:00:20.00,Default,Speaker,0,0,0,,Final dialogue
             .manual_syllables()
             .execute()
             .unwrap();
-        
+
         let text = doc.text();
         assert!(text.starts_with("Prefix: "));
         assert!(text.contains("\\k45"));

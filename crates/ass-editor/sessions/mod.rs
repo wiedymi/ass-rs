@@ -19,7 +19,10 @@ use std::collections::HashMap;
 use alloc::collections::BTreeMap as HashMap;
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 #[cfg(feature = "multi-thread")]
 use std::sync::Arc;
@@ -510,6 +513,8 @@ impl Default for EditorSessionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{string::ToString, vec};
 
     #[test]
     fn session_manager_creation() {

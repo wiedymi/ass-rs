@@ -21,7 +21,12 @@ use std::collections::HashMap;
 use alloc::collections::BTreeMap as HashMap;
 
 #[cfg(not(feature = "std"))]
-use alloc::{boxed::Box, format, string::{String, ToString}, vec::Vec};
+use alloc::{
+    boxed::Box,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 #[cfg(feature = "multi-thread")]
 use std::sync::Arc;
@@ -595,13 +600,13 @@ impl ExtensionManager {
                 extension_name,
             }))
         }
-        
+
         #[cfg(not(feature = "multi-thread"))]
         {
             // In single-threaded mode, we share the config state via Rc<RefCell>
             let config_clone = self.inner.borrow().config.clone();
             let shared_config = Rc::new(RefCell::new(config_clone));
-            
+
             Ok(Box::new(EditorContext {
                 document,
                 manager: self,
@@ -884,12 +889,12 @@ impl<'a> ExtensionContext for EditorContext<'a> {
         self.document.as_deref_mut()
     }
 
-    fn send_event(&mut self, event: DocumentEvent) -> Result<()> {
+    fn send_event(&mut self, _event: DocumentEvent) -> Result<()> {
         // For now, we'll just log the event
         // In a real implementation, this would use the event system
         #[cfg(feature = "std")]
         {
-            eprintln!("Extension {} sent event: {:?}", self.extension_name, event);
+            eprintln!("Extension {} sent event: {:?}", self.extension_name, _event);
         }
         Ok(())
     }
@@ -918,29 +923,29 @@ impl<'a> ExtensionContext for EditorContext<'a> {
         Ok(())
     }
 
-    fn register_command(&mut self, command: ExtensionCommand) -> Result<()> {
+    fn register_command(&mut self, _command: ExtensionCommand) -> Result<()> {
         // For now, just acknowledge the command in both modes
         // In a real implementation, this would register with a command system
         #[cfg(feature = "std")]
         {
             eprintln!(
                 "Extension {} registered command: {}",
-                self.extension_name, command.id
+                self.extension_name, _command.id
             );
         }
         Ok(())
     }
 
-    fn show_message(&mut self, message: &str, level: MessageLevel) -> Result<()> {
+    fn show_message(&mut self, _message: &str, _level: MessageLevel) -> Result<()> {
         // Simple console output for now
         #[cfg(feature = "std")]
         {
-            match level {
-                MessageLevel::Info => eprintln!("[INFO] {}: {}", self.extension_name, message),
-                MessageLevel::Warning => eprintln!("[WARN] {}: {}", self.extension_name, message),
-                MessageLevel::Error => eprintln!("[ERROR] {}: {}", self.extension_name, message),
+            match _level {
+                MessageLevel::Info => eprintln!("[INFO] {}: {}", self.extension_name, _message),
+                MessageLevel::Warning => eprintln!("[WARN] {}: {}", self.extension_name, _message),
+                MessageLevel::Error => eprintln!("[ERROR] {}: {}", self.extension_name, _message),
                 MessageLevel::Success => {
-                    eprintln!("[SUCCESS] {}: {}", self.extension_name, message)
+                    eprintln!("[SUCCESS] {}: {}", self.extension_name, _message)
                 }
             }
         }
@@ -961,6 +966,8 @@ impl<'a> ExtensionContext for EditorContext<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{string::ToString, vec};
 
     #[test]
     fn extension_info_creation() {

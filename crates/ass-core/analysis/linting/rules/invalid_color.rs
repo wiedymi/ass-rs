@@ -12,7 +12,11 @@ use crate::{
     parser::Section,
     utils::parse_bgr_color,
 };
-use alloc::{format, string::{String, ToString}, vec::Vec};
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 /// Rule for detecting invalid color formats in styles and override tags
 ///
@@ -169,6 +173,8 @@ impl InvalidColorRule {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn rule_metadata_correct() {

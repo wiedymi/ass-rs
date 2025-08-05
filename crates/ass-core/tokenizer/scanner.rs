@@ -7,6 +7,8 @@ use crate::{utils::CoreError, Result};
 use alloc::{format, string::ToString};
 use core::str::Chars;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 #[cfg(feature = "simd")]
 use super::simd;
 use super::{state::TokenContext, tokens::TokenType};
@@ -402,6 +404,8 @@ impl<'a> TokenScanner<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn char_navigator_new() {

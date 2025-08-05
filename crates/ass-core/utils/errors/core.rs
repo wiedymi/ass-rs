@@ -14,6 +14,8 @@
 use alloc::{format, string::String};
 use core::fmt;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 #[cfg(feature = "std")]
 use thiserror::Error;
 
@@ -249,11 +251,9 @@ impl fmt::Display for CoreError {
         }
     }
 }
-
 /// nostd compatible Error implementation
 #[cfg(not(feature = "std"))]
 impl core::error::Error for CoreError {}
-
 /// std compatible Display implementation
 #[cfg(feature = "std")]
 impl fmt::Display for CoreError {

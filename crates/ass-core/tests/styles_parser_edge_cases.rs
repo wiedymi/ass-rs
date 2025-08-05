@@ -17,7 +17,7 @@ mod tests {
 Style: Default,Arial,20,&Hffffff,&H0,&H0,&H0,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
 Style: Large,Arial,40,&Hff0000,&H0,&H0,&H0,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -42,7 +42,7 @@ Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, TertiaryColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, AlphaLevel, Encoding, RelativeToVideo
 Style: Default,Arial,20,16777215,255,0,0,0,0,1,2,0,2,10,10,10,0,1,0
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -63,7 +63,7 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
 Style: Default,Arial,20,&Hffffff
 Style: Complete,Arial,20,&Hffffff,&H0,&H0,&H0,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -82,7 +82,7 @@ Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 Format: Name, Fontname, Fontsize
 Style: Default,Arial,20,&Hffffff,&H0,&H0,&H0,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1,extra,fields
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -101,7 +101,7 @@ Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 Format: Name, Fontname
 Style: Default,Arial,20,&Hffffff,&H0,&H0,&H0,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -167,7 +167,7 @@ Style: Default,Arial,20
 Format:
 Style: Default,Arial,20
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -183,7 +183,7 @@ Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 Format:
 Style: Default,Arial,20
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -204,7 +204,7 @@ Style: Unicode测试,Arial,20,&Hff0000
 Style: Empty,,20,&H0000ff
 Style: Comma\,Name,Arial,20,&Hffff00
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -230,7 +230,7 @@ Format: Name, Fontname, Fontsize
 Format: Name, Fontname, Fontsize, PrimaryColour
 Style: Default,Arial,20,&Hffffff
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -247,7 +247,7 @@ Dialogue: 0:00:00.00,0:00:05.00,Default,Test
         let empty_section = r"
 [V4+ Styles]
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -267,7 +267,7 @@ Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ; Another comment
 !: This is also a comment
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -289,7 +289,7 @@ Style:    Spaced   ,   Arial   ,   20   ,   &H00ff00
 Style: 	Tabbed	,	Arial	,	20	,	&Hff0000
 Style: Mixed   ,	Arial,  20,&H0000ff
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";
@@ -310,7 +310,7 @@ Style: Minimum,,,,,,,,,,,,,,,,,,,,,
 Style: Maximum,Arial,999,&HFFFFFFFF,&HFFFFFFFF,&HFFFFFFFF,&HFFFFFFFF,1,1,1,1,1000,1000,100,360,4,100,100,11,9999,9999,9999,255
 Style: Negative,Arial,-1,&H0,&H0,&H0,&H0,-1,-1,-1,-1,-100,-100,-100,-360,-1,-100,-100,-1,-1,-1,-1,-1
 
-[Events]
+[Events\]
 Format: Start, End, Style, Text
 Dialogue: 0:00:00.00,0:00:05.00,Default,Test
 ";

@@ -27,6 +27,8 @@
 
 use core::fmt;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 /// Token produced by ASS tokenizer with zero-copy span
 ///
 /// Represents a lexical unit in ASS script with location information.
@@ -424,6 +426,8 @@ impl Default for TokenPosition {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::format;
 
     #[test]
     fn token_creation() {

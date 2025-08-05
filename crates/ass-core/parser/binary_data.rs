@@ -1,4 +1,4 @@
-//! Binary data parsing for [Fonts] and [Graphics] sections
+//! Binary data parsing for `[Fonts]` and `[Graphics]` sections
 //!
 //! Handles UU-encoded font and graphic data embedded in ASS scripts.
 //! Both sections use similar structure: filename declaration followed by
@@ -11,7 +11,7 @@ use super::{
     position_tracker::PositionTracker,
 };
 
-/// Generic parser for binary data sections ([Fonts] and [Graphics])
+/// Generic parser for binary data sections (`[Fonts\]` and `[Graphics]`)
 pub(super) struct BinaryDataParser<'a, T> {
     /// Position tracker for accurate span generation
     tracker: PositionTracker<'a>,
@@ -159,11 +159,11 @@ impl<'a, T> BinaryDataParser<'a, T> {
     }
 }
 
-/// Parser for [Fonts] section - wrapper around `BinaryDataParser`
+/// Parser for `[Fonts\]` section - wrapper around `BinaryDataParser`
 pub(super) struct FontsParser;
 
 impl FontsParser {
-    /// Parse [Fonts] section
+    /// Parse `[Fonts\]` section
     ///
     /// Returns tuple of (Section, `final_position`, `final_line`)
     pub fn parse(source: &str, position: usize, line: usize) -> (Section<'_>, usize, usize) {
@@ -183,11 +183,11 @@ impl FontsParser {
     }
 }
 
-/// Parser for [Graphics] section - wrapper around `BinaryDataParser`
+/// Parser for `[Graphics\]` section - wrapper around `BinaryDataParser`
 pub(super) struct GraphicsParser;
 
 impl GraphicsParser {
-    /// Parse [Graphics] section
+    /// Parse `[Graphics\]` section
     ///
     /// Returns tuple of (Section, `final_position`, `final_line`)
     pub fn parse(source: &str, position: usize, line: usize) -> (Section<'_>, usize, usize) {

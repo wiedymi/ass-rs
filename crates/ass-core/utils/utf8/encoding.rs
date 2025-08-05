@@ -187,6 +187,8 @@ fn detect_non_utf8_encoding(bytes: &[u8]) -> EncodingInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::format;
 
     #[test]
     fn encoding_info_creation() {

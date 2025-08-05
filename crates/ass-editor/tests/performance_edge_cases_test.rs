@@ -54,9 +54,7 @@ fn test_nested_undo_redo_performance() {
     }
 
     let elapsed = start.elapsed();
-    println!(
-        "{undo_count} undo + {redo_count} redo operations took: {elapsed:?}"
-    );
+    println!("{undo_count} undo + {redo_count} redo operations took: {elapsed:?}");
 
     // Document should contain some lines (depending on undo limit)
     assert!(doc.text().contains("Line"));

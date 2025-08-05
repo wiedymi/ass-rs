@@ -5,10 +5,13 @@
 //! for common metadata fields.
 
 use alloc::vec::Vec;
-#[cfg(debug_assertions)]
-use core::ops::Range;
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 
 use super::Span;
+#[cfg(debug_assertions)]
+use core::ops::Range;
 
 /// Script Info section containing metadata and headers
 ///
@@ -64,7 +67,7 @@ impl<'a> ScriptInfo<'a> {
         self.fields.iter().find(|(k, _)| *k == key).map(|(_, v)| *v)
     }
 
-    /// Get script title, defaulting to "<untitled>"
+    /// Get script title, defaulting to `<untitled>`
     ///
     /// Returns the "Title" field value or a default if not specified.
     /// This is a convenience method for the most commonly accessed field.
@@ -150,9 +153,8 @@ impl<'a> ScriptInfo<'a> {
     /// ```
     #[must_use]
     pub fn to_ass_string(&self) -> alloc::string::String {
-        use alloc::string::String;
         use core::fmt::Write;
-        let mut result = String::from("[Script Info]\n");
+        let mut result = alloc::string::String::from("[Script Info]\n");
         for (key, value) in &self.fields {
             let _ = writeln!(result, "{key}: {value}");
         }
@@ -180,6 +182,8 @@ impl<'a> ScriptInfo<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn script_info_field_access() {

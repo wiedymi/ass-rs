@@ -477,6 +477,8 @@ impl SmartArenaManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format};
     
     #[test]
     fn memory_pool_creation() {

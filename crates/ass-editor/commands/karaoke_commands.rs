@@ -4,11 +4,16 @@
 //! ASS karaoke timing tags like \k, \kf, \ko, \kt with proper syllable
 //! detection and timing validation.
 
-use crate::core::{EditorDocument, EditorError, Position, Range, Result};
 use super::{CommandResult, EditorCommand};
+use crate::core::{EditorDocument, EditorError, Position, Range, Result};
 
 #[cfg(not(feature = "std"))]
-use alloc::{format, string::{String, ToString}, vec, vec::Vec};
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 
 /// Generate karaoke timing tags for text
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,23 +88,21 @@ impl GenerateKaraokeCommand {
         let mut syllables = Vec::new();
         let mut current_start = 0;
         let chars: Vec<char> = text.chars().collect();
-        
+
         if chars.is_empty() {
             return vec![text.to_string()];
         }
 
         for (i, &ch) in chars.iter().enumerate() {
             // Split on spaces and common syllable boundaries
-            if ch.is_whitespace() || 
-               (i > 0 && self.is_syllable_boundary(&chars, i)) {
-                
+            if ch.is_whitespace() || (i > 0 && self.is_syllable_boundary(&chars, i)) {
                 if current_start < i {
                     let syllable: String = chars[current_start..i].iter().collect();
                     if !syllable.trim().is_empty() {
                         syllables.push(syllable);
                     }
                 }
-                
+
                 // Handle whitespace
                 if ch.is_whitespace() {
                     let mut end = i + 1;
@@ -113,11 +116,11 @@ impl GenerateKaraokeCommand {
                         continue;
                     }
                 }
-                
+
                 current_start = i;
             }
         }
-        
+
         // Add remaining text
         if current_start < chars.len() {
             let remaining: String = chars[current_start..].iter().collect();
@@ -125,7 +128,7 @@ impl GenerateKaraokeCommand {
                 syllables.push(remaining);
             }
         }
-        
+
         // Return syllables or whole text if none found
         if syllables.is_empty() {
             vec![text.to_string()]
@@ -133,20 +136,20 @@ impl GenerateKaraokeCommand {
             syllables
         }
     }
-    
+
     /// Check if position is a syllable boundary
     fn is_syllable_boundary(&self, chars: &[char], pos: usize) -> bool {
         if pos == 0 || pos >= chars.len() {
             return false;
         }
-        
+
         let prev = chars[pos - 1];
         let curr = chars[pos];
-        
+
         // Split on vowel-consonant or consonant-vowel boundaries
         let prev_vowel = "aeiouAEIOU".contains(prev);
         let curr_vowel = "aeiouAEIOU".contains(curr);
-        
+
         // Simple heuristic: split when transitioning from vowel to consonant
         // or when encountering certain consonant clusters
         prev_vowel && !curr_vowel && !curr.is_whitespace()
@@ -156,17 +159,17 @@ impl GenerateKaraokeCommand {
 impl EditorCommand for GenerateKaraokeCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         let original_text = document.text_range(self.range)?;
-        
+
         // Skip if text is already in override blocks
         if original_text.contains('{') || original_text.contains('}') {
             return Err(EditorError::command_failed(
-                "Cannot generate karaoke for text containing override blocks"
+                "Cannot generate karaoke for text containing override blocks",
             ));
         }
-        
+
         let syllables = self.split_into_syllables(&original_text);
         let tag = self.karaoke_type.tag_string();
-        
+
         let mut karaoke_text = String::new();
         for (i, syllable) in syllables.iter().enumerate() {
             if i == 0 {
@@ -178,9 +181,9 @@ impl EditorCommand for GenerateKaraokeCommand {
             }
             karaoke_text.push_str(syllable);
         }
-        
+
         document.replace_raw(self.range, &karaoke_text)?;
-        
+
         let end_pos = Position::new(self.range.start.offset + karaoke_text.len());
         let range = Range::new(self.range.start, end_pos);
 
@@ -229,9 +232,9 @@ impl EditorCommand for SplitKaraokeCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         let original_text = document.text_range(self.range)?;
         let processed_text = self.split_karaoke_text(&original_text)?;
-        
+
         document.replace_raw(self.range, &processed_text)?;
-        
+
         let end_pos = Position::new(self.range.start.offset + processed_text.len());
         let range = Range::new(self.range.start, end_pos);
 
@@ -254,12 +257,12 @@ impl SplitKaraokeCommand {
         // In practice, this would parse existing karaoke tags and split them
         let mut result = String::new();
         let mut last_pos = 0;
-        
+
         for &pos in &self.split_positions {
             if pos <= last_pos || pos >= text.len() {
                 continue;
             }
-            
+
             let segment = &text[last_pos..pos];
             if !segment.is_empty() {
                 let duration = self.new_duration.unwrap_or(50);
@@ -267,7 +270,7 @@ impl SplitKaraokeCommand {
             }
             last_pos = pos;
         }
-        
+
         // Add remaining text
         if last_pos < text.len() {
             let segment = &text[last_pos..];
@@ -276,7 +279,7 @@ impl SplitKaraokeCommand {
                 result.push_str(&format!("{{\\k{duration}}}{segment}"));
             }
         }
-        
+
         Ok(result)
     }
 }
@@ -341,9 +344,9 @@ impl EditorCommand for AdjustKaraokeCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         let original_text = document.text_range(self.range)?;
         let adjusted_text = self.adjust_karaoke_timing(&original_text)?;
-        
+
         document.replace_raw(self.range, &adjusted_text)?;
-        
+
         let end_pos = Position::new(self.range.start.offset + adjusted_text.len());
         let range = Range::new(self.range.start, end_pos);
 
@@ -371,29 +374,29 @@ impl EditorCommand for AdjustKaraokeCommand {
 impl AdjustKaraokeCommand {
     /// Adjust karaoke timing in text using ass-core's ExtensionRegistry system
     fn adjust_karaoke_timing(&self, text: &str) -> Result<String> {
-        use ass_core::plugin::{ExtensionRegistry, tags::karaoke::create_karaoke_handlers};
         use ass_core::analysis::events::tags::parse_override_block_with_registry;
-        
+        use ass_core::plugin::{tags::karaoke::create_karaoke_handlers, ExtensionRegistry};
+
         // Create registry with karaoke handlers
         let mut registry = ExtensionRegistry::new();
         for handler in create_karaoke_handlers() {
-            registry.register_tag_handler(handler).map_err(|e| 
-                crate::core::errors::EditorError::ValidationError { 
-                    message: format!("Failed to register karaoke handler: {e:?}") 
+            registry.register_tag_handler(handler).map_err(|e| {
+                crate::core::errors::EditorError::ValidationError {
+                    message: format!("Failed to register karaoke handler: {e:?}"),
                 }
-            )?;
+            })?;
         }
-        
+
         let mut result = String::new();
         let mut chars = text.chars().peekable();
         let mut custom_index = 0;
-        
+
         while let Some(ch) = chars.next() {
             if ch == '{' {
                 // Found override block - extract content
                 let mut override_content = String::new();
                 let mut brace_count = 1;
-                
+
                 for inner_ch in chars.by_ref() {
                     if inner_ch == '{' {
                         brace_count += 1;
@@ -405,15 +408,25 @@ impl AdjustKaraokeCommand {
                     }
                     override_content.push(inner_ch);
                 }
-                
+
                 // Use ass-core's registry-based parser
                 let mut tags = Vec::new();
                 let mut diagnostics = Vec::new();
-                parse_override_block_with_registry(&override_content, 0, &mut tags, &mut diagnostics, Some(&registry));
-                
+                parse_override_block_with_registry(
+                    &override_content,
+                    0,
+                    &mut tags,
+                    &mut diagnostics,
+                    Some(&registry),
+                );
+
                 // Process karaoke tags using ass-core's validated data
-                let processed_content = self.adjust_karaoke_tags_with_registry(&override_content, &tags, &mut custom_index)?;
-                
+                let processed_content = self.adjust_karaoke_tags_with_registry(
+                    &override_content,
+                    &tags,
+                    &mut custom_index,
+                )?;
+
                 result.push('{');
                 result.push_str(&processed_content);
                 result.push('}');
@@ -421,28 +434,37 @@ impl AdjustKaraokeCommand {
                 result.push(ch);
             }
         }
-        
+
         Ok(result)
     }
-    
+
     /// Adjust karaoke tags using registry-validated tag information
-    fn adjust_karaoke_tags_with_registry(&self, original_content: &str, tags: &[ass_core::analysis::events::tags::OverrideTag], custom_index: &mut usize) -> Result<String> {
+    fn adjust_karaoke_tags_with_registry(
+        &self,
+        original_content: &str,
+        tags: &[ass_core::analysis::events::tags::OverrideTag],
+        custom_index: &mut usize,
+    ) -> Result<String> {
         let mut result = original_content.to_string();
-        
+
         // Process tags in reverse order to maintain position accuracy
         for tag in tags.iter().rev() {
             if tag.name().starts_with('k') {
                 // This tag was validated by ass-core's karaoke handlers
                 let tag_name = tag.name();
                 let args = tag.args();
-                
+
                 // Extract duration from args (ass-core already validated this)
                 let current_duration: u32 = args.trim().parse().unwrap_or(0);
-                
+
                 // Calculate new duration based on adjustment type
                 let new_duration = match &self.adjustment {
-                    TimingAdjustment::Scale(factor) => ((current_duration as f32 * factor) as u32).max(1),
-                    TimingAdjustment::Offset(offset) => ((current_duration as i32 + offset).max(1)) as u32,
+                    TimingAdjustment::Scale(factor) => {
+                        ((current_duration as f32 * factor) as u32).max(1)
+                    }
+                    TimingAdjustment::Offset(offset) => {
+                        ((current_duration as i32 + offset).max(1)) as u32
+                    }
                     TimingAdjustment::SetAll(duration) => *duration,
                     TimingAdjustment::Custom(timings) => {
                         if *custom_index < timings.len() {
@@ -454,17 +476,16 @@ impl AdjustKaraokeCommand {
                         }
                     }
                 };
-                
+
                 // Replace the validated tag with adjusted version
                 let old_tag = format!("\\{tag_name}{current_duration}");
                 let new_tag = format!("\\{tag_name}{new_duration}");
                 result = result.replace(&old_tag, &new_tag);
             }
         }
-        
+
         Ok(result)
     }
-    
 }
 
 /// Apply karaoke timing to event text
@@ -496,9 +517,7 @@ pub enum KaraokeTemplate {
         karaoke_type: KaraokeType,
     },
     /// Import timing from another event
-    ImportFrom {
-        source_event_index: usize,
-    },
+    ImportFrom { source_event_index: usize },
 }
 
 impl ApplyKaraokeCommand {
@@ -514,7 +533,12 @@ impl ApplyKaraokeCommand {
     }
 
     /// Create a beat-based timing command
-    pub fn beat(event_range: Range, bpm: u32, beats_per_syllable: f32, karaoke_type: KaraokeType) -> Self {
+    pub fn beat(
+        event_range: Range,
+        bpm: u32,
+        beats_per_syllable: f32,
+        karaoke_type: KaraokeType,
+    ) -> Self {
         Self {
             event_range,
             karaoke_template: KaraokeTemplate::Beat {
@@ -540,9 +564,7 @@ impl ApplyKaraokeCommand {
     pub fn import_from(event_range: Range, source_event_index: usize) -> Self {
         Self {
             event_range,
-            karaoke_template: KaraokeTemplate::ImportFrom {
-                source_event_index,
-            },
+            karaoke_template: KaraokeTemplate::ImportFrom { source_event_index },
         }
     }
 }
@@ -551,9 +573,9 @@ impl EditorCommand for ApplyKaraokeCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         let original_text = document.text_range(self.event_range)?;
         let karaoke_text = self.apply_karaoke_template(&original_text, document)?;
-        
+
         document.replace_raw(self.event_range, &karaoke_text)?;
-        
+
         let end_pos = Position::new(self.event_range.start.offset + karaoke_text.len());
         let range = Range::new(self.event_range.start, end_pos);
 
@@ -571,7 +593,9 @@ impl EditorCommand for ApplyKaraokeCommand {
 
     fn memory_usage(&self) -> usize {
         let template_size = match &self.karaoke_template {
-            KaraokeTemplate::Pattern { durations, .. } => durations.len() * core::mem::size_of::<u32>(),
+            KaraokeTemplate::Pattern { durations, .. } => {
+                durations.len() * core::mem::size_of::<u32>()
+            }
             _ => 0,
         };
         core::mem::size_of::<Self>() + template_size
@@ -584,29 +608,40 @@ impl ApplyKaraokeCommand {
         // Extract text content from event (skip override blocks for syllable detection)
         let clean_text = self.extract_clean_text(text);
         let syllables = self.detect_syllables(&clean_text);
-        
+
         match &self.karaoke_template {
-            KaraokeTemplate::Equal { syllable_duration, karaoke_type } => {
-                self.apply_equal_timing(&syllables, *syllable_duration, *karaoke_type)
-            }
-            KaraokeTemplate::Beat { beats_per_minute, beats_per_syllable, karaoke_type } => {
-                self.apply_beat_timing(&syllables, *beats_per_minute, *beats_per_syllable, *karaoke_type)
-            }
-            KaraokeTemplate::Pattern { durations, karaoke_type } => {
-                self.apply_pattern_timing(&syllables, durations, *karaoke_type)
-            }
-            KaraokeTemplate::ImportFrom { source_event_index: _ } => {
+            KaraokeTemplate::Equal {
+                syllable_duration,
+                karaoke_type,
+            } => self.apply_equal_timing(&syllables, *syllable_duration, *karaoke_type),
+            KaraokeTemplate::Beat {
+                beats_per_minute,
+                beats_per_syllable,
+                karaoke_type,
+            } => self.apply_beat_timing(
+                &syllables,
+                *beats_per_minute,
+                *beats_per_syllable,
+                *karaoke_type,
+            ),
+            KaraokeTemplate::Pattern {
+                durations,
+                karaoke_type,
+            } => self.apply_pattern_timing(&syllables, durations, *karaoke_type),
+            KaraokeTemplate::ImportFrom {
+                source_event_index: _,
+            } => {
                 // Simplified - would need to parse other events
                 Ok(text.to_string())
             }
         }
     }
-    
+
     /// Extract clean text without override blocks
     fn extract_clean_text(&self, text: &str) -> String {
         let mut result = String::new();
         let mut chars = text.chars();
-        
+
         while let Some(ch) = chars.next() {
             if ch == '{' {
                 // Skip override block
@@ -625,10 +660,10 @@ impl ApplyKaraokeCommand {
                 result.push(ch);
             }
         }
-        
+
         result
     }
-    
+
     /// Detect syllables in clean text
     fn detect_syllables(&self, text: &str) -> Vec<String> {
         // Simple syllable detection - split on spaces and vowel boundaries
@@ -640,34 +675,50 @@ impl ApplyKaraokeCommand {
             })
             .collect()
     }
-    
+
     /// Apply equal timing to syllables
-    fn apply_equal_timing(&self, syllables: &[String], duration: u32, karaoke_type: KaraokeType) -> Result<String> {
+    fn apply_equal_timing(
+        &self,
+        syllables: &[String],
+        duration: u32,
+        karaoke_type: KaraokeType,
+    ) -> Result<String> {
         let tag = karaoke_type.tag_string();
         let mut result = String::new();
-        
+
         for (i, syllable) in syllables.iter().enumerate() {
             if i > 0 {
                 result.push(' '); // Add space between syllables
             }
             result.push_str(&format!("{{\\{tag}{duration}}}{syllable}"));
         }
-        
+
         Ok(result)
     }
-    
+
     /// Apply beat-based timing to syllables
-    fn apply_beat_timing(&self, syllables: &[String], bpm: u32, beats_per_syllable: f32, karaoke_type: KaraokeType) -> Result<String> {
+    fn apply_beat_timing(
+        &self,
+        syllables: &[String],
+        bpm: u32,
+        beats_per_syllable: f32,
+        karaoke_type: KaraokeType,
+    ) -> Result<String> {
         // Calculate duration in centiseconds: (60 seconds / BPM) * beats_per_syllable * 100 cs/s
         let duration = ((60.0 / bpm as f32) * beats_per_syllable * 100.0) as u32;
         self.apply_equal_timing(syllables, duration, karaoke_type)
     }
-    
+
     /// Apply pattern-based timing to syllables
-    fn apply_pattern_timing(&self, syllables: &[String], durations: &[u32], karaoke_type: KaraokeType) -> Result<String> {
+    fn apply_pattern_timing(
+        &self,
+        syllables: &[String],
+        durations: &[u32],
+        karaoke_type: KaraokeType,
+    ) -> Result<String> {
         let tag = karaoke_type.tag_string();
         let mut result = String::new();
-        
+
         for (i, syllable) in syllables.iter().enumerate() {
             if i > 0 {
                 result.push(' ');
@@ -675,7 +726,7 @@ impl ApplyKaraokeCommand {
             let duration = durations.get(i % durations.len()).copied().unwrap_or(50);
             result.push_str(&format!("{{\\{tag}{duration}}}{syllable}"));
         }
-        
+
         Ok(result)
     }
 }
@@ -684,13 +735,15 @@ impl ApplyKaraokeCommand {
 mod tests {
     use super::*;
     use crate::core::EditorDocument;
-
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
+    #[cfg(not(feature = "std"))]
     #[test]
     fn generate_karaoke_basic() {
         let mut doc = EditorDocument::from_content("Hello World").unwrap();
         let range = Range::new(Position::new(0), Position::new(11));
         let command = GenerateKaraokeCommand::new(range, 50);
-        
+
         let result = command.execute(&mut doc).unwrap();
         assert!(result.success);
         assert!(doc.text().contains("\\k50"));
@@ -701,7 +754,7 @@ mod tests {
         let mut doc = EditorDocument::from_content("Hello World").unwrap();
         let range = Range::new(Position::new(0), Position::new(11));
         let command = SplitKaraokeCommand::new(range, vec![5]).duration(30);
-        
+
         let result = command.execute(&mut doc).unwrap();
         assert!(result.success);
         assert!(doc.text().contains("\\k30"));
@@ -712,7 +765,7 @@ mod tests {
         let mut doc = EditorDocument::from_content("{\\k50}Hello").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
         let command = AdjustKaraokeCommand::scale(range, 2.0);
-        
+
         let result = command.execute(&mut doc).unwrap();
         assert!(result.success);
         assert!(doc.text().contains("\\k100"));
@@ -723,7 +776,7 @@ mod tests {
         let mut doc = EditorDocument::from_content("Hello World").unwrap();
         let range = Range::new(Position::new(0), Position::new(11));
         let command = ApplyKaraokeCommand::equal(range, 40, KaraokeType::Fill);
-        
+
         let result = command.execute(&mut doc).unwrap();
         assert!(result.success);
         assert!(doc.text().contains("\\kf40"));
@@ -734,7 +787,7 @@ mod tests {
         let mut doc = EditorDocument::from_content("Hello World").unwrap();
         let range = Range::new(Position::new(0), Position::new(11));
         let command = ApplyKaraokeCommand::beat(range, 120, 0.5, KaraokeType::Standard);
-        
+
         let result = command.execute(&mut doc).unwrap();
         assert!(result.success);
         // Beat timing: (60/120) * 0.5 * 100 = 25 centiseconds

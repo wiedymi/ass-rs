@@ -5,6 +5,8 @@
 
 use alloc::{format, string::String, vec::Vec};
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 /// Tokenization context for state-aware parsing
 ///
 /// Tracks current parsing context to enable context-sensitive tokenization
@@ -18,7 +20,7 @@ pub enum TokenContext {
     /// top-level document structure.
     Document,
 
-    /// Inside section header like [Events]
+    /// Inside section header like `[Events]`
     ///
     /// Special tokenization rules for section names within square brackets.
     SectionHeader,
@@ -307,6 +309,8 @@ impl<'a> IssueCollector<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn token_context_transitions() {

@@ -4,6 +4,9 @@
 //! code paths in the tokenizer, particularly error conditions and edge cases
 //! that are difficult to trigger through normal usage.
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
 use ass_core::tokenizer::{
     scanner::{CharNavigator, TokenScanner},
     state::{IssueCollector, TokenContext},
@@ -13,6 +16,8 @@ use ass_core::tokenizer::{
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::ToString};
 
     /// Test tokenizer position advancement validation to prevent infinite loops
     #[test]

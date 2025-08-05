@@ -3,13 +3,16 @@
 //! Provides conversion between ASS and other subtitle formats like SRT and WebVTT.
 //! Supports both import and export operations with format auto-detection.
 
-use crate::core::{EditorDocument, Result};
 use crate::core::errors::EditorError;
+use crate::core::{EditorDocument, Result};
 use ass_core::parser::ast::EventType;
 
 #[cfg(not(feature = "std"))]
-use alloc::{format, string::{String, ToString}, vec::Vec};
-
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 /// Supported subtitle formats
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,16 +72,16 @@ impl SubtitleFormat {
 pub struct ConversionOptions {
     /// Preserve styling information when possible
     pub preserve_styling: bool,
-    
+
     /// Preserve positioning information when possible
     pub preserve_positioning: bool,
-    
+
     /// Convert karaoke timing to inline format
     pub inline_karaoke: bool,
-    
+
     /// Strip all formatting tags
     pub strip_formatting: bool,
-    
+
     /// Target format-specific options
     pub format_options: FormatOptions,
 }
@@ -100,7 +103,7 @@ impl Default for ConversionOptions {
 pub enum FormatOptions {
     /// No format-specific options
     None,
-    
+
     /// SRT-specific options
     SRT {
         /// Include sequential numbering
@@ -108,7 +111,7 @@ pub enum FormatOptions {
         /// Use millisecond precision (3 digits)
         millisecond_precision: bool,
     },
-    
+
     /// WebVTT-specific options
     WebVTT {
         /// Include STYLE block for CSS
@@ -133,7 +136,7 @@ impl FormatConverter {
     /// Import subtitle content from various formats into ASS
     pub fn import(content: &str, format: Option<SubtitleFormat>) -> Result<String> {
         let detected_format = format.unwrap_or_else(|| SubtitleFormat::from_content(content));
-        
+
         match detected_format {
             SubtitleFormat::ASS | SubtitleFormat::SSA => {
                 // Already in ASS/SSA format, just return
@@ -144,7 +147,7 @@ impl FormatConverter {
             SubtitleFormat::PlainText => Self::import_plain_text(content),
         }
     }
-    
+
     /// Export ASS content to another subtitle format
     pub fn export(
         document: &EditorDocument,
@@ -159,11 +162,11 @@ impl FormatConverter {
             SubtitleFormat::PlainText => Self::export_plain_text(document, options),
         }
     }
-    
+
     /// Import SRT format
     fn import_srt(content: &str) -> Result<String> {
         let mut output = String::new();
-        
+
         // Add ASS header
         output.push_str("[Script Info]\n");
         output.push_str("Title: Imported from SRT\n");
@@ -172,16 +175,18 @@ impl FormatConverter {
         output.push_str("PlayResX: 640\n");
         output.push_str("PlayResY: 480\n");
         output.push_str("ScaledBorderAndShadow: yes\n\n");
-        
+
         // Add default style
         output.push_str("[V4+ Styles]\n");
         output.push_str("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n");
         output.push_str("Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1\n\n");
-        
+
         // Add events section
         output.push_str("[Events]\n");
-        output.push_str("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n");
-        
+        output.push_str(
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n",
+        );
+
         // Parse SRT entries
         let entries = Self::parse_srt_entries(content)?;
         for entry in entries {
@@ -190,19 +195,19 @@ impl FormatConverter {
                 entry.start, entry.end, entry.text
             ));
         }
-        
+
         Ok(output)
     }
-    
+
     /// Parse SRT entries
     fn parse_srt_entries(content: &str) -> Result<Vec<SrtEntry>> {
         let mut entries = Vec::new();
         let mut current_entry: Option<SrtEntry> = None;
         let mut in_text = false;
-        
+
         for line in content.lines() {
             let line = line.trim();
-            
+
             if line.is_empty() {
                 if let Some(entry) = current_entry.take() {
                     entries.push(entry);
@@ -210,14 +215,14 @@ impl FormatConverter {
                 in_text = false;
                 continue;
             }
-            
+
             // Check if it's a number (subtitle index)
             if line.chars().all(|c| c.is_ascii_digit()) && !in_text {
                 // Start new entry
                 current_entry = Some(SrtEntry::default());
                 continue;
             }
-            
+
             // Check if it's a timestamp line
             if line.contains("-->") {
                 if let Some(ref mut entry) = current_entry {
@@ -230,7 +235,7 @@ impl FormatConverter {
                 }
                 continue;
             }
-            
+
             // Otherwise it's subtitle text
             if in_text {
                 if let Some(ref mut entry) = current_entry {
@@ -243,42 +248,44 @@ impl FormatConverter {
                 }
             }
         }
-        
+
         // Don't forget the last entry
         if let Some(entry) = current_entry {
             entries.push(entry);
         }
-        
+
         Ok(entries)
     }
-    
+
     /// Parse SRT timestamp to ASS format
     fn parse_srt_time(time: &str) -> Result<String> {
         // SRT format: 00:00:00,000
         // ASS format: 0:00:00.00
-        
+
         let time = time.replace(',', ".");
         let parts: Vec<&str> = time.split(':').collect();
-        
+
         if parts.len() != 3 {
             return Err(EditorError::ValidationError {
                 message: format!("Invalid SRT timestamp: {time}"),
             });
         }
-        
+
         let hours: u32 = parts[0].parse().map_err(|_| EditorError::ValidationError {
             message: format!("Invalid hours in timestamp: {}", parts[0]),
         })?;
-        
+
         let minutes: u32 = parts[1].parse().map_err(|_| EditorError::ValidationError {
             message: format!("Invalid minutes in timestamp: {}", parts[1]),
         })?;
-        
+
         let seconds_parts: Vec<&str> = parts[2].split('.').collect();
-        let seconds: u32 = seconds_parts[0].parse().map_err(|_| EditorError::ValidationError {
-            message: format!("Invalid seconds in timestamp: {}", seconds_parts[0]),
-        })?;
-        
+        let seconds: u32 = seconds_parts[0]
+            .parse()
+            .map_err(|_| EditorError::ValidationError {
+                message: format!("Invalid seconds in timestamp: {}", seconds_parts[0]),
+            })?;
+
         let centiseconds = if seconds_parts.len() > 1 {
             // Convert milliseconds to centiseconds
             let millis: u32 = seconds_parts[1].parse().unwrap_or(0);
@@ -286,14 +293,16 @@ impl FormatConverter {
         } else {
             0
         };
-        
-        Ok(format!("{hours}:{minutes:02}:{seconds:02}.{centiseconds:02}"))
+
+        Ok(format!(
+            "{hours}:{minutes:02}:{seconds:02}.{centiseconds:02}"
+        ))
     }
-    
+
     /// Convert SRT formatting to ASS
     fn convert_srt_formatting(text: &str) -> String {
         let mut result = text.to_string();
-        
+
         // Convert basic HTML-like tags
         result = result.replace("<i>", "{\\i1}");
         result = result.replace("</i>", "{\\i0}");
@@ -301,7 +310,7 @@ impl FormatConverter {
         result = result.replace("</b>", "{\\b0}");
         result = result.replace("<u>", "{\\u1}");
         result = result.replace("</u>", "{\\u0}");
-        
+
         // Remove any other HTML tags
         #[cfg(feature = "formats")]
         {
@@ -310,14 +319,14 @@ impl FormatConverter {
                 .replace_all(&result, "")
                 .to_string();
         }
-        
+
         result
     }
-    
+
     /// Import WebVTT format
     fn import_webvtt(content: &str) -> Result<String> {
         let mut output = String::new();
-        
+
         // Add ASS header
         output.push_str("[Script Info]\n");
         output.push_str("Title: Imported from WebVTT\n");
@@ -326,16 +335,18 @@ impl FormatConverter {
         output.push_str("PlayResX: 640\n");
         output.push_str("PlayResY: 480\n");
         output.push_str("ScaledBorderAndShadow: yes\n\n");
-        
+
         // Add default style
         output.push_str("[V4+ Styles]\n");
         output.push_str("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n");
         output.push_str("Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1\n\n");
-        
+
         // Add events section
         output.push_str("[Events]\n");
-        output.push_str("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n");
-        
+        output.push_str(
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n",
+        );
+
         // Parse WebVTT cues
         let cues = Self::parse_webvtt_cues(content)?;
         for cue in cues {
@@ -344,19 +355,19 @@ impl FormatConverter {
                 cue.start, cue.end, cue.text
             ));
         }
-        
+
         Ok(output)
     }
-    
+
     /// Parse WebVTT cues
     fn parse_webvtt_cues(content: &str) -> Result<Vec<WebVttCue>> {
         let mut cues = Vec::new();
         let mut current_cue: Option<WebVttCue> = None;
         let mut in_cue = false;
-        
+
         for line in content.lines() {
             let line = line.trim();
-            
+
             // Skip WEBVTT header and empty lines
             if line.starts_with("WEBVTT") || line.starts_with("NOTE") || line.is_empty() {
                 if let Some(cue) = current_cue.take() {
@@ -365,7 +376,7 @@ impl FormatConverter {
                 in_cue = false;
                 continue;
             }
-            
+
             // Check if it's a timestamp line
             if line.contains("-->") {
                 current_cue = Some(WebVttCue::default());
@@ -379,7 +390,7 @@ impl FormatConverter {
                 }
                 continue;
             }
-            
+
             // Otherwise it's cue text
             if in_cue {
                 if let Some(ref mut cue) = current_cue {
@@ -391,22 +402,22 @@ impl FormatConverter {
                 }
             }
         }
-        
+
         // Don't forget the last cue
         if let Some(cue) = current_cue {
             cues.push(cue);
         }
-        
+
         Ok(cues)
     }
-    
+
     /// Parse WebVTT timestamp to ASS format
     fn parse_webvtt_time(time: &str) -> Result<String> {
         // WebVTT format: 00:00:00.000 or 00:00.000
         // ASS format: 0:00:00.00
-        
+
         let parts: Vec<&str> = time.split(':').collect();
-        
+
         let (hours, minutes, seconds_str) = if parts.len() == 3 {
             // HH:MM:SS.mmm
             (parts[0].parse::<u32>().unwrap_or(0), parts[1], parts[2])
@@ -418,16 +429,18 @@ impl FormatConverter {
                 message: format!("Invalid WebVTT timestamp: {time}"),
             });
         };
-        
+
         let minutes: u32 = minutes.parse().map_err(|_| EditorError::ValidationError {
             message: format!("Invalid minutes in timestamp: {minutes}"),
         })?;
-        
+
         let seconds_parts: Vec<&str> = seconds_str.split('.').collect();
-        let seconds: u32 = seconds_parts[0].parse().map_err(|_| EditorError::ValidationError {
-            message: format!("Invalid seconds in timestamp: {}", seconds_parts[0]),
-        })?;
-        
+        let seconds: u32 = seconds_parts[0]
+            .parse()
+            .map_err(|_| EditorError::ValidationError {
+                message: format!("Invalid seconds in timestamp: {}", seconds_parts[0]),
+            })?;
+
         let centiseconds = if seconds_parts.len() > 1 {
             // Convert milliseconds to centiseconds
             let millis: u32 = seconds_parts[1].parse().unwrap_or(0);
@@ -435,14 +448,16 @@ impl FormatConverter {
         } else {
             0
         };
-        
-        Ok(format!("{hours}:{minutes:02}:{seconds:02}.{centiseconds:02}"))
+
+        Ok(format!(
+            "{hours}:{minutes:02}:{seconds:02}.{centiseconds:02}"
+        ))
     }
-    
+
     /// Convert WebVTT formatting to ASS
     fn convert_webvtt_formatting(text: &str) -> String {
         let mut result = text.to_string();
-        
+
         // Convert WebVTT tags
         result = result.replace("<i>", "{\\i1}");
         result = result.replace("</i>", "{\\i0}");
@@ -450,48 +465,50 @@ impl FormatConverter {
         result = result.replace("</b>", "{\\b0}");
         result = result.replace("<u>", "{\\u1}");
         result = result.replace("</u>", "{\\u0}");
-        
+
         // Convert voice spans
         result = regex::Regex::new(r"<v\s+([^>]+)>")
             .unwrap()
             .replace_all(&result, "")
             .to_string();
         result = result.replace("</v>", "");
-        
+
         // Remove any other tags
         result = regex::Regex::new(r"<[^>]+>")
             .unwrap()
             .replace_all(&result, "")
             .to_string();
-        
+
         result
     }
-    
+
     /// Import plain text
     fn import_plain_text(content: &str) -> Result<String> {
         let mut output = String::new();
-        
+
         // Add minimal ASS header
         output.push_str("[Script Info]\n");
         output.push_str("Title: Imported from Plain Text\n");
         output.push_str("ScriptType: v4.00+\n\n");
-        
+
         output.push_str("[V4+ Styles]\n");
         output.push_str("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n");
         output.push_str("Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1\n\n");
-        
+
         output.push_str("[Events]\n");
-        output.push_str("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n");
-        
+        output.push_str(
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n",
+        );
+
         // Create a single dialogue line with all text
         let text = content.lines().collect::<Vec<_>>().join("\\N");
         output.push_str(&format!(
             "Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{text}\n"
         ));
-        
+
         Ok(output)
     }
-    
+
     /// Export to SSA format
     fn export_ssa(document: &EditorDocument, _options: &ConversionOptions) -> Result<String> {
         // SSA is very similar to ASS, just with slightly different headers
@@ -500,12 +517,12 @@ impl FormatConverter {
         output = output.replace("ScriptType: v4.00+", "ScriptType: v4.00");
         Ok(output)
     }
-    
+
     /// Export to SRT format
     fn export_srt(document: &EditorDocument, options: &ConversionOptions) -> Result<String> {
         let mut output = String::new();
         let mut index = 1;
-        
+
         document.parse_script_with(|script| {
             for section in script.sections() {
                 if let ass_core::parser::ast::Section::Events(events) = section {
@@ -514,12 +531,12 @@ impl FormatConverter {
                             // Add index
                             output.push_str(&format!("{index}\n"));
                             index += 1;
-                            
+
                             // Add timestamps
                             let start = Self::ass_time_to_srt(event.start);
                             let end = Self::ass_time_to_srt(event.end);
                             output.push_str(&format!("{start} --> {end}\n"));
-                            
+
                             // Add text
                             let text = if options.strip_formatting {
                                 Self::strip_ass_tags(event.text)
@@ -533,37 +550,37 @@ impl FormatConverter {
                 }
             }
         })?;
-        
+
         Ok(output)
     }
-    
+
     /// Convert ASS time to SRT format
     fn ass_time_to_srt(time: &str) -> String {
         // ASS format: 0:00:00.00
         // SRT format: 00:00:00,000
-        
+
         let parts: Vec<&str> = time.split(':').collect();
         if parts.len() != 3 {
             return time.to_string();
         }
-        
+
         let hours = format!("{:02}", parts[0].parse::<u32>().unwrap_or(0));
         let minutes = parts[1];
-        
+
         let seconds_parts: Vec<&str> = parts[2].split('.').collect();
         let seconds = seconds_parts[0];
         let centiseconds = seconds_parts.get(1).unwrap_or(&"00");
-        
+
         // Convert centiseconds to milliseconds
         let millis = centiseconds.parse::<u32>().unwrap_or(0) * 10;
-        
+
         format!("{hours}:{minutes}:{seconds},{millis:03}")
     }
-    
+
     /// Convert ASS formatting to SRT
     fn convert_ass_to_srt_formatting(text: &str) -> String {
         let mut result = text.to_string();
-        
+
         // Convert basic formatting
         result = result.replace("{\\i1}", "<i>");
         result = result.replace("{\\i0}", "</i>");
@@ -571,7 +588,7 @@ impl FormatConverter {
         result = result.replace("{\\b0}", "</b>");
         result = result.replace("{\\u1}", "<u>");
         result = result.replace("{\\u0}", "</u>");
-        
+
         // Remove all other ASS tags
         while let Some(start) = result.find('{') {
             if let Some(end) = result[start..].find('}') {
@@ -580,10 +597,10 @@ impl FormatConverter {
                 break;
             }
         }
-        
+
         result
     }
-    
+
     /// Strip all ASS tags from text
     fn strip_ass_tags(text: &str) -> String {
         let mut result = text.to_string();
@@ -596,23 +613,28 @@ impl FormatConverter {
         }
         result
     }
-    
+
     /// Export to WebVTT format
     fn export_webvtt(document: &EditorDocument, options: &ConversionOptions) -> Result<String> {
         let mut output = String::new();
-        
+
         // Add WebVTT header
         output.push_str("WEBVTT\n\n");
-        
+
         // Add style block if requested
-        if let FormatOptions::WebVTT { include_style_block: true, .. } = &options.format_options {
+        if let FormatOptions::WebVTT {
+            include_style_block: true,
+            ..
+        } = &options.format_options
+        {
             output.push_str("STYLE\n");
             output.push_str("::cue {\n");
-            output.push_str("  background-image: linear-gradient(to bottom, dimgray, lightgray);\n");
+            output
+                .push_str("  background-image: linear-gradient(to bottom, dimgray, lightgray);\n");
             output.push_str("  color: papayawhip;\n");
             output.push_str("}\n\n");
         }
-        
+
         document.parse_script_with(|script| {
             for section in script.sections() {
                 if let ass_core::parser::ast::Section::Events(events) = section {
@@ -622,18 +644,22 @@ impl FormatConverter {
                             let start = Self::ass_time_to_webvtt(event.start);
                             let end = Self::ass_time_to_webvtt(event.end);
                             output.push_str(&format!("{start} --> {end}"));
-                            
+
                             // Add cue settings if requested
-                            if let FormatOptions::WebVTT { use_cue_settings: true, .. } = &options.format_options {
+                            if let FormatOptions::WebVTT {
+                                use_cue_settings: true,
+                                ..
+                            } = &options.format_options
+                            {
                                 // Parse margins as integers for positioning
                                 let margin_v: i32 = event.margin_v.parse().unwrap_or(0);
                                 if margin_v != 0 {
                                     output.push_str(&format!(" line:{}", 100 - margin_v));
                                 }
                             }
-                            
+
                             output.push('\n');
-                            
+
                             // Add text
                             let text = if options.strip_formatting {
                                 Self::strip_ass_tags(event.text)
@@ -647,37 +673,37 @@ impl FormatConverter {
                 }
             }
         })?;
-        
+
         Ok(output)
     }
-    
+
     /// Convert ASS time to WebVTT format
     fn ass_time_to_webvtt(time: &str) -> String {
         // ASS format: 0:00:00.00
         // WebVTT format: 00:00:00.000
-        
+
         let parts: Vec<&str> = time.split(':').collect();
         if parts.len() != 3 {
             return time.to_string();
         }
-        
+
         let hours = format!("{:02}", parts[0].parse::<u32>().unwrap_or(0));
         let minutes = parts[1];
-        
+
         let seconds_parts: Vec<&str> = parts[2].split('.').collect();
         let seconds = seconds_parts[0];
         let centiseconds = seconds_parts.get(1).unwrap_or(&"00");
-        
+
         // Convert centiseconds to milliseconds
         let millis = centiseconds.parse::<u32>().unwrap_or(0) * 10;
-        
+
         format!("{hours}:{minutes}:{seconds}.{millis:03}")
     }
-    
+
     /// Convert ASS formatting to WebVTT
     fn convert_ass_to_webvtt_formatting(text: &str) -> String {
         let mut result = text.to_string();
-        
+
         // Convert basic formatting
         result = result.replace("{\\i1}", "<i>");
         result = result.replace("{\\i0}", "</i>");
@@ -685,7 +711,7 @@ impl FormatConverter {
         result = result.replace("{\\b0}", "</b>");
         result = result.replace("{\\u1}", "<u>");
         result = result.replace("{\\u0}", "</u>");
-        
+
         // Remove all other ASS tags
         while let Some(start) = result.find('{') {
             if let Some(end) = result[start..].find('}') {
@@ -694,14 +720,14 @@ impl FormatConverter {
                 break;
             }
         }
-        
+
         result
     }
-    
+
     /// Export to plain text
     fn export_plain_text(document: &EditorDocument, options: &ConversionOptions) -> Result<String> {
         let mut output = String::new();
-        
+
         document.parse_script_with(|script| {
             for section in script.sections() {
                 if let ass_core::parser::ast::Section::Events(events) = section {
@@ -719,7 +745,7 @@ impl FormatConverter {
                 }
             }
         })?;
-        
+
         Ok(output)
     }
 }
@@ -744,13 +770,13 @@ struct WebVttCue {
 #[cfg(feature = "std")]
 pub fn import_from_file(path: &str) -> Result<EditorDocument> {
     use std::fs;
-    
-    let content = fs::read_to_string(path)
-        .map_err(|e| EditorError::IoError(e.to_string()))?;
-    
-    let format = path.rfind('.')
+
+    let content = fs::read_to_string(path).map_err(|e| EditorError::IoError(e.to_string()))?;
+
+    let format = path
+        .rfind('.')
         .and_then(|pos| SubtitleFormat::from_extension(&path[pos + 1..]));
-    
+
     let ass_content = FormatConverter::import(&content, format)?;
     EditorDocument::from_content(&ass_content)
 }
@@ -764,31 +790,45 @@ pub fn export_to_file(
     options: &ConversionOptions,
 ) -> Result<()> {
     use std::fs;
-    
-    let detected_format = format.or_else(|| {
-        path.rfind('.')
-            .and_then(|pos| SubtitleFormat::from_extension(&path[pos + 1..]))
-    }).unwrap_or(SubtitleFormat::ASS);
-    
+
+    let detected_format = format
+        .or_else(|| {
+            path.rfind('.')
+                .and_then(|pos| SubtitleFormat::from_extension(&path[pos + 1..]))
+        })
+        .unwrap_or(SubtitleFormat::ASS);
+
     let content = FormatConverter::export(document, detected_format, options)?;
-    
-    fs::write(path, content)
-        .map_err(|e| EditorError::IoError(e.to_string()))?;
-    
+
+    fs::write(path, content).map_err(|e| EditorError::IoError(e.to_string()))?;
+
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::String};
+
     #[test]
     fn test_format_detection() {
-        assert_eq!(SubtitleFormat::from_extension("ass"), Some(SubtitleFormat::ASS));
-        assert_eq!(SubtitleFormat::from_extension("srt"), Some(SubtitleFormat::SRT));
-        assert_eq!(SubtitleFormat::from_extension("vtt"), Some(SubtitleFormat::WebVTT));
+        assert_eq!(
+            SubtitleFormat::from_extension("ass"),
+            Some(SubtitleFormat::ASS)
+        );
+        assert_eq!(
+            SubtitleFormat::from_extension("srt"),
+            Some(SubtitleFormat::SRT)
+        );
+        assert_eq!(
+            SubtitleFormat::from_extension("vtt"),
+            Some(SubtitleFormat::WebVTT)
+        );
         assert_eq!(SubtitleFormat::from_extension("unknown"), None);
-        
+
         assert_eq!(
             SubtitleFormat::from_content("[Script Info]\nTitle: Test"),
             SubtitleFormat::ASS
@@ -802,7 +842,7 @@ mod tests {
             SubtitleFormat::SRT
         );
     }
-    
+
     #[test]
     fn test_srt_import() {
         let srt_content = r#"1
@@ -812,15 +852,15 @@ Hello <i>world</i>!
 2
 00:00:05,000 --> 00:00:10,000
 This is a <b>test</b>."#;
-        
+
         let result = FormatConverter::import(srt_content, Some(SubtitleFormat::SRT)).unwrap();
-        
+
         assert!(result.contains("[Script Info]"));
         assert!(result.contains("[Events]"));
         assert!(result.contains("Hello {\\i1}world{\\i0}!"));
         assert!(result.contains("This is a {\\b1}test{\\b0}."));
     }
-    
+
     #[test]
     fn test_webvtt_import() {
         let webvtt_content = r#"WEBVTT
@@ -830,14 +870,14 @@ Hello <i>world</i>!
 
 00:00:05.000 --> 00:00:10.000
 This is a test."#;
-        
+
         let result = FormatConverter::import(webvtt_content, Some(SubtitleFormat::WebVTT)).unwrap();
-        
+
         assert!(result.contains("[Script Info]"));
         assert!(result.contains("[Events]"));
         assert!(result.contains("Hello {\\i1}world{\\i0}!"));
     }
-    
+
     #[test]
     fn test_export_srt() {
         let doc = EditorDocument::from_content(
@@ -853,15 +893,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Hello {\i1}world{\i0}!
 Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,Test line\NSecond line"#
         ).unwrap();
-        
+
         let options = ConversionOptions::default();
         let result = FormatConverter::export(&doc, SubtitleFormat::SRT, &options).unwrap();
-        
+
         assert!(result.contains("1\n00:00:00,000 --> 00:00:05,000"));
         assert!(result.contains("Hello <i>world</i>!"));
         assert!(result.contains("Test line\nSecond line"));
     }
-    
+
     #[test]
     fn test_export_webvtt() {
         let doc = EditorDocument::from_content(
@@ -870,30 +910,32 @@ Title: Test
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Hello world!"#
-        ).unwrap();
-        
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Hello world!"#,
+        )
+        .unwrap();
+
         let options = ConversionOptions::default();
         let result = FormatConverter::export(&doc, SubtitleFormat::WebVTT, &options).unwrap();
-        
+
         assert!(result.starts_with("WEBVTT"));
         assert!(result.contains("00:00:00.000 --> 00:00:05.000"));
         assert!(result.contains("Hello world!"));
     }
-    
+
     #[test]
     fn test_strip_formatting() {
         let doc = EditorDocument::from_content(
             r#"[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{\i1}Hello{\i0} {\b1}world{\b0}!"#
-        ).unwrap();
-        
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{\i1}Hello{\i0} {\b1}world{\b0}!"#,
+        )
+        .unwrap();
+
         let options = ConversionOptions {
             strip_formatting: true,
             ..Default::default()
         };
-        
+
         let result = FormatConverter::export(&doc, SubtitleFormat::SRT, &options).unwrap();
         assert!(result.contains("Hello world!"));
         assert!(!result.contains("<i>"));

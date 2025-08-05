@@ -266,7 +266,7 @@ impl<'a> DialogueInfo<'a> {
 mod tests {
     use super::*;
     use crate::parser::ast::{Event, EventType, Span};
-
+    #[cfg(not(feature = "std"))]
     #[test]
     fn dialogue_info_analyze_valid() {
         let event = Event {

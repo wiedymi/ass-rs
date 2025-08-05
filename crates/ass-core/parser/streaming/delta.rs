@@ -226,7 +226,8 @@ impl<'a> FromIterator<ParseDelta<'a>> for DeltaBatch<'a> {
 mod tests {
     use super::*;
     use crate::parser::ast::{ScriptInfo, Span};
-    use alloc::vec;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::ToString, vec};
 
     #[test]
     fn delta_creation() {

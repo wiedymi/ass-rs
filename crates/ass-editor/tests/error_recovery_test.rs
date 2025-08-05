@@ -215,7 +215,10 @@ fn test_extension_manager_error_cases() {
     let long_key = "k".repeat(10000);
     let long_value = "v".repeat(10000);
     manager.set_config(long_key.clone(), long_value.clone());
-    assert_eq!(manager.get_config(&long_key).as_deref(), Some(long_value.as_str()));
+    assert_eq!(
+        manager.get_config(&long_key).as_deref(),
+        Some(long_value.as_str())
+    );
 }
 
 // Extension loading error test removed - Extension trait not publicly exported
@@ -223,6 +226,7 @@ fn test_extension_manager_error_cases() {
 // ===== Session Manager Errors =====
 
 #[test]
+#[cfg(feature = "std")] // EditorSessionManager requires std feature
 fn test_session_manager_error_cases() {
     let mut manager = EditorSessionManager::new();
 
@@ -277,7 +281,7 @@ fn test_concurrent_error_handling() {
         let handle = thread::spawn(move || {
             // Each thread creates its own manager
             let mut local_manager = ass_editor::EditorSessionManager::new();
-            
+
             // Try to create a session
             match local_manager.create_session("shared".to_string()) {
                 Ok(_) => success_count_clone.fetch_add(1, Ordering::Relaxed),

@@ -6,11 +6,15 @@
 
 #![allow(clippy::while_let_on_iterator)]
 
-use crate::core::{EditorDocument, EditorError, Position, Range, Result};
 use super::{CommandResult, EditorCommand};
+use crate::core::{EditorDocument, EditorError, Position, Range, Result};
 
 #[cfg(not(feature = "std"))]
-use alloc::{format, string::{String, ToString}, vec::Vec};
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 /// Insert ASS override tag at specified position
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,7 +47,7 @@ impl InsertTagCommand {
     /// Validate and format tag for insertion
     fn format_tag(&self) -> Result<String> {
         let tag = self.tag.trim();
-        
+
         // Validate tag format - should start with backslash
         if !tag.starts_with('\\') {
             return Err(EditorError::command_failed(format!(
@@ -125,7 +129,7 @@ impl EditorCommand for RemoveTagCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         let original_text = document.text_range(self.range)?;
         let cleaned_text = self.remove_tags_from_text(&original_text)?;
-        
+
         document.replace_raw(self.range, &cleaned_text)?;
 
         let end_pos = Position::new(self.range.start.offset + cleaned_text.len());
@@ -142,8 +146,7 @@ impl EditorCommand for RemoveTagCommand {
     }
 
     fn memory_usage(&self) -> usize {
-        core::mem::size_of::<Self>() 
-            + self.tag_pattern.as_ref().map_or(0, |p| p.len())
+        core::mem::size_of::<Self>() + self.tag_pattern.as_ref().map_or(0, |p| p.len())
     }
 }
 
@@ -152,13 +155,13 @@ impl RemoveTagCommand {
     fn remove_tags_from_text(&self, text: &str) -> Result<String> {
         let mut result = String::new();
         let mut chars = text.chars().peekable();
-        
+
         while let Some(ch) = chars.next() {
             if ch == '{' {
                 // Found override block - process it
                 let mut override_content = String::new();
                 let mut brace_count = 1;
-                
+
                 while let Some(inner_ch) = chars.next() {
                     if inner_ch == '{' {
                         brace_count += 1;
@@ -170,10 +173,10 @@ impl RemoveTagCommand {
                     }
                     override_content.push(inner_ch);
                 }
-                
+
                 // Process override content
                 let cleaned_override = self.process_override_content(&override_content);
-                
+
                 // Add back if not empty or if we're keeping empty overrides
                 if !cleaned_override.is_empty() || !self.clean_empty_overrides {
                     result.push('{');
@@ -184,24 +187,24 @@ impl RemoveTagCommand {
                 result.push(ch);
             }
         }
-        
+
         Ok(result)
     }
-    
+
     /// Process content inside override brackets using ass-core's parser
     fn process_override_content(&self, content: &str) -> String {
         use ass_core::analysis::events::tags::parse_override_block;
-        
+
         if let Some(pattern) = &self.tag_pattern {
             // Remove only specific pattern using ass-core's parser
             let mut tags = Vec::new();
             let mut diagnostics = Vec::new();
             parse_override_block(content, 0, &mut tags, &mut diagnostics);
-            
+
             // Rebuild content without matching tags
             let mut result = String::new();
             let mut processed_positions = Vec::new();
-            
+
             // Process tags from ass-core parser
             for tag in &tags {
                 let pattern_without_backslash = &pattern[1..]; // Remove leading backslash from pattern
@@ -210,14 +213,14 @@ impl RemoveTagCommand {
                     processed_positions.push((tag.position(), tag.name(), tag.args()));
                 }
             }
-            
+
             // Rebuild the override content, keeping only non-matching tags
             for (_, name, args) in processed_positions {
                 result.push('\\');
                 result.push_str(name);
                 result.push_str(args);
             }
-            
+
             result
         } else {
             // Remove all tags - return empty string
@@ -262,7 +265,7 @@ impl EditorCommand for ReplaceTagCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         let original_text = document.text_range(self.range)?;
         let replaced_text = self.replace_tags_in_text(&original_text)?;
-        
+
         document.replace_raw(self.range, &replaced_text)?;
 
         let end_pos = Position::new(self.range.start.offset + replaced_text.len());
@@ -276,9 +279,7 @@ impl EditorCommand for ReplaceTagCommand {
     }
 
     fn memory_usage(&self) -> usize {
-        core::mem::size_of::<Self>() 
-            + self.find_pattern.len() 
-            + self.replace_with.len()
+        core::mem::size_of::<Self>() + self.find_pattern.len() + self.replace_with.len()
     }
 }
 
@@ -288,14 +289,14 @@ impl ReplaceTagCommand {
         let mut result = String::new();
         let mut chars = text.chars().peekable();
         let mut replacements_made = 0;
-        
+
         while let Some(ch) = chars.next() {
             if ch == '{' {
                 // Found override block
                 result.push(ch);
                 let mut override_content = String::new();
                 let mut brace_count = 1;
-                
+
                 while let Some(inner_ch) = chars.next() {
                     if inner_ch == '{' {
                         brace_count += 1;
@@ -303,7 +304,10 @@ impl ReplaceTagCommand {
                         brace_count -= 1;
                         if brace_count == 0 {
                             // Process override content before closing
-                            let processed = self.process_override_for_replacement(&override_content, &mut replacements_made);
+                            let processed = self.process_override_for_replacement(
+                                &override_content,
+                                &mut replacements_made,
+                            );
                             result.push_str(&processed);
                             result.push(inner_ch);
                             break;
@@ -315,31 +319,37 @@ impl ReplaceTagCommand {
                 result.push(ch);
             }
         }
-        
+
         Ok(result)
     }
-    
+
     /// Process override content for tag replacement using ass-core's parser
-    fn process_override_for_replacement(&self, content: &str, replacements_made: &mut usize) -> String {
+    fn process_override_for_replacement(
+        &self,
+        content: &str,
+        replacements_made: &mut usize,
+    ) -> String {
         use ass_core::analysis::events::tags::parse_override_block;
-        
+
         if !self.replace_all && *replacements_made > 0 {
             return content.to_string();
         }
-        
+
         let mut tags = Vec::new();
         let mut diagnostics = Vec::new();
         parse_override_block(content, 0, &mut tags, &mut diagnostics);
-        
+
         let mut result = String::new();
-        
+
         // Process tags from ass-core parser
         for tag in &tags {
             // Reconstruct the full tag to match against the find pattern
             let tag_full = format!("\\{}{}", tag.name(), tag.args());
-            
+
             // Check if this tag matches our find pattern
-            if tag_full.starts_with(&self.find_pattern) && (self.replace_all || *replacements_made == 0) {
+            if tag_full.starts_with(&self.find_pattern)
+                && (self.replace_all || *replacements_made == 0)
+            {
                 // Replace the tag - preserve any suffix
                 let suffix = &tag_full[self.find_pattern.len()..];
                 result.push_str(&self.replace_with);
@@ -350,7 +360,7 @@ impl ReplaceTagCommand {
                 result.push_str(&tag_full);
             }
         }
-        
+
         result
     }
 }
@@ -401,7 +411,7 @@ impl WrapTagCommand {
 
         // Auto-generate closing tag based on opening tag
         let tag = self.opening_tag.trim_start_matches('\\');
-        
+
         if tag.starts_with('b') {
             "\\b0".to_string()
         } else if tag.starts_with('i') {
@@ -421,16 +431,18 @@ impl WrapTagCommand {
 impl EditorCommand for WrapTagCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         let closing_tag = self.get_closing_tag();
-        
+
         // Insert closing tag first (so positions don't shift)
         let closing_formatted = format!("{{{closing_tag}}}");
         document.insert_raw(self.range.end, &closing_formatted)?;
-        
+
         // Insert opening tag
         let opening_formatted = format!("{{{}}}", self.opening_tag);
         document.insert_raw(self.range.start, &opening_formatted)?;
-        
-        let total_length = opening_formatted.len() + (self.range.end.offset - self.range.start.offset) + closing_formatted.len();
+
+        let total_length = opening_formatted.len()
+            + (self.range.end.offset - self.range.start.offset)
+            + closing_formatted.len();
         let end_pos = Position::new(self.range.start.offset + total_length);
         let range = Range::new(self.range.start, end_pos);
 
@@ -442,7 +454,7 @@ impl EditorCommand for WrapTagCommand {
     }
 
     fn memory_usage(&self) -> usize {
-        core::mem::size_of::<Self>() 
+        core::mem::size_of::<Self>()
             + self.opening_tag.len()
             + self.closing_tag.as_ref().map_or(0, |t| t.len())
     }
@@ -489,14 +501,12 @@ impl EditorCommand for ParseTagCommand {
     fn execute(&self, document: &mut EditorDocument) -> Result<CommandResult> {
         let text = document.text_range(self.range)?;
         let parsed_tags = self.parse_tags_from_text(&text)?;
-        
+
         // Store results in a way that can be retrieved
         // For now, we'll just return success - in a real implementation,
         // you might want to store results in the command result or document metadata
-        
-        Ok(CommandResult::success().with_message(format!(
-            "Parsed {} ASS tags", parsed_tags.len()
-        )))
+
+        Ok(CommandResult::success().with_message(format!("Parsed {} ASS tags", parsed_tags.len())))
     }
 
     fn description(&self) -> &str {
@@ -509,14 +519,14 @@ impl ParseTagCommand {
     pub fn parse_tags_from_text(&self, text: &str) -> Result<Vec<ParsedTag>> {
         let mut tags = Vec::new();
         let mut chars = text.chars().enumerate().peekable();
-        
+
         while let Some((pos, ch)) = chars.next() {
             if ch == '{' {
                 // Found override block
                 let mut override_content = String::new();
                 let mut brace_count = 1;
                 let start_pos = pos;
-                
+
                 while let Some((_, inner_ch)) = chars.next() {
                     if inner_ch == '{' {
                         brace_count += 1;
@@ -528,35 +538,40 @@ impl ParseTagCommand {
                     }
                     override_content.push(inner_ch);
                 }
-                
+
                 // Parse tags from override content
-                let mut override_tags = self.extract_tags_from_override(&override_content, start_pos)?;
+                let mut override_tags =
+                    self.extract_tags_from_override(&override_content, start_pos)?;
                 tags.append(&mut override_tags);
             }
         }
-        
+
         Ok(tags)
     }
-    
+
     /// Extract individual tags from override block content using ass-core's parser
-    fn extract_tags_from_override(&self, content: &str, base_position: usize) -> Result<Vec<ParsedTag>> {
+    fn extract_tags_from_override(
+        &self,
+        content: &str,
+        base_position: usize,
+    ) -> Result<Vec<ParsedTag>> {
         use ass_core::analysis::events::tags::parse_override_block;
-        
+
         let mut core_tags = Vec::new();
         let mut diagnostics = Vec::new();
         parse_override_block(content, 0, &mut core_tags, &mut diagnostics);
-        
+
         let mut tags = Vec::new();
-        
+
         // Convert ass-core tags to ParsedTag format
         for core_tag in &core_tags {
             let args = core_tag.args();
-            
+
             // Parse parameters and determine tag format based on argument structure
             let mut parameters = Vec::new();
             let tag = if args.starts_with('(') && args.ends_with(')') {
                 // Arguments in parentheses - extract to parameters field, tag is just name
-                let param_content = &args[1..args.len()-1];
+                let param_content = &args[1..args.len() - 1];
                 if !param_content.is_empty() {
                     parameters = param_content
                         .split(',')
@@ -568,20 +583,22 @@ impl ParseTagCommand {
                 // Arguments not in parentheses - include in tag field
                 format!("\\{}{}", core_tag.name(), args)
             };
-            
+
             let position = if self.include_positions {
-                Some(Position::new(self.range.start.offset + base_position + core_tag.position()))
+                Some(Position::new(
+                    self.range.start.offset + base_position + core_tag.position(),
+                ))
             } else {
                 None
             };
-            
+
             tags.push(ParsedTag {
                 tag,
                 position,
                 parameters,
             });
         }
-        
+
         Ok(tags)
     }
 }
@@ -590,12 +607,16 @@ impl ParseTagCommand {
 mod tests {
     use super::*;
     use crate::core::EditorDocument;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn insert_tag_basic() {
         let mut doc = EditorDocument::from_content("Hello World").unwrap();
         let command = InsertTagCommand::new(Position::new(5), "\\b1".to_string());
-        
+
         let result = command.execute(&mut doc).unwrap();
         assert!(result.success);
         assert_eq!(doc.text(), "Hello{\\b1} World");
@@ -604,9 +625,8 @@ mod tests {
     #[test]
     fn insert_tag_no_auto_wrap() {
         let mut doc = EditorDocument::from_content("Hello World").unwrap();
-        let command = InsertTagCommand::new(Position::new(5), "\\b1".to_string())
-            .no_auto_wrap();
-        
+        let command = InsertTagCommand::new(Position::new(5), "\\b1".to_string()).no_auto_wrap();
+
         let result = command.execute(&mut doc).unwrap();
         assert!(result.success);
         assert_eq!(doc.text(), "Hello\\b1 World");
@@ -617,7 +637,7 @@ mod tests {
         let mut doc = EditorDocument::from_content("Hello {\\b1}World{\\i1} Test").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
         let command = RemoveTagCommand::new(range);
-        
+
         let result = command.execute(&mut doc).unwrap();
         assert!(result.success);
         assert_eq!(doc.text(), "Hello World Test");
@@ -627,9 +647,8 @@ mod tests {
     fn remove_tag_specific_pattern() {
         let mut doc = EditorDocument::from_content("Hello {\\b1\\i1}World").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        let command = RemoveTagCommand::new(range)
-            .pattern("\\b".to_string());
-        
+        let command = RemoveTagCommand::new(range).pattern("\\b".to_string());
+
         let result = command.execute(&mut doc).unwrap();
         assert!(result.success);
         assert_eq!(doc.text(), "Hello {\\i1}World");
@@ -639,9 +658,8 @@ mod tests {
     fn replace_tag() {
         let mut doc = EditorDocument::from_content("Hello {\\b1}World{\\b1} Test").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
-        let command = ReplaceTagCommand::new(range, "\\b1".to_string(), "\\b0".to_string())
-            .all();
-        
+        let command = ReplaceTagCommand::new(range, "\\b1".to_string(), "\\b0".to_string()).all();
+
         let result = command.execute(&mut doc).unwrap();
         assert!(result.success);
         assert_eq!(doc.text(), "Hello {\\b0}World{\\b0} Test");
@@ -652,7 +670,7 @@ mod tests {
         let mut doc = EditorDocument::from_content("Hello World").unwrap();
         let range = Range::new(Position::new(6), Position::new(11));
         let command = WrapTagCommand::new(range, "\\b1".to_string());
-        
+
         let result = command.execute(&mut doc).unwrap();
         assert!(result.success);
         assert_eq!(doc.text(), "Hello {\\b1}World{\\b0}");
@@ -660,17 +678,18 @@ mod tests {
 
     #[test]
     fn parse_tags() {
-        let mut doc = EditorDocument::from_content("Hello {\\b1\\c&H00FF00&\\pos(100,200)}World").unwrap();
+        let mut doc =
+            EditorDocument::from_content("Hello {\\b1\\c&H00FF00&\\pos(100,200)}World").unwrap();
         let range = Range::new(Position::new(0), Position::new(doc.text().len()));
         let command = ParseTagCommand::new(range).with_positions();
-        
+
         let result = command.execute(&mut doc).unwrap();
         assert!(result.success);
-        
+
         // Test parsing functionality directly
         let text = doc.text();
         let parsed = command.parse_tags_from_text(&text).unwrap();
-        
+
         assert_eq!(parsed.len(), 3);
         assert_eq!(parsed[0].tag, "\\b1");
         assert_eq!(parsed[1].tag, "\\c&H00FF00&");
@@ -681,7 +700,7 @@ mod tests {
     #[test]
     fn tag_validation() {
         let mut doc = EditorDocument::new();
-        
+
         // Test invalid tag (no backslash)
         let command = InsertTagCommand::new(Position::new(0), "b1".to_string());
         let result = command.execute(&mut doc);

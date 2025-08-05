@@ -6,6 +6,8 @@ use core::ops::Range;
 use crate::parser::errors::ParseError;
 use crate::parser::SectionType;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 /// Represents a text change in the source
 #[derive(Debug, Clone)]
 pub struct TextChange {
@@ -185,6 +187,10 @@ pub fn find_section_end(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::String;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn test_adjust_range_before_change() {

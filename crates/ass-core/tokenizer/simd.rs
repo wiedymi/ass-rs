@@ -16,7 +16,11 @@
 //! `wide` crate. No unsafe code is used in this module.
 
 use crate::utils::CoreError;
+use wide::u8x16;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(not(feature = "std"))]
 #[cfg(feature = "simd")]
 use wide::u8x16;
 
@@ -284,6 +288,8 @@ fn validate_utf8_scalar(bytes: &[u8]) -> Result<(), CoreError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, vec};
 
     #[test]
     fn scan_delimiters_finds_colon() {

@@ -3,12 +3,16 @@
 //! Contains the Event struct and `EventType` enum representing events from the
 //! [Events] section with zero-copy design and time parsing utilities.
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec::Vec};
+
+use super::Span;
 #[cfg(debug_assertions)]
 use core::ops::Range;
 
-use super::Span;
-
-/// Event from [Events] section (dialogue, comments, etc.)
+/// Event from `[Events\]` section (dialogue, comments, etc.)
 ///
 /// Represents a single event in the subtitle timeline. Events can be dialogue
 /// lines, comments, or other commands with associated timing and styling.
@@ -222,7 +226,6 @@ impl Event<'_> {
     /// ```
     #[must_use]
     pub fn to_ass_string(&self) -> alloc::string::String {
-        use alloc::format;
         let event_type_str = self.event_type.as_str();
 
         // Use standard V4+ format by default
@@ -270,8 +273,6 @@ impl Event<'_> {
     /// ```
     #[must_use]
     pub fn to_ass_string_with_format(&self, format: &[&str]) -> alloc::string::String {
-        use alloc::{format, vec::Vec};
-
         let event_type_str = self.event_type.as_str();
         let mut field_values = Vec::with_capacity(format.len());
 
@@ -355,6 +356,8 @@ impl Default for Event<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn event_type_parsing() {

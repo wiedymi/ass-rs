@@ -468,6 +468,8 @@ impl<'a> StyleAnalyzer<'a> {
 mod tests {
     use super::*;
     use crate::analysis::styles::validation::ConflictType;
+    #[cfg(not(feature = "std"))]
+    use alloc::format;
 
     #[test]
     fn analyzer_creation() {

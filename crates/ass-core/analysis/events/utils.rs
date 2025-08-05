@@ -240,7 +240,34 @@ pub fn find_events_in_range(events: &[DialogueInfo<'_>], start_cs: u32, end_cs: 
 mod tests {
     use super::*;
     use crate::parser::{ast::Span, Event};
+    #[cfg(not(feature = "std"))]
+    use alloc::boxed::Box;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
+    #[cfg(not(feature = "std"))]
+    fn create_test_dialogue_info(start: &'static str, end: &'static str) -> DialogueInfo<'static> {
+        // Create a static event for the lifetime requirement
+        // Using Box::leak is acceptable in tests for simplicity
+        let event = Box::leak(Box::new(Event {
+            event_type: crate::parser::ast::EventType::Dialogue,
+            start,
+            end,
+            text: "Test",
+            layer: "0",
+            style: "Default",
+            name: "",
+            margin_l: "0",
+            margin_r: "0",
+            margin_v: "0",
+            margin_t: None,
+            margin_b: None,
+            effect: "",
+            span: Span::new(0, 0, 0, 0),
+        }));
+        DialogueInfo::analyze(event).unwrap()
+    }
 
+    #[cfg(feature = "std")]
     fn create_test_dialogue_info(start: &'static str, end: &'static str) -> DialogueInfo<'static> {
         // Create a static event for the lifetime requirement
         // Using Box::leak is acceptable in tests for simplicity

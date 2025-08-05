@@ -7,6 +7,8 @@
 use alloc::{format, string::String};
 use core::fmt;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 /// Parse issue severity levels for partial recovery
 ///
 /// Determines how serious an issue is and whether it should block processing.
@@ -227,6 +229,8 @@ impl ParseIssue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn issue_severity_display() {

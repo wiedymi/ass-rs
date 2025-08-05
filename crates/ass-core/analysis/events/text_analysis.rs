@@ -347,6 +347,8 @@ impl<'a> TextAnalysis<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn text_analysis_simple_text() {
@@ -565,13 +567,13 @@ mod tests {
 
     #[test]
     fn text_analysis_escape_sequences() {
-        let text = "Test\\\\backslash and \\{brace and \\}close";
+        let text = "Test`[Events]`backslash and \\{brace and \\}close";
         let analysis = TextAnalysis::analyze(text).unwrap();
 
         // These should be treated as literal characters, not escape sequences
         assert_eq!(
             analysis.plain_text(),
-            "Test\\\\backslash and \\{brace and \\}close"
+            "Test`[Events]`backslash and \\{brace and \\}close"
         );
     }
 

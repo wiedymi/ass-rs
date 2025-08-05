@@ -24,7 +24,12 @@ pub use style_commands::*;
 pub use tag_commands::*;
 
 #[cfg(not(feature = "std"))]
-use alloc::{boxed::Box, format, string::{String, ToString}, vec::Vec};
+use alloc::{
+    boxed::Box,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 /// Result of executing a command
 ///
@@ -194,7 +199,7 @@ impl InsertTextCommand {
     ///
     /// let mut doc = EditorDocument::new();
     /// let command = InsertTextCommand::new(Position::new(0), "Hello World".to_string());
-    /// 
+    ///
     /// let result = command.execute(&mut doc).unwrap();
     /// assert!(result.success);
     /// assert_eq!(doc.text(), "Hello World");
@@ -345,11 +350,11 @@ impl BatchCommand {
     /// use ass_editor::{BatchCommand, InsertTextCommand, DeleteTextCommand, Position, Range, EditorDocument, EditorCommand};
     ///
     /// let mut doc = EditorDocument::from_content("Hello World").unwrap();
-    /// 
+    ///
     /// let batch = BatchCommand::new("Multiple operations".to_string())
     ///     .add_command(Box::new(InsertTextCommand::new(Position::new(5), " beautiful".to_string())))
     ///     .add_command(Box::new(DeleteTextCommand::new(Range::new(Position::new(15), Position::new(21)))));
-    /// 
+    ///
     /// let result = batch.execute(&mut doc).unwrap();
     /// assert!(result.success);
     /// assert_eq!(doc.text(), "Hello beautiful");
@@ -545,7 +550,9 @@ impl DocumentCommandExt for EditorDocument {
 mod tests {
     use super::*;
     use crate::core::EditorDocument;
-
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
     #[test]
     fn insert_command_execution() {
         let mut doc = EditorDocument::new();

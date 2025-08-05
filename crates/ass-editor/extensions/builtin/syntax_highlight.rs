@@ -1,7 +1,7 @@
 //! Built-in syntax highlighting extension for ASS/SSA files
 //!
 //! Provides syntax highlighting for ASS subtitle format, including:
-//! - Section headers (\\[Script Info\\], \\[Styles\\], \\[Events\\])
+//! - Section headers (`[Script Info]`, `[Styles]`, `[Events]`)
 //! - Field names and values
 //! - Override tags and their parameters
 //! - Comments and special formatting
@@ -724,6 +724,8 @@ impl EditorExtension for SyntaxHighlightExtension {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn test_token_types() {

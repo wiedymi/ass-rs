@@ -132,6 +132,8 @@ pub fn create_alignment_handlers() -> alloc::vec::Vec<alloc::boxed::Box<dyn TagH
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn alignment_handler_valid() {
@@ -168,7 +170,7 @@ mod tests {
     #[test]
     fn numpad_alignment_handler_valid() {
         let handler = NumpadAlignmentTagHandler;
-        for i in 1..=9 {
+        for i in 1..=9i32 {
             assert_eq!(handler.process(&i.to_string()), TagResult::Processed);
         }
         // With whitespace
@@ -254,7 +256,7 @@ mod tests {
     fn numpad_alignment_validation() {
         let handler = NumpadAlignmentTagHandler;
         // Valid
-        for i in 1..=9 {
+        for i in 1..=9i32 {
             assert!(handler.validate(&i.to_string()));
         }
         // Invalid

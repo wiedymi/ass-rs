@@ -330,7 +330,7 @@ Style: Quote,Georgia,35,&H00C0C0C0,&H000000FF,&H00606060,&H80000000,0,1,0,0,98,9
 Style: Code,Courier,28,&H0000FF00,&H000000FF,&H00008000,&H80000000,0,0,0,0,90,90,0,0,1,1,1,3,30,30,30,1
 Style: Warning,Arial,40,&H000080FF,&H000000FF,&H00000080,&H80000000,1,0,0,0,115,115,1,0,1,2,2,2,10,10,10,1
 
-[Events]
+[Events\]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Default style text
 Dialogue: 0,0:00:05.00,0:00:10.00,Title,,0,0,0,,Title style text

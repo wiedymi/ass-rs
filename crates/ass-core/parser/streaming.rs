@@ -36,6 +36,8 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 mod delta;
 mod processor;
 mod state;
@@ -46,7 +48,11 @@ pub use processor::LineProcessor;
 pub use state::{ParserState, SectionKind, StreamingContext};
 
 use crate::{utils::CoreError, Result, ScriptVersion};
-use alloc::{format, string::{String, ToString}, vec::Vec};
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::ops::Range;
 
 /// Result of streaming parser containing owned sections
@@ -257,6 +263,8 @@ pub fn build_modified_source(original: &str, range: Range<usize>, replacement: &
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::String, string::ToString, vec};
 
     #[test]
     fn streaming_parser_creation() {
@@ -466,10 +474,10 @@ mod tests {
 
     #[test]
     fn streaming_large_chunk_comprehensive() {
-        #[cfg(feature = "std")]
-        use std::fmt::Write;
         #[cfg(not(feature = "std"))]
         use alloc::fmt::Write;
+        #[cfg(feature = "std")]
+        use std::fmt::Write;
 
         let mut parser = StreamingParser::new();
         // Create a large chunk

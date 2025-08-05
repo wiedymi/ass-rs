@@ -30,7 +30,11 @@
 //! registry.register_tag_handler(Box::new(CustomColorTag));
 //! ```
 
-use alloc::{boxed::Box, string::{String, ToString}, vec::Vec};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::fmt;
 
 #[cfg(feature = "std")]
@@ -38,7 +42,6 @@ use std::collections::HashMap;
 
 #[cfg(not(feature = "std"))]
 use hashbrown::HashMap;
-
 pub mod sections;
 pub mod tags;
 
@@ -254,19 +257,13 @@ impl ExtensionRegistry {
     /// Get list of registered tag handler names
     #[must_use]
     pub fn tag_handler_names(&self) -> Vec<&str> {
-        self.tag_handlers
-            .keys()
-            .map(String::as_str)
-            .collect()
+        self.tag_handlers.keys().map(String::as_str).collect()
     }
 
     /// Get list of registered section processor names
     #[must_use]
     pub fn section_processor_names(&self) -> Vec<&str> {
-        self.section_processors
-            .keys()
-            .map(String::as_str)
-            .collect()
+        self.section_processors.keys().map(String::as_str).collect()
     }
 
     /// Check if a tag handler is registered

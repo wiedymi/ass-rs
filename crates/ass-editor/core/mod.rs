@@ -23,8 +23,8 @@ pub use builders::{EventBuilder, StyleBuilder};
 pub use document::{DocumentPosition, EditorDocument};
 pub use errors::{EditorError, Result};
 pub use fluent::{
-    AtPosition, SelectRange, EventInfo, EventFilter, EventSortCriteria, 
-    EventSortOptions, EventAccessor, EventQuery, OwnedEvent
+    AtPosition, EventAccessor, EventFilter, EventInfo, EventQuery, EventSortCriteria,
+    EventSortOptions, OwnedEvent, SelectRange,
 };
 pub use history::{HistoryEntry, HistoryStats, UndoManager, UndoStack, UndoStackConfig};
 #[cfg(feature = "stream")]
@@ -32,6 +32,4 @@ pub use incremental::{DocumentChange, IncrementalParser};
 pub use position::{LineColumn, Position, PositionBuilder, Range, Selection};
 
 #[cfg(feature = "concurrency")]
-pub use thread_safety::{
-    SyncDocument, DocumentPool, ScopedDocumentLock,
-};
+pub use thread_safety::{DocumentPool, ScopedDocumentLock, SyncDocument};

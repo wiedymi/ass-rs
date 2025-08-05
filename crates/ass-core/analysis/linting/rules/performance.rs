@@ -148,6 +148,8 @@ impl PerformanceRule {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::String;
 
     #[test]
     fn rule_metadata_correct() {
@@ -230,7 +232,7 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{long_text}"
     fn many_override_tags_detected() {
         let mut text_with_tags = String::new();
         for i in 0..25 {
-            use std::fmt::Write;
+            use core::fmt::Write;
             write!(text_with_tags, "{{\\i{}}}text", i % 2).unwrap();
         }
 

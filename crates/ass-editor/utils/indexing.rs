@@ -12,13 +12,13 @@ use crate::utils::search::{DocumentSearch, SearchOptions, SearchResult, SearchSt
 use fst::{automaton, IntoStreamer, Set, SetBuilder, Streamer};
 
 #[cfg(feature = "std")]
-use std::{collections::HashMap, borrow::Cow};
+use std::{borrow::Cow, collections::HashMap};
 
 #[cfg(not(feature = "std"))]
-use alloc::{collections::BTreeMap as HashMap, borrow::Cow};
+use alloc::{borrow::Cow, collections::BTreeMap as HashMap, string::String};
 
 #[cfg(not(feature = "std"))]
-use alloc::{boxed::Box, string::{String, ToString}, vec::Vec};
+use alloc::{boxed::Box, string::ToString, vec::Vec};
 
 #[cfg(feature = "std")]
 use std::time::Instant;
@@ -93,9 +93,13 @@ impl FstSearchIndex {
             content_hash: 0,
             build_time: {
                 #[cfg(feature = "std")]
-                { Instant::now() }
+                {
+                    Instant::now()
+                }
                 #[cfg(not(feature = "std"))]
-                { 0 }
+                {
+                    0
+                }
             },
             index_size: 0,
         }
@@ -209,9 +213,13 @@ impl DocumentSearch for FstSearchIndex {
         self.content_hash = calculate_hash(&content);
         self.build_time = {
             #[cfg(feature = "std")]
-            { Instant::now() }
+            {
+                Instant::now()
+            }
             #[cfg(not(feature = "std"))]
-            { 0 }
+            {
+                0
+            }
         };
 
         let words = self.extract_words(&content);
@@ -302,9 +310,13 @@ impl DocumentSearch for FstSearchIndex {
             match_count: self.position_map.len(),
             search_time_us: {
                 #[cfg(feature = "std")]
-                { self.build_time.elapsed().as_micros() as u64 }
+                {
+                    self.build_time.elapsed().as_micros() as u64
+                }
                 #[cfg(not(feature = "std"))]
-                { 0 }
+                {
+                    0
+                }
             },
             hit_limit: false,
             index_size: self.index_size,
@@ -354,9 +366,13 @@ impl LinearSearchIndex {
             content_hash: 0,
             build_time: {
                 #[cfg(feature = "std")]
-                { Instant::now() }
+                {
+                    Instant::now()
+                }
                 #[cfg(not(feature = "std"))]
-                { 0 }
+                {
+                    0
+                }
             },
         }
     }
@@ -368,9 +384,13 @@ impl DocumentSearch for LinearSearchIndex {
         self.content_hash = calculate_hash(&content);
         self.build_time = {
             #[cfg(feature = "std")]
-            { Instant::now() }
+            {
+                Instant::now()
+            }
             #[cfg(not(feature = "std"))]
-            { 0 }
+            {
+                0
+            }
         };
 
         // Simple word extraction for linear search
@@ -447,9 +467,13 @@ impl DocumentSearch for LinearSearchIndex {
             match_count: self.word_positions.len(),
             search_time_us: {
                 #[cfg(feature = "std")]
-                { self.build_time.elapsed().as_micros() as u64 }
+                {
+                    self.build_time.elapsed().as_micros() as u64
+                }
                 #[cfg(not(feature = "std"))]
-                { 0 }
+                {
+                    0
+                }
             },
             hit_limit: false,
             index_size: self.word_positions.len() * 64, // Rough estimate
@@ -488,6 +512,7 @@ fn calculate_hash(content: &str) -> u64 {
 mod tests {
     use super::*;
     use crate::utils::search::SearchScope;
+    #[cfg(not(feature = "std"))]
     use crate::EditorDocument;
 
     #[test]

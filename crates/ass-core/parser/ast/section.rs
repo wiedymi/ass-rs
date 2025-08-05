@@ -5,10 +5,13 @@
 //! zero-copy design and span validation for debugging.
 
 use alloc::vec::Vec;
-#[cfg(debug_assertions)]
-use core::ops::Range;
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 
 use super::{Event, Font, Graphic, ScriptInfo, Span, Style};
+#[cfg(debug_assertions)]
+use core::ops::Range;
 
 /// Section type discriminant for efficient lookup and filtering
 ///
@@ -30,11 +33,11 @@ pub enum SectionType {
     ScriptInfo,
     /// [V4+ Styles] section identifier
     Styles,
-    /// [Events] section identifier
+    /// `[Events\]` section identifier
     Events,
-    /// [Fonts] section identifier
+    /// `[Fonts\]` section identifier
     Fonts,
-    /// [Graphics] section identifier
+    /// `[Graphics\]` section identifier
     Graphics,
 }
 
@@ -68,19 +71,19 @@ pub enum Section<'a> {
     /// visual properties for subtitle rendering.
     Styles(Vec<Style<'a>>),
 
-    /// [Events] section with dialogue and commands
+    /// `[Events\]` section with dialogue and commands
     ///
     /// Contains dialogue lines, comments, and other timed events
     /// that make up the actual subtitle content.
     Events(Vec<Event<'a>>),
 
-    /// [Fonts] section with embedded font data
+    /// `[Fonts\]` section with embedded font data
     ///
     /// Contains UU-encoded font files embedded in the script.
     /// Allows scripts to include custom fonts for portable rendering.
     Fonts(Vec<Font<'a>>),
 
-    /// [Graphics] section with embedded images
+    /// `[Graphics\]` section with embedded images
     ///
     /// Contains UU-encoded image files embedded in the script.
     /// Used for logos, textures, and other graphical elements.
@@ -238,6 +241,8 @@ impl SectionType {
 mod tests {
     use super::*;
     use crate::parser::ast::{Event, EventType, Span, Style};
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn section_type_discrimination() {

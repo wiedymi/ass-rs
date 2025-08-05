@@ -540,11 +540,23 @@ impl FormatExporter for WebVttFormat {
     }
 }
 
-impl Format for WebVttFormat {}
+impl Format for WebVttFormat {
+    fn as_importer(&self) -> &dyn FormatImporter {
+        self
+    }
+
+    fn as_exporter(&self) -> &dyn FormatExporter {
+        self
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::String, vec};
 
     const SAMPLE_WEBVTT: &str = r#"WEBVTT
 

@@ -4,9 +4,17 @@
 //! while maintaining zero-copy semantics through lifetime-generic spans.
 
 use crate::{Result, ScriptVersion};
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 #[cfg(feature = "stream")]
 use alloc::format;
-use alloc::{boxed::Box, string::String, string::ToString, vec, vec::Vec};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 #[cfg(feature = "stream")]
 use core::ops::Range;
 
@@ -195,7 +203,7 @@ pub struct Script<'a> {
     /// Format fields for [V4+ Styles] section
     styles_format: Option<Vec<&'a str>>,
 
-    /// Format fields for [Events] section
+    /// Format fields for `[Events\]` section
     events_format: Option<Vec<&'a str>>,
 
     /// Change tracker for incremental updates
@@ -354,7 +362,7 @@ impl<'a> Script<'a> {
         self.styles_format.as_deref()
     }
 
-    /// Get format fields for [Events] section
+    /// Get format fields for `[Events\]` section
     #[must_use]
     pub fn events_format(&self) -> Option<&[&'a str]> {
         self.events_format.as_deref()
@@ -415,7 +423,7 @@ impl<'a> Script<'a> {
 
     /// Parse an event line with context from the script
     ///
-    /// Uses the script's stored format for [Events] section if available,
+    /// Uses the script's stored format for `[Events\]` section if available,
     /// otherwise falls back to default format.
     ///
     /// # Arguments
@@ -759,7 +767,7 @@ impl<'a> Script<'a> {
         }
     }
 
-    /// Add an event to the [Events] section
+    /// Add an event to the `[Events\]` section
     ///
     /// Creates the section if it doesn't exist.
     ///
@@ -1201,7 +1209,6 @@ impl<'a> Script<'a> {
         new_source: &'a str,
         change: &crate::parser::incremental::TextChange,
     ) -> Result<Self> {
-        use crate::parser::main::Parser;
         use crate::parser::sections::SectionFormats;
 
         // Step 1: Identify affected sections
@@ -1410,7 +1417,6 @@ impl<'a> Script<'a> {
     /// ```
     #[must_use]
     pub fn to_ass_string(&self) -> alloc::string::String {
-        use alloc::string::String;
         let mut result = String::new();
 
         for (idx, section) in self.sections.iter().enumerate() {
@@ -1793,6 +1799,8 @@ impl Default for ScriptBuilder<'_> {
 mod tests {
     use super::*;
     use crate::parser::ast::SectionType;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::String, vec};
 
     #[test]
     fn parse_minimal_script() {
@@ -2001,10 +2009,10 @@ mod tests {
 
     #[test]
     fn parse_very_long_content() {
-        #[cfg(feature = "std")]
-        use std::fmt::Write;
         #[cfg(not(feature = "std"))]
         use alloc::fmt::Write;
+        #[cfg(feature = "std")]
+        use std::fmt::Write;
 
         let mut content = String::from("[Script Info]\nTitle: Long Test\n");
         for i in 0..1000 {
@@ -2793,10 +2801,10 @@ Comment: 0,0:00:05.00,0:00:10.00,Default,This is a comment
 
     #[test]
     fn parse_large_script_comprehensive() {
-        #[cfg(feature = "std")]
-        use std::fmt::Write;
         #[cfg(not(feature = "std"))]
         use alloc::fmt::Write;
+        #[cfg(feature = "std")]
+        use std::fmt::Write;
 
         let mut content = String::from("[Script Info]\nTitle: Large Test\n");
 

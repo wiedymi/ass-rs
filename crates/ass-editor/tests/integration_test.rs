@@ -64,7 +64,9 @@ mod advanced_tests {
             "[Script Info]\nTitle: Test\n\n[Events]\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Hello"
         ).unwrap();
 
-        let mut context = manager.create_context("test_extension".to_string(), Some(&mut doc)).unwrap();
+        let mut context = manager
+            .create_context("test_extension".to_string(), Some(&mut doc))
+            .unwrap();
 
         context
             .show_message("Test message", MessageLevel::Info)

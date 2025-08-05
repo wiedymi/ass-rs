@@ -7,7 +7,7 @@
 //! # Supported Tags
 //!
 //! - `pos`: Absolute positioning (x,y)
-//! - `move`: Animated movement (x1,y1,x2,y2[,t1,t2])
+//! - `move`: Animated movement (x1,y1,x2,y2\[,t1,t2\])
 //!
 //! # Performance
 //!
@@ -59,7 +59,7 @@ impl TagHandler for PositionTagHandler {
 /// Handler for movement tag (`\move`)
 ///
 /// Moves text from (x1,y1) to (x2,y2) optionally between times t1 and t2.
-/// Arguments: x1,y1,x2,y2[,t1,t2]
+/// Arguments: x1,y1,x2,y2`[,t1,t2\]`
 pub struct MoveTagHandler;
 
 impl TagHandler for MoveTagHandler {
