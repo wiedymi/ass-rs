@@ -12,7 +12,7 @@ use core::fmt;
 extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::format;
-#[cfg(not(feature = "std"))]
+
 /// Create color format error with detailed context
 ///
 /// Generates a `CoreError::InvalidColor` with descriptive message about
