@@ -8,6 +8,11 @@ use ass_core::utils::{decode_uu_data, parse_bgr_color, CoreError, Spans};
 #[cfg(test)]
 mod tests {
     use super::*;
+    
+    #[cfg(not(feature = "std"))]
+    extern crate alloc;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::ToString};
 
     /// Test `Spans` struct with invalid span data
     #[test]

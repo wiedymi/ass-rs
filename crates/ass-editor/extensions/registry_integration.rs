@@ -322,6 +322,8 @@ impl Default for RegistryIntegration {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn test_registry_integration_creation() {

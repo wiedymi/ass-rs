@@ -309,6 +309,8 @@ impl AsyncDocument {
 #[cfg(feature = "concurrency")]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::ToString};
     use crate::commands::InsertTextCommand;
     use crate::core::Position;
 

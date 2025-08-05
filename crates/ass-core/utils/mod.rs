@@ -33,8 +33,7 @@ pub mod utf8;
 
 pub use benchmark_generators::{
     create_test_event, generate_overlapping_script, generate_script_with_issues, ComplexityLevel,
-    ScriptGenerator,
-};
+    ScriptGenerator};
 pub use errors::CoreError;
 pub use hashers::{create_hash_map, create_hash_map_with_capacity, create_hasher, hash_value};
 pub use utf8::{detect_encoding, normalize_line_endings, recover_utf8, strip_bom, validate_utf8};
@@ -46,8 +45,7 @@ pub use utf8::{detect_encoding, normalize_line_endings, recover_utf8, strip_bom,
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Spans<'a> {
     /// Reference to the original source text
-    source: &'a str,
-}
+    source: &'a str}
 
 impl<'a> Spans<'a> {
     /// Create new span utilities for source text
@@ -451,6 +449,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn spans_validation() {

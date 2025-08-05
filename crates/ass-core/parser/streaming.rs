@@ -263,6 +263,8 @@ pub fn build_modified_source(original: &str, range: Range<usize>, replacement: &
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::String, string::ToString, vec};
 
     #[test]
     fn streaming_parser_creation() {

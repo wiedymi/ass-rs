@@ -128,6 +128,8 @@ mod tests;
 #[cfg(test)]
 mod inline_tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::ToString, vec};
 
     #[test]
     fn error_creation_methods() {

@@ -2306,6 +2306,10 @@ impl EditorDocument {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn document_creation() {
@@ -2561,44 +2565,44 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,Speaker,10,20,30,fade,Original text"#;
     fn test_undo_redo_basic() {
         let mut doc = EditorDocument::from_content("[Script Info]\nTitle: Test").unwrap();
         let initial_len = doc.len_bytes();
-        println!(
-            "Initial doc length: {}, content: {:?}",
-            initial_len,
-            doc.text()
-        );
+        // println!(
+        //     "Initial doc length: {}, content: {:?}",
+        //     initial_len,
+        //     doc.text()
+        // );
 
         // Insert some text
         doc.insert(Position::new(initial_len), "\nAuthor: John")
             .unwrap();
-        println!(
-            "After insert: length: {}, content: {:?}",
-            doc.len_bytes(),
-            doc.text()
-        );
+        // println!(
+        //     "After insert: length: {}, content: {:?}",
+        //     doc.len_bytes(),
+        //     doc.text()
+        // );
         assert!(doc.text().contains("Author: John"));
         assert!(doc.can_undo());
         assert!(!doc.can_redo());
 
         // Undo the insert
         let result = doc.undo().unwrap();
-        println!(
-            "After undo: length: {}, content: {:?}",
-            doc.len_bytes(),
-            doc.text()
-        );
+        // println!(
+        //     "After undo: length: {}, content: {:?}",
+        //     doc.len_bytes(),
+        //     doc.text()
+        // );
         assert!(result.success);
         assert!(!doc.text().contains("Author: John"));
         assert!(!doc.can_undo());
         assert!(doc.can_redo());
 
         // Redo the insert
-        println!("About to redo...");
+        // println!("About to redo...");
         let result = doc.redo().unwrap();
-        println!(
-            "After redo: length: {}, content: {:?}",
-            doc.len_bytes(),
-            doc.text()
-        );
+        // println!(
+        //     "After redo: length: {}, content: {:?}",
+        //     doc.len_bytes(),
+        //     doc.text()
+        // );
         assert!(result.success);
         assert!(doc.text().contains("Author: John"));
         assert!(doc.can_undo());

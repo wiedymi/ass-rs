@@ -1865,6 +1865,10 @@ impl<'a> EventQuery<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     #[cfg(feature = "rope")]

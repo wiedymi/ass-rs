@@ -612,7 +612,7 @@ fn parse_u16(u16_str: &str) -> Result<u16> {
 mod tests {
     use super::*;
     use crate::parser::ast::Span;
-
+    #[cfg(not(feature = "std"))]
     fn create_test_style() -> Style<'static> {
         Style {
             name: "Test",

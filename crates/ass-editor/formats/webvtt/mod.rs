@@ -545,6 +545,10 @@ impl Format for WebVttFormat {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, vec, string::String};
 
     const SAMPLE_WEBVTT: &str = r#"WEBVTT
 

@@ -196,6 +196,8 @@ impl Default for StreamingContext {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::ToString};
 
     #[test]
     fn parser_state_transitions() {

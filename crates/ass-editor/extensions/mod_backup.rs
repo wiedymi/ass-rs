@@ -887,6 +887,8 @@ impl<'a> ExtensionContext for EditorContext<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, vec, string::ToString};
 
     #[test]
     fn extension_info_creation() {

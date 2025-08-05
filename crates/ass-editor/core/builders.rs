@@ -11,12 +11,11 @@ use ass_core::ScriptVersion;
 use std::borrow::Cow;
 
 #[cfg(not(feature = "std"))]
-use alloc::{borrow::Cow, vec};
+use alloc::{borrow::Cow, format, string::ToString, vec};
 
 #[cfg(not(feature = "std"))]
 use alloc::{
-    format,
-    string::{String, ToString},
+    string::String,
     vec::Vec,
 };
 
@@ -726,6 +725,8 @@ impl StyleBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn event_builder_dialogue() {

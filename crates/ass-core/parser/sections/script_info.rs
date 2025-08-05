@@ -169,6 +169,8 @@ impl<'a> ScriptInfoParser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format};
 
     #[test]
     fn parse_empty_section() {

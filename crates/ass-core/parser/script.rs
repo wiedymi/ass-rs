@@ -1209,7 +1209,6 @@ impl<'a> Script<'a> {
         new_source: &'a str,
         change: &crate::parser::incremental::TextChange,
     ) -> Result<Self> {
-        use crate::parser::main::Parser;
         use crate::parser::sections::SectionFormats;
 
         // Step 1: Identify affected sections
@@ -1418,7 +1417,6 @@ impl<'a> Script<'a> {
     /// ```
     #[must_use]
     pub fn to_ass_string(&self) -> alloc::string::String {
-        use alloc::string::String;
         let mut result = String::new();
 
         for (idx, section) in self.sections.iter().enumerate() {
@@ -1800,6 +1798,8 @@ impl Default for ScriptBuilder<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, vec, string::String};
     use crate::parser::ast::SectionType;
 
     #[test]

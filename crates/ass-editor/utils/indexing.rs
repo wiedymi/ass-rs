@@ -15,12 +15,12 @@ use fst::{automaton, IntoStreamer, Set, SetBuilder, Streamer};
 use std::{borrow::Cow, collections::HashMap};
 
 #[cfg(not(feature = "std"))]
-use alloc::{borrow::Cow, collections::BTreeMap as HashMap};
+use alloc::{borrow::Cow, collections::BTreeMap as HashMap, string::String};
 
 #[cfg(not(feature = "std"))]
 use alloc::{
     boxed::Box,
-    string::{String, ToString},
+    string::ToString,
     vec::Vec,
 };
 
@@ -516,6 +516,7 @@ fn calculate_hash(content: &str) -> u64 {
 mod tests {
     use super::*;
     use crate::utils::search::SearchScope;
+    #[cfg(not(feature = "std"))]
     use crate::EditorDocument;
 
     #[test]

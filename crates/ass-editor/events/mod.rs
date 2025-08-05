@@ -843,6 +843,8 @@ impl DocumentEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{string::ToString, vec};
 
     #[test]
     fn document_event_creation() {

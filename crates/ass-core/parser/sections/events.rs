@@ -404,6 +404,8 @@ impl<'a> EventsParser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn parse_empty_section() {

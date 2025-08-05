@@ -404,6 +404,8 @@ impl<'a> TokenScanner<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn char_navigator_new() {

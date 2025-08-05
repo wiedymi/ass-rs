@@ -226,6 +226,7 @@ fn test_extension_manager_error_cases() {
 // ===== Session Manager Errors =====
 
 #[test]
+#[cfg(feature = "std")] // EditorSessionManager requires std feature
 fn test_session_manager_error_cases() {
     let mut manager = EditorSessionManager::new();
 

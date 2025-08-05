@@ -288,6 +288,8 @@ fn validate_utf8_scalar(bytes: &[u8]) -> Result<(), CoreError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, vec};
 
     #[test]
     fn scan_delimiters_finds_colon() {

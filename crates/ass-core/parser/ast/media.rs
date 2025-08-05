@@ -3,10 +3,12 @@
 //! Contains Font and Graphic structs representing embedded media from the
 //! [Fonts] and [Graphics] sections with zero-copy design and UU-decoding.
 
-use alloc::vec::Vec;
-
 #[cfg(not(feature = "std"))]
 extern crate alloc;
+
+use alloc::vec::Vec;
+#[cfg(not(feature = "std"))]
+use alloc::format;
 
 use super::Span;
 #[cfg(debug_assertions)]
@@ -92,7 +94,6 @@ impl Font<'_> {
     /// ```
     #[must_use]
     pub fn to_ass_string(&self) -> alloc::string::String {
-        use alloc::format;
 
         let mut result = format!("fontname: {}\n", self.filename);
         for line in &self.data_lines {
@@ -192,7 +193,6 @@ impl Graphic<'_> {
     /// ```
     #[must_use]
     pub fn to_ass_string(&self) -> alloc::string::String {
-        use alloc::format;
 
         let mut result = format!("filename: {}\n", self.filename);
         for line in &self.data_lines {
@@ -227,6 +227,8 @@ impl Graphic<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, vec};
 
     #[test]
     fn font_creation() {

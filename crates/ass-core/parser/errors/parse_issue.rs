@@ -229,6 +229,8 @@ impl ParseIssue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn issue_severity_display() {

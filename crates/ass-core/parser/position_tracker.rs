@@ -148,7 +148,6 @@ impl<'a> PositionTracker<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn tracker_creation() {
         let source = "Hello\nWorld";

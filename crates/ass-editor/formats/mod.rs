@@ -345,6 +345,10 @@ pub mod webvtt;
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, vec, string::String};
 
     #[test]
     fn test_format_info_creation() {

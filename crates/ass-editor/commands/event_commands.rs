@@ -930,8 +930,11 @@ impl EditorCommand for EventEffectCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
     use crate::core::EditorDocument;
-
     const TEST_CONTENT: &str = r#"[Script Info]
 Title: Event Commands Test
 
@@ -1108,7 +1111,7 @@ Comment: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Third event
         append_cmd.execute(&mut doc).unwrap();
 
         // Check that both effects are present
-        println!("Document after append: {}", doc.text());
+        // println!("Document after append: {}", doc.text());
         assert!(doc.text().contains("Fade(255,0) Move(100,200)"));
 
         // Clear the effect

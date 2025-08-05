@@ -297,6 +297,7 @@ pub fn create_color_handlers() -> alloc::vec::Vec<alloc::boxed::Box<dyn TagHandl
 #[cfg(test)]
 mod tests {
     use super::*;
+    
 
     #[test]
     fn validate_color_valid() {

@@ -12,10 +12,10 @@ use ass_core::parser::{script::ScriptDeltaOwned, Script};
 use std::borrow::Cow;
 
 #[cfg(not(feature = "std"))]
-use alloc::{borrow::Cow, format, string::ToString};
+use alloc::{borrow::Cow, format, string::String, string::ToString};
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 
 /// Represents a change to the document with delta tracking
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -316,7 +316,10 @@ impl IncrementalParser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
     use crate::core::Position;
+    #[cfg(not(feature = "std"))]
 
     #[test]
     fn test_incremental_parser_creation() {

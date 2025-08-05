@@ -198,10 +198,12 @@ PlayResY: 1080",
         );
 
         for i in 0..self.styles_count {
+            let style_name_string;
             let style_name = if i == 0 {
                 "Default"
             } else {
-                &format!("Style{i}")
+                style_name_string = format!("Style{i}");
+                &style_name_string
             };
             let fontsize = 20 + (i * 2);
             let color = format!("&H00{:06X}&", i * 0x0011_1111);
@@ -328,10 +330,6 @@ PlayResY: 1080",
 
     /// Generate karaoke-style dialogue with timing
     fn generate_karaoke_dialogue(event_index: usize, base_text: &str) -> String {
-        #[cfg(not(feature = "std"))]
-        use alloc::fmt::Write;
-        #[cfg(feature = "std")]
-        use std::fmt::Write;
 
         let words: Vec<&str> = base_text.split_whitespace().collect();
         let mut karaoke_text = String::new();
@@ -476,6 +474,7 @@ pub fn generate_script_with_issues(event_count: usize) -> String {
         let end_time = format!("0:{:02}:{:02}.50", i / 60, i % 60);
 
         // Add some problematic content every 10th event
+        let text_string;
         let text = if i % 10 == 0 {
             r"Text with {\} empty tag and {\invalidtag} unknown tag"
         } else if i % 7 == 0 {
@@ -483,7 +482,8 @@ pub fn generate_script_with_issues(event_count: usize) -> String {
             r"{\pos(100,200)\move(100,200,500,400,0,5000)\t(0,1000,\frz360)\t(1000,2000,\fscx200\fscy200)\t(2000,3000,\alpha&HFF&)\t(3000,4000,\alpha&H00&)\t(4000,5000,\c&HFF0000&)}Performance heavy animation"
         } else {
             let line_num = i + 1;
-            &format!("Normal dialogue line {line_num}")
+            text_string = format!("Normal dialogue line {line_num}");
+            &text_string
         };
 
         writeln!(
@@ -543,6 +543,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 #[cfg(test)]
 mod tests {
     use super::*;
+    
 
     #[test]
     fn script_generator_simple() {

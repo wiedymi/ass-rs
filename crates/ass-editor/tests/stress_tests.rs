@@ -299,6 +299,7 @@ fn stress_test_concurrent_operations() {
 
 #[test]
 #[ignore]
+#[cfg(feature = "formats")]
 fn stress_test_format_conversions() {
     use ass_editor::utils::formats::{ConversionOptions, FormatConverter, SubtitleFormat};
 

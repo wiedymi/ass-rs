@@ -901,6 +901,8 @@ pub fn create_search() -> Box<dyn DocumentSearch> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{borrow::Cow, string::ToString, vec};
 
     #[test]
     fn search_options_default() {
@@ -917,8 +919,8 @@ mod tests {
         let result = SearchResult {
             start: Position::new(0),
             end: Position::new(5),
-            text: std::borrow::Cow::Borrowed("hello"),
-            context: std::borrow::Cow::Borrowed("hello world"),
+            text: Cow::Borrowed("hello"),
+            context: Cow::Borrowed("hello world"),
             line: 0,
             column: 0,
         };

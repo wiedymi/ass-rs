@@ -1,13 +1,22 @@
 //! Extended tests for auto-completion extension
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
 #[cfg(test)]
 mod tests {
+
     use crate::core::{EditorDocument, Position};
     use crate::extensions::builtin::auto_complete::{
         AutoCompleteExtension, CompletionContext, CompletionItem, CompletionType,
     };
     use crate::extensions::{EditorExtension, ExtensionManager, ExtensionState};
+    #[cfg(feature = "std")]
     use std::collections::HashMap;
+    #[cfg(not(feature = "std"))]
+    use alloc::collections::BTreeMap as HashMap;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn test_section_completions() {
@@ -191,10 +200,10 @@ mod tests {
 
         // Debug output if test fails
         if completions.is_empty() {
-            println!(
-                "No style completions found. Style names: {:?}",
-                ext.style_names
-            );
+            // println!(
+            //     "No style completions found. Style names: {:?}",
+            //     ext.style_names
+            // );
         }
 
         assert_eq!(completions.len(), 2);

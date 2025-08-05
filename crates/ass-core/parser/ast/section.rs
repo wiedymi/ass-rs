@@ -240,7 +240,10 @@ impl SectionType {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{vec};
     use crate::parser::ast::{Event, EventType, Span, Style};
+    
 
     #[test]
     fn section_type_discrimination() {

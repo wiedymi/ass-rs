@@ -426,6 +426,8 @@ impl Default for TokenPosition {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::format;
 
     #[test]
     fn token_creation() {

@@ -21,14 +21,11 @@ use crate::{
     analysis::events::{
         scoring::{
             calculate_animation_score, calculate_complexity_score, get_performance_impact,
-            PerformanceImpact,
-        },
-        text_analysis::TextAnalysis,
-    },
+            PerformanceImpact},
+        text_analysis::TextAnalysis},
     parser::Event,
     utils::{parse_ass_time, CoreError},
-    Result,
-};
+    Result};
 
 #[cfg(feature = "plugins")]
 use crate::plugin::ExtensionRegistry;
@@ -43,8 +40,7 @@ pub enum TimingRelation {
     /// One event completely contains the other
     FullOverlap,
     /// Events have identical timing
-    Identical,
-}
+    Identical}
 
 /// Comprehensive analysis results for a dialogue event
 ///
@@ -64,8 +60,7 @@ pub struct DialogueInfo<'a> {
     /// Overall rendering complexity (0-100)
     complexity_score: u8,
     /// Text analysis results
-    text_info: TextAnalysis<'a>,
-}
+    text_info: TextAnalysis<'a>}
 
 impl<'a> DialogueInfo<'a> {
     /// Analyze a dialogue event comprehensively
@@ -175,8 +170,7 @@ impl<'a> DialogueInfo<'a> {
             end_cs,
             animation_score,
             complexity_score,
-            text_info,
-        })
+            text_info})
     }
 
     /// Get event duration in milliseconds
@@ -266,7 +260,8 @@ impl<'a> DialogueInfo<'a> {
 mod tests {
     use super::*;
     use crate::parser::ast::{Event, EventType, Span};
-
+    #[cfg(not(feature = "std"))]
+    
     #[test]
     fn dialogue_info_analyze_valid() {
         let event = Event {
@@ -283,8 +278,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let info = DialogueInfo::analyze(&event).unwrap();
         assert_eq!(info.duration_ms(), 5000);
@@ -309,8 +303,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let info = DialogueInfo::analyze(&event).unwrap();
         assert_eq!(info.duration_ms(), 5000);
@@ -336,8 +329,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         assert!(DialogueInfo::analyze(&event).is_err());
     }
@@ -358,8 +350,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         assert!(DialogueInfo::analyze(&event).is_err());
     }
@@ -380,8 +371,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let event2 = Event {
             event_type: EventType::Dialogue,
@@ -397,8 +387,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let info1 = DialogueInfo::analyze(&event1).unwrap();
         let info2 = DialogueInfo::analyze(&event2).unwrap();
@@ -423,8 +412,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let event2 = Event {
             event_type: EventType::Dialogue,
@@ -440,8 +428,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let info1 = DialogueInfo::analyze(&event1).unwrap();
         let info2 = DialogueInfo::analyze(&event2).unwrap();
@@ -472,8 +459,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let event2 = Event {
             event_type: EventType::Dialogue,
@@ -489,8 +475,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let info1 = DialogueInfo::analyze(&event1).unwrap();
         let info2 = DialogueInfo::analyze(&event2).unwrap();
@@ -515,8 +500,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let event2 = Event {
             event_type: EventType::Dialogue,
@@ -532,8 +516,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let info1 = DialogueInfo::analyze(&event1).unwrap();
         let info2 = DialogueInfo::analyze(&event2).unwrap();
@@ -558,8 +541,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let info = DialogueInfo::analyze(&event).unwrap();
 
@@ -588,8 +570,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let complex_event = Event {
             event_type: EventType::Dialogue,
@@ -605,8 +586,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let simple_info = DialogueInfo::analyze(&simple_event).unwrap();
         let complex_info = DialogueInfo::analyze(&complex_event).unwrap();
@@ -631,8 +611,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let info = DialogueInfo::analyze(&event).unwrap();
         assert_eq!(info.override_count(), 7);
@@ -654,8 +633,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let info = DialogueInfo::analyze(&low_impact_event).unwrap();
         // Performance impact depends on complexity score
@@ -678,8 +656,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let info = DialogueInfo::analyze(&event).unwrap();
         assert_eq!(
@@ -706,8 +683,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         assert!(DialogueInfo::analyze(&event).is_err());
     }
@@ -728,8 +704,7 @@ mod tests {
             margin_t: None,
             margin_b: None,
             effect: "",
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         assert!(DialogueInfo::analyze(&event).is_err());
     }

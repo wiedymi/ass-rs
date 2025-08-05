@@ -181,6 +181,8 @@ impl<T> From<T> for ParseResultWithIssues<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{vec, string::{String, ToString}};
     use crate::parser::errors::{IssueCategory, IssueSeverity, ParseError, ParseIssue};
 
     #[test]

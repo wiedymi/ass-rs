@@ -579,6 +579,10 @@ pub struct HistoryStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use alloc::format;
 
     #[test]
     fn undo_stack_basic_operations() {

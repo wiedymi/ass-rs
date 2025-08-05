@@ -734,7 +734,10 @@ impl ApplyKaraokeCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
     use crate::core::EditorDocument;
+    #[cfg(not(feature = "std"))]
 
     #[test]
     fn generate_karaoke_basic() {

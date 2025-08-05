@@ -309,6 +309,8 @@ impl<'a> IssueCollector<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn token_context_transitions() {

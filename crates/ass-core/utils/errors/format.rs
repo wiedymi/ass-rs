@@ -12,6 +12,7 @@ use core::fmt;
 extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::format;
+#[cfg(not(feature = "std"))]
 /// Create color format error with detailed context
 ///
 /// Generates a `CoreError::InvalidColor` with descriptive message about
@@ -114,6 +115,7 @@ pub fn validate_color_format(color: &str) -> Result<(), CoreError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    
 
     #[test]
     fn color_error_creation() {

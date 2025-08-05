@@ -145,6 +145,10 @@ impl Format for AssFormat {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, vec, string::String};
     use std::io::Cursor;
 
     const SAMPLE_ASS: &str = r#"[Script Info]

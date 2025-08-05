@@ -94,8 +94,7 @@ impl TagHandler for BlurEdgesTagHandler {
     fn process(&self, args: &str) -> TagResult {
         match args.trim() {
             "0" | "1" => TagResult::Processed,
-            _ => TagResult::Failed(String::from("Blur edges tag accepts only 0 or 1")),
-        }
+            _ => TagResult::Failed(String::from("Blur edges tag accepts only 0 or 1"))}
     }
 
     fn validate(&self, args: &str) -> bool {
@@ -130,7 +129,8 @@ pub fn create_advanced_handlers() -> alloc::vec::Vec<alloc::boxed::Box<dyn TagHa
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    
+    
     #[test]
     fn border_handler_valid() {
         let handler = BorderTagHandler;

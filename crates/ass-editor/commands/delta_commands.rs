@@ -261,7 +261,10 @@ impl Default for DeltaBatchCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
     use crate::EditorDocument;
+    #[cfg(not(feature = "std"))]
 
     #[test]
     fn test_incremental_insert_command() {

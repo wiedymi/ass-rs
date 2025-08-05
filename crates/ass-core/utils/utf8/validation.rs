@@ -197,6 +197,7 @@ pub fn count_replacement_chars(text: &str) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    
 
     #[test]
     fn validate_valid_utf8() {

@@ -808,6 +808,10 @@ pub fn export_to_file(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::String};
 
     #[test]
     fn test_format_detection() {

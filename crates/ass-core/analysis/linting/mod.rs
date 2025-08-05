@@ -365,6 +365,8 @@ pub fn lint_script(script: &Script, config: &LintConfig) -> Result<Vec<LintIssue
 mod tests {
     use super::*;
     use crate::parser::Script;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn issue_severity_display() {

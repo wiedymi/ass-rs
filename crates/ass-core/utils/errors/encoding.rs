@@ -117,8 +117,7 @@ fn is_valid_ass_char(ch: char) -> bool {
         // Allow non-ASCII printable characters (Unicode)
         c if !c.is_ascii() && !c.is_control() => true,
         // Reject control characters and other problematic chars
-        _ => false,
-    }
+        _ => false}
 }
 
 /// Validate BOM (Byte Order Mark) handling
@@ -184,6 +183,8 @@ pub fn validate_bom_handling(bytes: &[u8]) -> Result<(), CoreError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn utf8_error_creation() {

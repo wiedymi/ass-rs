@@ -35,8 +35,7 @@ pub struct ScriptInfo<'a> {
     /// Key-value pairs as zero-copy spans
     pub fields: Vec<(&'a str, &'a str)>,
     /// Span in source text where this script info section is defined
-    pub span: Span,
-}
+    pub span: Span}
 
 impl<'a> ScriptInfo<'a> {
     /// Get field value by key (case-sensitive)
@@ -153,9 +152,8 @@ impl<'a> ScriptInfo<'a> {
     /// ```
     #[must_use]
     pub fn to_ass_string(&self) -> alloc::string::String {
-        use alloc::string::String;
         use core::fmt::Write;
-        let mut result = String::from("[Script Info]\n");
+        let mut result = alloc::string::String::from("[Script Info]\n");
         for (key, value) in &self.fields {
             let _ = writeln!(result, "{key}: {value}");
         }
@@ -183,14 +181,15 @@ impl<'a> ScriptInfo<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::{vec};
 
     #[test]
     fn script_info_field_access() {
         let fields = vec![("Title", "Test Script"), ("ScriptType", "v4.00+")];
         let info = ScriptInfo {
             fields,
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         assert_eq!(info.title(), "Test Script");
         assert_eq!(info.script_type(), Some("v4.00+"));
@@ -201,8 +200,7 @@ mod tests {
     fn script_info_defaults() {
         let info = ScriptInfo {
             fields: Vec::new(),
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
         assert_eq!(info.title(), "<untitled>");
         assert_eq!(info.wrap_style(), 0);
         assert_eq!(info.layout_resolution(), None);
@@ -214,8 +212,7 @@ mod tests {
         let fields = vec![("PlayResX", "1920"), ("PlayResY", "1080")];
         let info = ScriptInfo {
             fields,
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
         assert_eq!(info.play_resolution(), Some((1920, 1080)));
     }
 
@@ -224,8 +221,7 @@ mod tests {
         let fields = vec![("PlayResX", "1920")];
         let info = ScriptInfo {
             fields,
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
         assert_eq!(info.play_resolution(), None);
     }
 
@@ -234,8 +230,7 @@ mod tests {
         let fields = vec![("LayoutResX", "1920"), ("LayoutResY", "1080")];
         let info = ScriptInfo {
             fields,
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
         assert_eq!(info.layout_resolution(), Some((1920, 1080)));
     }
 
@@ -244,8 +239,7 @@ mod tests {
         let fields = vec![("LayoutResX", "1920")];
         let info = ScriptInfo {
             fields,
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
         assert_eq!(info.layout_resolution(), None);
     }
 
@@ -254,8 +248,7 @@ mod tests {
         let fields = vec![("WrapStyle", "2")];
         let info = ScriptInfo {
             fields,
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
         assert_eq!(info.wrap_style(), 2);
     }
 
@@ -264,8 +257,7 @@ mod tests {
         let fields = vec![("WrapStyle", "invalid")];
         let info = ScriptInfo {
             fields,
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
         assert_eq!(info.wrap_style(), 0); // Default fallback
     }
 
@@ -274,8 +266,7 @@ mod tests {
         let fields = vec![("PlayResX", "invalid"), ("PlayResY", "1080")];
         let info = ScriptInfo {
             fields,
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
         assert_eq!(info.play_resolution(), None);
     }
 
@@ -284,8 +275,7 @@ mod tests {
         let fields = vec![("title", "Test"), ("Title", "Correct")];
         let info = ScriptInfo {
             fields,
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
         assert_eq!(info.get_field("Title"), Some("Correct"));
         assert_eq!(info.get_field("title"), Some("Test"));
     }
@@ -301,8 +291,7 @@ mod tests {
         ];
         let info = ScriptInfo {
             fields,
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let ass_string = info.to_ass_string();
         assert!(ass_string.starts_with("[Script Info]\n"));
@@ -317,8 +306,7 @@ mod tests {
     fn script_info_to_ass_string_empty() {
         let info = ScriptInfo {
             fields: vec![],
-            span: Span::new(0, 0, 0, 0),
-        };
+            span: Span::new(0, 0, 0, 0)};
 
         let ass_string = info.to_ass_string();
         assert_eq!(ass_string, "[Script Info]\n");

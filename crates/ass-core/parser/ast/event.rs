@@ -5,6 +5,8 @@
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec::Vec};
 
 use super::Span;
 #[cfg(debug_assertions)]
@@ -224,7 +226,6 @@ impl Event<'_> {
     /// ```
     #[must_use]
     pub fn to_ass_string(&self) -> alloc::string::String {
-        use alloc::format;
         let event_type_str = self.event_type.as_str();
 
         // Use standard V4+ format by default
@@ -272,7 +273,6 @@ impl Event<'_> {
     /// ```
     #[must_use]
     pub fn to_ass_string_with_format(&self, format: &[&str]) -> alloc::string::String {
-        use alloc::{format, vec::Vec};
 
         let event_type_str = self.event_type.as_str();
         let mut field_values = Vec::with_capacity(format.len());
@@ -357,6 +357,8 @@ impl Default for Event<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn event_type_parsing() {

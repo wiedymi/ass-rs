@@ -126,6 +126,7 @@ pub fn create_clipping_handlers() -> alloc::vec::Vec<alloc::boxed::Box<dyn TagHa
 #[cfg(test)]
 mod tests {
     use super::*;
+    
 
     #[test]
     fn clip_handler_rectangular_valid() {
