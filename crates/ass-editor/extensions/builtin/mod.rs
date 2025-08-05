@@ -52,7 +52,9 @@ pub fn register_builtin_extensions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::extensions::{EditorExtension, ExtensionCapability, ExtensionManager};
+    #[cfg(not(feature = "std"))]
+    use crate::extensions::ExtensionManager;
+    use crate::extensions::{EditorExtension, ExtensionCapability};
     #[cfg(not(feature = "std"))]
     use alloc::string::ToString;
     #[cfg(not(feature = "std"))]

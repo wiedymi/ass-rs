@@ -172,7 +172,4 @@ pub fn detect_bom(bytes: &[u8]) -> Option<(BomType, usize)> {
 }
 
 #[cfg(test)]
-mod tests {
-    #[cfg(feature = "std")]
-    use HashSet;
-}
+mod tests {}

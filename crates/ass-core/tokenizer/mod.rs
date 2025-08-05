@@ -252,7 +252,7 @@ mod inline_tests {
     #[cfg(not(feature = "std"))]
     use hashbrown::HashSet;
     #[cfg(feature = "std")]
-    use HashSet;
+    use std::collections::HashSet;
 
     #[test]
     fn tokenize_section_header() {

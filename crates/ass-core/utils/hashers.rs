@@ -165,10 +165,4 @@ impl HashConfig {
 }
 
 #[cfg(test)]
-mod tests {
-    #[cfg(feature = "std")]
-    use HashSet;
-
-    #[cfg(feature = "std")]
-    use HashSet;
-}
+mod tests {}
