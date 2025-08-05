@@ -89,7 +89,7 @@ jobs:
         if: env.PUBLISH_CRATE == 'workspace'
         run: |
           for i in {1..60}; do
-            if cargo search ass-core | grep -q "ass-core ="; then
+            if cargo search ass-core | awk '/^ass-core =/'; then
               echo "ass-core is now available on crates.io"
               break
             fi
