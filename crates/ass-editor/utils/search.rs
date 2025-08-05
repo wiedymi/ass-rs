@@ -1159,8 +1159,7 @@ mod tests {
         let error_msg = result.unwrap_err().to_string();
         assert!(
             error_msg.contains("Regex") || error_msg.contains("regex"),
-            "Expected error to contain 'regex', but got: {}",
-            error_msg
+            "Expected error to contain 'regex', but got: {error_msg}"
         );
     }
 }
