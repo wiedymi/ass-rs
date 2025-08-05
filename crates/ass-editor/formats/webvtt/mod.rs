@@ -540,7 +540,15 @@ impl FormatExporter for WebVttFormat {
     }
 }
 
-impl Format for WebVttFormat {}
+impl Format for WebVttFormat {
+    fn as_importer(&self) -> &dyn FormatImporter {
+        self
+    }
+
+    fn as_exporter(&self) -> &dyn FormatExporter {
+        self
+    }
+}
 
 #[cfg(test)]
 mod tests {

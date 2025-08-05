@@ -105,6 +105,8 @@
 //! ## Multi-Document Sessions
 //!
 //! ```
+//! # #[cfg(feature = "std")]
+//! # {
 //! # use ass_editor::{EditorSessionManager, SessionConfig};
 //! let mut manager = EditorSessionManager::new();
 //!
@@ -117,6 +119,7 @@
 //!
 //! manager.switch_session("subtitle2.ass").unwrap();
 //! // Edit session2 with shared plugins and memory pools...
+//! # }
 //! ```
 //!
 //! # Feature Flags

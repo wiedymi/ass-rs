@@ -448,7 +448,15 @@ impl FormatExporter for SrtFormat {
     }
 }
 
-impl Format for SrtFormat {}
+impl Format for SrtFormat {
+    fn as_importer(&self) -> &dyn FormatImporter {
+        self
+    }
+
+    fn as_exporter(&self) -> &dyn FormatExporter {
+        self
+    }
+}
 
 #[cfg(test)]
 mod tests {

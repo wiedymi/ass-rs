@@ -24,7 +24,7 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
 Style: Default,Arial,20,&HFFFFFF,&H0,&H0,&H0,0,0,0,0,100,100,0,0,1,2,0,2,10,10,15,25,1,0
 Style: Title,Times New Roman,28,&HFF0000,&H0,&H0,&H0,1,0,0,0,110,110,2,0,1,3,1,5,20,20,30,35,1,1
 
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginT, MarginB, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,5,5,,{\kt500}Hello v4++
 Dialogue: 1,0:00:05.00,0:00:10.00,Title,,0,0,10,15,,Advanced margins test
@@ -79,7 +79,7 @@ ScriptType: v4.00+
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Arial,20,&HFFFFFF,&H0,&H0,&H0,0,0,0,0,100,100,0,0,1,2,0,2,10,10,15,1
 
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,10,,Hello v4+
 ";
@@ -123,7 +123,7 @@ ScriptType: v4.00++
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: OldStyle,Arial,16,&HFFFFFF,&H0,&H0,&H0,0,0,0,0,100,100,0,0,1,2,0,2,10,10,15,1
 
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,OldStyle,,0,0,10,,Mixed format test
 ";
@@ -153,7 +153,7 @@ ScriptType: v4.00++
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginT, Encoding
 Style: IncompleteStyle,Arial,16,&HFFFFFF,&H0,&H0,&H0,0,0,0,0,100,100,0,0,1,2,0,2,10,10,20,1
 
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginT, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,IncompleteStyle,,0,0,5,,Incomplete margin format
 ";
@@ -296,7 +296,7 @@ ScriptType: v4.00++
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginT, MarginB, Encoding, RelativeTo
 Style: Karaoke,Arial,24,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,0,2,10,10,20,20,1,0
 
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginT, MarginB, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:10.00,Karaoke,,0,0,0,0,,{\kt100}Ka{\kt150}ra{\kt200}o{\kt100}ke {\kt300}test
 ";

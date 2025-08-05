@@ -1156,6 +1156,11 @@ mod tests {
         // Should return error when regex feature is not enabled
         let result = search.search("test", &options);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("regex"));
+        let error_msg = result.unwrap_err().to_string();
+        assert!(
+            error_msg.contains("Regex") || error_msg.contains("regex"),
+            "Expected error to contain 'regex', but got: {}",
+            error_msg
+        );
     }
 }

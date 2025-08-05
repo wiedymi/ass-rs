@@ -435,7 +435,7 @@ mod tests {
         let mut diagnostics = Vec::new();
 
         // Test with empty tag name (just \\ followed by another tag)
-        parse_override_block("`[Events]`b1", 0, &mut tags, &mut diagnostics);
+        parse_override_block("\\\\b1", 0, &mut tags, &mut diagnostics);
 
         // Should have one diagnostic for empty override
         assert!(!diagnostics.is_empty());

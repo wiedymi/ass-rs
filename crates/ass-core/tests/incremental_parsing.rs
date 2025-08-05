@@ -17,7 +17,7 @@ ScriptType: v4.00+
 Format: Name, Fontname
 Style: Default,Arial
 
-[Events\]
+[Events]
 Format: Start, End, Text
 Dialogue: 0:00:00.00,0:00:05.00,Hello World";
 
@@ -55,7 +55,7 @@ fn test_parse_incremental_event_change() {
     let original_content = r"[Script Info]
 Title: Test
 
-[Events\]
+[Events]
 Format: Start, End, Text
 Dialogue: 0:00:00.00,0:00:05.00,Original text
 Dialogue: 0:00:05.00,0:00:10.00,Second line
@@ -95,7 +95,7 @@ Format: Name, Fontname, Fontsize
 Style: Default,Arial,20
 Style: Bold,Arial Bold,24
 
-[Events\]
+[Events]
 Format: Start, End, Text
 Dialogue: 0:00:00.00,0:00:05.00,Test";
 
@@ -128,7 +128,7 @@ fn test_parse_incremental_multiline_change() {
 Title: Test
 Author: Someone
 
-[Events\]
+[Events]
 Format: Start, End, Text
 Dialogue: 0:00:00.00,0:00:05.00,Line 1";
 
@@ -167,7 +167,7 @@ fn test_calculate_delta_section_added() {
     let original = r"[Script Info]
 Title: Test
 
-[Events\]
+[Events]
 Format: Start, End, Text
 Dialogue: 0:00:00.00,0:00:05.00,Test";
 
@@ -178,7 +178,7 @@ Title: Test
 Format: Name, Fontname
 Style: Default,Arial
 
-[Events\]
+[Events]
 Format: Start, End, Text
 Dialogue: 0:00:00.00,0:00:05.00,Test";
 
@@ -213,14 +213,14 @@ fn test_calculate_delta_section_modified() {
     let original = r"[Script Info]
 Title: Original
 
-[Events\]
+[Events]
 Format: Start, End, Text
 Dialogue: 0:00:00.00,0:00:05.00,Original";
 
     let modified = r"[Script Info]
 Title: Modified
 
-[Events\]
+[Events]
 Format: Start, End, Text
 Dialogue: 0:00:00.00,0:00:05.00,Modified";
 
@@ -243,14 +243,14 @@ Title: Test
 Format: Name, Fontname
 Style: Default,Arial
 
-[Events\]
+[Events]
 Format: Start, End, Text
 Dialogue: 0:00:00.00,0:00:05.00,Test";
 
     let modified = r"[Script Info]
 Title: Test
 
-[Events\]
+[Events]
 Format: Start, End, Text
 Dialogue: 0:00:00.00,0:00:05.00,Test";
 
@@ -271,7 +271,7 @@ fn test_parse_partial_title_change() {
 Title: Original Title
 Author: Test Author
 
-[Events\]
+[Events]
 Format: Start, End, Text
 Dialogue: 0:00:00.00,0:00:05.00,Test";
 
@@ -296,7 +296,7 @@ fn test_parse_partial_add_event() {
     let original_content = r"[Script Info]
 Title: Test
 
-[Events\]
+[Events]
 Format: Start, End, Text
 Dialogue: 0:00:00.00,0:00:05.00,First";
 
@@ -326,7 +326,7 @@ Format: Name, Fontname, Fontsize, PrimaryColour
 Style: Default,Arial,20,&H00FFFFFF
 Style: Alt,Times,18,&H00FF0000
 
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,Line 1
 Dialogue: 0,0:00:05.00,0:00:10.00,Alt,Line 2

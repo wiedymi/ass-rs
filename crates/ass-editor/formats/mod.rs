@@ -181,6 +181,12 @@ pub trait Format: FormatImporter + FormatExporter {
     fn supports_extension(&self, extension: &str) -> bool {
         self.can_import(extension) || self.can_export(extension)
     }
+
+    /// Get self as an importer (workaround for trait upcasting)
+    fn as_importer(&self) -> &dyn FormatImporter;
+
+    /// Get self as an exporter (workaround for trait upcasting)
+    fn as_exporter(&self) -> &dyn FormatExporter;
 }
 
 /// Registry for managing available formats
@@ -220,7 +226,7 @@ impl FormatRegistry {
         // Check combined formats first
         for format in self.formats.values() {
             if format.can_import(extension) {
-                return Some(format.as_ref());
+                return Some(format.as_importer());
             }
         }
 
@@ -239,7 +245,7 @@ impl FormatRegistry {
         // Check combined formats first
         for format in self.formats.values() {
             if format.can_export(extension) {
-                return Some(format.as_ref());
+                return Some(format.as_exporter());
             }
         }
 

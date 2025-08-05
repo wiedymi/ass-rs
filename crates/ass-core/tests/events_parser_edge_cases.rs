@@ -20,7 +20,7 @@ Title: Test Events
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Arial,20,&Hffffff,&H0,&H0,&H0,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
 
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Hello World!
 Comment: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,This is a comment
@@ -56,7 +56,7 @@ Title: Test No Text
 Format: Name, Fontname, Fontsize, PrimaryColour
 Style: Default,Arial,20,&Hffffff
 
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,
 Comment: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,
@@ -85,7 +85,7 @@ Title: Test Few Fields
 Format: Name, Fontname, Fontsize, PrimaryColour
 Style: Default,Arial,20,&Hffffff
 
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default
 Comment: 0,0:00:05.00,0:00:10.00
@@ -119,7 +119,7 @@ Title: Test Missing Fields
 Format: Name, Fontname
 Style: Default,Arial
 
-[Events\]
+[Events]
 Format: Layer, Start, End
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,Hello World!
 Comment: 0,0:00:05.00,0:00:10.00,Extra,Field,Values,Here
@@ -145,7 +145,7 @@ Comment: 0,0:00:05.00,0:00:10.00,Extra,Field,Values,Here
 [Script Info]
 Title: Test Truncated
 
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,Hello Wor";
 
@@ -156,7 +156,7 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,Hello Wor";
 
         // Test ending in middle of comment
         let truncated_comment = r"
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Text
 ; This is a comment that gets cut off in the mid";
 
@@ -168,7 +168,7 @@ Format: Layer, Start, End, Style, Text
 
         // Test ending with whitespace
         let ending_whitespace = r"
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,Test
 
@@ -184,7 +184,7 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,Test
     #[test]
     fn test_malformed_event_lines() {
         let malformed_events = r"
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Text
 Dialogue:
 Comment:
@@ -211,7 +211,7 @@ InvalidType: 0,0:00:00.00,0:00:05.00,Default,This is not a valid event type
     #[test]
     fn test_events_special_characters() {
         let special_chars = r"
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,Speaker!@#$%,0,0,0,,Hello World!
 Comment: 0,0:00:05.00,0:00:10.00,Default,Unicode测试,0,0,0,,Unicode text: こんにちは 🌍
@@ -242,7 +242,7 @@ Dialogue: 0,0:00:35.00,0:00:40.00,Default,,0,0,0,,Text with {override tags} and 
     #[test]
     fn test_multiple_format_lines() {
         let multiple_formats = r"
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Text
 Format: Layer, Start, End, Style, Name, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,Default,Speaker,Hello World!
@@ -263,7 +263,7 @@ Comment: 0,0:00:05.00,0:00:10.00,Default,Speaker,0,0,0,,This is a comment
 [Script Info]
 Title: Test Empty Events
 
-[Events\]
+[Events]
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour
@@ -280,7 +280,7 @@ Style: Default,Arial,20,&Hffffff
     #[test]
     fn test_events_only_comments() {
         let only_comments = r"
-[Events\]
+[Events]
 ; This is a comment
 ; Another comment
 !: This is also a comment
@@ -303,7 +303,7 @@ Style: Default,Arial,20,&Hffffff
     #[test]
     fn test_event_spacing_variations() {
         let spacing_variations = r"
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Text
 Dialogue:0,0:00:00.00,0:00:05.00,Default,No spaces after colon
 Dialogue:   0   ,   0:00:05.00   ,   0:00:10.00   ,   Default   ,   Lots of spaces
@@ -322,7 +322,7 @@ Comment:0,0:00:20.00,0:00:25.00,Default,Minimal spacing
     #[test]
     fn test_event_field_boundaries() {
         let boundary_cases = r"
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,,,,,,,
 Dialogue: 999,23:59:59.99,23:59:59.99,VeryLongStyleNameThatShouldStillWork,VeryLongSpeakerName,9999,9999,9999,VeryLongEffectName,Very long text that goes on and on and should still be parsed correctly
@@ -344,7 +344,7 @@ Movie: 0,0:00:00.00,10:00:00.00,Default,,0,0,0,,Very long duration
     #[test]
     fn test_mixed_event_types() {
         let mixed_events = r"
-[Events\]
+[Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,First dialogue
 Comment: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,Overlapping comment

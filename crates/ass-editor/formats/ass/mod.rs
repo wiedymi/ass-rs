@@ -140,7 +140,15 @@ impl FormatExporter for AssFormat {
     }
 }
 
-impl Format for AssFormat {}
+impl Format for AssFormat {
+    fn as_importer(&self) -> &dyn FormatImporter {
+        self
+    }
+
+    fn as_exporter(&self) -> &dyn FormatExporter {
+        self
+    }
+}
 
 #[cfg(test)]
 mod tests {
