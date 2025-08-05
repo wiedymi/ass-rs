@@ -348,7 +348,7 @@ mod tests {
     #[cfg(not(feature = "std"))]
     use alloc::string::ToString;
     #[cfg(not(feature = "std"))]
-    use alloc::{format, vec, string::String};
+    use alloc::{format, string::String, vec};
 
     #[test]
     fn test_format_info_creation() {

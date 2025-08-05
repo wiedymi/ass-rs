@@ -127,7 +127,6 @@ pub fn create_font_handlers() -> alloc::vec::Vec<alloc::boxed::Box<dyn TagHandle
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn font_name_valid() {

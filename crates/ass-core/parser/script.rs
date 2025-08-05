@@ -1798,9 +1798,9 @@ impl Default for ScriptBuilder<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(not(feature = "std"))]
-    use alloc::{format, vec, string::String};
     use crate::parser::ast::SectionType;
+    #[cfg(not(feature = "std"))]
+    use alloc::{format, string::String, vec};
 
     #[test]
     fn parse_minimal_script() {

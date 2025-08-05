@@ -115,7 +115,6 @@ pub fn validate_color_format(color: &str) -> Result<(), CoreError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn color_error_creation() {

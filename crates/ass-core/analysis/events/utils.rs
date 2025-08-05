@@ -238,12 +238,12 @@ pub fn find_events_in_range(events: &[DialogueInfo<'_>], start_cs: u32, end_cs: 
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::parser::{ast::Span, Event};
     #[cfg(not(feature = "std"))]
     use alloc::boxed::Box;
-    use super::*;
     #[cfg(not(feature = "std"))]
-    use alloc::{vec};
-    use crate::parser::{ast::Span, Event};
+    use alloc::vec;
     #[cfg(not(feature = "std"))]
     fn create_test_dialogue_info(start: &'static str, end: &'static str) -> DialogueInfo<'static> {
         // Create a static event for the lifetime requirement

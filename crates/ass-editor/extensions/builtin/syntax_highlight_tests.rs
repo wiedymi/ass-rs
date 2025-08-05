@@ -5,15 +5,15 @@ extern crate alloc;
 
 #[cfg(test)]
 mod tests {
-    #[cfg(not(feature = "std"))]
-    use alloc::{string::ToString, vec::Vec};
     use crate::core::EditorDocument;
     use crate::extensions::builtin::syntax_highlight::{SyntaxHighlightExtension, TokenType};
     use crate::extensions::{EditorExtension, ExtensionManager, ExtensionState};
-    #[cfg(feature = "std")]
-    use std::collections::HashMap;
     #[cfg(not(feature = "std"))]
     use alloc::collections::BTreeMap as HashMap;
+    #[cfg(not(feature = "std"))]
+    use alloc::{string::ToString, vec::Vec};
+    #[cfg(feature = "std")]
+    use std::collections::HashMap;
 
     #[test]
     fn test_section_header_tokenization() {

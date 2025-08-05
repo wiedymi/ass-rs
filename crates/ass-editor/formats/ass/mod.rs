@@ -148,7 +148,7 @@ mod tests {
     #[cfg(not(feature = "std"))]
     use alloc::string::ToString;
     #[cfg(not(feature = "std"))]
-    use alloc::{format, vec, string::String};
+    use alloc::{format, string::String, vec};
     use std::io::Cursor;
 
     const SAMPLE_ASS: &str = r#"[Script Info]

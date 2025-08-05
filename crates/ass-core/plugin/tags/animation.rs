@@ -209,7 +209,6 @@ pub fn create_animation_handlers() -> alloc::vec::Vec<alloc::boxed::Box<dyn TagH
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn transform_handler_valid() {

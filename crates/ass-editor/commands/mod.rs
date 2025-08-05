@@ -549,11 +549,10 @@ impl DocumentCommandExt for EditorDocument {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(not(feature = "std"))]
-    use alloc::string::ToString;
     use crate::core::EditorDocument;
     #[cfg(not(feature = "std"))]
-
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
     #[test]
     fn insert_command_execution() {
         let mut doc = EditorDocument::new();

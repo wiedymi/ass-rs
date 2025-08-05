@@ -173,7 +173,7 @@ pub const fn get_performance_impact(complexity_score: u8) -> PerformanceImpact {
 mod tests {
     use super::*;
     #[cfg(not(feature = "std"))]
-    use alloc::{vec};
+    use alloc::vec;
 
     #[test]
     fn test_animation_score_empty() {

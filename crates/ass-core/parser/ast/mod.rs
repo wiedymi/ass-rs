@@ -101,7 +101,7 @@ impl Span {
 mod tests {
     use super::*;
     #[cfg(not(feature = "std"))]
-    use alloc::{vec};
+    use alloc::vec;
 
     #[test]
     fn test_span_creation() {

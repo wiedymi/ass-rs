@@ -555,9 +555,9 @@ impl Default for LazyValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(not(feature = "std"))]
-    use alloc::{vec, string::ToString};
     use crate::EditorDocument;
+    #[cfg(not(feature = "std"))]
+    use alloc::{string::ToString, vec};
 
     #[test]
     fn test_validation_issue_creation() {

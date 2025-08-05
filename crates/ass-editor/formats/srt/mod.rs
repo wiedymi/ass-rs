@@ -456,7 +456,7 @@ mod tests {
     #[cfg(not(feature = "std"))]
     use alloc::string::ToString;
     #[cfg(not(feature = "std"))]
-    use alloc::{format, vec, string::String};
+    use alloc::{format, string::String, vec};
 
     const SAMPLE_SRT: &str = "1\n00:00:00,000 --> 00:00:05,000\n<b>Hello</b> <i>World</i>!\n\n2\n00:00:06,000 --> 00:00:10,000\nThis is a <u>subtitle</u> with <font color=\"#FF0000\">red text</font>.\n\n3\n00:00:12,500 --> 00:00:15,750\nMultiple\nlines\nhere\n\n";
 

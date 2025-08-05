@@ -117,7 +117,8 @@ fn is_valid_ass_char(ch: char) -> bool {
         // Allow non-ASCII printable characters (Unicode)
         c if !c.is_ascii() && !c.is_control() => true,
         // Reject control characters and other problematic chars
-        _ => false}
+        _ => false,
+    }
 }
 
 /// Validate BOM (Byte Order Mark) handling

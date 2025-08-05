@@ -514,7 +514,7 @@ impl Default for EditorSessionManager {
 mod tests {
     use super::*;
     #[cfg(not(feature = "std"))]
-    use alloc::{vec, string::ToString};
+    use alloc::{string::ToString, vec};
 
     #[test]
     fn session_manager_creation() {

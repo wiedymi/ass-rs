@@ -160,7 +160,4 @@ pub fn create_formatting_handlers() -> alloc::vec::Vec<alloc::boxed::Box<dyn Tag
 }
 
 #[cfg(test)]
-mod tests {
-    
-    
-}
+mod tests {}

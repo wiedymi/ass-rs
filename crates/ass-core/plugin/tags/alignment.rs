@@ -134,7 +134,7 @@ mod tests {
     use super::*;
     #[cfg(not(feature = "std"))]
     use alloc::string::ToString;
-    
+
     #[test]
     fn alignment_handler_valid() {
         let handler = AlignmentTagHandler;

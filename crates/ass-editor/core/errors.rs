@@ -329,7 +329,7 @@ impl core::error::Error for EditorError {}
 mod tests {
     use super::*;
     #[cfg(not(feature = "std"))]
-    use alloc::{string::ToString};
+    use alloc::string::ToString;
 
     #[test]
     fn error_conversion_from_core() {

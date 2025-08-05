@@ -237,9 +237,9 @@ pub fn count_overlapping_events(events: &[Event]) -> Result<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(not(feature = "std"))]
-    use alloc::{vec, string::ToString};
     use crate::parser::ast::Span;
+    #[cfg(not(feature = "std"))]
+    use alloc::{string::ToString, vec};
 
     fn create_test_event(start: &'static str, end: &'static str) -> Event<'static> {
         Event {

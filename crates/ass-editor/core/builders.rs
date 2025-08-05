@@ -14,10 +14,7 @@ use std::borrow::Cow;
 use alloc::{borrow::Cow, format, string::ToString, vec};
 
 #[cfg(not(feature = "std"))]
-use alloc::{
-    string::String,
-    vec::Vec,
-};
+use alloc::{string::String, vec::Vec};
 
 /// Builder for creating ASS events with fluent API
 ///

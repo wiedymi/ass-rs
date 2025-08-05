@@ -7,13 +7,16 @@ use crate::{
     analysis::{
         events::text_analysis::TextAnalysis,
         linting::{IssueCategory, IssueSeverity, LintIssue, LintRule},
-        ScriptAnalysis},
+        ScriptAnalysis,
+    },
     parser::Section,
-    utils::parse_bgr_color};
+    utils::parse_bgr_color,
+};
 use alloc::{
     format,
     string::{String, ToString},
-    vec::Vec};
+    vec::Vec,
+};
 
 /// Rule for detecting invalid color formats in styles and override tags
 ///
@@ -171,7 +174,7 @@ impl InvalidColorRule {
 mod tests {
     use super::*;
     #[cfg(not(feature = "std"))]
-    use alloc::{string::ToString};
+    use alloc::string::ToString;
 
     #[test]
     fn rule_metadata_correct() {

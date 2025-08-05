@@ -6,9 +6,9 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
-use alloc::vec::Vec;
 #[cfg(not(feature = "std"))]
 use alloc::format;
+use alloc::vec::Vec;
 
 use super::Span;
 #[cfg(debug_assertions)]
@@ -94,7 +94,6 @@ impl Font<'_> {
     /// ```
     #[must_use]
     pub fn to_ass_string(&self) -> alloc::string::String {
-
         let mut result = format!("fontname: {}\n", self.filename);
         for line in &self.data_lines {
             result.push_str(line);
@@ -193,7 +192,6 @@ impl Graphic<'_> {
     /// ```
     #[must_use]
     pub fn to_ass_string(&self) -> alloc::string::String {
-
         let mut result = format!("filename: {}\n", self.filename);
         for line in &self.data_lines {
             result.push_str(line);

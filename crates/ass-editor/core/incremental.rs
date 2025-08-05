@@ -316,11 +316,10 @@ impl IncrementalParser {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(not(feature = "std"))]
-    use alloc::string::ToString;
     use crate::core::Position;
     #[cfg(not(feature = "std"))]
-
+    use alloc::string::ToString;
+    #[cfg(not(feature = "std"))]
     #[test]
     fn test_incremental_parser_creation() {
         let parser = IncrementalParser::new();

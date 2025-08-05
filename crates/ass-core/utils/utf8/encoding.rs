@@ -34,7 +34,8 @@ pub struct EncodingInfo {
     /// BOM type if detected
     pub bom_type: Option<BomType>,
     /// Whether the text appears to be valid in this encoding
-    pub is_valid: bool}
+    pub is_valid: bool,
+}
 
 impl EncodingInfo {
     /// Create new encoding info with basic parameters
@@ -50,7 +51,8 @@ impl EncodingInfo {
             confidence,
             has_bom: false,
             bom_type: None,
-            is_valid: true}
+            is_valid: true,
+        }
     }
 
     /// Create encoding info with BOM information
@@ -67,7 +69,8 @@ impl EncodingInfo {
             confidence,
             has_bom: true,
             bom_type: Some(bom_type),
-            is_valid: true}
+            is_valid: true,
+        }
     }
 }
 

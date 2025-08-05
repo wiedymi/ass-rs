@@ -228,6 +228,4 @@ impl CoreError {
 }
 
 #[cfg(test)]
-mod tests {
-    
-}
+mod tests {}

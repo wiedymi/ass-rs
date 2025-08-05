@@ -16,7 +16,7 @@ extern crate alloc;
 mod tests {
     use super::*;
     #[cfg(not(feature = "std"))]
-    use alloc::{string::String};
+    use alloc::string::String;
 
     /// Test input size limit exceeded error path (L90-L96)
     #[test]

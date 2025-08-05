@@ -124,7 +124,7 @@ pub fn create_aegisub_processors() -> alloc::vec::Vec<alloc::boxed::Box<dyn Sect
 mod tests {
     use super::*;
     #[cfg(not(feature = "std"))]
-    use alloc::{vec};
+    use alloc::vec;
 
     #[test]
     fn aegisub_project_processor_valid() {

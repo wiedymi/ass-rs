@@ -18,11 +18,7 @@ use std::{borrow::Cow, collections::HashMap};
 use alloc::{borrow::Cow, collections::BTreeMap as HashMap, string::String};
 
 #[cfg(not(feature = "std"))]
-use alloc::{
-    boxed::Box,
-    string::ToString,
-    vec::Vec,
-};
+use alloc::{boxed::Box, string::ToString, vec::Vec};
 
 #[cfg(feature = "std")]
 use std::time::Instant;

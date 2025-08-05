@@ -248,11 +248,11 @@ mod tests;
 mod inline_tests {
     use super::*;
     #[cfg(not(feature = "std"))]
-    use alloc::{string::ToString};
-    #[cfg(feature = "std")]
-    use HashSet;
+    use alloc::string::ToString;
     #[cfg(not(feature = "std"))]
     use hashbrown::HashSet;
+    #[cfg(feature = "std")]
+    use HashSet;
 
     #[test]
     fn tokenize_section_header() {

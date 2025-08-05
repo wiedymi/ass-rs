@@ -141,7 +141,6 @@ impl Style<'_> {
     /// ```
     #[must_use]
     pub fn to_ass_string(&self) -> alloc::string::String {
-
         // Use standard V4+ format by default
         // TODO: Support custom format lines
         format!(
@@ -199,7 +198,6 @@ impl Style<'_> {
     /// ```
     #[must_use]
     pub fn to_ass_string_with_format(&self, format: &[&str]) -> alloc::string::String {
-
         let mut field_values = Vec::with_capacity(format.len());
 
         for field in format {

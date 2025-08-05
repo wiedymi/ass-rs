@@ -8,7 +8,8 @@ use alloc::string::ToString;
 
 use super::{
     delta::DeltaBatch,
-    state::{ParserState, SectionKind, StreamingContext}};
+    state::{ParserState, SectionKind, StreamingContext},
+};
 
 /// Line processor for streaming ASS parser
 ///
@@ -19,7 +20,8 @@ pub struct LineProcessor {
     /// Current parser state
     pub state: ParserState,
     /// Parsing context with line tracking
-    pub context: StreamingContext}
+    pub context: StreamingContext,
+}
 
 impl LineProcessor {
     /// Create new line processor
@@ -27,7 +29,8 @@ impl LineProcessor {
     pub const fn new() -> Self {
         Self {
             state: ParserState::ExpectingSection,
-            context: StreamingContext::new()}
+            context: StreamingContext::new(),
+        }
     }
 
     /// Process a single complete line
@@ -64,7 +67,9 @@ impl LineProcessor {
             }
             ParserState::InEvent {
                 section,
-                fields_seen} => Ok(self.process_event_continuation(line, *section, *fields_seen))}
+                fields_seen,
+            } => Ok(self.process_event_continuation(line, *section, *fields_seen)),
+        }
     }
 
     /// Process section header line
@@ -200,7 +205,6 @@ impl Default for LineProcessor {
 mod tests {
     use super::*;
     #[cfg(not(feature = "std"))]
-    
     #[test]
     fn processor_creation() {
         let processor = LineProcessor::new();

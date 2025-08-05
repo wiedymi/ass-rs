@@ -930,11 +930,11 @@ impl EditorCommand for EventEffectCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::EditorDocument;
     #[cfg(not(feature = "std"))]
     use alloc::string::ToString;
     #[cfg(not(feature = "std"))]
     use alloc::vec;
-    use crate::core::EditorDocument;
     const TEST_CONTENT: &str = r#"[Script Info]
 Title: Event Commands Test
 

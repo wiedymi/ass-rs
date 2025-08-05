@@ -273,7 +273,6 @@ impl Event<'_> {
     /// ```
     #[must_use]
     pub fn to_ass_string_with_format(&self, format: &[&str]) -> alloc::string::String {
-
         let event_type_str = self.event_type.as_str();
         let mut field_values = Vec::with_capacity(format.len());
 

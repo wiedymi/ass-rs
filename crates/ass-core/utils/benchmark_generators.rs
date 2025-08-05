@@ -330,7 +330,6 @@ PlayResY: 1080",
 
     /// Generate karaoke-style dialogue with timing
     fn generate_karaoke_dialogue(event_index: usize, base_text: &str) -> String {
-
         let words: Vec<&str> = base_text.split_whitespace().collect();
         let mut karaoke_text = String::new();
 
@@ -543,7 +542,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn script_generator_simple() {

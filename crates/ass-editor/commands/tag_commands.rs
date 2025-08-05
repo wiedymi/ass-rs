@@ -606,11 +606,11 @@ impl ParseTagCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::EditorDocument;
     #[cfg(not(feature = "std"))]
     use alloc::string::ToString;
     #[cfg(not(feature = "std"))]
     use alloc::vec;
-    use crate::core::EditorDocument;
 
     #[test]
     fn insert_tag_basic() {

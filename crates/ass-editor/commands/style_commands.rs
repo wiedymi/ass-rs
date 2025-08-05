@@ -596,9 +596,9 @@ impl EditorCommand for ApplyStyleCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::EditorDocument;
     #[cfg(not(feature = "std"))]
     use alloc::string::ToString;
-    use crate::core::EditorDocument;
     const TEST_CONTENT: &str = r#"[Script Info]
 Title: Test Script
 

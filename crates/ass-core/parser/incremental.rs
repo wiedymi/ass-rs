@@ -188,9 +188,9 @@ pub fn find_section_end(
 mod tests {
     use super::*;
     #[cfg(not(feature = "std"))]
-    use alloc::string::ToString;
+    use alloc::string::String;
     #[cfg(not(feature = "std"))]
-    use alloc::{string::String};
+    use alloc::string::ToString;
 
     #[test]
     fn test_adjust_range_before_change() {

@@ -11,12 +11,12 @@ mod tests {
         AutoCompleteExtension, CompletionContext, CompletionItem, CompletionType,
     };
     use crate::extensions::{EditorExtension, ExtensionManager, ExtensionState};
-    #[cfg(feature = "std")]
-    use std::collections::HashMap;
     #[cfg(not(feature = "std"))]
     use alloc::collections::BTreeMap as HashMap;
     #[cfg(not(feature = "std"))]
     use alloc::string::ToString;
+    #[cfg(feature = "std")]
+    use std::collections::HashMap;
 
     #[test]
     fn test_section_completions() {
