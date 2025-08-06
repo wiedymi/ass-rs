@@ -1,6 +1,6 @@
 [package]
 name = "ass-editor"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.75"
 license = "MIT"
@@ -16,7 +16,7 @@ keywords = ["ass", "subtitle", "editor", "ssa", "substation"]
 path = "lib.rs"
 
 [dependencies]
-ass-core = { version = "0.1.0", path = "../ass-core", default-features = false }
+ass-core = { version = "0.1.1", path = "../ass-core", default-features = false }
 thiserror = { workspace = true, optional = true } # Only enabled with `std`
 
 # Rope data structure for text editing (feature-gated)

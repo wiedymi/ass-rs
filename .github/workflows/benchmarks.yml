@@ -1,0 +1,126 @@
+name: Performance Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy, rustfmt
+    
+    - name: Cache Rust Dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        key: benchmark-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Install Benchmark Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gnuplot
+    
+    - name: Run Core Parser Benchmarks
+      run: |
+        cd crates/ass-core
+        cargo bench --features=benches parser_benchmarks -- --output-format json > parser_results.json
+        
+    - name: Run Incremental Parsing Benchmarks
+      run: |
+        cd crates/ass-core
+        cargo bench --features=benches incremental_benchmarks -- --output-format json > incremental_results.json
+    
+    - name: Validate Performance Targets
+      run: |
+        cd crates/ass-core
+        cargo run --features=benches --bin validate-bench-results parser_results.json incremental_results.json
+    
+    - name: Upload Benchmark Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results
+        path: |
+          crates/ass-core/parser_results.json
+          crates/ass-core/incremental_results.json
+          target/criterion/
+
+  performance-regression:
+    name: Performance Regression Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Cache Rust Dependencies
+      uses: Swatinem/rust-cache@v2
+    
+    - name: Benchmark Base Branch
+      run: |
+        git checkout ${{ github.base_ref }}
+        cd crates/ass-core
+        cargo bench --features=benches -- --save-baseline base
+        
+    - name: Benchmark PR Branch
+      run: |
+        git checkout ${{ github.head_ref }}
+        cd crates/ass-core
+        cargo bench --features=benches -- --save-baseline pr
+        
+    - name: Compare Performance
+      run: |
+        cd crates/ass-core
+        cargo bench --features=benches -- --load-baseline base --baseline pr
+        
+    - name: Performance Regression Report
+      run: |
+        cd crates/ass-core
+        if [ -d target/criterion ]; then
+          echo "Performance comparison report available"
+          # Extract key metrics and check for regressions
+          cargo run --features=benches --bin check-perf-regression target/criterion/
+        fi
+
+  benchmark-on-schedule:
+    name: Scheduled Benchmark Run
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Cache Rust Dependencies
+      uses: Swatinem/rust-cache@v2
+    
+    - name: Run Full Benchmark Suite
+      run: |
+        cd crates/ass-core
+        cargo bench --features=benches,simd,arena
+        
+    - name: Archive Results
+      run: |
+        mkdir -p benchmark-history/$(date +%Y-%m-%d)
+        cp -r target/criterion benchmark-history/$(date +%Y-%m-%d)/
+        
+    - name: Upload to Performance Database
+      run: |
+        # Future: upload to performance tracking system
+        echo "Benchmarks completed on $(date)"
