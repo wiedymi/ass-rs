@@ -187,6 +187,9 @@ impl<'a> StyleAnalyzer<'a> {
                 {
                     // Only apply scaling if resolutions differ
                     if layout_x != play_x || layout_y != play_y {
+                        // Scale FROM layout TO play resolution
+                        // If LayoutRes > PlayRes, we scale down (e.g., 1920→640 = 0.333)
+                        // If LayoutRes < PlayRes, we scale up (e.g., 640→1920 = 3.0)
                         #[allow(clippy::cast_precision_loss)]
                         let scale_x = play_x as f32 / layout_x as f32;
                         #[allow(clippy::cast_precision_loss)]

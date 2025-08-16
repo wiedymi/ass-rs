@@ -59,6 +59,33 @@ The ASS-RS ecosystem consists of modular, interoperable crates:
 - **SIMD Acceleration**: 20-30% faster with portable SIMD
 - **Streaming**: <10ms/MB for chunked inputs
 
+## 🎨 Enhanced Features
+
+### Complex Transform Animations
+ASS-RS now fully supports nested tags within `\t` transform animations, enabling complex multi-property animations:
+
+```rust
+// Complex nested transform now works correctly
+let text = r"{\t(0,1000,\fs50\1c&HFF0000&\frz45)}Animated text";
+```
+
+### Line Break Type Preservation
+Maintains distinction between hard (`\N`) and soft (`\n`) line breaks for proper text wrapping:
+
+```rust
+use ass_core::analysis::events::{TextWithLineBreaks, LineBreakType};
+
+let processed = TextWithLineBreaks::from_text(text, drawing_mode);
+match processed.get_break_type_at(position) {
+    Some(LineBreakType::Hard) => {}, // Force new line
+    Some(LineBreakType::Soft) => {}, // Allow wrapping
+    None => {},
+}
+```
+
+### libass-Compatible Positioning
+Full compatibility with libass positioning behavior including anchor points, rotation origins, and movement interpolation. See [FIXES_AND_IMPROVEMENTS.md](FIXES_AND_IMPROVEMENTS.md) for detailed implementation notes.
+
 ## 🎯 Quick Start
 
 Add to your `Cargo.toml`:
@@ -108,6 +135,14 @@ for section in script.sections() {
         _ => {}
     }
 }
+
+// For complex nested transforms, use the fixed parser
+use ass_core::analysis::events::parse_override_block_fixed;
+
+let mut tags = Vec::new();
+let mut diagnostics = Vec::new();
+let complex_transform = r"\t(0,1000,\fs50\1c&HFF0000&)";
+parse_override_block_fixed(complex_transform, 0, &mut tags, &mut diagnostics);
 ```
 
 ## 🔧 Features

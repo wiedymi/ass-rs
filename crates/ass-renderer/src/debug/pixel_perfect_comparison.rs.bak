@@ -1,0 +1,789 @@
+//! Pixel-perfect comparison tool for validating ASS renderer against libass
+//!
+//! This module provides comprehensive tools for comparing our renderer output
+//! with libass to ensure pixel-perfect compatibility.
+
+use crate::{Frame, RenderError, Renderer, RenderContext, BackendType};
+use super::LibassRenderer;
+use std::path::{Path, PathBuf};
+use std::collections::HashMap;
+use ass_core::parser::Script;
+
+#[cfg(feature = "nostd")]
+use alloc::{vec::Vec, string::String, format};
+
+/// Pixel comparison result
+#[derive(Debug, Clone)]
+pub struct PixelComparisonResult {
+    /// Total number of pixels
+    pub total_pixels: usize,
+    /// Number of matching pixels
+    pub matching_pixels: usize,
+    /// Number of mismatched pixels
+    pub mismatched_pixels: usize,
+    /// Percentage of pixels that match (0.0 to 100.0)
+    pub match_percentage: f64,
+    /// Maximum color difference found
+    pub max_difference: u32,
+    /// Average color difference for mismatched pixels
+    pub avg_difference: f64,
+    /// Detailed mismatch information
+    pub mismatches: Vec<PixelMismatch>,
+    /// Heatmap of differences (if generated)
+    pub difference_map: Option<Vec<u8>>,
+    /// Per-channel statistics
+    pub channel_stats: ChannelStatistics,
+}
+
+/// Information about a single pixel mismatch
+#[derive(Debug, Clone)]
+pub struct PixelMismatch {
+    /// X coordinate
+    pub x: u32,
+    /// Y coordinate  
+    pub y: u32,
+    /// Our renderer's pixel value [R, G, B, A]
+    pub our_pixel: [u8; 4],
+    /// Libass pixel value [R, G, B, A]
+    pub libass_pixel: [u8; 4],
+    /// Total difference across all channels
+    pub difference: u32,
+}
+
+/// Per-channel comparison statistics
+#[derive(Debug, Clone)]
+pub struct ChannelStatistics {
+    /// Red channel differences
+    pub red: ChannelDiff,
+    /// Green channel differences
+    pub green: ChannelDiff,
+    /// Blue channel differences
+    pub blue: ChannelDiff,
+    /// Alpha channel differences
+    pub alpha: ChannelDiff,
+}
+
+/// Statistics for a single color channel
+#[derive(Debug, Clone)]
+pub struct ChannelDiff {
+    /// Maximum difference in this channel
+    pub max_diff: u8,
+    /// Average difference in this channel
+    pub avg_diff: f64,
+    /// Number of pixels with differences in this channel
+    pub diff_count: usize,
+}
+
+/// Configuration for pixel comparison
+#[derive(Debug, Clone)]
+pub struct ComparisonConfig {
+    /// Tolerance for color differences (0 = exact match required)
+    pub tolerance: u8,
+    /// Maximum number of mismatches to record in detail
+    pub max_recorded_mismatches: usize,
+    /// Generate visual difference heatmap
+    pub generate_heatmap: bool,
+    /// Generate side-by-side comparison image
+    pub generate_comparison: bool,
+    /// Save debug output to files
+    pub save_debug_output: bool,
+    /// Output directory for debug files
+    pub output_dir: PathBuf,
+    /// Compare only specific region (x, y, width, height)
+    pub region_of_interest: Option<(u32, u32, u32, u32)>,
+}
+
+impl Default for ComparisonConfig {
+    fn default() -> Self {
+        Self {
+            tolerance: 0,
+            max_recorded_mismatches: 1000,
+            generate_heatmap: true,
+            generate_comparison: true,
+            save_debug_output: true,
+            output_dir: PathBuf::from("pixel_comparison_output"),
+            region_of_interest: None,
+        }
+    }
+}
+
+/// Pixel-perfect comparison tool
+pub struct PixelPerfectComparator {
+    config: ComparisonConfig,
+    our_renderer: Renderer,
+    libass_renderer: LibassRenderer,
+    width: u32,
+    height: u32,
+}
+
+impl PixelPerfectComparator {
+    /// Create a new comparator with the given dimensions
+    pub fn new(width: u32, height: u32) -> Result<Self, RenderError> {
+        Self::with_config(width, height, ComparisonConfig::default())
+    }
+
+    /// Create a new comparator with custom configuration
+    pub fn with_config(
+        width: u32,
+        height: u32,
+        config: ComparisonConfig,
+    ) -> Result<Self, RenderError> {
+        let context = RenderContext::new(width, height);
+        let our_renderer = Renderer::new(BackendType::Software, context)?;
+        let libass_renderer = LibassRenderer::new(width, height)?;
+
+        Ok(Self {
+            config,
+            our_renderer,
+            libass_renderer,
+            width,
+            height,
+        })
+    }
+
+    /// Convert Script to string format for libass
+    fn script_to_string(&self, script: &Script) -> String {
+        use ass_core::parser::Section;
+        let mut output = String::new();
+        
+        // Serialize each section
+        for section in script.sections() {
+            match section {
+                Section::ScriptInfo(info) => {
+                    output.push_str("[Script Info]\n");
+                    if let Some(title) = info.title() {
+                        output.push_str(&format!("Title: {}\n", title));
+                    }
+                    if let Some(script_type) = info.script_type() {
+                        output.push_str(&format!("ScriptType: {}\n", script_type));
+                    }
+                    if let Some((x, y)) = info.play_resolution() {
+                        output.push_str(&format!("PlayResX: {}\n", x));
+                        output.push_str(&format!("PlayResY: {}\n", y));
+                    }
+                    if let Some((x, y)) = info.layout_resolution() {
+                        output.push_str(&format!("LayoutResX: {}\n", x));
+                        output.push_str(&format!("LayoutResY: {}\n", y));
+                    }
+                    if let Some(wrap) = info.wrap_style() {
+                        output.push_str(&format!("WrapStyle: {}\n", wrap));
+                    }
+                    if let Some(collisions) = info.collisions() {
+                        output.push_str(&format!("Collisions: {}\n", collisions));
+                    }
+                    output.push('\n');
+                }
+                Section::Styles(styles) => {
+                    output.push_str("[V4+ Styles]\n");
+                    output.push_str("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n");
+                    for style in styles.styles() {
+                        output.push_str(&format!("Style: {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
+                            style.name(),
+                            style.fontname(),
+                            style.fontsize(),
+                            style.primary_colour(),
+                            style.secondary_colour(),
+                            style.outline_colour(),
+                            style.back_colour(),
+                            if style.bold() { 1 } else { 0 },
+                            if style.italic() { 1 } else { 0 },
+                            if style.underline() { 1 } else { 0 },
+                            if style.strike_out() { 1 } else { 0 },
+                            style.scale_x(),
+                            style.scale_y(),
+                            style.spacing(),
+                            style.angle(),
+                            style.border_style(),
+                            style.outline(),
+                            style.shadow(),
+                            style.alignment(),
+                            style.margin_l(),
+                            style.margin_r(),
+                            style.margin_v(),
+                            style.encoding()
+                        ));
+                    }
+                    output.push('\n');
+                }
+                Section::Events(events) => {
+                    output.push_str("[Events]\n");
+                    output.push_str("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n");
+                    for event in events.events() {
+                        let event_type = match event.event_type() {
+                            ass_core::parser::ast::EventType::Dialogue => "Dialogue",
+                            ass_core::parser::ast::EventType::Comment => "Comment",
+                            ass_core::parser::ast::EventType::Picture => "Picture",
+                            ass_core::parser::ast::EventType::Sound => "Sound",
+                            ass_core::parser::ast::EventType::Movie => "Movie",
+                            ass_core::parser::ast::EventType::Command => "Command",
+                        };
+                        
+                        output.push_str(&format!("{}: {},{},{},{},{},{},{},{},{},{}\n",
+                            event_type,
+                            event.layer(),
+                            Self::format_time(event.start()),
+                            Self::format_time(event.end()),
+                            event.style(),
+                            event.name(),
+                            event.margin_l(),
+                            event.margin_r(),
+                            event.margin_v(),
+                            event.effect(),
+                            event.text()
+                        ));
+                    }
+                    output.push('\n');
+                }
+                Section::Fonts(_) => {
+                    // Skip fonts section for now
+                }
+                Section::Graphics(_) => {
+                    // Skip graphics section for now
+                }
+            }
+        }
+        
+        output
+    }
+
+    /// Format time in ASS format (h:mm:ss.cc)
+    fn format_time(centiseconds: u32) -> String {
+        let hours = centiseconds / 360000;
+        let minutes = (centiseconds % 360000) / 6000;
+        let seconds = (centiseconds % 6000) / 100;
+        let cs = centiseconds % 100;
+        format!("{}:{:02}:{:02}.{:02}", hours, minutes, seconds, cs)
+    }
+
+    /// Compare rendering of a script at a specific time
+    pub fn compare_at_time(
+        &mut self,
+        script: &Script,
+        time_ms: u32,
+    ) -> Result<PixelComparisonResult, RenderError> {
+        // Render with our renderer
+        let our_frame = self.our_renderer.render_frame(script, time_ms * 10)?; // Convert to centiseconds
+        
+        // Render with libass
+        // Convert Script to string format for libass
+        let script_str = self.script_to_string(script);
+        self.libass_renderer.load_script(&script_str)?;
+        let libass_frame = self.libass_renderer.render_to_frame(time_ms as i64)?;
+
+        // Compare the frames
+        self.compare_frames(&our_frame, &libass_frame, Some(time_ms))
+    }
+
+    /// Compare two rendered frames
+    pub fn compare_frames(
+        &self,
+        our_frame: &Frame,
+        libass_frame: &Frame,
+        time_ms: Option<u32>,
+    ) -> Result<PixelComparisonResult, RenderError> {
+        let our_data = our_frame.data();
+        let libass_data = libass_frame.data();
+
+        if our_data.len() != libass_data.len() {
+            return Err(RenderError::InvalidInput(format!(
+                "Frame size mismatch: {} vs {} bytes",
+                our_data.len(),
+                libass_data.len()
+            )));
+        }
+
+        let mut result = PixelComparisonResult {
+            total_pixels: (self.width * self.height) as usize,
+            matching_pixels: 0,
+            mismatched_pixels: 0,
+            match_percentage: 0.0,
+            max_difference: 0,
+            avg_difference: 0.0,
+            mismatches: Vec::new(),
+            difference_map: None,
+            channel_stats: ChannelStatistics {
+                red: ChannelDiff { max_diff: 0, avg_diff: 0.0, diff_count: 0 },
+                green: ChannelDiff { max_diff: 0, avg_diff: 0.0, diff_count: 0 },
+                blue: ChannelDiff { max_diff: 0, avg_diff: 0.0, diff_count: 0 },
+                alpha: ChannelDiff { max_diff: 0, avg_diff: 0.0, diff_count: 0 },
+            },
+        };
+
+        let mut difference_map = if self.config.generate_heatmap {
+            Some(vec![0u8; our_data.len()])
+        } else {
+            None
+        };
+
+        let mut total_diff = 0u64;
+        let mut red_diff_sum = 0u64;
+        let mut green_diff_sum = 0u64;
+        let mut blue_diff_sum = 0u64;
+        let mut alpha_diff_sum = 0u64;
+
+        // Check region of interest or full frame
+        let (start_x, start_y, end_x, end_y) = if let Some((x, y, w, h)) = self.config.region_of_interest {
+            (x, y, x + w, y + h)
+        } else {
+            (0, 0, self.width, self.height)
+        };
+
+        for y in start_y..end_y {
+            for x in start_x..end_x {
+                let idx = ((y * self.width + x) * 4) as usize;
+                
+                if idx + 3 >= our_data.len() {
+                    continue;
+                }
+
+                let our_pixel = [
+                    our_data[idx],
+                    our_data[idx + 1],
+                    our_data[idx + 2],
+                    our_data[idx + 3],
+                ];
+                
+                let libass_pixel = [
+                    libass_data[idx],
+                    libass_data[idx + 1],
+                    libass_data[idx + 2],
+                    libass_data[idx + 3],
+                ];
+
+                // Calculate per-channel differences
+                let r_diff = (our_pixel[0] as i32 - libass_pixel[0] as i32).unsigned_abs();
+                let g_diff = (our_pixel[1] as i32 - libass_pixel[1] as i32).unsigned_abs();
+                let b_diff = (our_pixel[2] as i32 - libass_pixel[2] as i32).unsigned_abs();
+                let a_diff = (our_pixel[3] as i32 - libass_pixel[3] as i32).unsigned_abs();
+
+                let pixel_diff = r_diff + g_diff + b_diff + a_diff;
+
+                if pixel_diff <= self.config.tolerance as u32 {
+                    result.matching_pixels += 1;
+                } else {
+                    result.mismatched_pixels += 1;
+                    total_diff += pixel_diff as u64;
+
+                    // Update channel statistics
+                    if r_diff > 0 {
+                        result.channel_stats.red.diff_count += 1;
+                        result.channel_stats.red.max_diff = result.channel_stats.red.max_diff.max(r_diff as u8);
+                        red_diff_sum += r_diff as u64;
+                    }
+                    if g_diff > 0 {
+                        result.channel_stats.green.diff_count += 1;
+                        result.channel_stats.green.max_diff = result.channel_stats.green.max_diff.max(g_diff as u8);
+                        green_diff_sum += g_diff as u64;
+                    }
+                    if b_diff > 0 {
+                        result.channel_stats.blue.diff_count += 1;
+                        result.channel_stats.blue.max_diff = result.channel_stats.blue.max_diff.max(b_diff as u8);
+                        blue_diff_sum += b_diff as u64;
+                    }
+                    if a_diff > 0 {
+                        result.channel_stats.alpha.diff_count += 1;
+                        result.channel_stats.alpha.max_diff = result.channel_stats.alpha.max_diff.max(a_diff as u8);
+                        alpha_diff_sum += a_diff as u64;
+                    }
+
+                    result.max_difference = result.max_difference.max(pixel_diff);
+
+                    // Record detailed mismatch info (up to limit)
+                    if result.mismatches.len() < self.config.max_recorded_mismatches {
+                        result.mismatches.push(PixelMismatch {
+                            x,
+                            y,
+                            our_pixel,
+                            libass_pixel,
+                            difference: pixel_diff,
+                        });
+                    }
+
+                    // Update difference heatmap
+                    if let Some(ref mut map) = difference_map {
+                        // Create heatmap visualization (red = high difference)
+                        let heat = ((pixel_diff as f32 / 1020.0) * 255.0).min(255.0) as u8;
+                        map[idx] = heat;      // Red channel
+                        map[idx + 1] = 0;     // Green channel
+                        map[idx + 2] = 255 - heat; // Blue channel
+                        map[idx + 3] = 255;   // Alpha channel
+                    }
+                }
+            }
+        }
+
+        // Calculate statistics
+        result.match_percentage = (result.matching_pixels as f64 / result.total_pixels as f64) * 100.0;
+        
+        if result.mismatched_pixels > 0 {
+            result.avg_difference = total_diff as f64 / result.mismatched_pixels as f64;
+            
+            // Calculate per-channel averages
+            if result.channel_stats.red.diff_count > 0 {
+                result.channel_stats.red.avg_diff = red_diff_sum as f64 / result.channel_stats.red.diff_count as f64;
+            }
+            if result.channel_stats.green.diff_count > 0 {
+                result.channel_stats.green.avg_diff = green_diff_sum as f64 / result.channel_stats.green.diff_count as f64;
+            }
+            if result.channel_stats.blue.diff_count > 0 {
+                result.channel_stats.blue.avg_diff = blue_diff_sum as f64 / result.channel_stats.blue.diff_count as f64;
+            }
+            if result.channel_stats.alpha.diff_count > 0 {
+                result.channel_stats.alpha.avg_diff = alpha_diff_sum as f64 / result.channel_stats.alpha.diff_count as f64;
+            }
+        }
+
+        result.difference_map = difference_map;
+
+        // Save debug output if configured
+        if self.config.save_debug_output {
+            self.save_debug_output(&result, our_frame, libass_frame, time_ms)?;
+        }
+
+        Ok(result)
+    }
+
+    /// Save debug output files
+    fn save_debug_output(
+        &self,
+        result: &PixelComparisonResult,
+        our_frame: &Frame,
+        libass_frame: &Frame,
+        time_ms: Option<u32>,
+    ) -> Result<(), RenderError> {
+        #[cfg(not(feature = "nostd"))]
+        {
+            use std::fs;
+            
+            // Create output directory
+            fs::create_dir_all(&self.config.output_dir)
+                .map_err(|e| RenderError::IOError(format!("Failed to create output dir: {}", e)))?;
+
+            let time_suffix = time_ms.map_or_else(
+                || String::from("comparison"),
+                |t| format!("{:06}ms", t)
+            );
+
+            // Save our renderer output
+            #[cfg(feature = "image")]
+            {
+                let our_path = self.config.output_dir.join(format!("our_renderer_{}.png", time_suffix));
+                self.save_frame_as_png(our_frame, &our_path)?;
+
+                // Save libass output
+                let libass_path = self.config.output_dir.join(format!("libass_{}.png", time_suffix));
+                self.save_frame_as_png(libass_frame, &libass_path)?;
+
+                // Save difference heatmap
+                if let Some(ref diff_map) = result.difference_map {
+                    let diff_path = self.config.output_dir.join(format!("difference_{}.png", time_suffix));
+                    self.save_rgba_as_png(diff_map, self.width, self.height, &diff_path)?;
+                }
+
+                // Generate side-by-side comparison
+                if self.config.generate_comparison {
+                    let comparison = self.create_side_by_side(our_frame, libass_frame, result)?;
+                    let comp_path = self.config.output_dir.join(format!("comparison_{}.png", time_suffix));
+                    self.save_rgba_as_png(&comparison, self.width * 3, self.height, &comp_path)?;
+                }
+            }
+
+            // Save detailed report
+            let report_path = self.config.output_dir.join(format!("report_{}.txt", time_suffix));
+            let report = self.generate_report(result, time_ms);
+            fs::write(report_path, report)
+                .map_err(|e| RenderError::IOError(format!("Failed to write report: {}", e)))?;
+
+            // Save mismatch details as CSV
+            if !result.mismatches.is_empty() {
+                let csv_path = self.config.output_dir.join(format!("mismatches_{}.csv", time_suffix));
+                let csv = self.generate_csv(result);
+                fs::write(csv_path, csv)
+                    .map_err(|e| RenderError::IOError(format!("Failed to write CSV: {}", e)))?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Generate detailed text report
+    fn generate_report(&self, result: &PixelComparisonResult, time_ms: Option<u32>) -> String {
+        let mut report = String::new();
+        
+        report.push_str("=== PIXEL PERFECT COMPARISON REPORT ===\n\n");
+        
+        if let Some(time) = time_ms {
+            report.push_str(&format!("Time: {} ms\n", time));
+        }
+        
+        report.push_str(&format!("Resolution: {}x{}\n", self.width, self.height));
+        report.push_str(&format!("Total Pixels: {}\n\n", result.total_pixels));
+        
+        report.push_str("=== OVERALL RESULTS ===\n");
+        report.push_str(&format!("Matching Pixels: {} ({:.2}%)\n", 
+            result.matching_pixels, result.match_percentage));
+        report.push_str(&format!("Mismatched Pixels: {} ({:.2}%)\n", 
+            result.mismatched_pixels, 100.0 - result.match_percentage));
+        
+        if result.match_percentage == 100.0 {
+            report.push_str("\n✅ PIXEL PERFECT MATCH!\n");
+        } else {
+            report.push_str(&format!("\n❌ NOT PIXEL PERFECT - {:.2}% accuracy\n", result.match_percentage));
+            report.push_str(&format!("Maximum Difference: {}/1020\n", result.max_difference));
+            report.push_str(&format!("Average Difference: {:.2}/1020\n", result.avg_difference));
+        }
+        
+        report.push_str("\n=== PER-CHANNEL ANALYSIS ===\n");
+        report.push_str(&format!("Red Channel:\n  Max Diff: {}\n  Avg Diff: {:.2}\n  Pixels with Diff: {}\n",
+            result.channel_stats.red.max_diff,
+            result.channel_stats.red.avg_diff,
+            result.channel_stats.red.diff_count));
+        report.push_str(&format!("Green Channel:\n  Max Diff: {}\n  Avg Diff: {:.2}\n  Pixels with Diff: {}\n",
+            result.channel_stats.green.max_diff,
+            result.channel_stats.green.avg_diff,
+            result.channel_stats.green.diff_count));
+        report.push_str(&format!("Blue Channel:\n  Max Diff: {}\n  Avg Diff: {:.2}\n  Pixels with Diff: {}\n",
+            result.channel_stats.blue.max_diff,
+            result.channel_stats.blue.avg_diff,
+            result.channel_stats.blue.diff_count));
+        report.push_str(&format!("Alpha Channel:\n  Max Diff: {}\n  Avg Diff: {:.2}\n  Pixels with Diff: {}\n",
+            result.channel_stats.alpha.max_diff,
+            result.channel_stats.alpha.avg_diff,
+            result.channel_stats.alpha.diff_count));
+        
+        if !result.mismatches.is_empty() {
+            report.push_str(&format!("\n=== TOP {} MISMATCHES ===\n", 
+                result.mismatches.len().min(10)));
+            
+            for (i, mismatch) in result.mismatches.iter().take(10).enumerate() {
+                report.push_str(&format!(
+                    "{}. Position ({}, {}): Our=[{},{},{},{}] Libass=[{},{},{},{}] Diff={}\n",
+                    i + 1,
+                    mismatch.x, mismatch.y,
+                    mismatch.our_pixel[0], mismatch.our_pixel[1], 
+                    mismatch.our_pixel[2], mismatch.our_pixel[3],
+                    mismatch.libass_pixel[0], mismatch.libass_pixel[1],
+                    mismatch.libass_pixel[2], mismatch.libass_pixel[3],
+                    mismatch.difference
+                ));
+            }
+        }
+        
+        report
+    }
+
+    /// Generate CSV of mismatches
+    fn generate_csv(&self, result: &PixelComparisonResult) -> String {
+        let mut csv = String::from("x,y,our_r,our_g,our_b,our_a,libass_r,libass_g,libass_b,libass_a,difference\n");
+        
+        for mismatch in &result.mismatches {
+            csv.push_str(&format!(
+                "{},{},{},{},{},{},{},{},{},{},{}\n",
+                mismatch.x, mismatch.y,
+                mismatch.our_pixel[0], mismatch.our_pixel[1],
+                mismatch.our_pixel[2], mismatch.our_pixel[3],
+                mismatch.libass_pixel[0], mismatch.libass_pixel[1],
+                mismatch.libass_pixel[2], mismatch.libass_pixel[3],
+                mismatch.difference
+            ));
+        }
+        
+        csv
+    }
+
+    /// Create side-by-side comparison image
+    fn create_side_by_side(
+        &self,
+        our_frame: &Frame,
+        libass_frame: &Frame,
+        result: &PixelComparisonResult,
+    ) -> Result<Vec<u8>, RenderError> {
+        let width = self.width as usize;
+        let height = self.height as usize;
+        let mut comparison = vec![0u8; width * 3 * height * 4];
+        
+        let our_data = our_frame.data();
+        let libass_data = libass_frame.data();
+        
+        for y in 0..height {
+            for x in 0..width {
+                let src_idx = (y * width + x) * 4;
+                
+                // Our renderer (left)
+                let dst_idx_our = (y * width * 3 + x) * 4;
+                comparison[dst_idx_our..dst_idx_our + 4]
+                    .copy_from_slice(&our_data[src_idx..src_idx + 4]);
+                
+                // Libass (middle)
+                let dst_idx_libass = (y * width * 3 + width + x) * 4;
+                comparison[dst_idx_libass..dst_idx_libass + 4]
+                    .copy_from_slice(&libass_data[src_idx..src_idx + 4]);
+                
+                // Difference (right)
+                if let Some(ref diff_map) = result.difference_map {
+                    let dst_idx_diff = (y * width * 3 + width * 2 + x) * 4;
+                    comparison[dst_idx_diff..dst_idx_diff + 4]
+                        .copy_from_slice(&diff_map[src_idx..src_idx + 4]);
+                }
+            }
+        }
+        
+        Ok(comparison)
+    }
+
+    #[cfg(feature = "image")]
+    fn save_frame_as_png(&self, frame: &Frame, path: &Path) -> Result<(), RenderError> {
+        let img = image::RgbaImage::from_raw(
+            self.width,
+            self.height,
+            frame.data().to_vec()
+        ).ok_or_else(|| RenderError::InvalidInput("Failed to create image".into()))?;
+        
+        img.save(path)
+            .map_err(|e| RenderError::IOError(format!("Failed to save PNG: {}", e)))?;
+        
+        Ok(())
+    }
+
+    #[cfg(feature = "image")]
+    fn save_rgba_as_png(&self, data: &[u8], width: u32, height: u32, path: &Path) -> Result<(), RenderError> {
+        let img = image::RgbaImage::from_raw(
+            width,
+            height,
+            data.to_vec()
+        ).ok_or_else(|| RenderError::InvalidInput("Failed to create image".into()))?;
+        
+        img.save(path)
+            .map_err(|e| RenderError::IOError(format!("Failed to save PNG: {}", e)))?;
+        
+        Ok(())
+    }
+
+    #[cfg(not(feature = "image"))]
+    fn save_frame_as_png(&self, _frame: &Frame, _path: &Path) -> Result<(), RenderError> {
+        Ok(())
+    }
+
+    #[cfg(not(feature = "image"))]
+    fn save_rgba_as_png(&self, _data: &[u8], _width: u32, _height: u32, _path: &Path) -> Result<(), RenderError> {
+        Ok(())
+    }
+}
+
+/// Automated test runner for comparing multiple frames
+pub struct LibassCompatibilityTester {
+    comparator: PixelPerfectComparator,
+    test_times: Vec<u32>,
+    tolerance: u8,
+}
+
+impl LibassCompatibilityTester {
+    /// Create a new tester
+    pub fn new(width: u32, height: u32) -> Result<Self, RenderError> {
+        let mut config = ComparisonConfig::default();
+        config.tolerance = 0; // Require exact match by default
+        
+        Ok(Self {
+            comparator: PixelPerfectComparator::with_config(width, height, config)?,
+            test_times: vec![0, 500, 1000, 2000, 3000, 5000, 10000],
+            tolerance: 0,
+        })
+    }
+
+    /// Set custom test times (in milliseconds)
+    pub fn set_test_times(&mut self, times: Vec<u32>) {
+        self.test_times = times;
+    }
+
+    /// Set tolerance for pixel differences
+    pub fn set_tolerance(&mut self, tolerance: u8) {
+        self.tolerance = tolerance;
+        self.comparator.config.tolerance = tolerance;
+    }
+
+    /// Run compatibility test for a script
+    pub fn test_script(&mut self, script: &Script) -> Result<TestReport, RenderError> {
+        let mut report = TestReport {
+            script_name: String::from("test_script"),
+            total_frames: self.test_times.len(),
+            perfect_frames: 0,
+            imperfect_frames: 0,
+            frame_results: Vec::new(),
+            overall_accuracy: 0.0,
+        };
+
+        for &time_ms in &self.test_times {
+            let result = self.comparator.compare_at_time(script, time_ms)?;
+            
+            let is_perfect = result.match_percentage == 100.0;
+            if is_perfect {
+                report.perfect_frames += 1;
+            } else {
+                report.imperfect_frames += 1;
+            }
+
+            report.frame_results.push(FrameTestResult {
+                time_ms,
+                is_pixel_perfect: is_perfect,
+                accuracy: result.match_percentage,
+                max_difference: result.max_difference,
+                mismatched_pixels: result.mismatched_pixels,
+            });
+
+            // Log progress
+            println!(
+                "Frame at {}ms: {:.2}% accurate ({} mismatches)",
+                time_ms, result.match_percentage, result.mismatched_pixels
+            );
+        }
+
+        report.overall_accuracy = report.frame_results.iter()
+            .map(|r| r.accuracy)
+            .sum::<f64>() / report.frame_results.len() as f64;
+
+        Ok(report)
+    }
+}
+
+/// Test report for a script
+#[derive(Debug, Clone)]
+pub struct TestReport {
+    pub script_name: String,
+    pub total_frames: usize,
+    pub perfect_frames: usize,
+    pub imperfect_frames: usize,
+    pub frame_results: Vec<FrameTestResult>,
+    pub overall_accuracy: f64,
+}
+
+/// Test result for a single frame
+#[derive(Debug, Clone)]
+pub struct FrameTestResult {
+    pub time_ms: u32,
+    pub is_pixel_perfect: bool,
+    pub accuracy: f64,
+    pub max_difference: u32,
+    pub mismatched_pixels: usize,
+}
+
+impl TestReport {
+    /// Check if all frames are pixel-perfect
+    pub fn is_pixel_perfect(&self) -> bool {
+        self.perfect_frames == self.total_frames
+    }
+
+    /// Generate a summary string
+    pub fn summary(&self) -> String {
+        format!(
+            "Test Report: {} frames tested\n\
+             Pixel Perfect: {} frames ({:.1}%)\n\
+             Imperfect: {} frames\n\
+             Overall Accuracy: {:.2}%",
+            self.total_frames,
+            self.perfect_frames,
+            (self.perfect_frames as f64 / self.total_frames as f64) * 100.0,
+            self.imperfect_frames,
+            self.overall_accuracy
+        )
+    }
+}

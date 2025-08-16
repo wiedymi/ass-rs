@@ -158,16 +158,18 @@ pub fn parse_bgr_color(color_str: &str) -> Result<[u8; 4], CoreError> {
 
     let color_array = match hex_part.len() {
         6 => {
-            let blue = ((hex_value >> 16) & 0xFF) as u8;
-            let green = ((hex_value >> 8) & 0xFF) as u8;
+            // ASS uses BGR format: &HBBGGRR
             let red = (hex_value & 0xFF) as u8;
-            [red, green, blue, 0]
+            let green = ((hex_value >> 8) & 0xFF) as u8;
+            let blue = ((hex_value >> 16) & 0xFF) as u8;
+            [red, green, blue, 255] // Default to fully opaque
         }
         8 => {
-            let alpha = ((hex_value >> 24) & 0xFF) as u8;
-            let blue = ((hex_value >> 16) & 0xFF) as u8;
-            let green = ((hex_value >> 8) & 0xFF) as u8;
+            // ASS uses ABGR format: &HAABBGGRR
+            let alpha = 255 - ((hex_value >> 24) & 0xFF) as u8; // ASS alpha is inverted (0=opaque, FF=transparent)
             let red = (hex_value & 0xFF) as u8;
+            let green = ((hex_value >> 8) & 0xFF) as u8;
+            let blue = ((hex_value >> 16) & 0xFF) as u8;
             [red, green, blue, alpha]
         }
         _ => {

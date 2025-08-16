@@ -62,6 +62,16 @@ pub struct OverrideTag<'a> {
 }
 
 impl<'a> OverrideTag<'a> {
+    /// Create a new override tag
+    pub const fn new(name: &'a str, args: &'a str, complexity: u8, position: usize) -> Self {
+        Self {
+            name,
+            args,
+            complexity,
+            position,
+        }
+    }
+    
     /// Get tag name
     #[must_use]
     pub const fn name(&self) -> &'a str {
@@ -124,16 +134,49 @@ pub fn parse_override_block<'a>(
             pos += 1;
 
             let name_start = pos;
-            while pos < chars.len() && chars[pos].is_ascii_alphabetic() {
-                pos += 1;
+            // Tags can start with digits (e.g., \1c, \2c, \3c, \4c for colors, \1a, \2a for alpha)
+            // But after the initial characters, only continue if alphabetic to avoid consuming arguments
+            let mut tag_name_len = 0;
+            while pos < chars.len() {
+                if tag_name_len == 0 && chars[pos].is_ascii_digit() {
+                    // Allow digit as first character (for \1c, \2c, etc.)
+                    pos += 1;
+                    tag_name_len += 1;
+                } else if chars[pos].is_ascii_alphabetic() {
+                    pos += 1;
+                    tag_name_len += 1;
+                } else {
+                    break;
+                }
             }
 
             if pos > name_start {
                 let name_end = pos;
                 let args_start = pos;
 
-                while pos < chars.len() && chars[pos] != '\\' {
-                    pos += 1;
+                // Special handling for \t tag which can contain nested tags in parentheses
+                let tag_name_preview = &content[name_start..name_end];
+                if tag_name_preview == "t" && pos < chars.len() && chars[pos] == '(' {
+                    // For \t tag with parentheses, we need to find the matching closing parenthesis
+                    // and include everything inside, even if it contains backslashes
+                    let mut paren_depth = 0;
+                    while pos < chars.len() {
+                        if chars[pos] == '(' {
+                            paren_depth += 1;
+                        } else if chars[pos] == ')' {
+                            paren_depth -= 1;
+                            if paren_depth == 0 {
+                                pos += 1; // Include the closing parenthesis
+                                break;
+                            }
+                        }
+                        pos += 1;
+                    }
+                } else {
+                    // For other tags, stop at the next backslash
+                    while pos < chars.len() && chars[pos] != '\\' {
+                        pos += 1;
+                    }
                 }
 
                 let tag_name = &content[name_start..name_end];
@@ -200,16 +243,49 @@ pub fn parse_override_block_with_registry<'a>(
             pos += 1;
 
             let name_start = pos;
-            while pos < chars.len() && chars[pos].is_ascii_alphabetic() {
-                pos += 1;
+            // Tags can start with digits (e.g., \1c, \2c, \3c, \4c for colors, \1a, \2a for alpha)
+            // But after the initial characters, only continue if alphabetic to avoid consuming arguments
+            let mut tag_name_len = 0;
+            while pos < chars.len() {
+                if tag_name_len == 0 && chars[pos].is_ascii_digit() {
+                    // Allow digit as first character (for \1c, \2c, etc.)
+                    pos += 1;
+                    tag_name_len += 1;
+                } else if chars[pos].is_ascii_alphabetic() {
+                    pos += 1;
+                    tag_name_len += 1;
+                } else {
+                    break;
+                }
             }
 
             if pos > name_start {
                 let name_end = pos;
                 let args_start = pos;
 
-                while pos < chars.len() && chars[pos] != '\\' {
-                    pos += 1;
+                // Special handling for \t tag which can contain nested tags in parentheses
+                let tag_name_preview = &content[name_start..name_end];
+                if tag_name_preview == "t" && pos < chars.len() && chars[pos] == '(' {
+                    // For \t tag with parentheses, we need to find the matching closing parenthesis
+                    // and include everything inside, even if it contains backslashes
+                    let mut paren_depth = 0;
+                    while pos < chars.len() {
+                        if chars[pos] == '(' {
+                            paren_depth += 1;
+                        } else if chars[pos] == ')' {
+                            paren_depth -= 1;
+                            if paren_depth == 0 {
+                                pos += 1; // Include the closing parenthesis
+                                break;
+                            }
+                        }
+                        pos += 1;
+                    }
+                } else {
+                    // For other tags, stop at the next backslash
+                    while pos < chars.len() && chars[pos] != '\\' {
+                        pos += 1;
+                    }
                 }
 
                 let tag_name = &content[name_start..name_end];
