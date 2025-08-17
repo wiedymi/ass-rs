@@ -59,32 +59,6 @@ The ASS-RS ecosystem consists of modular, interoperable crates:
 - **SIMD Acceleration**: 20-30% faster with portable SIMD
 - **Streaming**: <10ms/MB for chunked inputs
 
-## 🎨 Enhanced Features
-
-### Complex Transform Animations
-ASS-RS now fully supports nested tags within `\t` transform animations, enabling complex multi-property animations:
-
-```rust
-// Complex nested transform now works correctly
-let text = r"{\t(0,1000,\fs50\1c&HFF0000&\frz45)}Animated text";
-```
-
-### Line Break Type Preservation
-Maintains distinction between hard (`\N`) and soft (`\n`) line breaks for proper text wrapping:
-
-```rust
-use ass_core::analysis::events::{TextWithLineBreaks, LineBreakType};
-
-let processed = TextWithLineBreaks::from_text(text, drawing_mode);
-match processed.get_break_type_at(position) {
-    Some(LineBreakType::Hard) => {}, // Force new line
-    Some(LineBreakType::Soft) => {}, // Allow wrapping
-    None => {},
-}
-```
-
-### libass-Compatible Positioning
-Full compatibility with libass positioning behavior including anchor points, rotation origins, and movement interpolation. See [FIXES_AND_IMPROVEMENTS.md](FIXES_AND_IMPROVEMENTS.md) for detailed implementation notes.
 
 ## 🎯 Quick Start
 
@@ -92,7 +66,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-ass-core = "0.1"
+ass-core = "0.1.1"
 ```
 
 Basic usage:
@@ -180,22 +154,6 @@ wasm-pack test --chrome
 cargo +nightly fuzz run tokenizer
 ```
 
-## 📊 Benchmarks
-
-Current performance vs libass (measured on 1KB typical karaoke script):
-
-| Operation | ass-rs | libass | Improvement |
-|-----------|--------|--------|-------------|
-| Parse     | 2.1ms  | 8.4ms  | **4.0x** |
-| Analysis  | 0.8ms  | 3.2ms  | **4.0x** |
-| Memory    | 1.1KB  | 4.8KB  | **4.4x** |
-
-*Benchmarks run on 2023 MacBook Pro M2, averaged over 1000 iterations*
-
-## 🤝 Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
 ### Development Setup
 
 ```bash
@@ -252,7 +210,3 @@ cargo bench
 ## 📄 License
 
 Licensed under the [MIT license](LICENSE).
-
----
-
-**Built with ❤️ in Rust for subtitle enthusiasts worldwide**
