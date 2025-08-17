@@ -234,7 +234,11 @@ impl DocumentSearch for FstSearchIndex {
         self.build_index(document)
     }
 
-    fn search(&self, pattern: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
+    fn search<'a>(
+        &'a self,
+        pattern: &str,
+        options: &SearchOptions,
+    ) -> Result<Vec<SearchResult<'a>>> {
         #[cfg(feature = "std")]
         let _start_time = Instant::now();
         let mut results = Vec::new();
