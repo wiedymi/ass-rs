@@ -38,7 +38,7 @@ pub trait Pipeline: Send + Sync {
     ) -> Result<(), RenderError>;
 
     /// Get the current script
-    fn script(&self) -> Option<&Script>;
+    fn script(&self) -> Option<&Script<'_>>;
 
     /// Process events into intermediate layers
     fn process_events(

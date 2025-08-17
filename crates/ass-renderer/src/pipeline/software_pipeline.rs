@@ -1832,7 +1832,7 @@ impl Pipeline for SoftwarePipeline {
         Ok(())
     }
 
-    fn script(&self) -> Option<&Script> {
+    fn script(&self) -> Option<&Script<'_>> {
         None // We don't store the script reference directly
     }
 
