@@ -1,13 +1,19 @@
 //! Text segmentation for handling inline formatting changes
 
 use crate::utils::RenderError;
-use ass_core::analysis::events::{OverrideTag, TextAnalysis};
-use ass_core::plugin::ExtensionRegistry;
+use ass_core::analysis::events::TextAnalysis;
 
 #[cfg(feature = "nostd")]
-use alloc::{string::String, vec, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 #[cfg(not(feature = "nostd"))]
-use std::{string::String, vec::Vec};
+use std::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 /// A text segment with its own formatting
 #[derive(Debug, Clone)]

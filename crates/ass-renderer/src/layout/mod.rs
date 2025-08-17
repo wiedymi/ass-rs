@@ -10,7 +10,6 @@ use alloc::{
 #[cfg(not(feature = "nostd"))]
 use std::{string::String, vec::Vec};
 
-use crate::pipeline::shaping::ShapedText;
 pub use positioning::{convert_ssa_alignment, scale_coordinates, BoundingBox, PositionInfo};
 
 /// Alignment types for subtitle positioning

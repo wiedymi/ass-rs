@@ -5,9 +5,6 @@ use alloc::{string::String, vec::Vec};
 #[cfg(not(feature = "nostd"))]
 use std::{string::String, vec::Vec};
 
-use crate::utils::RenderError;
-use ass_core::analysis::events::OverrideTag;
-
 /// Transform animation data
 #[derive(Debug, Clone)]
 pub struct TransformAnimation {

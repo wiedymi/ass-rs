@@ -2,17 +2,20 @@
 
 use crate::pipeline::transform::TransformAnimation;
 use crate::utils::RenderError;
-use ass_core::analysis::events::{OverrideTag, TextAnalysis};
-use ass_core::plugin::{ExtensionRegistry, TagHandler};
-
 #[cfg(feature = "nostd")]
-use ahash::HashMap;
-#[cfg(feature = "nostd")]
-use alloc::{string::String, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+use ass_core::analysis::events::TextAnalysis;
 #[cfg(not(feature = "nostd"))]
 use std::collections::HashMap;
 #[cfg(not(feature = "nostd"))]
-use std::{eprintln, string::String, vec::Vec};
+use std::{
+    eprintln,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 /// Processed tag values ready for rendering
 #[derive(Debug, Clone)]
@@ -208,18 +211,18 @@ fn process_single_tag(tag: &OverrideTag, processed: &mut ProcessedTags) -> Resul
             }
         }
         "move" => {
-            #[cfg(debug_assertions)]
+            #[cfg(all(debug_assertions, not(feature = "nostd")))]
             eprintln!("PARSING MOVE TAG: args = '{}'", tag.args());
 
             if let Some(data) = parse_move_args(tag.args()) {
-                #[cfg(debug_assertions)]
+                #[cfg(all(debug_assertions, not(feature = "nostd")))]
                 eprintln!(
                     "  Parsed move: x1={}, y1={}, x2={}, y2={}, t1={}, t2={}",
                     data.0, data.1, data.2, data.3, data.4, data.5
                 );
                 processed.movement = Some(data);
             } else {
-                #[cfg(debug_assertions)]
+                #[cfg(all(debug_assertions, not(feature = "nostd")))]
                 eprintln!("  Failed to parse move args!");
             }
         }

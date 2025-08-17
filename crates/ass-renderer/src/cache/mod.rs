@@ -14,7 +14,7 @@ use alloc::collections::BTreeMap as HashMap;
 use alloc::{string::String, sync::Arc};
 
 /// Cache key for shaped text
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct TextCacheKey {
     pub text: String,
     pub font_family: String,
@@ -24,7 +24,7 @@ pub struct TextCacheKey {
 }
 
 /// Cache key for drawing paths
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct DrawingCacheKey {
     pub commands: String,
 }

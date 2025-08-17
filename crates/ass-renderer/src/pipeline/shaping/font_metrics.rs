@@ -1,6 +1,5 @@
 //! Font metrics handling for libass/VSFilter compatibility
 
-use crate::utils::RenderError;
 use ttf_parser::Face;
 
 /// Font metrics with VSFilter compatibility

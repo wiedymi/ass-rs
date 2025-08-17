@@ -1,7 +1,9 @@
 //! Tag parameter validation module
 
 #[cfg(feature = "nostd")]
-use alloc::format;
+use alloc::{format, string::ToString};
+#[cfg(not(feature = "nostd"))]
+use std::string::ToString;
 
 use crate::utils::RenderError;
 

@@ -1,9 +1,17 @@
 //! Fixed software pipeline implementation with proper style resolution
 
 #[cfg(feature = "nostd")]
-use alloc::{string::{String, ToString}, vec, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 #[cfg(not(feature = "nostd"))]
-use std::{eprintln, string::{String, ToString}, vec::Vec};
+use std::{
+    eprintln,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 use crate::layout::{Alignment, LayoutContext, TextMetrics};
 use crate::pipeline::{

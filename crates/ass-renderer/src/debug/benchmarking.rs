@@ -142,8 +142,7 @@ impl PerformanceBenchmark {
 
             // Update context resolution
             let context = RenderContext::new(resolution.0, resolution.1);
-            self.our_renderer =
-                Renderer::new(crate::backends::BackendType::Software, context)?;
+            self.our_renderer = Renderer::new(crate::backends::BackendType::Software, context)?;
 
             #[cfg(feature = "libass-compare")]
             {

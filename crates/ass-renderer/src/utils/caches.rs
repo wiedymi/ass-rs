@@ -3,9 +3,9 @@
 use ahash::AHashMap;
 
 #[cfg(feature = "nostd")]
-use alloc::{boxed::Box, string::String, vec, vec::Vec};
+use alloc::{string::String, vec, vec::Vec};
 #[cfg(not(feature = "nostd"))]
-use std::{boxed::Box, string::String, vec::Vec};
+use std::{string::String, vec::Vec};
 
 /// Glyph cache for rendered glyphs
 pub struct GlyphCache {

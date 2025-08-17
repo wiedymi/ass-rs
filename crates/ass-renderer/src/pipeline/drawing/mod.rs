@@ -1,9 +1,16 @@
 //! Drawing command processing module
 
 #[cfg(feature = "nostd")]
-use alloc::{format, string::String, vec::Vec};
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 #[cfg(not(feature = "nostd"))]
-use std::{string::String, vec::Vec};
+use std::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 use crate::utils::RenderError;
 use tiny_skia::{Path, PathBuilder};

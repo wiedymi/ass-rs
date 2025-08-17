@@ -5,7 +5,7 @@ use crate::renderer::RenderContext;
 use crate::utils::{DirtyRegion, RenderError};
 
 #[cfg(feature = "nostd")]
-use alloc::{boxed::Box, format, string::ToString, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, format, sync::Arc, vec::Vec};
 #[cfg(not(feature = "nostd"))]
 use std::{boxed::Box, sync::Arc, vec::Vec};
 

@@ -4,14 +4,14 @@ mod font_metrics;
 pub use font_metrics::FontMetrics;
 
 #[cfg(feature = "nostd")]
-use alloc::{format, sync::Arc, vec::Vec};
+use alloc::{format, string::ToString, sync::Arc, vec::Vec};
 #[cfg(not(feature = "nostd"))]
-use std::{sync::Arc, vec::Vec};
+use std::{string::ToString, sync::Arc, vec::Vec};
 
 use crate::utils::RenderError;
 use ahash::AHashMap;
 use fontdb::{Database as FontDatabase, ID as FontId};
-use rustybuzz::{Direction, Face, Feature, GlyphBuffer, UnicodeBuffer, Variation};
+use rustybuzz::{Face, Feature, UnicodeBuffer, Variation};
 use tiny_skia::{Path, PathBuilder};
 
 /// Shaped glyph representation

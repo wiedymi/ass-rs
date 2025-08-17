@@ -1,6 +1,5 @@
 use crate::{Frame, RenderError};
 
-
 #[cfg(feature = "nostd")]
 extern crate alloc;
 #[cfg(feature = "nostd")]

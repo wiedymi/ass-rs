@@ -11,9 +11,6 @@
 #[cfg(feature = "nostd")]
 extern crate alloc;
 
-#[cfg(feature = "nostd")]
-use alloc::{boxed::Box, string::String, vec::Vec};
-
 pub mod animation;
 pub mod backends;
 pub mod cache;

@@ -3,11 +3,6 @@
 use ass_core::parser::Script;
 use fontdb::Database as FontDatabase;
 
-#[cfg(feature = "nostd")]
-use alloc::vec::Vec;
-#[cfg(not(feature = "nostd"))]
-use std::vec::Vec;
-
 /// Load embedded fonts from ASS script into font database
 pub fn load_embedded_fonts(script: &Script, font_database: &mut FontDatabase) {
     // Check if the script has a Fonts section

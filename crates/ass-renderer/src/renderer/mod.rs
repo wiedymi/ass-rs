@@ -108,17 +108,17 @@ impl Renderer {
             .process_events(&events, time_cs, &self.context)?;
 
         // Debug: Check what layers we have
-        eprintln!("RENDERER: Got {} layers", layers.len());
+        // eprintln!("RENDERER: Got {} layers", layers.len());
         for (i, layer) in layers.iter().enumerate() {
             match layer {
                 crate::pipeline::IntermediateLayer::Vector(_) => {
-                    eprintln!("RENDERER: Layer {} is VectorData", i);
+                    // eprintln!("RENDERER: Layer {} is VectorData", i);
                 }
                 crate::pipeline::IntermediateLayer::Text(_) => {
-                    eprintln!("RENDERER: Layer {} is TextData", i);
+                    // eprintln!("RENDERER: Layer {} is TextData", i);
                 }
                 crate::pipeline::IntermediateLayer::Raster(_) => {
-                    eprintln!("RENDERER: Layer {} is RasterData", i);
+                    // eprintln!("RENDERER: Layer {} is RasterData", i);
                 }
             }
         }

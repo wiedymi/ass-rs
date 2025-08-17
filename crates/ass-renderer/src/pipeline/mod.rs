@@ -2,15 +2,14 @@
 
 use crate::renderer::RenderContext;
 use crate::utils::{DirtyRegion, RenderError};
-#[cfg(feature = "analysis-integration")]
 use ass_core::analysis::ScriptAnalysis;
 use ass_core::parser::{Event, Script};
 use smallvec::SmallVec;
 
 #[cfg(feature = "nostd")]
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{string::String, vec::Vec};
 #[cfg(not(feature = "nostd"))]
-use std::{boxed::Box, string::String, vec::Vec};
+use std::{string::String, vec::Vec};
 
 pub mod animation;
 pub mod compositing;
