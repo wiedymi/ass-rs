@@ -10,7 +10,7 @@ use ass_core::utils::{format_ass_time, parse_ass_time};
 
 /// Helper function to parse an ASS event line with proper comma handling
 /// Returns parsed Event struct or error if parsing fails
-fn parse_event_line(line: &str) -> core::result::Result<Event, EditorError> {
+fn parse_event_line(line: &str) -> core::result::Result<Event<'_>, EditorError> {
     // Extract event type
     let colon_pos = line
         .find(':')

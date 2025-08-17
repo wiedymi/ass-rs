@@ -765,7 +765,11 @@ impl DocumentSearch for DocumentSearchImpl {
         }
     }
 
-    fn search(&self, pattern: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
+    fn search<'a>(
+        &'a self,
+        pattern: &str,
+        options: &SearchOptions,
+    ) -> Result<Vec<SearchResult<'a>>> {
         #[cfg(feature = "std")]
         let _start_time = Instant::now();
 
@@ -855,13 +859,13 @@ impl DocumentSearch for DocumentSearchImpl {
         Ok(results)
     }
 
-    fn find_replace(
-        &self,
+    fn find_replace<'a>(
+        &'a self,
         document: &mut EditorDocument,
         pattern: &str,
         replacement: &str,
         options: &SearchOptions,
-    ) -> Result<Vec<SearchResult>> {
+    ) -> Result<Vec<SearchResult<'a>>> {
         let results = self.search(pattern, options)?;
         let mut replaced = Vec::new();
 
