@@ -587,6 +587,9 @@ fn uuencode_data(filename: &str, data: &[u8]) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::core::EditorDocument;
+    
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     const TEST_CONTENT: &str = r#"[Script Info]
 Title: Test
