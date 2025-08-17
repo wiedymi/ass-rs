@@ -11,12 +11,6 @@
 extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::{format, string::ToString};
-#[allow(
-    clippy::missing_docs_in_private_items,
-    clippy::option_if_let_else,
-    clippy::range_plus_one,
-    clippy::cast_precision_loss
-)]
 use ass_core::{
     parser::{incremental::TextChange, Script},
     utils::ScriptGenerator,
@@ -372,9 +366,9 @@ fn bench_large_scale_anime(c: &mut Criterion) {
     for (profile_name, event_count) in &large_sizes {
         // Generate large anime subtitle file
         let script_text = ScriptGenerator::anime_realistic(*event_count).generate();
-        let file_size_mb = script_text.len() as f64 / 1_048_576.0;
+        let file_size_mb = script_text.len() / 1_048_576;
 
-        println!("Generated {profile_name}: {file_size_mb:.1}MB ({event_count} events)");
+        println!("Generated {profile_name}: {file_size_mb}MB ({event_count} events)");
 
         // Test incremental changes on large files
         let small_change = create_section_change(&script_text, 50);
@@ -451,7 +445,11 @@ fn bench_large_scale_anime(c: &mut Criterion) {
 
                     // Estimate memory usage (in real implementation would use actual measurements)
                     let estimated_memory = input_size + change.new_text.len();
-                    let memory_ratio = estimated_memory as f64 / input_size as f64;
+                    let memory_ratio = if input_size == 0 {
+                        0
+                    } else {
+                        estimated_memory * 100 / input_size
+                    };
 
                     std_black_box((result, duration, memory_ratio))
                 });
@@ -513,19 +511,18 @@ fn create_cross_section_change(script_text: &str, size: usize) -> TextChange {
 
 /// Create a change at section boundary
 fn create_section_boundary_change(script_text: &str) -> TextChange {
-    if let Some(events_start) = script_text.find("[Events]") {
-        TextChange {
-            range: events_start..events_start,
-            new_text: "\n[Custom Section]\nTest: Value\n\n".to_string(),
-            line_range: 10..14,
-        }
-    } else {
-        TextChange {
+    script_text.find("[Events]").map_or_else(
+        || TextChange {
             range: 0..0,
             new_text: "[New Section]\n".to_string(),
             line_range: 1..2,
-        }
-    }
+        },
+        |events_start| TextChange {
+            range: events_start..events_start,
+            new_text: "\n[Custom Section]\nTest: Value\n\n".to_string(),
+            line_range: 10..14,
+        },
+    )
 }
 
 /// Create typing simulation - many small insertions
@@ -552,7 +549,7 @@ fn create_backspace_simulation(script_text: &str, count: usize) -> Vec<TextChang
     for i in 0..count {
         let pos = start_pos.saturating_sub(i);
         changes.push(TextChange {
-            range: pos..pos + 1,
+            range: pos..pos,
             new_text: String::new(),
             line_range: 10..10,
         });

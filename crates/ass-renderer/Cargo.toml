@@ -1,0 +1,130 @@
+[package]
+name = "ass-renderer"
+version = "0.1.0"
+edition = "2021"
+authors = ["ass-rs contributors"]
+description = "High-performance ASS subtitle renderer with modular backends"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ass-rs/ass-renderer"
+keywords = ["ass", "subtitle", "renderer", "webgpu", "vulkan"]
+categories = ["multimedia::video", "graphics", "rendering"]
+
+[dependencies]
+# Core dependency
+ass-core = { path = "../ass-core", version = "0.1.0" }
+
+# Text shaping and rendering
+rustybuzz = "0.11"
+tiny-skia = "0.11"
+fontdb = "0.16"
+ttf-parser = "0.20"
+
+# Parallelization
+rayon = { version = "1.10", optional = true }
+
+# GPU backends
+ash = { version = "0.37", optional = true }
+wgpu = { version = "0.19", optional = true }
+pollster = { version = "0.3", optional = true }
+bytemuck = { version = "1.14", features = ["derive"], optional = true }
+
+# Utilities
+smallvec = "1.14"
+thiserror = "1.0"
+ahash = "0.8"
+bumpalo = { version = "3.16", optional = true }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+
+# Debug and visualization
+image = { version = "0.24", optional = true }
+
+# Libass comparison - temporarily disabled due to bindgen issues
+# libass = { version = "0.2", optional = true }
+
+# GUI support (optional)
+winit = { version = "0.29", optional = true }
+softbuffer = { version = "0.4", optional = true }
+egui = { version = "0.27", optional = true }
+egui-winit = { version = "0.27", optional = true }
+egui-wgpu = { version = "0.27", optional = true }
+rfd = { version = "0.13", optional = true }
+
+# macOS/iOS support
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+metal = { version = "0.27", optional = true }
+
+# WASM support
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+web-sys = { version = "0.3", optional = true, features = [
+    "Window",
+    "Document",
+    "HtmlCanvasElement",
+    "WebGl2RenderingContext",
+    "OffscreenCanvas"
+]}
+
+[build-dependencies]
+pkg-config = "0.3"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.5"
+pretty_assertions = "1.4"
+env_logger = "0.11"
+
+[features]
+default = ["analysis-integration", "software-backend", "backend-probing", "simd", "image", "serde", "libass-compare"]
+
+# Main feature sets
+minimal = ["nostd", "analysis-integration"]
+full = ["analysis-integration", "software-backend", "backend-probing", "simd", "image", "serde", "libass-compare"]
+
+# Core features
+analysis-integration = ["ass-core/analysis"]
+libass-compare = [] # Currently a stub - libass integration temporarily disabled
+software-backend = ["rayon"]
+hardware-backend = ["vulkan", "metal"]
+web-backend = ["wgpu", "pollster", "bytemuck", "wasm-bindgen", "wasm-bindgen-futures", "web-sys"]
+backend-probing = []
+backend-metrics = []
+
+# Hardware backend sub-features
+vulkan = ["ash", "hardware-backend"]
+metal = ["dep:metal", "hardware-backend"]
+
+# Performance features
+simd = ["ass-core/simd", "tiny-skia/simd"]
+arena = ["bumpalo", "ass-core/arena"]
+
+# WASM optimizations
+wasm = ["web-backend"]
+
+# Serialization
+serde = ["dep:serde", "dep:serde_json", "ass-core/serde"]
+
+# Debug features
+image = ["dep:image"]
+
+# No-std support (limited backends)
+nostd = ["ass-core/nostd"]
+
+# Unicode wrapping support
+unicode-wrap = ["ass-core/unicode-wrap"]
+
+# Development features
+benches = []
+gui-dev = ["winit", "softbuffer", "egui", "egui-winit", "egui-wgpu", "wgpu", "pollster", "rfd"]
+docs = ["full", "gui-dev", "web-backend", "unicode-wrap", "plugins", "benches"] # Safe feature set for documentation
+
+# Plugin system support
+plugins = []
+
+[[bench]]
+name = "render_benchmarks"
+harness = false
+required-features = ["benches"]

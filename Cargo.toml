@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/ass-core", "crates/ass-editor"]
+members = ["crates/ass-core", "crates/ass-editor", "crates/ass-renderer"]
 resolver = "2"
 
 [workspace.dependencies]

@@ -9,7 +9,6 @@
 extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::{format, string::ToString};
-#[allow(clippy::missing_docs_in_private_items)]
 use std::{
     env,
     fs::File,
@@ -38,21 +37,29 @@ impl Default for PerformanceTargets {
 /// Benchmark result data
 #[derive(Debug)]
 struct BenchmarkResult {
+    /// Benchmark name
     name: String,
+    /// Time in nanoseconds
     time_ns: f64,
+    /// Throughput in bytes per second
     throughput_bytes_per_sec: Option<f64>,
+    /// Memory usage in bytes
     memory_usage: Option<usize>,
 }
 
 /// Performance validation results
 #[derive(Debug)]
 struct ValidationResults {
+    /// Tests that passed validation
     passed: Vec<String>,
+    /// Tests that failed validation
     failed: Vec<String>,
+    /// Warning messages
     warnings: Vec<String>,
 }
 
 impl ValidationResults {
+    /// Create a new validation results struct
     const fn new() -> Self {
         Self {
             passed: Vec::new(),
@@ -61,18 +68,22 @@ impl ValidationResults {
         }
     }
 
+    /// Add a passing test
     fn add_pass(&mut self, test: String) {
         self.passed.push(test);
     }
 
+    /// Add a failing test
     fn add_fail(&mut self, test: String) {
         self.failed.push(test);
     }
 
+    /// Add a warning
     fn add_warning(&mut self, warning: String) {
         self.warnings.push(warning);
     }
 
+    /// Print validation summary
     fn print_summary(&self) {
         println!("\\n=== Performance Validation Results ===");
         println!("Passed: {}", self.passed.len());
@@ -101,6 +112,7 @@ impl ValidationResults {
         }
     }
 
+    /// Check if all validations passed
     fn is_success(&self) -> bool {
         self.failed.is_empty()
     }

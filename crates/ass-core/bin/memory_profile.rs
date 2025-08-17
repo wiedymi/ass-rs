@@ -6,7 +6,6 @@
 extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::{format, string::ToString};
-#[allow(clippy::missing_docs_in_private_items, clippy::cast_precision_loss)]
 use ass_core::{parser::Script, utils::ScriptGenerator};
 /// Get current process memory usage (RSS) in bytes
 #[cfg(target_os = "macos")]
@@ -31,16 +30,22 @@ fn get_memory_usage() -> Option<usize> {
     None
 }
 
+/// Format byte count into human-readable string
 fn format_bytes(bytes: usize) -> String {
     if bytes < 1024 {
         format!("{bytes} B")
     } else if bytes < 1_048_576 {
-        format!("{:.2} KB", bytes as f64 / 1024.0)
+        let kb = bytes / 1024;
+        let remainder = (bytes % 1024) * 100 / 1024;
+        format!("{kb}.{remainder:02} KB")
     } else {
-        format!("{:.2} MB", bytes as f64 / 1_048_576.0)
+        let mb = bytes / 1_048_576;
+        let remainder = (bytes % 1_048_576) * 100 / 1_048_576;
+        format!("{mb}.{remainder:02} MB")
     }
 }
 
+/// Profile memory usage for parsing a script
 fn profile_memory(name: &str, script_text: &str) {
     println!("\n=== Memory Profile: {name} ===");
     println!("Input size: {}", format_bytes(script_text.len()));
@@ -64,17 +69,21 @@ fn profile_memory(name: &str, script_text: &str) {
 
     if let (Some(before), Some(after)) = (mem_before, mem_after) {
         let used = after.saturating_sub(before);
-        let ratio = used as f64 / script_text.len() as f64;
+        let ratio = if script_text.is_empty() {
+            0
+        } else {
+            used * 100 / script_text.len()
+        };
 
         println!("Memory before: {}", format_bytes(before));
         println!("Memory after: {}", format_bytes(after));
         println!("Memory used: {}", format_bytes(used));
-        println!("Memory ratio: {ratio:.2}x input size");
+        println!("Memory ratio: {ratio}% of input size");
 
-        if ratio <= 1.1 {
-            println!("✅ PASS: Memory usage within target (<1.1x)");
+        if ratio <= 110 {
+            println!("✅ PASS: Memory usage within target (<110%)");
         } else {
-            println!("❌ FAIL: Memory usage exceeds target (>1.1x)");
+            println!("❌ FAIL: Memory usage exceeds target (>110%)");
         }
     } else {
         println!("⚠️  Memory measurement not available on this platform");
