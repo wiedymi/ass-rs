@@ -2,6 +2,7 @@
 
 use crate::utils::RenderError;
 use ass_core::analysis::events::TextAnalysis;
+use ass_core::ExtensionRegistry;
 
 #[cfg(feature = "nostd")]
 use alloc::{
@@ -31,11 +32,11 @@ pub struct TextSegment {
 /// Process text with inline tag changes into segments
 pub fn segment_text_with_tags<'a>(
     text: &'a str,
-    registry: Option<&ExtensionRegistry>,
+    _registry: Option<&ExtensionRegistry>,
 ) -> Result<Vec<TextSegment>, RenderError> {
     // Analyze text to get tags and their positions
     #[cfg(feature = "plugins")]
-    let analysis = TextAnalysis::analyze_with_registry(text, registry)
+    let analysis = TextAnalysis::analyze_with_registry(text, _registry)
         .map_err(|e| RenderError::InvalidScript(e.to_string()))?;
 
     #[cfg(not(feature = "plugins"))]

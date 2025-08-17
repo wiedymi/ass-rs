@@ -95,16 +95,16 @@ pub fn shape_text_with_style(
     // Get font data using face_source
     let (source, index) = font_database
         .face_source(font_id)
-        .ok_or_else(|| RenderError::FontError(format!("Failed to load font data")))?;
+        .ok_or_else(|| RenderError::FontError("Failed to load font data".to_string()))?;
 
     // Extract data based on source type
     let font_data = match source {
         fontdb::Source::Binary(data) => data,
-        fontdb::Source::File(path) => {
+        fontdb::Source::File(_path) => {
             #[cfg(not(feature = "nostd"))]
             {
-                std::sync::Arc::new(std::fs::read(&path).map_err(|e| {
-                    RenderError::FontError(format!("Failed to read font file: {}", e))
+                std::sync::Arc::new(std::fs::read(&_path).map_err(|e| {
+                    RenderError::FontError(format!("Failed to read font file: {e}"))
                 })?)
             }
             #[cfg(feature = "nostd")]
@@ -119,11 +119,11 @@ pub fn shape_text_with_style(
 
     // Create rustybuzz face
     let rb_face = Face::from_slice(font_data.as_ref().as_ref(), index)
-        .ok_or_else(|| RenderError::FontError(format!("Failed to create font face")))?;
+        .ok_or_else(|| RenderError::FontError("Failed to create font face".to_string()))?;
 
     // Parse with ttf-parser for OS/2 table access
     let ttf_face = ttf_parser::Face::parse(font_data.as_ref().as_ref(), index)
-        .map_err(|_| RenderError::FontError(format!("Failed to parse font for metrics")))?;
+        .map_err(|_| RenderError::FontError("Failed to parse font for metrics".to_string()))?;
 
     // Get font metrics with VSFilter compatibility
     let metrics = FontMetrics::from_face(&ttf_face);
@@ -134,7 +134,7 @@ pub fn shape_text_with_style(
 
     // Shape the text
     let features: Vec<Feature> = Vec::new();
-    let variations: Vec<Variation> = Vec::new();
+    let _variations: Vec<Variation> = Vec::new();
     let output = rustybuzz::shape(&rb_face, &features, buffer);
 
     // Get glyph positions and convert to our format
@@ -269,8 +269,7 @@ fn find_font(
 
     font_database.query(&final_query).ok_or_else(|| {
         RenderError::FontError(format!(
-            "Font '{}' not found and no fallback available",
-            family
+            "Font '{family}' not found and no fallback available"
         ))
     })
 }
@@ -315,11 +314,11 @@ impl GlyphRenderer {
 
             let data = match source {
                 fontdb::Source::Binary(data) => data,
-                fontdb::Source::File(path) => {
+                fontdb::Source::File(_path) => {
                     #[cfg(not(feature = "nostd"))]
                     {
-                        std::sync::Arc::new(std::fs::read(&path).map_err(|e| {
-                            RenderError::FontError(format!("Failed to read font file: {}", e))
+                        std::sync::Arc::new(std::fs::read(&_path).map_err(|e| {
+                            RenderError::FontError(format!("Failed to read font file: {e}"))
                         })?)
                     }
                     #[cfg(feature = "nostd")]
@@ -375,7 +374,7 @@ impl GlyphRenderer {
             let glyph_id = ttf_parser::GlyphId(glyph.glyph_id as u16);
 
             // Get glyph outline
-            if let Some(bbox) = font.glyph_bounding_box(glyph_id) {
+            if let Some(_bbox) = font.glyph_bounding_box(glyph_id) {
                 let scale = shaped.font_size / font.units_per_em() as f32;
 
                 // Outline builder to convert ttf-parser outlines to tiny-skia paths

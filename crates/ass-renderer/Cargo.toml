@@ -116,6 +116,9 @@ unicode-wrap = ["ass-core/unicode-wrap"]
 # Development features
 benches = []
 
+# Plugin system support
+plugins = []
+
 [[bench]]
 name = "render_benchmarks"
 harness = false

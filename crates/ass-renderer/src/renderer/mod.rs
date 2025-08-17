@@ -76,7 +76,7 @@ impl Renderer {
         #[cfg(feature = "analysis-integration")]
         let analysis = ScriptAnalysis::analyze(script).ok();
         #[cfg(not(feature = "analysis-integration"))]
-        let analysis = None;
+        let analysis: Option<()> = None;
 
         // Extract script resolution and update context
         for section in script.sections() {
@@ -102,14 +102,17 @@ impl Renderer {
             ));
         }
 
+        #[cfg(feature = "analysis-integration")]
         self.pipeline.prepare_script(script, analysis.as_ref())?;
+        #[cfg(not(feature = "analysis-integration"))]
+        self.pipeline.prepare_script(script, None)?;
         let layers = self
             .pipeline
             .process_events(&events, time_cs, &self.context)?;
 
         // Debug: Check what layers we have
         // eprintln!("RENDERER: Got {} layers", layers.len());
-        for (i, layer) in layers.iter().enumerate() {
+        for (_i, layer) in layers.iter().enumerate() {
             match layer {
                 crate::pipeline::IntermediateLayer::Vector(_) => {
                     // eprintln!("RENDERER: Layer {} is VectorData", i);
@@ -153,9 +156,12 @@ impl Renderer {
         #[cfg(feature = "analysis-integration")]
         let analysis = ScriptAnalysis::analyze(script).ok();
         #[cfg(not(feature = "analysis-integration"))]
-        let analysis = None;
+        let analysis: Option<()> = None;
 
+        #[cfg(feature = "analysis-integration")]
         self.pipeline.prepare_script(script, analysis.as_ref())?;
+        #[cfg(not(feature = "analysis-integration"))]
+        self.pipeline.prepare_script(script, None)?;
         let layers = self
             .pipeline
             .process_events(&events, time_cs, &self.context)?;
@@ -227,12 +233,16 @@ impl Renderer {
 #[derive(Debug, Clone)]
 pub struct PerformanceMetrics {
     #[cfg(not(feature = "nostd"))]
+    /// Time spent parsing the script
     pub parse_time: Duration,
     #[cfg(not(feature = "nostd"))]
+    /// Time spent shaping text
     pub shape_time: Duration,
     #[cfg(not(feature = "nostd"))]
+    /// Time spent rendering
     pub render_time: Duration,
     #[cfg(not(feature = "nostd"))]
+    /// Total time for the operation
     pub total_time: Duration,
     #[cfg(feature = "nostd")]
     pub parse_time: u64, // milliseconds
@@ -247,6 +257,8 @@ pub struct PerformanceMetrics {
 /// Cache statistics
 #[derive(Debug, Clone)]
 pub struct CacheStatistics {
+    /// Number of glyph cache hits
     pub glyph_hits: usize,
+    /// Number of font database entries
     pub font_entries: usize,
 }

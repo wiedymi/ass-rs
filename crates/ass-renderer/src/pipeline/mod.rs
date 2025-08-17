@@ -2,6 +2,7 @@
 
 use crate::renderer::RenderContext;
 use crate::utils::{DirtyRegion, RenderError};
+#[cfg(feature = "analysis-integration")]
 use ass_core::analysis::ScriptAnalysis;
 use ass_core::parser::{Event, Script};
 use smallvec::SmallVec;
@@ -32,7 +33,8 @@ pub trait Pipeline: Send + Sync {
     fn prepare_script(
         &mut self,
         script: &Script,
-        analysis: Option<&ScriptAnalysis>,
+        #[cfg(feature = "analysis-integration")] analysis: Option<&ScriptAnalysis>,
+        #[cfg(not(feature = "analysis-integration"))] _analysis: Option<()>,
     ) -> Result<(), RenderError>;
 
     /// Get the current script

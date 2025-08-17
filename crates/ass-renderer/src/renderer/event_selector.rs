@@ -30,9 +30,13 @@ pub struct EventSelector {
 /// A region that needs re-rendering
 #[derive(Debug, Clone)]
 pub struct DirtyRegion {
+    /// X coordinate of the region
     pub x: u32,
+    /// Y coordinate of the region
     pub y: u32,
+    /// Width of the region
     pub width: u32,
+    /// Height of the region
     pub height: u32,
 }
 
@@ -252,6 +256,7 @@ impl Default for EventSelector {
 }
 
 /// Legacy function for backward compatibility
+#[allow(dead_code)] // Kept for backward compatibility
 pub fn select_active_events<'a>(script: &'a Script<'a>, time_cs: u32) -> Vec<&'a Event<'a>> {
     let mut selector = EventSelector::new();
     selector

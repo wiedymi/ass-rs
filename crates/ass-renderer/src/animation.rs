@@ -85,15 +85,40 @@ impl AnimationTiming {
 #[derive(Debug, Clone)]
 pub enum AnimatedValue {
     /// Integer value animation
-    Integer { from: i32, to: i32 },
+    Integer {
+        /// Starting value
+        from: i32,
+        /// Ending value
+        to: i32,
+    },
     /// Float value animation
-    Float { from: f32, to: f32 },
+    Float {
+        /// Starting value
+        from: f32,
+        /// Ending value
+        to: f32,
+    },
     /// Color animation (RGBA)
-    Color { from: [u8; 4], to: [u8; 4] },
+    Color {
+        /// Starting color [R, G, B, A]
+        from: [u8; 4],
+        /// Ending color [R, G, B, A]
+        to: [u8; 4],
+    },
     /// Position animation
-    Position { from: (f32, f32), to: (f32, f32) },
+    Position {
+        /// Starting position (x, y)
+        from: (f32, f32),
+        /// Ending position (x, y)
+        to: (f32, f32),
+    },
     /// Scale animation
-    Scale { from: (f32, f32), to: (f32, f32) },
+    Scale {
+        /// Starting scale (x, y)
+        from: (f32, f32),
+        /// Ending scale (x, y)
+        to: (f32, f32),
+    },
 }
 
 impl AnimatedValue {
@@ -134,10 +159,15 @@ impl AnimatedValue {
 /// Result of animation interpolation
 #[derive(Debug, Clone)]
 pub enum AnimatedResult {
+    /// Integer result value
     Integer(i32),
+    /// Float result value
     Float(f32),
+    /// Color result value [R, G, B, A]
     Color([u8; 4]),
+    /// Position result value (x, y)
     Position((f32, f32)),
+    /// Scale result value (x, y)
     Scale((f32, f32)),
 }
 

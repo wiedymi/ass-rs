@@ -7,9 +7,9 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use ass_core::analysis::events::TextAnalysis;
+use ass_core::analysis::events::{OverrideTag, TextAnalysis};
+use ass_core::ExtensionRegistry;
 #[cfg(not(feature = "nostd"))]
-use std::collections::HashMap;
 #[cfg(not(feature = "nostd"))]
 use std::{
     eprintln,
@@ -56,19 +56,30 @@ pub struct ProcessedTags {
 }
 
 #[derive(Debug, Clone, Default)]
+/// Color override settings for rendering
 pub struct ColorOverrides {
+    /// Primary color override
     pub primary: Option<[u8; 4]>,
+    /// Secondary color override
     pub secondary: Option<[u8; 4]>,
+    /// Outline color override
     pub outline: Option<[u8; 4]>,
+    /// Shadow color override
     pub shadow: Option<[u8; 4]>,
+    /// General alpha override
     pub alpha: Option<u8>,
-    pub alpha1: Option<u8>, // \1a
-    pub alpha2: Option<u8>, // \2a
-    pub alpha3: Option<u8>, // \3a
-    pub alpha4: Option<u8>, // \4a
+    /// Primary color alpha override (\1a)
+    pub alpha1: Option<u8>,
+    /// Secondary color alpha override (\2a)
+    pub alpha2: Option<u8>,
+    /// Outline color alpha override (\3a)
+    pub alpha3: Option<u8>,
+    /// Shadow color alpha override (\4a)
+    pub alpha4: Option<u8>,
 }
 
 #[derive(Debug, Clone, Default)]
+/// Font override settings
 pub struct FontOverrides {
     pub name: Option<String>,
     pub size: Option<f32>,
@@ -83,6 +94,7 @@ pub struct FontOverrides {
 }
 
 #[derive(Debug, Clone, Default)]
+/// Text formatting override settings
 pub struct FormattingOverrides {
     pub bold: Option<bool>,
     pub italic: Option<bool>,
@@ -130,35 +142,46 @@ pub struct FadeData {
 }
 
 #[derive(Debug, Clone)]
+/// Karaoke timing and style data
 pub struct KaraokeData {
+    /// Duration of karaoke effect in centiseconds
     pub duration: u32,
+    /// Style of karaoke effect
     pub style: KaraokeStyle,
     /// Karaoke syllable start time in centiseconds (for \kt)
     pub start_time: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
+/// Karaoke effect styles
 pub enum KaraokeStyle {
+    /// Basic karaoke effect
     Basic,
+    /// Fill-based karaoke effect
     Fill,
+    /// Outline-based karaoke effect
     Outline,
-    Sweep, // For \K capital K
+    /// Sweep karaoke effect (\K capital K)
+    Sweep,
 }
 
 #[derive(Debug, Clone)]
+/// Line break types in ASS text
 pub enum LineBreakType {
-    Hard(usize), // \N position in text
-    Soft(usize), // \n position in text
+    /// Hard line break (\N) at position in text
+    Hard(usize),
+    /// Soft line break (\n) at position in text
+    Soft(usize),
 }
 
 /// Process tags from event text
 pub fn process_event_tags<'a>(
     text: &'a str,
-    registry: Option<&ExtensionRegistry>,
+    _registry: Option<&ExtensionRegistry>,
 ) -> Result<(ProcessedTags, String), RenderError> {
     // Analyze text to extract tags
     #[cfg(feature = "plugins")]
-    let analysis = TextAnalysis::analyze_with_registry(text, registry)
+    let analysis = TextAnalysis::analyze_with_registry(text, _registry)
         .map_err(|e| RenderError::InvalidScript(e.to_string()))?;
 
     #[cfg(not(feature = "plugins"))]
@@ -519,6 +542,7 @@ fn process_single_tag(tag: &OverrideTag, processed: &mut ProcessedTags) -> Resul
     Ok(())
 }
 
+/// Parse position arguments from ASS \pos tag
 pub fn parse_pos_args(args: &str) -> Option<(f32, f32)> {
     let args = args.trim_start_matches('(').trim_end_matches(')');
     let parts: Vec<&str> = args.split(',').collect();
@@ -533,6 +557,7 @@ pub fn parse_pos_args(args: &str) -> Option<(f32, f32)> {
     None
 }
 
+/// Parse movement arguments from ASS \move tag
 pub fn parse_move_args(args: &str) -> Option<(f32, f32, f32, f32, u32, u32)> {
     let args = args.trim_start_matches('(').trim_end_matches(')');
     let parts: Vec<&str> = args.split(',').collect();
@@ -566,11 +591,13 @@ pub fn parse_move_args(args: &str) -> Option<(f32, f32, f32, f32, u32, u32)> {
     None
 }
 
+/// Parse color arguments from ASS color tags
 pub fn parse_color(args: &str) -> Option<[u8; 4]> {
     // Use ass-core's color parsing
     ass_core::utils::parse_bgr_color(args).ok()
 }
 
+/// Parse alpha arguments from ASS alpha tags
 pub fn parse_alpha(args: &str) -> Option<u8> {
     let hex = args
         .trim_start_matches("&H")
@@ -605,6 +632,7 @@ fn parse_clip_args(args: &str) -> Option<ClipData> {
     None
 }
 
+/// Parse fade arguments from ASS \fade tag
 pub fn parse_fade_args(args: &str) -> Option<FadeData> {
     let args = args.trim_start_matches('(').trim_end_matches(')');
     let parts: Vec<&str> = args.split(',').collect();

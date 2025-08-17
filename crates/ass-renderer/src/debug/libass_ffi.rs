@@ -8,8 +8,8 @@
 
 #![allow(unsafe_code)] // Required for FFI
 
-use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_double, c_int, c_long, c_void};
+use std::ffi::CString;
+use std::os::raw::{c_char, c_double, c_int, c_long};
 use std::ptr;
 
 #[repr(C)]

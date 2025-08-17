@@ -72,6 +72,7 @@ pub struct CompatibilityTester {
     config: TestConfig,
     /// Results cache for regression testing
     #[cfg(not(feature = "nostd"))]
+    #[allow(dead_code)] // Cache for future regression testing functionality
     results_cache: HashMap<String, CompatibilityResult>,
 }
 
@@ -278,7 +279,7 @@ impl CompatibilityTester {
     }
 
     /// Find clusters of different pixels
-    fn find_difference_clusters(&self, diff_map: &[u8]) -> Vec<DiffCluster> {
+    fn find_difference_clusters(&self, _diff_map: &[u8]) -> Vec<DiffCluster> {
         // TODO: Implement connected component analysis
         // For now, return empty clusters
         Vec::new()
@@ -476,6 +477,7 @@ struct DiffCluster {
     bounds: (u32, u32, u32, u32),
     avg_diff: f64,
     max_diff: u8,
+    #[allow(dead_code)] // Stored for future diff analysis features
     pixel_count: usize,
 }
 

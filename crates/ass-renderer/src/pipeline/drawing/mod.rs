@@ -53,21 +53,21 @@ pub fn process_drawing_commands(commands: &str) -> Result<Option<Path>, RenderEr
     }
 
     let mut builder = PathBuilder::new();
-    let mut current_pos = (0.0, 0.0);
+    let mut _current_pos = (0.0, 0.0);
 
     for cmd in draw_commands {
         match cmd {
             DrawCommand::MoveTo { x, y } => {
                 builder.move_to(x, y);
-                current_pos = (x, y);
+                _current_pos = (x, y);
             }
             DrawCommand::MoveToNoDraw { x, y } => {
                 builder.move_to(x, y);
-                current_pos = (x, y);
+                _current_pos = (x, y);
             }
             DrawCommand::LineTo { x, y } => {
                 builder.line_to(x, y);
-                current_pos = (x, y);
+                _current_pos = (x, y);
             }
             DrawCommand::BezierTo {
                 x1,
@@ -78,7 +78,7 @@ pub fn process_drawing_commands(commands: &str) -> Result<Option<Path>, RenderEr
                 y3,
             } => {
                 builder.cubic_to(x1, y1, x2, y2, x3, y3);
-                current_pos = (x3, y3);
+                _current_pos = (x3, y3);
             }
             DrawCommand::Spline { ref points } => {
                 // Convert B-spline to Bezier curves
@@ -86,7 +86,7 @@ pub fn process_drawing_commands(commands: &str) -> Result<Option<Path>, RenderEr
                     let beziers = spline_to_bezier(points, false);
                     for (c1, c2, end) in beziers {
                         builder.cubic_to(c1.0, c1.1, c2.0, c2.1, end.0, end.1);
-                        current_pos = end;
+                        _current_pos = end;
                     }
                 }
             }
@@ -96,7 +96,7 @@ pub fn process_drawing_commands(commands: &str) -> Result<Option<Path>, RenderEr
                     let beziers = spline_to_bezier(points, true);
                     for (c1, c2, end) in beziers {
                         builder.cubic_to(c1.0, c1.1, c2.0, c2.1, end.0, end.1);
-                        current_pos = end;
+                        _current_pos = end;
                     }
                 }
             }
@@ -112,7 +112,7 @@ pub fn process_drawing_commands(commands: &str) -> Result<Option<Path>, RenderEr
 /// Parse drawing commands from string
 pub fn parse_draw_commands(text: &str) -> Result<Vec<DrawCommand>, RenderError> {
     let mut commands = Vec::new();
-    let mut tokens = tokenize_drawing_commands(text);
+    let tokens = tokenize_drawing_commands(text);
     let mut i = 0;
 
     while i < tokens.len() {
@@ -311,7 +311,7 @@ fn is_command(token: &str) -> bool {
 /// Parse coordinate string to f32
 fn parse_coord(s: &str) -> Result<f32, RenderError> {
     s.parse::<f32>()
-        .map_err(|_| RenderError::InvalidDrawCommand(format!("Invalid coordinate: {}", s)))
+        .map_err(|_| RenderError::InvalidDrawCommand(format!("Invalid coordinate: {s}")))
 }
 
 /// Convert B-spline control points to Bezier curves

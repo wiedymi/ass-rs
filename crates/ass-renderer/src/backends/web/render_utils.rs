@@ -3,12 +3,12 @@
 #[cfg(feature = "nostd")]
 use alloc::{vec, vec::Vec};
 
-use crate::pipeline::{IntermediateLayer, TextData, VectorData};
+use crate::pipeline::{TextData, VectorData};
 use crate::utils::RenderError;
 use wgpu::util::DeviceExt;
 use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, ColorTargetState};
-use wgpu::{DepthStencilState, FragmentState, MultisampleState, PrimitiveState, VertexState};
-use wgpu::{Device, PipelineLayout, Queue, RenderPipeline, ShaderModule, TextureFormat};
+use wgpu::{FragmentState, MultisampleState, PrimitiveState, VertexState};
+use wgpu::{Device, PipelineLayout, RenderPipeline, ShaderModule, TextureFormat};
 
 /// Vertex structure for rendering
 #[repr(C)]
@@ -134,8 +134,8 @@ pub fn render_text_layer(
     screen_height: f32,
 ) -> Result<(wgpu::Buffer, wgpu::Buffer, u32), RenderError> {
     // Convert text position to NDC coordinates
-    let x = (text_data.position.0 / screen_width) * 2.0 - 1.0;
-    let y = 1.0 - (text_data.position.1 / screen_height) * 2.0;
+    let x = (text_data.x / screen_width) * 2.0 - 1.0;
+    let y = 1.0 - (text_data.y / screen_height) * 2.0;
 
     // Estimate text size (simplified)
     let text_width = (text_data.text.len() as f32 * 10.0) / screen_width * 2.0;
@@ -171,15 +171,15 @@ pub fn render_text_layer(
 pub fn render_vector_layer(
     device: &Device,
     vector_data: &VectorData,
-    screen_width: f32,
-    screen_height: f32,
+    _screen_width: f32,
+    _screen_height: f32,
 ) -> Result<(wgpu::Buffer, wgpu::Buffer, u32), RenderError> {
     // Convert color
     let color = [
-        vector_data.fill_color.0 as f32 / 255.0,
-        vector_data.fill_color.1 as f32 / 255.0,
-        vector_data.fill_color.2 as f32 / 255.0,
-        vector_data.fill_color.3 as f32 / 255.0,
+        vector_data.color[0] as f32 / 255.0,
+        vector_data.color[1] as f32 / 255.0,
+        vector_data.color[2] as f32 / 255.0,
+        vector_data.color[3] as f32 / 255.0,
     ];
 
     // Create simple triangle for testing
@@ -212,17 +212,11 @@ pub fn render_vector_layer(
 fn extract_color_from_tags(text_data: &TextData) -> [f32; 4] {
     let mut color = [1.0, 1.0, 1.0, 1.0]; // Default white
 
-    if let Some(primary) = text_data.tags.colors.primary {
-        // ASS colors are in BGR format
-        color[2] = ((primary >> 16) & 0xFF) as f32 / 255.0; // B
-        color[1] = ((primary >> 8) & 0xFF) as f32 / 255.0; // G
-        color[0] = (primary & 0xFF) as f32 / 255.0; // R
-    }
-
-    if let Some(alpha) = text_data.tags.colors.alpha {
-        // ASS alpha is inverted (0 = opaque, 255 = transparent)
-        color[3] = (255 - alpha) as f32 / 255.0;
-    }
+    // Use text_data.color directly since TextData already has an RGBA color field
+    color[0] = text_data.color[0] as f32 / 255.0;
+    color[1] = text_data.color[1] as f32 / 255.0;
+    color[2] = text_data.color[2] as f32 / 255.0;
+    color[3] = text_data.color[3] as f32 / 255.0;
 
     color
 }

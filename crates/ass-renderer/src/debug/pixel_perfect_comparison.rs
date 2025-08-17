@@ -1,6 +1,5 @@
 //! Pixel-perfect comparison utilities for frame analysis
 
-use crate::renderer::Frame;
 
 #[cfg(feature = "nostd")]
 use alloc::vec::Vec;

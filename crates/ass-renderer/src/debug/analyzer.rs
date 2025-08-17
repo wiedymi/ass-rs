@@ -1,3 +1,8 @@
+//! Frame analysis tools for detailed debugging and profiling
+//!
+//! This module provides in-depth analysis capabilities for rendered frames,
+//! including pixel statistics, region detection, and text analysis.
+
 use crate::Frame;
 
 #[cfg(feature = "nostd")]
@@ -11,6 +16,7 @@ pub struct FrameAnalyzer {
 }
 
 impl FrameAnalyzer {
+    /// Create a new frame analyzer with all analysis features enabled
     pub fn new() -> Self {
         Self {
             enable_pixel_histogram: true,
@@ -19,6 +25,7 @@ impl FrameAnalyzer {
         }
     }
 
+    /// Analyze a frame and generate a detailed report
     pub fn analyze(&self, frame: &Frame) -> AnalysisReport {
         let mut report = AnalysisReport::new(frame.width(), frame.height());
 
@@ -220,17 +227,28 @@ impl FrameAnalyzer {
     }
 }
 
+/// Detailed analysis report for a rendered frame
 #[derive(Debug, Clone)]
 pub struct AnalysisReport {
+    /// Frame width in pixels
     pub width: u32,
+    /// Frame height in pixels
     pub height: u32,
+    /// Total number of pixels in the frame
     pub total_pixels: usize,
+    /// Number of non-transparent pixels
     pub non_transparent_pixels: usize,
+    /// Percentage of transparent pixels
     pub transparency_percentage: f32,
+    /// Histogram of pixel color distribution
     pub pixel_histogram: PixelHistogram,
+    /// Detected regions in the frame
     pub regions: Vec<Region>,
+    /// Detected text areas in the frame
     pub text_areas: Vec<TextArea>,
+    /// Dominant color in the frame [R, G, B, A]
     pub dominant_color: [u8; 4],
+    /// Estimated contrast ratio
     pub contrast_ratio: f32,
 }
 
@@ -289,7 +307,7 @@ impl AnalysisReport {
         dominant
     }
 
-    fn calculate_contrast_ratio(&self, frame: &Frame) -> f32 {
+    fn calculate_contrast_ratio(&self, _frame: &Frame) -> f32 {
         // Simplified contrast calculation
         // In a real implementation, this would calculate Weber contrast or Michelson contrast
         if self.pixel_histogram.white_pixels > 0 && self.pixel_histogram.black_pixels > 0 {

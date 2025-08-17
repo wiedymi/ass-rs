@@ -1,5 +1,7 @@
 //! Metal backend for macOS/iOS
 
+#![allow(dead_code)] // Work in progress backend
+
 #[cfg(feature = "nostd")]
 use alloc::{boxed::Box, format, vec, vec::Vec};
 #[cfg(not(feature = "nostd"))]
@@ -70,14 +72,14 @@ impl MetalBackend {
         let shader_source = include_str!("metal_shaders.metal");
         let library = device
             .new_library_with_source(shader_source, &CompileOptions::new())
-            .map_err(|e| RenderError::BackendError(format!("Failed to compile shaders: {}", e)))?;
+            .map_err(|e| RenderError::BackendError(format!("Failed to compile shaders: {e}")))?;
 
         let vertex_function = library
             .get_function("vertex_main", None)
-            .ok_or_else(|| RenderError::BackendError("Vertex function not found".into()))?;
+            .map_err(|_| RenderError::BackendError("Vertex function not found".into()))?;
         let fragment_function = library
             .get_function("fragment_main", None)
-            .ok_or_else(|| RenderError::BackendError("Fragment function not found".into()))?;
+            .map_err(|_| RenderError::BackendError("Fragment function not found".into()))?;
 
         // Create vertex descriptor
         let vertex_descriptor = VertexDescriptor::new();
@@ -121,7 +123,7 @@ impl MetalBackend {
         let pipeline_state = device
             .new_render_pipeline_state(&pipeline_descriptor)
             .map_err(|e| {
-                RenderError::BackendError(format!("Failed to create pipeline state: {}", e))
+                RenderError::BackendError(format!("Failed to create pipeline state: {e}"))
             })?;
 
         self.pipeline_state = Some(pipeline_state);

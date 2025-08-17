@@ -76,8 +76,8 @@ impl TransformAnimation {
 
         // Find where tags start (after numeric parameters)
         let mut tag_start = 0;
-        let mut depth = 0;
-        let mut in_tag = false;
+        let mut _depth = 0;
+        let in_tag = false;
 
         for (i, ch) in inner.chars().enumerate() {
             if ch == '\\' && !in_tag {
@@ -85,9 +85,9 @@ impl TransformAnimation {
                 break;
             }
             if ch == '(' {
-                depth += 1;
+                _depth += 1;
             } else if ch == ')' {
-                depth -= 1;
+                _depth -= 1;
             }
         }
 

@@ -1,6 +1,6 @@
 //! Benchmarking and performance analysis for compatibility testing
 
-use crate::debug::{CompatibilityResult, LibassRenderer};
+use crate::debug::LibassRenderer;
 use crate::renderer::{RenderContext, Renderer};
 use crate::utils::RenderError;
 use ass_core::parser::Script;

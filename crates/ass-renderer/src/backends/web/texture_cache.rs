@@ -1,6 +1,6 @@
 //! Texture caching for WebGPU backend (placeholder)
 
-use ahash::AHashMap;
+use ahash::{AHashMap, AHasher};
 
 #[cfg(feature = "nostd")]
 use alloc::{string::String, sync::Arc, vec::Vec};
@@ -62,8 +62,6 @@ impl TextureCache {
         height: u32,
     ) -> Result<&wgpu::TextureView, crate::utils::RenderError> {
         #[cfg(feature = "nostd")]
-        use ahash::AHasher as DefaultHasher;
-        #[cfg(feature = "nostd")]
         use core::hash::{Hash, Hasher};
         #[cfg(not(feature = "nostd"))]
         use std::collections::hash_map::DefaultHasher;
@@ -71,21 +69,21 @@ impl TextureCache {
         use std::hash::{Hash, Hasher};
 
         // Create cache key
-        let mut hasher = DefaultHasher::new();
+        let mut hasher = AHasher::default();
         pixels.hash(&mut hasher);
         let hash = hasher.finish();
         #[cfg(not(feature = "nostd"))]
         let key = TextureCacheKey::Image {
-            path: format!("hash_{}", hash),
+            path: format!("hash_{hash}"),
         };
         #[cfg(feature = "nostd")]
         let key = TextureCacheKey::Image {
-            path: alloc::format!("hash_{}", hash),
+            path: alloc::format!("hash_{hash}"),
         };
 
-        // Check cache
-        if let Some((_, view)) = self.textures.get(&key) {
-            return Ok(view);
+        // Check cache first
+        if self.textures.contains_key(&key) {
+            return Ok(&self.textures[&key].1);
         }
 
         // Create texture
@@ -128,7 +126,7 @@ impl TextureCache {
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         self.textures.insert(key.clone(), (texture, view));
 
-        Ok(&self.textures.get(&key).unwrap().1)
+        Ok(&self.textures[&key].1)
     }
 
     /// Clear the cache
@@ -139,6 +137,7 @@ impl TextureCache {
     }
 }
 
+#[cfg(not(feature = "web-backend"))]
 impl Default for TextureCache {
     fn default() -> Self {
         Self::new()

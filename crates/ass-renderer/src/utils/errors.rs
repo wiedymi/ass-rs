@@ -1,9 +1,11 @@
 //! Error types for rendering
 
 #[cfg(feature = "nostd")]
-use alloc::{fmt, string::String};
+use alloc::{string::String};
+#[cfg(feature = "nostd")]
+use core::fmt;
 #[cfg(not(feature = "nostd"))]
-use std::{fmt, string::String};
+use std::string::String;
 
 #[cfg(not(feature = "nostd"))]
 use thiserror::Error;
@@ -163,26 +165,26 @@ impl fmt::Display for RenderError {
             Self::NoBackendAvailable => write!(f, "No rendering backend available"),
             Self::UnsupportedBackend(s) => write!(f, "Unsupported backend: {}", s),
             Self::BackendInitFailed(s) => write!(f, "Backend initialization failed: {}", s),
-            Self::BackendError(s) => write!(f, "Backend error: {}", s),
+            Self::BackendError(s) => write!(f, "Backend error: {s}"),
             Self::PipelineError(s) => write!(f, "Pipeline error: {}", s),
             Self::ShapingError(s) => write!(f, "Text shaping failed: {}", s),
             Self::DrawingError(s) => write!(f, "Drawing failed: {}", s),
             Self::InvalidDrawCommand(s) => write!(f, "Invalid draw command: {}", s),
             Self::EffectError(s) => write!(f, "Effect application failed: {}", s),
             Self::CompositingError(s) => write!(f, "Compositing failed: {}", s),
-            Self::FontError(s) => write!(f, "Font error: {}", s),
-            Self::GpuError(s) => write!(f, "GPU error: {}", s),
+            Self::FontError(s) => write!(f, "Font error: {s}"),
+            Self::GpuError(s) => write!(f, "GPU error: {s}"),
             #[cfg(target_arch = "wasm32")]
-            Self::WasmError(s) => write!(f, "WASM error: {}", s),
-            Self::ResourceLimitExceeded(s) => write!(f, "Resource limit exceeded: {}", s),
-            Self::InvalidScript(s) => write!(f, "Invalid script: {}", s),
-            Self::ParseError(s) => write!(f, "Parse error: {}", s),
-            Self::InvalidInput(s) => write!(f, "Invalid input: {}", s),
-            Self::CoreError(e) => write!(f, "Core error: {}", e),
-            Self::InitializationError(s) => write!(f, "Initialization error: {}", s),
-            Self::IOError(s) => write!(f, "IO error: {}", s),
-            Self::InvalidState(s) => write!(f, "Invalid state: {}", s),
-            Self::UnsupportedOperation(s) => write!(f, "Unsupported operation: {}", s),
+            Self::WasmError(s) => write!(f, "WASM error: {s}"),
+            Self::ResourceLimitExceeded(s) => write!(f, "Resource limit exceeded: {s}"),
+            Self::InvalidScript(s) => write!(f, "Invalid script: {s}"),
+            Self::ParseError(s) => write!(f, "Parse error: {s}"),
+            Self::InvalidInput(s) => write!(f, "Invalid input: {s}"),
+            Self::CoreError(e) => write!(f, "Core error: {e}"),
+            Self::InitializationError(s) => write!(f, "Initialization error: {s}"),
+            Self::IOError(s) => write!(f, "IO error: {s}"),
+            Self::InvalidState(s) => write!(f, "Invalid state: {s}"),
+            Self::UnsupportedOperation(s) => write!(f, "Unsupported operation: {s}"),
         }
     }
 }

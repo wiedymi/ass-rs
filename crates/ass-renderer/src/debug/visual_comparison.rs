@@ -80,7 +80,7 @@ impl VisualComparison {
     pub fn render_with_debug(
         &mut self,
         script: &Script,
-        time_ms: u32,
+        _time_ms: u32,
     ) -> Result<Pixmap, RenderError> {
         // Clear debug info
         self.debug_info.clear();
@@ -170,8 +170,8 @@ impl VisualComparison {
     fn draw_alignment_grid(
         &self,
         pixmap: &mut Pixmap,
-        play_res_x: u32,
-        play_res_y: u32,
+        _play_res_x: u32,
+        _play_res_y: u32,
     ) -> Result<(), RenderError> {
         let mut paint = Paint::default();
         paint.set_color(Color::from_rgba8(100, 100, 100, 50)); // Semi-transparent gray
@@ -223,7 +223,7 @@ impl VisualComparison {
         let mut x_offset = pixmap.width() as f32 - 250.0;
         let y_offset = 10.0;
 
-        for (name, rgba) in colors.iter() {
+        for (_name, rgba) in colors.iter() {
             let mut paint = Paint::default();
             paint.set_color(Color::from_rgba8(rgba[0], rgba[1], rgba[2], rgba[3]));
 

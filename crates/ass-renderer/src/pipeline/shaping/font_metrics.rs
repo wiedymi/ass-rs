@@ -85,7 +85,7 @@ impl FontMetrics {
     }
 
     /// Apply font spacing (letter spacing) to advance width
-    pub fn apply_spacing(advance: f32, spacing: f32, font_size: f32) -> f32 {
+    pub fn apply_spacing(advance: f32, spacing: f32, _font_size: f32) -> f32 {
         // ASS font spacing is in pixels, added to each character's advance
         advance + spacing
     }

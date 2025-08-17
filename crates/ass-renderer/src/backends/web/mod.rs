@@ -1,9 +1,11 @@
 //! WebGPU backend implementation
 
+#![allow(dead_code)] // Work in progress backend
+
 #[cfg(feature = "nostd")]
-use alloc::{boxed::Box, format, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, format, vec::Vec};
 #[cfg(not(feature = "nostd"))]
-use std::{boxed::Box, sync::Arc, vec::Vec};
+use std::{boxed::Box, vec::Vec};
 
 use crate::backends::{BackendFeature, BackendType, RenderBackend};
 use crate::pipeline::{IntermediateLayer, Pipeline, SoftwarePipeline};
@@ -16,7 +18,6 @@ mod shader;
 mod texture_cache;
 
 pub use self::pipeline::WebGpuPipeline;
-use self::render_utils::Vertex;
 
 /// WebGPU rendering backend
 pub struct WebGpuBackend {
@@ -58,7 +59,7 @@ impl WebGpuBackend {
                 None,
             )
             .await
-            .map_err(|e| RenderError::BackendError(format!("Failed to create device: {}", e)))?;
+            .map_err(|e| RenderError::BackendError(format!("Failed to create device: {e}")))?;
 
         Ok(Self {
             device: Some(device),
@@ -245,6 +246,35 @@ impl RenderBackend for WebGpuBackend {
             label: Some("Render Encoder"),
         });
 
+        // Prepare all buffers first (outside render pass)
+        let mut buffers_and_counts: Vec<(wgpu::Buffer, wgpu::Buffer, u32)> = Vec::new();
+        
+        for layer in layers {
+            match layer {
+                IntermediateLayer::Text(text_data) => {
+                    let (vertex_buffer, index_buffer, index_count) =
+                        render_utils::render_text_layer(
+                            device,
+                            text_data,
+                            context.width() as f32,
+                            context.height() as f32,
+                        )?;
+                    buffers_and_counts.push((vertex_buffer, index_buffer, index_count));
+                }
+                IntermediateLayer::Vector(vector_data) => {
+                    let (vertex_buffer, index_buffer, index_count) =
+                        render_utils::render_vector_layer(
+                            device,
+                            vector_data,
+                            context.width() as f32,
+                            context.height() as f32,
+                        )?;
+                    buffers_and_counts.push((vertex_buffer, index_buffer, index_count));
+                }
+                _ => {}
+            }
+        }
+
         // Begin render pass
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -268,50 +298,16 @@ impl RenderBackend for WebGpuBackend {
                 // In production, this would be done during backend creation
             }
 
-            // Render each layer
-            for layer in layers {
-                match layer {
-                    IntermediateLayer::Text(text_data) => {
-                        // Create vertex buffer for text
-                        let (vertex_buffer, index_buffer, index_count) =
-                            render_utils::render_text_layer(
-                                device,
-                                text_data,
-                                context.width() as f32,
-                                context.height() as f32,
-                            )?;
-
-                        if let Some(pipeline) = &self.render_pipeline {
-                            render_pass.set_pipeline(pipeline);
-                            render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-                            render_pass.set_index_buffer(
-                                index_buffer.slice(..),
-                                wgpu::IndexFormat::Uint16,
-                            );
-                            render_pass.draw_indexed(0..index_count, 0, 0..1);
-                        }
-                    }
-                    IntermediateLayer::Vector(vector_data) => {
-                        // Create vertex buffer for vector
-                        let (vertex_buffer, index_buffer, index_count) =
-                            render_utils::render_vector_layer(
-                                device,
-                                vector_data,
-                                context.width() as f32,
-                                context.height() as f32,
-                            )?;
-
-                        if let Some(pipeline) = &self.render_pipeline {
-                            render_pass.set_pipeline(pipeline);
-                            render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-                            render_pass.set_index_buffer(
-                                index_buffer.slice(..),
-                                wgpu::IndexFormat::Uint16,
-                            );
-                            render_pass.draw_indexed(0..index_count, 0, 0..1);
-                        }
-                    }
-                    _ => {}
+            // Now render all layers
+            if let Some(pipeline) = &self.render_pipeline {
+                for (vertex_buffer, index_buffer, index_count) in &buffers_and_counts {
+                    render_pass.set_pipeline(pipeline);
+                    render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+                    render_pass.set_index_buffer(
+                        index_buffer.slice(..),
+                        wgpu::IndexFormat::Uint16,
+                    );
+                    render_pass.draw_indexed(0..*index_count, 0, 0..1);
                 }
             }
         }

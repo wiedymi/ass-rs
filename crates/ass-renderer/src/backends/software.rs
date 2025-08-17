@@ -1,5 +1,18 @@
 //! Software (CPU) rendering backend using tiny-skia
 
+// Debug macro that only works with std
+#[cfg(not(feature = "nostd"))]
+macro_rules! debug_println {
+    ($($arg:tt)*) => {
+        eprintln!($($arg)*)
+    };
+}
+
+#[cfg(feature = "nostd")]
+macro_rules! debug_println {
+    ($($arg:tt)*) => {};
+}
+
 #[cfg(feature = "nostd")]
 use alloc::{boxed::Box, format, vec, vec::Vec};
 #[cfg(not(feature = "nostd"))]
@@ -38,7 +51,7 @@ impl SoftwareBackend {
             // Try to load additional Unicode fonts for better coverage
             if let Ok(home) = std::env::var("HOME") {
                 let font_dirs = [
-                    format!("{}/.fonts", home),
+                    format!("{home}/.fonts"),
                     "/usr/share/fonts".to_string(),
                     "/usr/local/share/fonts".to_string(),
                     "/System/Library/Fonts".to_string(), // macOS
@@ -83,7 +96,7 @@ impl SoftwareBackend {
 
             if !found_japanese {
                 #[cfg(not(feature = "nostd"))]
-                eprintln!(
+                debug_println!(
                     "Warning: No Japanese fonts found. Japanese text may not render correctly."
                 );
             }
@@ -142,8 +155,10 @@ impl SoftwareBackend {
         let transform = Transform::from_translate(data.x as f32, data.y as f32);
 
         // Use SourceOver blend mode for proper alpha compositing
-        let mut paint = tiny_skia::PixmapPaint::default();
-        paint.blend_mode = tiny_skia::BlendMode::SourceOver;
+        let paint = tiny_skia::PixmapPaint {
+            blend_mode: tiny_skia::BlendMode::SourceOver,
+            ..Default::default()
+        };
 
         self.pixmap
             .draw_pixmap(0, 0, src_pixmap.as_ref(), &paint, transform, None);
@@ -152,7 +167,7 @@ impl SoftwareBackend {
     }
 
     fn draw_vector_layer(&mut self, data: &crate::pipeline::VectorData) -> Result<(), RenderError> {
-        eprintln!(
+        debug_println!(
             "DRAWING RENDER: draw_vector_layer called with color {:?}",
             data.color
         );
@@ -165,12 +180,12 @@ impl SoftwareBackend {
         paint.blend_mode = tiny_skia::BlendMode::SourceOver;
 
         if let Some(path) = &data.path {
-            eprintln!(
+            debug_println!(
                 "DRAWING RENDER: Filling path with color RGBA({}, {}, {}, {})",
                 data.color[0], data.color[1], data.color[2], data.color[3]
             );
 
-            eprintln!("DRAWING RENDER: Path bounds: {:?}", path.bounds());
+            debug_println!("DRAWING RENDER: Path bounds: {:?}", path.bounds());
 
             self.pixmap.fill_path(
                 path,
@@ -189,8 +204,10 @@ impl SoftwareBackend {
                 stroke.color[3],
             );
 
-            let mut sk_stroke = tiny_skia::Stroke::default();
-            sk_stroke.width = stroke.width;
+            let sk_stroke = tiny_skia::Stroke {
+                width: stroke.width,
+                ..Default::default()
+            };
 
             if let Some(path) = &data.path {
                 self.pixmap
@@ -272,7 +289,7 @@ impl SoftwareBackend {
 
         // Render glyphs to paths using cached renderer with spacing
         let paths = self.glyph_renderer.render_shaped_text(
-            &*shaped,
+            &shaped,
             font_id,
             &self.font_database,
             data.spacing,
@@ -280,13 +297,13 @@ impl SoftwareBackend {
 
         #[cfg(all(debug_assertions, not(feature = "nostd")))]
         if data.text.contains("Чысценькая") {
-            eprintln!("  Rendered {} glyph paths", paths.len());
+            debug_println!("  Rendered {} glyph paths", paths.len());
         }
 
         // Build base transform with rotation and scaling
         // The data.x and data.y are the top-left corner of the text box
         // But glyphs are positioned from their baseline, so we need to adjust y by adding the baseline offset
-        let baseline_y = data.y + (*shaped).baseline;
+        let baseline_y = data.y + shaped.baseline;
 
         #[cfg(all(debug_assertions, not(feature = "nostd")))]
         {
@@ -300,19 +317,19 @@ impl SoftwareBackend {
             } else {
                 &data.text
             };
-            eprintln!(
+            debug_println!(
                 "Drawing text: '{}' at ({}, {}), baseline={}, baseline_y={}",
                 debug_text,
                 data.x,
                 data.y,
-                (*shaped).baseline,
+                shaped.baseline,
                 baseline_y
             );
-            if baseline_y > 1080.0 || baseline_y < -100.0 {
-                eprintln!(
+            if !(-100.0..=1080.0).contains(&baseline_y) {
+                debug_println!(
                     "WARNING: Baseline off-screen! data.y={}, baseline={}, baseline_y={}",
                     data.y,
-                    (*shaped).baseline,
+                    shaped.baseline,
                     baseline_y
                 );
             }
@@ -323,9 +340,9 @@ impl SoftwareBackend {
         // Check for rotation, scaling, and shear effects
         #[cfg(all(debug_assertions, not(feature = "nostd")))]
         if data.text.contains("Чысценькая") {
-            eprintln!("  Applying {} effects to text", data.effects.len());
+            debug_println!("  Applying {} effects to text", data.effects.len());
             for effect in &data.effects {
-                eprintln!("    Effect: {:?}", effect);
+                debug_println!("    Effect: {:?}", effect);
             }
         }
 
@@ -342,8 +359,8 @@ impl SoftwareBackend {
                         // Get the center of the text for rotation
                         // The text is positioned at its baseline, so we need to calculate center
                         // relative to the text's actual bounding box
-                        let text_center_x = (*shaped).width / 2.0;
-                        let text_center_y = (*shaped).height / 2.0;
+                        let text_center_x = shaped.width / 2.0;
+                        let text_center_y = shaped.height / 2.0;
 
                         // Move center to origin, rotate, then move back
                         base_transform = base_transform
@@ -352,7 +369,7 @@ impl SoftwareBackend {
                             .pre_translate(-text_center_x, -text_center_y);
 
                         #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                        eprintln!(
+                        debug_println!(
                             "Applied rotation: {} degrees ({} radians) around center ({}, {})",
                             z, angle_rad, text_center_x, text_center_y
                         );
@@ -386,7 +403,7 @@ impl SoftwareBackend {
                     let y_scale = *y / 100.0;
 
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!(
+                    debug_println!(
                         "SCALE: Applying scale transform - x={:.2}, y={:.2} for text '{}'",
                         x_scale, y_scale, data.text
                     );
@@ -396,8 +413,8 @@ impl SoftwareBackend {
                     // but we still need to apply the transform for proper scaling
                     if (x_scale - 1.0).abs() > 0.01 || (y_scale - 1.0).abs() > 0.01 {
                         // Get the center of the text for scaling
-                        let text_center_x = (*shaped).width / 2.0;
-                        let text_center_y = (*shaped).height / 2.0 - (*shaped).baseline;
+                        let text_center_x = shaped.width / 2.0;
+                        let text_center_y = shaped.height / 2.0 - shaped.baseline;
 
                         base_transform = base_transform
                             .pre_translate(text_center_x, text_center_y)
@@ -456,33 +473,30 @@ impl SoftwareBackend {
 
         // Apply effects in order: shadow, outline, then main text
         for effect in &data.effects {
-            match effect {
-                crate::pipeline::TextEffect::Shadow {
-                    color,
-                    x_offset,
-                    y_offset,
-                } => {
-                    // Draw shadow first
-                    let mut shadow_paint = tiny_skia::Paint::default();
-                    shadow_paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
-                    shadow_paint.anti_alias = true;
-                    shadow_paint.blend_mode = tiny_skia::BlendMode::SourceOver;
+            if let crate::pipeline::TextEffect::Shadow {
+                color,
+                x_offset,
+                y_offset,
+            } = effect {
+                // Draw shadow first
+                let mut shadow_paint = tiny_skia::Paint::default();
+                shadow_paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
+                shadow_paint.anti_alias = true;
+                shadow_paint.blend_mode = tiny_skia::BlendMode::SourceOver;
 
-                    let shadow_transform = base_transform.pre_translate(*x_offset, *y_offset);
+                let shadow_transform = base_transform.pre_translate(*x_offset, *y_offset);
 
-                    for path in &paths {
-                        if let Some(transformed) = path.clone().transform(shadow_transform) {
-                            self.pixmap.fill_path(
-                                &transformed,
-                                &shadow_paint,
-                                tiny_skia::FillRule::Winding,
-                                Transform::identity(),
-                                clip_mask.as_ref(),
-                            );
-                        }
+                for path in &paths {
+                    if let Some(transformed) = path.clone().transform(shadow_transform) {
+                        self.pixmap.fill_path(
+                            &transformed,
+                            &shadow_paint,
+                            tiny_skia::FillRule::Winding,
+                            Transform::identity(),
+                            clip_mask.as_ref(),
+                        );
                     }
                 }
-                _ => {}
             }
         }
 
@@ -497,28 +511,29 @@ impl SoftwareBackend {
 
         // Draw outline if present
         for effect in &data.effects {
-            match effect {
-                crate::pipeline::TextEffect::Outline { color, width } => {
+            if let crate::pipeline::TextEffect::Outline { color, width } = effect {
                     let mut outline_paint = tiny_skia::Paint::default();
                     outline_paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
                     outline_paint.anti_alias = true;
                     outline_paint.blend_mode = tiny_skia::BlendMode::SourceOver;
 
                     // Create stroke configuration for path expansion
-                    let mut stroke = tiny_skia::Stroke::default();
-                    stroke.width = *width * 0.6; // Further reduce width to match libass
-                    stroke.line_cap = tiny_skia::LineCap::Square;
-                    stroke.line_join = tiny_skia::LineJoin::Miter;
+                    let stroke = tiny_skia::Stroke {
+                        width: *width * 0.6, // Further reduce width to match libass
+                        line_cap: tiny_skia::LineCap::Square,
+                        line_join: tiny_skia::LineJoin::Miter,
+                        ..Default::default()
+                    };
 
                     // If edge blur is needed, render outline to temporary pixmap first
                     if let Some(blur_radius) = edge_blur_radius {
                         if blur_radius > 0.0 {
                             let blur_size = (blur_radius * 2.0).ceil() as u32;
                             let outline_width =
-                                ((*shaped).width + blur_size as f32 * 2.0 + *width * 2.0).ceil()
+                                (shaped.width + blur_size as f32 * 2.0 + *width * 2.0).ceil()
                                     as u32;
                             let outline_height =
-                                ((*shaped).height + blur_size as f32 * 2.0 + *width * 2.0).ceil()
+                                (shaped.height + blur_size as f32 * 2.0 + *width * 2.0).ceil()
                                     as u32;
 
                             if let Some(mut temp_pixmap) =
@@ -562,8 +577,10 @@ impl SoftwareBackend {
                                     -(blur_size as f32) - *width,
                                 );
 
-                                let mut paint = tiny_skia::PixmapPaint::default();
-                                paint.blend_mode = tiny_skia::BlendMode::SourceOver;
+                                let paint = tiny_skia::PixmapPaint {
+                                    blend_mode: tiny_skia::BlendMode::SourceOver,
+                                    ..Default::default()
+                                };
 
                                 self.pixmap.draw_pixmap(
                                     0,
@@ -598,8 +615,6 @@ impl SoftwareBackend {
                             }
                         }
                     }
-                }
-                _ => {}
             }
         }
 
@@ -610,7 +625,7 @@ impl SoftwareBackend {
         text_paint.blend_mode = tiny_skia::BlendMode::SourceOver;
 
         #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        eprintln!(
+        debug_println!(
             "Drawing main text with color: R={}, G={}, B={}, A={}",
             data.color[0], data.color[1], data.color[2], data.color[3]
         );
@@ -628,7 +643,7 @@ impl SoftwareBackend {
         let karaoke_info = data.effects.iter().find_map(|e| {
             if let crate::pipeline::TextEffect::Karaoke { progress, style } = e {
                 #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                eprintln!("KARAOKE DETECTED: progress={}, style={}", progress, style);
+                debug_println!("KARAOKE DETECTED: progress={}, style={}", progress, style);
                 Some((*progress, *style))
             } else {
                 None
@@ -642,8 +657,8 @@ impl SoftwareBackend {
         if let Some(radius) = blur_radius {
             // Create a temporary pixmap for blurred text
             let blur_size = (radius * 2.0).ceil() as u32;
-            let text_width = ((*shaped).width + blur_size as f32 * 2.0).ceil() as u32;
-            let text_height = ((*shaped).height + blur_size as f32 * 2.0).ceil() as u32;
+            let text_width = (shaped.width + blur_size as f32 * 2.0).ceil() as u32;
+            let text_height = (shaped.height + blur_size as f32 * 2.0).ceil() as u32;
 
             if let Some(mut temp_pixmap) = Pixmap::new(text_width, text_height) {
                 temp_pixmap.fill(tiny_skia::Color::TRANSPARENT);
@@ -668,8 +683,10 @@ impl SoftwareBackend {
                 // Draw blurred result to main pixmap
                 let blend_transform =
                     Transform::from_translate(data.x - blur_size as f32, data.y - blur_size as f32);
-                let mut paint = tiny_skia::PixmapPaint::default();
-                paint.blend_mode = tiny_skia::BlendMode::SourceOver;
+                let paint = tiny_skia::PixmapPaint {
+                    blend_mode: tiny_skia::BlendMode::SourceOver,
+                    ..Default::default()
+                };
 
                 self.pixmap
                     .draw_pixmap(0, 0, temp_pixmap.as_ref(), &paint, blend_transform, None);
@@ -678,7 +695,7 @@ impl SoftwareBackend {
             // Draw with karaoke effect based on style
 
             #[cfg(all(debug_assertions, not(feature = "nostd")))]
-            eprintln!(
+            debug_println!(
                 "KARAOKE RENDERING: progress={}, style={}, original color=({},{},{},{})",
                 progress, karaoke_style, data.color[0], data.color[1], data.color[2], data.color[3]
             );
@@ -698,7 +715,7 @@ impl SoftwareBackend {
                     // Sung - use highlight color (typically secondary color, we'll use yellow)
                     karaoke_paint.set_color_rgba8(255, 255, 0, data.color[3]); // Yellow
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("KARAOKE COLOR: Sung - Yellow (255,255,0,{})", data.color[3]);
+                    debug_println!("KARAOKE COLOR: Sung - Yellow (255,255,0,{})", data.color[3]);
                 } else {
                     // Not yet sung - use original color
                     karaoke_paint.set_color_rgba8(
@@ -708,7 +725,7 @@ impl SoftwareBackend {
                         data.color[3],
                     );
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!(
+                    debug_println!(
                         "KARAOKE COLOR: Not sung - Original ({},{},{},{})",
                         data.color[0], data.color[1], data.color[2], data.color[3]
                     );
@@ -751,7 +768,7 @@ impl SoftwareBackend {
         } else {
             // Draw without blur or karaoke
             #[cfg(all(debug_assertions, not(feature = "nostd")))]
-            eprintln!(
+            debug_println!(
                 "Drawing {} paths for main text at transform ({}, {})",
                 paths.len(),
                 text_transform.tx,
@@ -764,7 +781,7 @@ impl SoftwareBackend {
                     {
                         if data.text.contains("Чысценькая") {
                             let bounds = transformed.bounds();
-                            eprintln!(
+                            debug_println!(
                                 "  Glyph {}: bounds = ({:.1}, {:.1}, {:.1}, {:.1})",
                                 i,
                                 bounds.left(),
@@ -774,7 +791,7 @@ impl SoftwareBackend {
                             );
                         }
                         if i == 0 {
-                            eprintln!(
+                            debug_println!(
                                 "Drawing path 0 for main text, bounds: {:?}",
                                 transformed.bounds()
                             );
@@ -797,15 +814,17 @@ impl SoftwareBackend {
             // Position underline according to libass formula: baseline + descent/2
             // baseline_y is already calculated as data.y + (*shaped).baseline
             // descent is negative, so we need to subtract half of its absolute value
-            let underline_y = baseline_y - (*shaped).descent / 2.0;
+            let underline_y = baseline_y - shaped.descent / 2.0;
             let mut builder = tiny_skia::PathBuilder::new();
             builder.move_to(data.x, underline_y);
-            builder.line_to(data.x + (*shaped).width, underline_y);
+            builder.line_to(data.x + shaped.width, underline_y);
 
             if let Some(underline_path) = builder.finish() {
-                let mut stroke = tiny_skia::Stroke::default();
-                stroke.width = data.font_size * 0.08;
-                stroke.line_cap = tiny_skia::LineCap::Round;
+                let stroke = tiny_skia::Stroke {
+                    width: data.font_size * 0.08,
+                    line_cap: tiny_skia::LineCap::Round,
+                    ..Default::default()
+                };
                 self.pixmap.stroke_path(
                     &underline_path,
                     &text_paint,
@@ -820,15 +839,17 @@ impl SoftwareBackend {
         if strikethrough {
             // Position strikethrough according to libass formula: baseline - ascent/3
             // baseline_y is already calculated as data.y + (*shaped).baseline
-            let strike_y = baseline_y - (*shaped).ascent / 3.0;
+            let strike_y = baseline_y - shaped.ascent / 3.0;
             let mut builder = tiny_skia::PathBuilder::new();
             builder.move_to(data.x, strike_y);
-            builder.line_to(data.x + (*shaped).width, strike_y);
+            builder.line_to(data.x + shaped.width, strike_y);
 
             if let Some(strike_path) = builder.finish() {
-                let mut stroke = tiny_skia::Stroke::default();
-                stroke.width = data.font_size * 0.06;
-                stroke.line_cap = tiny_skia::LineCap::Round;
+                let stroke = tiny_skia::Stroke {
+                    width: data.font_size * 0.06,
+                    line_cap: tiny_skia::LineCap::Round,
+                    ..Default::default()
+                };
                 self.pixmap.stroke_path(
                     &strike_path,
                     &text_paint,
@@ -914,6 +935,7 @@ fn apply_box_blur(pixmap: &mut Pixmap, radius: f32) {
 
 /// Apply optimized box blur using SIMD when available
 #[cfg(feature = "simd")]
+#[allow(dead_code)] // Placeholder for future SIMD optimization
 fn apply_box_blur_simd(pixmap: &mut Pixmap, radius: f32) {
     if radius <= 0.0 {
         return;
@@ -963,12 +985,12 @@ impl RenderBackend for SoftwareBackend {
                 } else {
                     &data[0..4]
                 };
-                eprintln!("PIXMAP SAMPLES: [0]={:?}, [1000]={:?}", sample1, sample2);
+                debug_println!("PIXMAP SAMPLES: [0]={:?}, [1000]={:?}", sample1, sample2);
 
                 // Count non-opaque pixels
                 let non_opaque = data.chunks_exact(4).filter(|p| p[3] != 255).count();
                 let transparent = data.chunks_exact(4).filter(|p| p[3] == 0).count();
-                eprintln!(
+                debug_println!(
                     "PIXMAP ALPHA STATS: {} non-opaque pixels, {} transparent pixels out of {}",
                     non_opaque,
                     transparent,

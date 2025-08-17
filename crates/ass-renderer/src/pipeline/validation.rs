@@ -9,12 +9,11 @@ use crate::utils::RenderError;
 
 /// Validate alignment value (1-9 for numpad positions)
 pub fn validate_alignment(value: u8) -> Result<u8, RenderError> {
-    if value >= 1 && value <= 9 {
+    if (1..=9).contains(&value) {
         Ok(value)
     } else {
         Err(RenderError::InvalidScript(format!(
-            "Invalid alignment value: {}. Must be 1-9",
-            value
+            "Invalid alignment value: {value}. Must be 1-9"
         )))
     }
 }
@@ -25,8 +24,7 @@ pub fn validate_wrap_style(value: u8) -> Result<u8, RenderError> {
         Ok(value)
     } else {
         Err(RenderError::InvalidScript(format!(
-            "Invalid wrap style: {}. Must be 0-3",
-            value
+            "Invalid wrap style: {value}. Must be 0-3"
         )))
     }
 }
@@ -37,8 +35,7 @@ pub fn validate_drawing_mode(value: u8) -> Result<u8, RenderError> {
         Ok(value)
     } else {
         Err(RenderError::InvalidScript(format!(
-            "Invalid drawing mode: {}. Must be 0-4",
-            value
+            "Invalid drawing mode: {value}. Must be 0-4"
         )))
     }
 }
@@ -49,20 +46,18 @@ pub fn validate_font_size(value: f32) -> Result<f32, RenderError> {
         Ok(value)
     } else {
         Err(RenderError::InvalidScript(format!(
-            "Invalid font size: {}. Must be positive and reasonable",
-            value
+            "Invalid font size: {value}. Must be positive and reasonable"
         )))
     }
 }
 
 /// Validate scale percentage (0-1000%)
 pub fn validate_scale(value: f32) -> Result<f32, RenderError> {
-    if value >= 0.0 && value <= 1000.0 {
+    if (0.0..=1000.0).contains(&value) {
         Ok(value)
     } else {
         Err(RenderError::InvalidScript(format!(
-            "Invalid scale: {}%. Must be 0-1000",
-            value
+            "Invalid scale: {value}%. Must be 0-1000"
         )))
     }
 }
@@ -80,24 +75,22 @@ pub fn validate_rotation(value: f32) -> Result<f32, RenderError> {
 
 /// Validate border width (non-negative)
 pub fn validate_border_width(value: f32) -> Result<f32, RenderError> {
-    if value >= 0.0 && value < 100.0 {
+    if (0.0..100.0).contains(&value) {
         Ok(value)
     } else {
         Err(RenderError::InvalidScript(format!(
-            "Invalid border width: {}. Must be non-negative",
-            value
+            "Invalid border width: {value}. Must be non-negative"
         )))
     }
 }
 
 /// Validate blur amount (non-negative)
 pub fn validate_blur(value: f32) -> Result<f32, RenderError> {
-    if value >= 0.0 && value < 100.0 {
+    if (0.0..100.0).contains(&value) {
         Ok(value)
     } else {
         Err(RenderError::InvalidScript(format!(
-            "Invalid blur: {}. Must be non-negative",
-            value
+            "Invalid blur: {value}. Must be non-negative"
         )))
     }
 }

@@ -35,9 +35,9 @@ pub fn load_embedded_fonts(script: &Script, font_database: &mut FontDatabase) {
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
                     eprintln!("Successfully loaded embedded font: {}", font.filename);
                 }
-                Err(e) => {
+                Err(_e) => {
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("Failed to decode embedded font {}: {:?}", font.filename, e);
+                    eprintln!("Failed to decode embedded font {}: {:?}", font.filename, _e);
                 }
             }
         }
@@ -45,7 +45,7 @@ pub fn load_embedded_fonts(script: &Script, font_database: &mut FontDatabase) {
 }
 
 /// Load fonts from file paths specified in script metadata
-pub fn load_font_files(script: &Script, font_database: &mut FontDatabase) {
+pub fn load_font_files(script: &Script, #[cfg_attr(feature = "nostd", allow(unused_variables))] font_database: &mut FontDatabase) {
     // Check Script Info section for font file references
     if let Some(script_info) = script.sections().iter().find_map(|section| {
         if let ass_core::parser::ast::Section::ScriptInfo(info) = section {
@@ -58,19 +58,19 @@ pub fn load_font_files(script: &Script, font_database: &mut FontDatabase) {
         for (key, value) in &script_info.fields {
             // Some scripts use "Font:" or "Fontname:" fields to specify external fonts
             if key.to_lowercase().contains("font") {
-                let font_path = value.trim();
+                let _font_path = value.trim();
 
                 #[cfg(not(feature = "nostd"))]
                 {
                     // Try to load as a file path if it exists
-                    let path = std::path::Path::new(font_path);
+                    let path = std::path::Path::new(_font_path);
                     if path.exists() && path.is_file() {
                         #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                        eprintln!("Loading external font file: {}", font_path);
+                        eprintln!("Loading external font file: {}", _font_path);
 
-                        if let Err(e) = font_database.load_font_file(path) {
+                        if let Err(_e) = font_database.load_font_file(path) {
                             #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                            eprintln!("Failed to load font file {}: {:?}", font_path, e);
+                            eprintln!("Failed to load font file {}: {:?}", _font_path, _e);
                         }
                     }
                 }

@@ -16,16 +16,22 @@ use alloc::{string::String, sync::Arc};
 /// Cache key for shaped text
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct TextCacheKey {
+    /// Text content to be shaped
     pub text: String,
+    /// Font family name
     pub font_family: String,
-    pub font_size: u32, // Rounded to avoid float comparison issues
+    /// Font size (rounded to avoid float comparison issues)
+    pub font_size: u32,
+    /// Whether text should be bold
     pub bold: bool,
+    /// Whether text should be italic
     pub italic: bool,
 }
 
 /// Cache key for drawing paths
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct DrawingCacheKey {
+    /// Drawing commands as string
     pub commands: String,
 }
 
@@ -46,10 +52,15 @@ pub struct RenderCache {
 /// Cache statistics for monitoring
 #[derive(Debug, Default, Clone)]
 pub struct CacheStats {
+    /// Number of text cache hits
     pub text_hits: usize,
+    /// Number of text cache misses
     pub text_misses: usize,
+    /// Number of drawing cache hits
     pub drawing_hits: usize,
+    /// Number of drawing cache misses
     pub drawing_misses: usize,
+    /// Number of cache evictions
     pub evictions: usize,
 }
 
@@ -141,12 +152,14 @@ impl RenderCache {
 
     /// Print cache statistics
     pub fn print_stats(&self) {
+        #[cfg(not(feature = "nostd"))]
         let text_ratio = if self.stats.text_hits + self.stats.text_misses > 0 {
             self.stats.text_hits as f64 / (self.stats.text_hits + self.stats.text_misses) as f64
         } else {
             0.0
         };
 
+        #[cfg(not(feature = "nostd"))]
         let drawing_ratio = if self.stats.drawing_hits + self.stats.drawing_misses > 0 {
             self.stats.drawing_hits as f64
                 / (self.stats.drawing_hits + self.stats.drawing_misses) as f64

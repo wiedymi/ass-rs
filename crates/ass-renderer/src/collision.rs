@@ -22,9 +22,13 @@ pub trait CollisionDetector: Send + Sync {
 /// Bounding box for collision detection
 #[derive(Debug, Clone, Copy)]
 pub struct BoundingBox {
+    /// X coordinate of the box
     pub x: f32,
+    /// Y coordinate of the box
     pub y: f32,
+    /// Width of the box
     pub width: f32,
+    /// Height of the box
     pub height: f32,
 }
 
@@ -78,17 +82,25 @@ impl BoundingBox {
 /// Positioned subtitle event
 #[derive(Debug, Clone)]
 pub struct PositionedEvent {
+    /// Bounding box of the event
     pub bbox: BoundingBox,
+    /// Layer number for z-order
     pub layer: i32,
+    /// Vertical margin
     pub margin_v: i32,
+    /// Left margin
     pub margin_l: i32,
+    /// Right margin
     pub margin_r: i32,
+    /// Text alignment (1-9 numpad style)
     pub alignment: u8,
-    pub priority: i32, // Lower priority events can be moved
+    /// Priority for collision resolution (lower priority events can be moved)
+    pub priority: i32,
 }
 
 /// Collision resolver for subtitle positioning
 pub struct CollisionResolver {
+    #[allow(dead_code)] // Used in constructor, may be needed for future collision algorithms
     screen_width: f32,
     screen_height: f32,
     positioned_events: Vec<PositionedEvent>,

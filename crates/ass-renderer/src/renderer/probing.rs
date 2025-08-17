@@ -21,8 +21,8 @@ impl BackendProber {
 
         #[cfg(all(feature = "web-backend", target_arch = "wasm32"))]
         {
-            preferred_order.push(BackendType::WebGpu);
-            preferred_order.push(BackendType::WebGl);
+            preferred_order.push(BackendType::WebGPU);
+            preferred_order.push(BackendType::WebGL);
         }
 
         #[cfg(all(feature = "vulkan", not(target_arch = "wasm32")))]
@@ -54,12 +54,12 @@ impl BackendProber {
                     eprintln!("Selected {} backend for rendering", backend_type.as_str());
                     return Ok(backend);
                 }
-                Err(e) => {
+                Err(_e) => {
                     #[cfg(not(feature = "nostd"))]
                     eprintln!(
                         "Failed to initialize {} backend: {}",
                         backend_type.as_str(),
-                        e
+                        _e
                     );
                 }
             }
@@ -94,7 +94,7 @@ impl BackendProber {
             }
 
             #[cfg(feature = "web-backend")]
-            BackendType::WebGpu => {
+            BackendType::WebGPU => {
                 use crate::backends::web::WebGpuBackend;
                 Ok(Arc::new(WebGpuBackend::from_dimensions(
                     context.width(),
@@ -103,7 +103,7 @@ impl BackendProber {
             }
 
             #[cfg(feature = "web-backend")]
-            BackendType::WebGl => {
+            BackendType::WebGL => {
                 // WebGL backend not implemented yet
                 Err(RenderError::UnsupportedBackend(
                     "WebGL backend not implemented",
@@ -139,7 +139,7 @@ impl BackendProber {
             }
 
             #[cfg(feature = "web-backend")]
-            BackendType::WebGpu | BackendType::WebGl => {
+            BackendType::WebGPU | BackendType::WebGL => {
                 #[cfg(target_arch = "wasm32")]
                 {
                     true

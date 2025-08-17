@@ -4,8 +4,6 @@ use ass_core::parser::Script;
 #[cfg(not(feature = "nostd"))]
 use std::collections::HashMap;
 #[cfg(not(feature = "nostd"))]
-use std::path::Path;
-#[cfg(not(feature = "nostd"))]
 use std::time::{Duration, Instant};
 
 #[cfg(feature = "nostd")]
@@ -19,6 +17,7 @@ use alloc::vec::Vec;
 pub struct DebugPlayer {
     renderer: Renderer,
     script_content: Option<String>,
+    #[allow(dead_code)] // Debug feature - may be used for future player functionality
     parsed_script: Option<Script<'static>>,
     current_time_ms: u32,
     playback_speed: f32,

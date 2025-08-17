@@ -132,7 +132,7 @@ impl Effect for AnimationEffect {
         match &self.property {
             AnimationProperty::Opacity { start, end } => {
                 let opacity = lerp(*start, *end, t);
-                let opacity_byte = (opacity * 255.0) as u8;
+                let _opacity_byte = (opacity * 255.0) as u8;
 
                 // Apply opacity to alpha channel
                 for pixel in pixels.chunks_exact_mut(4) {

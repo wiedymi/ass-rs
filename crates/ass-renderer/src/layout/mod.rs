@@ -16,14 +16,23 @@ pub use positioning::{convert_ssa_alignment, scale_coordinates, BoundingBox, Pos
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Alignment {
     // ASS alignments (numpad layout)
+    /// Bottom left alignment
     BottomLeft = 1,
+    /// Bottom center alignment
     BottomCenter = 2,
+    /// Bottom right alignment
     BottomRight = 3,
+    /// Middle left alignment
     MiddleLeft = 4,
+    /// Center alignment
     Center = 5,
+    /// Middle right alignment
     MiddleRight = 6,
+    /// Top left alignment
     TopLeft = 7,
+    /// Top center alignment
     TopCenter = 8,
+    /// Top right alignment
     TopRight = 9,
 }
 
@@ -218,7 +227,7 @@ impl MultiLineLayout {
     /// Create layout for multi-line text
     pub fn new(
         text: &str,
-        context: &LayoutContext,
+        _context: &LayoutContext,
         alignment: Alignment,
         line_spacing: f32,
     ) -> Self {

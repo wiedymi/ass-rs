@@ -435,7 +435,7 @@ pub struct ColorHistogram {
     pub blue_sum: u64,
     pub alpha_sum: u64,
     pub count: usize,
-    pub unique_colors: std::collections::HashSet<(u8, u8, u8, u8)>,
+    pub unique_colors: HashSet<(u8, u8, u8, u8)>,
 }
 
 impl ColorHistogram {
@@ -446,7 +446,7 @@ impl ColorHistogram {
             blue_sum: 0,
             alpha_sum: 0,
             count: 0,
-            unique_colors: std::collections::HashSet::new(),
+            unique_colors: HashSet::new(),
         }
     }
 

@@ -62,7 +62,7 @@ impl PositionInfo {
             let render_x = pos_x - Self::get_alignment_offset_x(alignment, bbox);
             let render_y = pos_y - Self::get_alignment_offset_y(alignment, bbox);
             (render_x, render_y, true)
-        } else if let Some((x1, y1, x2, y2, _t1, _t2)) = tags.movement {
+        } else if let Some((x1, y1, _x2, _y2, _t1, _t2)) = tags.movement {
             // \move tag (simplified - should interpolate based on time)
             // For now just use start position
             let render_x = x1 - Self::get_alignment_offset_x(alignment, bbox);

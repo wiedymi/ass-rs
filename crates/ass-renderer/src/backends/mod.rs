@@ -5,7 +5,7 @@ use crate::renderer::RenderContext;
 use crate::utils::{DirtyRegion, RenderError};
 
 #[cfg(feature = "nostd")]
-use alloc::{boxed::Box, format, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, format, string::ToString, sync::Arc, vec::Vec};
 #[cfg(not(feature = "nostd"))]
 use std::{boxed::Box, sync::Arc, vec::Vec};
 
@@ -144,9 +144,6 @@ impl Default for BackendMetrics {
     }
 }
 
-#[cfg(not(feature = "nostd"))]
-#[cfg(feature = "nostd")]
-use alloc::sync::Arc;
 
 /// Create a backend instance for the given type
 pub fn create_backend(
@@ -194,7 +191,8 @@ pub fn create_backend(
 
         #[cfg(all(feature = "hardware-backend", feature = "metal", target_os = "macos"))]
         BackendType::Metal => {
-            let backend = hardware::metal::MetalBackend::new(width, height)?;
+            let context = crate::renderer::RenderContext::new(width, height);
+            let backend = hardware::metal::MetalBackend::new(&context)?;
             Ok(Arc::new(backend))
         }
 
@@ -211,9 +209,11 @@ pub fn create_backend(
         }
 
         #[allow(unreachable_patterns)]
-        _ => Err(RenderError::BackendError(format!(
-            "{} backend not available in this build",
-            backend_type.as_str()
-        ))),
+        _ => {
+            let backend_name = backend_type.as_str();
+            Err(RenderError::BackendError(format!(
+                "{backend_name} backend not available in this build"
+            )))
+        },
     }
 }
