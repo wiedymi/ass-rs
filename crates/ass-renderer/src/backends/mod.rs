@@ -5,9 +5,21 @@ use crate::renderer::RenderContext;
 use crate::utils::{DirtyRegion, RenderError};
 
 #[cfg(feature = "nostd")]
-use alloc::{boxed::Box, format, string::ToString, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, format, sync::Arc, vec::Vec};
 #[cfg(not(feature = "nostd"))]
 use std::{boxed::Box, sync::Arc, vec::Vec};
+
+// ToString is only needed for backends that aren't compiled with minimal features
+#[cfg(all(
+    feature = "nostd",
+    any(feature = "hardware-backend", feature = "web-backend")
+))]
+use alloc::string::ToString;
+#[cfg(all(
+    not(feature = "nostd"),
+    any(feature = "hardware-backend", feature = "web-backend")
+))]
+use std::string::ToString;
 
 #[cfg(feature = "software-backend")]
 pub mod software;

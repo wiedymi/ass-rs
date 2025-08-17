@@ -95,7 +95,7 @@ impl EventSelector {
             #[cfg(all(debug_assertions, not(feature = "nostd")))]
             eprintln!(
                 "EventSelector: Checking {} events at time {}",
-                events_section.iter().count(),
+                events_section.len(),
                 time_cs
             );
             for (idx, event) in events_section.iter().enumerate() {

@@ -45,7 +45,7 @@ pub mod libass_renderer;
 #[cfg(feature = "libass-compare")]
 pub mod pixel_perfect_comparison;
 /// Visual report generation
-#[cfg(not(feature = "nostd"))]
+#[cfg(all(not(feature = "nostd"), feature = "libass-compare"))]
 pub mod visual_reporting;
 
 pub use analyzer::{AnalysisReport, FrameAnalyzer};
@@ -62,7 +62,7 @@ pub use libass_compatibility::{
 pub use libass_renderer::LibassRenderer;
 #[cfg(feature = "libass-compare")]
 pub use pixel_perfect_comparison::PixelPerfectComparison;
-#[cfg(not(feature = "nostd"))]
+#[cfg(all(not(feature = "nostd"), feature = "libass-compare"))]
 pub use visual_reporting::{generate_compatibility_report, ReportConfig, VisualReportGenerator};
 // #[cfg(feature = "libass-compare")]
 // pub use pixel_perfect_comparison::{
@@ -301,7 +301,7 @@ impl DebugRenderer {
         // Create directory if it doesn't exist
         #[cfg(not(feature = "nostd"))]
         std::fs::create_dir_all(dir)
-            .map_err(|e| RenderError::BackendError(format!("Failed to create debug dir: {}", e)))?;
+            .map_err(|e| RenderError::BackendError(format!("Failed to create debug dir: {e}")))?;
         #[cfg(feature = "nostd")]
         return Err(RenderError::BackendError(
             "File operations not supported in no_std".into(),
@@ -310,23 +310,20 @@ impl DebugRenderer {
         // Save frame as PNG with debug overlay if enabled
         if self.enable_visual_overlay {
             let debug_frame = self.create_debug_overlay(frame, info)?;
-            save_frame_as_png(
-                &debug_frame,
-                &format!("{}/frame_{:06}_debug.png", dir, time_ms),
-            )?;
+            save_frame_as_png(&debug_frame, &format!("{dir}/frame_{time_ms:06}_debug.png"))?;
         } else {
-            save_frame_as_png(frame, &format!("{}/frame_{:06}.png", dir, time_ms))?;
+            save_frame_as_png(frame, &format!("{dir}/frame_{time_ms:06}.png"))?;
         }
 
         // Save debug info as JSON
         #[cfg(all(not(feature = "nostd"), feature = "serde"))]
         {
-            let json_path = format!("{}/frame_{:06}_info.json", dir, time_ms);
+            let json_path = format!("{dir}/frame_{time_ms:06}_info.json");
             let json = serde_json::to_string_pretty(&info).map_err(|e| {
-                RenderError::BackendError(format!("Failed to serialize debug info: {}", e))
+                RenderError::BackendError(format!("Failed to serialize debug info: {e}"))
             })?;
             std::fs::write(json_path, json).map_err(|e| {
-                RenderError::BackendError(format!("Failed to write debug info: {}", e))
+                RenderError::BackendError(format!("Failed to write debug info: {e}"))
             })?;
         }
 
@@ -403,7 +400,7 @@ impl DebugRenderer {
             checksum_match: frame1.frame_checksum == frame2.frame_checksum,
             pixel_diff: (frame1.non_transparent_pixels as i32
                 - frame2.non_transparent_pixels as i32)
-                .abs() as u32,
+                .unsigned_abs(),
             render_time_diff: frame1.render_time_ms - frame2.render_time_ms,
             bbox_changed: frame1.bounding_box != frame2.bounding_box,
         })
@@ -475,7 +472,7 @@ fn save_frame_as_png(frame: &Frame, path: &str) -> Result<(), RenderError> {
         .ok_or_else(|| RenderError::BackendError("Failed to create image buffer".into()))?;
 
         img.save(path)
-            .map_err(|e| RenderError::BackendError(format!("Failed to save PNG: {}", e)))?;
+            .map_err(|e| RenderError::BackendError(format!("Failed to save PNG: {e}")))?;
     }
 
     #[cfg(not(feature = "image"))]

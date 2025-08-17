@@ -176,7 +176,7 @@ impl LibassRenderer {
                 }
 
                 let src_idx = (y * image.stride + x) as usize;
-                let dst_idx = (dst_y * stride as usize + dst_x * 4) as usize;
+                let dst_idx = dst_y * stride as usize + dst_x * 4;
 
                 if src_idx < bitmap.len() && dst_idx + 3 < buffer.len() {
                     // Get alpha from bitmap (libass uses alpha channel for glyph coverage)

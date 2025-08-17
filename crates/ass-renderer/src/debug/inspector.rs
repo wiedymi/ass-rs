@@ -19,6 +19,12 @@ pub struct FrameInspector {
     cursor_y: u32,
 }
 
+impl Default for FrameInspector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FrameInspector {
     pub fn new() -> Self {
         Self {
@@ -180,7 +186,7 @@ impl FrameInspector {
                                 y,
                                 start_x: x,
                                 end_x: x,
-                                pixels: vec![pixel.clone()],
+                                pixels: vec![pixel],
                                 avg_color: [pixel.r, pixel.g, pixel.b, pixel.a],
                             });
                         }
@@ -238,7 +244,8 @@ impl FrameInspector {
             width,
             height
         );
-        println!("┌{}┐", "─".repeat(width as usize));
+        let border = "─".repeat(width as usize);
+        println!("┌{border}┐");
 
         for y in 0..height {
             print!("│");
@@ -255,7 +262,8 @@ impl FrameInspector {
             println!("│");
         }
 
-        println!("└{}┘", "─".repeat(width as usize));
+        let border = "─".repeat(width as usize);
+        println!("└{border}┘");
         println!("Legend: █=opaque ▓=semi ░=faint ·=trace  =transparent");
     }
 }
@@ -272,19 +280,25 @@ pub struct PixelInfo {
 
 impl PixelInfo {
     pub fn to_hex(&self) -> String {
-        format!("#{:02X}{:02X}{:02X}{:02X}", self.r, self.g, self.b, self.a)
+        format!(
+            "#{r:02X}{g:02X}{b:02X}{a:02X}",
+            r = self.r,
+            g = self.g,
+            b = self.b,
+            a = self.a
+        )
     }
 
     pub fn to_css(&self) -> String {
         if self.a == 255 {
-            format!("rgb({}, {}, {})", self.r, self.g, self.b)
+            format!("rgb({r}, {g}, {b})", r = self.r, g = self.g, b = self.b)
         } else {
             format!(
-                "rgba({}, {}, {}, {:.2})",
-                self.r,
-                self.g,
-                self.b,
-                self.a as f32 / 255.0
+                "rgba({r}, {g}, {b}, {a:.2})",
+                r = self.r,
+                g = self.g,
+                b = self.b,
+                a = self.a as f32 / 255.0
             )
         }
     }
@@ -308,13 +322,7 @@ impl PixelInfo {
     }
 
     pub fn is_similar(&self, other: &PixelInfo, threshold: u8) -> bool {
-        let diff = |a: u8, b: u8| -> u8 {
-            if a > b {
-                a - b
-            } else {
-                b - a
-            }
-        };
+        let diff = |a: u8, b: u8| -> u8 { a.abs_diff(b) };
 
         diff(self.r, other.r) <= threshold
             && diff(self.g, other.g) <= threshold
@@ -342,16 +350,25 @@ impl PixelInfo {
         println!("╔════════════════════════════════════╗");
         println!("║         Pixel Information          ║");
         println!("╚════════════════════════════════════╝");
-        println!("Position: ({}, {})", self.x, self.y);
-        println!("RGBA: ({}, {}, {}, {})", self.r, self.g, self.b, self.a);
-        println!("Hex: {}", self.to_hex());
-        println!("CSS: {}", self.to_css());
-        println!("Luminance: {:.2}", self.luminance());
+        println!("Position: ({x}, {y})", x = self.x, y = self.y);
+        println!(
+            "RGBA: ({r}, {g}, {b}, {a})",
+            r = self.r,
+            g = self.g,
+            b = self.b,
+            a = self.a
+        );
+        println!("Hex: {hex}", hex = self.to_hex());
+        println!("CSS: {css}", css = self.to_css());
+        println!("Luminance: {luminance:.2}", luminance = self.luminance());
         println!(
             "Grayscale: {}",
             if self.is_grayscale() { "Yes" } else { "No" }
         );
-        println!("Opacity: {:.1}%", (self.a as f32 / 255.0) * 100.0);
+        println!(
+            "Opacity: {opacity:.1}%",
+            opacity = (self.a as f32 / 255.0) * 100.0
+        );
 
         // Color classification
         let color_name = if self.a == 0 {
@@ -381,7 +398,7 @@ impl PixelInfo {
             }
         };
 
-        println!("Color: {}", color_name);
+        println!("Color: {color_name}");
         println!("════════════════════════════════════");
     }
 }
@@ -413,7 +430,8 @@ impl RegionInfo {
             "Region: {}x{} at ({}, {})",
             self.width, self.height, self.x, self.y
         );
-        println!("Total pixels: {}", self.pixels.len());
+        let pixel_count = self.pixels.len();
+        println!("Total pixels: {pixel_count}");
 
         if !self.pixels.is_empty() {
             let non_transparent = self.pixels.iter().filter(|p| p.a > 0).count();
@@ -480,7 +498,8 @@ impl ColorHistogram {
                 avg[0], avg[1], avg[2], avg[3]
             );
         }
-        println!("Unique colors: {}", self.unique_colors.len());
+        let color_count = self.unique_colors.len();
+        println!("Unique colors: {color_count}");
     }
 }
 
@@ -521,13 +540,7 @@ impl LineScanSegment {
 
         // Check if pixel is similar to average
         let threshold = 30;
-        let diff = |a: u8, b: u8| -> u8 {
-            if a > b {
-                a - b
-            } else {
-                b - a
-            }
-        };
+        let diff = |a: u8, b: u8| -> u8 { a.abs_diff(b) };
 
         diff(self.avg_color[0], pixel.r) <= threshold
             && diff(self.avg_color[1], pixel.g) <= threshold

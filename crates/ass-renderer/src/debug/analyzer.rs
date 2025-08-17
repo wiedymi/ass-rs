@@ -15,6 +15,12 @@ pub struct FrameAnalyzer {
     enable_text_detection: bool,
 }
 
+impl Default for FrameAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FrameAnalyzer {
     /// Create a new frame analyzer with all analysis features enabled
     pub fn new() -> Self {
@@ -180,8 +186,8 @@ impl FrameAnalyzer {
 
         // Calculate average color
         if region.pixel_count > 0 {
-            for i in 0..4 {
-                region.avg_color[i] = (color_sum[i] / region.pixel_count as u64) as u8;
+            for (i, sum) in color_sum.iter().enumerate() {
+                region.avg_color[i] = (sum / region.pixel_count as u64) as u8;
             }
         }
 
@@ -204,7 +210,7 @@ impl FrameAnalyzer {
 
             // Text typically has aspect ratio > 2 for horizontal text
             // and reasonable height (20-200 pixels for typical subtitles)
-            if aspect_ratio > 1.5 && height > 15 && height < 200 {
+            if aspect_ratio > 1.5 && (15..200).contains(&height) {
                 // Check if it's high contrast (likely text)
                 let is_bright = region.avg_color[0] > 200
                     || region.avg_color[1] > 200
@@ -329,33 +335,55 @@ impl AnalysisReport {
         println!("╚════════════════════════════════════════╝");
 
         println!("\n📊 Basic Statistics:");
-        println!("  • Resolution: {}x{}", self.width, self.height);
-        println!("  • Total Pixels: {}", self.total_pixels);
+        println!(
+            "  • Resolution: {width}x{height}",
+            width = self.width,
+            height = self.height
+        );
+        println!(
+            "  • Total Pixels: {total_pixels}",
+            total_pixels = self.total_pixels
+        );
         println!(
             "  • Non-transparent: {} ({:.1}%)",
             self.non_transparent_pixels,
             (self.non_transparent_pixels as f32 / self.total_pixels as f32) * 100.0
         );
-        println!("  • Transparency: {:.1}%", self.transparency_percentage);
+        println!(
+            "  • Transparency: {transparency:.1}%",
+            transparency = self.transparency_percentage
+        );
 
         println!("\n🎨 Color Distribution:");
-        println!("  • White pixels: {}", self.pixel_histogram.white_pixels);
-        println!("  • Black pixels: {}", self.pixel_histogram.black_pixels);
-        println!("  • Gray pixels: {}", self.pixel_histogram.gray_pixels);
         println!(
-            "  • Colored pixels: {}",
-            self.pixel_histogram.colored_pixels
+            "  • White pixels: {white_pixels}",
+            white_pixels = self.pixel_histogram.white_pixels
         );
         println!(
-            "  • Dominant color: RGBA({}, {}, {}, {})",
-            self.dominant_color[0],
-            self.dominant_color[1],
-            self.dominant_color[2],
-            self.dominant_color[3]
+            "  • Black pixels: {black_pixels}",
+            black_pixels = self.pixel_histogram.black_pixels
+        );
+        println!(
+            "  • Gray pixels: {gray_pixels}",
+            gray_pixels = self.pixel_histogram.gray_pixels
+        );
+        println!(
+            "  • Colored pixels: {colored_pixels}",
+            colored_pixels = self.pixel_histogram.colored_pixels
+        );
+        println!(
+            "  • Dominant color: RGBA({r}, {g}, {b}, {a})",
+            r = self.dominant_color[0],
+            g = self.dominant_color[1],
+            b = self.dominant_color[2],
+            a = self.dominant_color[3]
         );
 
         println!("\n🔍 Region Detection:");
-        println!("  • Detected regions: {}", self.regions.len());
+        println!(
+            "  • Detected regions: {regions_count}",
+            regions_count = self.regions.len()
+        );
         for (i, region) in self.regions.iter().enumerate() {
             println!(
                 "    {}. Box: ({}, {}) to ({}, {}) | Pixels: {} | Color: RGBA({}, {}, {}, {})",
@@ -376,7 +404,10 @@ impl AnalysisReport {
         if self.text_areas.is_empty() {
             println!("  • No text areas detected");
         } else {
-            println!("  • Detected text areas: {}", self.text_areas.len());
+            println!(
+                "  • Detected text areas: {text_areas_count}",
+                text_areas_count = self.text_areas.len()
+            );
             for (i, area) in self.text_areas.iter().enumerate() {
                 println!(
                     "    {}. Position: ({}, {}) | Size: {}x{} | Font: ~{}px | Confidence: {:.1}%",
@@ -392,8 +423,14 @@ impl AnalysisReport {
         }
 
         println!("\n⚡ Performance Indicators:");
-        println!("  • Contrast ratio: {:.2}", self.contrast_ratio);
-        println!("  • Memory usage: {} KB", (self.total_pixels * 4) / 1024);
+        println!(
+            "  • Contrast ratio: {contrast_ratio:.2}",
+            contrast_ratio = self.contrast_ratio
+        );
+        println!(
+            "  • Memory usage: {memory_kb} KB",
+            memory_kb = (self.total_pixels * 4) / 1024
+        );
 
         println!("\n═══════════════════════════════════════");
     }
@@ -496,7 +533,7 @@ fn calculate_text_confidence(region: &Region) -> f32 {
     let mut confidence: f32 = 0.0;
 
     // Good aspect ratio for text
-    if aspect > 2.0 && aspect < 20.0 {
+    if (2.0..20.0).contains(&aspect) {
         confidence += 0.3;
     }
 
@@ -509,7 +546,7 @@ fn calculate_text_confidence(region: &Region) -> f32 {
     }
 
     // Reasonable size
-    if height > 20 && height < 150 {
+    if (20..150).contains(&height) {
         confidence += 0.3;
     }
 

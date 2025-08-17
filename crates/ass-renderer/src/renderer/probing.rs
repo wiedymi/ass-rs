@@ -17,6 +17,7 @@ pub struct BackendProber {
 impl BackendProber {
     /// Create a new backend prober with default preferences
     #[allow(clippy::vec_init_then_push)] // Conditional compilation makes vec! macro difficult
+    #[allow(unused_mut)] // mut is needed for conditional features
     pub fn new() -> Self {
         let mut preferred_order = Vec::new();
 

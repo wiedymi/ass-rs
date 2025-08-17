@@ -465,7 +465,7 @@ fn process_single_tag(tag: &OverrideTag, processed: &mut ProcessedTags) -> Resul
 
             if let Ok(duration) = tag.args().parse::<u32>() {
                 #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                eprintln!("TAG PROCESSOR: Parsed karaoke duration: {}", duration);
+                eprintln!("TAG PROCESSOR: Parsed karaoke duration: {duration}");
 
                 processed.karaoke = Some(KaraokeData {
                     duration, // Already in centiseconds

@@ -94,7 +94,7 @@ impl DebugPlayer {
         // Parse and store the script to avoid re-parsing on every frame
         let owned_content = script_content.to_string();
         let script = Script::parse(&owned_content)
-            .map_err(|e| RenderError::ParseError(format!("Failed to parse script: {:?}", e)))?;
+            .map_err(|e| RenderError::ParseError(format!("Failed to parse script: {e:?}")))?;
 
         // Calculate actual end time from events
         let mut max_time = 0u32;
@@ -127,8 +127,9 @@ impl DebugPlayer {
         // We'll need to parse on demand but cache rendered frames
 
         println!(
-            "Script loaded. Duration: {}ms, Events: {}",
-            self.end_time_ms, event_count
+            "Script loaded. Duration: {duration}ms, Events: {events}",
+            duration = self.end_time_ms,
+            events = event_count
         );
 
         Ok(())
@@ -157,7 +158,10 @@ impl DebugPlayer {
         self.playback_start_instant = Some(Instant::now());
         self.playback_start_time_ms = self.current_time_ms;
         self.accumulated_time_ms = 0.0;
-        println!("▶️  Playback started at {}ms", self.current_time_ms);
+        println!(
+            "▶️  Playback started at {current_time}ms",
+            current_time = self.current_time_ms
+        );
     }
 
     pub fn pause(&mut self) {
@@ -170,7 +174,10 @@ impl DebugPlayer {
         }
         self.is_playing = false;
         self.playback_start_instant = None;
-        println!("⏸️  Playback paused at {}ms", self.current_time_ms);
+        println!(
+            "⏸️  Playback paused at {current_time}ms",
+            current_time = self.current_time_ms
+        );
     }
 
     pub fn stop(&mut self) {
@@ -188,7 +195,10 @@ impl DebugPlayer {
             self.playback_start_time_ms = self.current_time_ms;
             self.accumulated_time_ms = 0.0;
         }
-        println!("⏩ Seeked to {}ms", self.current_time_ms);
+        println!(
+            "⏩ Seeked to {current_time}ms",
+            current_time = self.current_time_ms
+        );
     }
 
     pub fn set_speed(&mut self, speed: f32) {
@@ -201,8 +211,8 @@ impl DebugPlayer {
                 self.playback_start_time_ms = self.current_time_ms;
             }
         }
-        self.playback_speed = speed.max(0.1).min(10.0);
-        println!("🎚️  Playback speed: {}x", self.playback_speed);
+        self.playback_speed = speed.clamp(0.1, 10.0);
+        println!("🎚️  Playback speed: {speed}x", speed = self.playback_speed);
     }
 
     pub fn step_forward(&mut self) {
@@ -213,7 +223,10 @@ impl DebugPlayer {
             self.playback_start_time_ms = self.current_time_ms;
             self.accumulated_time_ms = 0.0;
         }
-        println!("⏭️  Step forward to {}ms", self.current_time_ms);
+        println!(
+            "⏭️  Step forward to {current_time}ms",
+            current_time = self.current_time_ms
+        );
     }
 
     pub fn step_backward(&mut self) {
@@ -223,7 +236,10 @@ impl DebugPlayer {
             self.playback_start_time_ms = self.current_time_ms;
             self.accumulated_time_ms = 0.0;
         }
-        println!("⏮️  Step backward to {}ms", self.current_time_ms);
+        println!(
+            "⏮️  Step backward to {current_time}ms",
+            current_time = self.current_time_ms
+        );
     }
 
     pub fn toggle_stats(&mut self) {
@@ -239,7 +255,10 @@ impl DebugPlayer {
         if self.save_frames {
             #[cfg(not(feature = "nostd"))]
             std::fs::create_dir_all(&self.output_dir).ok();
-            println!("💾 Frame saving: ON (to {})", self.output_dir);
+            println!(
+                "💾 Frame saving: ON (to {output_dir})",
+                output_dir = self.output_dir
+            );
         } else {
             println!("💾 Frame saving: OFF");
         }
@@ -247,12 +266,15 @@ impl DebugPlayer {
 
     pub fn set_loop(&mut self, enable: bool) {
         self.loop_playback = enable;
-        println!("🔁 Loop playback: {}", if enable { "ON" } else { "OFF" });
+        println!(
+            "🔁 Loop playback: {status}",
+            status = if enable { "ON" } else { "OFF" }
+        );
     }
 
     pub fn set_output_dir(&mut self, dir: &str) {
         self.output_dir = dir.to_string();
-        println!("📁 Output directory set to: {}", dir);
+        println!("📁 Output directory set to: {dir}");
     }
 
     pub fn is_playing(&self) -> bool {
@@ -265,7 +287,8 @@ impl DebugPlayer {
 
     pub fn toggle_loop(&mut self) {
         self.loop_playback = !self.loop_playback;
-        println!("🔁 Loop: {}", if self.loop_playback { "ON" } else { "OFF" });
+        let loop_status = if self.loop_playback { "ON" } else { "OFF" };
+        println!("🔁 Loop: {loop_status}");
     }
 
     pub fn increase_speed(&mut self) {
@@ -294,7 +317,7 @@ impl DebugPlayer {
                 };
 
                 if self.show_stats {
-                    println!("📦 Using cached frame for {}ms", cache_key);
+                    println!("📦 Using cached frame for {cache_key}ms");
                 }
 
                 return Ok(player_frame);
@@ -307,7 +330,7 @@ impl DebugPlayer {
             .ok_or_else(|| RenderError::InvalidInput("No script loaded".into()))?;
 
         let script = Script::parse(script_content)
-            .map_err(|e| RenderError::ParseError(format!("Failed to parse script: {:?}", e)))?;
+            .map_err(|e| RenderError::ParseError(format!("Failed to parse script: {e:?}")))?;
 
         let start = Instant::now();
         // Convert milliseconds to centiseconds for the renderer
@@ -403,7 +426,7 @@ impl DebugPlayer {
             "│ Render: {:.2}ms                    │",
             player_frame.render_time.as_secs_f64() * 1000.0
         );
-        println!("│ Visible pixels: {:6}            │", non_transparent);
+        println!("│ Visible pixels: {non_transparent:6}            │");
         println!(
             "│ Speed: {:.1}x | Progress: {:3.1}%    │",
             self.playback_speed,
@@ -430,7 +453,7 @@ impl DebugPlayer {
             .ok_or_else(|| RenderError::BackendError("Failed to create image buffer".into()))?;
 
             img.save(&path)
-                .map_err(|e| RenderError::BackendError(format!("Failed to save frame: {}", e)))?;
+                .map_err(|e| RenderError::BackendError(format!("Failed to save frame: {e}")))?;
         }
 
         Ok(())
@@ -443,7 +466,7 @@ impl DebugPlayer {
             .ok_or_else(|| RenderError::InvalidInput("No script loaded".into()))?;
 
         let script = Script::parse(script_content)
-            .map_err(|e| RenderError::ParseError(format!("Failed to parse script: {:?}", e)))?;
+            .map_err(|e| RenderError::ParseError(format!("Failed to parse script: {e:?}")))?;
 
         let mut report = TestReport {
             test_points: Vec::new(),
@@ -459,7 +482,7 @@ impl DebugPlayer {
         );
 
         for time_ms in test_points {
-            println!("  Testing at {}ms...", time_ms);
+            println!("  Testing at {time_ms}ms...");
 
             let start = Instant::now();
             // Convert milliseconds to centiseconds for the renderer
@@ -526,7 +549,8 @@ impl TestReport {
         println!("╚════════════════════════════════════════╝");
 
         println!("\n📈 Overall Statistics:");
-        println!("  • Test points: {}", self.test_points.len());
+        let test_points_len = self.test_points.len();
+        println!("  • Test points: {test_points_len}");
         println!(
             "  • Frames with content: {} ({:.1}%)",
             self.frames_with_content,
@@ -562,9 +586,9 @@ impl TestReport {
             }
         }
 
-        println!("  • Fast (<5ms): {}", fast);
-        println!("  • Normal (5-15ms): {}", normal);
-        println!("  • Slow (>15ms): {}", slow);
+        println!("  • Fast (<5ms): {fast}");
+        println!("  • Normal (5-15ms): {normal}");
+        println!("  • Slow (>15ms): {slow}");
 
         println!("\n🔍 Individual Test Points:");
         for point in &self.test_points {

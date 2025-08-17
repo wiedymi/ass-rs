@@ -69,11 +69,11 @@ pub fn load_font_files(
                     let path = std::path::Path::new(_font_path);
                     if path.exists() && path.is_file() {
                         #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                        eprintln!("Loading external font file: {}", _font_path);
+                        eprintln!("Loading external font file: {_font_path}");
 
                         if let Err(_e) = font_database.load_font_file(path) {
                             #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                            eprintln!("Failed to load font file {}: {:?}", _font_path, _e);
+                            eprintln!("Failed to load font file {_font_path}: {_e:?}");
                         }
                     }
                 }

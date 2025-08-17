@@ -1,5 +1,6 @@
 //! Benchmarking and performance analysis for compatibility testing
 
+#[cfg(feature = "libass-compare")]
 use crate::debug::LibassRenderer;
 use crate::renderer::{RenderContext, Renderer};
 use crate::utils::RenderError;
@@ -136,8 +137,8 @@ impl PerformanceBenchmark {
 
         for &resolution in &test_resolutions {
             eprintln!(
-                "Benchmarking {} at {}x{}",
-                test_name, resolution.0, resolution.1
+                "Benchmarking {test_name} at {}x{}",
+                resolution.0, resolution.1
             );
 
             // Update context resolution
@@ -176,7 +177,7 @@ impl PerformanceBenchmark {
         #[cfg(feature = "libass-compare")]
         let libass_performance = self.benchmark_libass_renderer(script, test_time_cs).ok();
         #[cfg(not(feature = "libass-compare"))]
-        let libass_performance = None;
+        let libass_performance: Option<PerformanceMetrics> = None;
 
         // Calculate ratios
         let (performance_ratio, memory_ratio) = if let Some(ref libass_perf) = libass_performance {
@@ -197,10 +198,7 @@ impl PerformanceBenchmark {
         let compatibility_score = 0.95; // Placeholder
 
         Ok(BenchmarkResult {
-            test_name: format!(
-                "{}_{}_{}x{}",
-                test_name, "single", resolution.0, resolution.1
-            ),
+            test_name: format!("{test_name}_{}_{}x{}", "single", resolution.0, resolution.1),
             resolution,
             our_performance,
             #[cfg(feature = "libass-compare")]
@@ -395,7 +393,7 @@ impl PerformanceBenchmark {
         let total_frames = ((end_time - start_time) / 4) as usize; // 25 FPS
         let mut frame_times = Vec::new();
 
-        eprintln!("Benchmarking animation frame rate: {} frames", total_frames);
+        eprintln!("Benchmarking animation frame rate: {total_frames} frames");
 
         #[cfg(not(feature = "nostd"))]
         let start_benchmark = Instant::now();
@@ -427,9 +425,9 @@ impl PerformanceBenchmark {
         let realtime_fps = total_frames as f64 / total_time;
 
         eprintln!("Animation benchmark results:");
-        eprintln!("  Average frame time: {:.2}ms", avg_frame_time);
-        eprintln!("  Theoretical FPS: {:.1}", fps);
-        eprintln!("  Actual FPS: {:.1}", realtime_fps);
+        eprintln!("  Average frame time: {avg_frame_time:.2}ms");
+        eprintln!("  Theoretical FPS: {fps:.1}");
+        eprintln!("  Actual FPS: {realtime_fps:.1}");
 
         let our_performance = PerformanceMetrics {
             avg_render_time_ms: avg_frame_time,
@@ -450,7 +448,7 @@ impl PerformanceBenchmark {
         };
 
         Ok(BenchmarkResult {
-            test_name: format!("{}_animation_fps", test_name),
+            test_name: format!("{test_name}_animation_fps"),
             resolution: (
                 self.our_renderer.context().width(),
                 self.our_renderer.context().height(),

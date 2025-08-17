@@ -245,7 +245,7 @@ fn find_font(
 
             if let Some(id) = font_database.query(&fallback_query) {
                 #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                println!("Using Japanese font fallback: {} -> {}", family, fallback);
+                println!("Using Japanese font fallback: {family} -> {fallback}");
                 return Ok(id);
             }
         }

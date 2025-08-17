@@ -1,5 +1,6 @@
 //! Visual reporting system for compatibility test results
 
+#[cfg(feature = "libass-compare")]
 use crate::debug::{CompatibilityResult, DiffRegion, DiffType};
 use crate::utils::RenderError;
 
@@ -71,34 +72,32 @@ impl VisualReportGenerator {
     #[cfg(not(feature = "nostd"))]
     pub fn generate_report(&self) -> Result<String, RenderError> {
         // Create output directory
-        fs::create_dir_all(&self.output_dir).map_err(|e| {
-            RenderError::IOError(format!("Failed to create output directory: {}", e))
-        })?;
+        fs::create_dir_all(&self.output_dir)
+            .map_err(|e| RenderError::IOError(format!("Failed to create output directory: {e}")))?;
 
         // Generate main report
         let report_path = Path::new(&self.output_dir).join("compatibility_report.html");
         let html_content = self.generate_html_report()?;
 
         fs::write(&report_path, html_content)
-            .map_err(|e| RenderError::IOError(format!("Failed to write report: {}", e)))?;
+            .map_err(|e| RenderError::IOError(format!("Failed to write report: {e}")))?;
 
         // Generate CSS file
         let css_path = Path::new(&self.output_dir).join("report.css");
         fs::write(css_path, Self::generate_css())
-            .map_err(|e| RenderError::IOError(format!("Failed to write CSS: {}", e)))?;
+            .map_err(|e| RenderError::IOError(format!("Failed to write CSS: {e}")))?;
 
         // Generate JavaScript file
         let js_path = Path::new(&self.output_dir).join("report.js");
         fs::write(js_path, Self::generate_javascript())
-            .map_err(|e| RenderError::IOError(format!("Failed to write JavaScript: {}", e)))?;
+            .map_err(|e| RenderError::IOError(format!("Failed to write JavaScript: {e}")))?;
 
         // Generate summary JSON
         if self.config.include_metrics {
             let json_path = Path::new(&self.output_dir).join("summary.json");
             let summary = self.generate_summary_json()?;
-            fs::write(json_path, summary).map_err(|e| {
-                RenderError::IOError(format!("Failed to write summary JSON: {}", e))
-            })?;
+            fs::write(json_path, summary)
+                .map_err(|e| RenderError::IOError(format!("Failed to write summary JSON: {e}")))?;
         }
 
         Ok(report_path.to_string_lossy().to_string())
@@ -238,10 +237,9 @@ impl VisualReportGenerator {
                 r#"
                 <div class="summary-card">
                     <h3>Performance Ratio</h3>
-                    <div class="metric-value">{:.2}x</div>
+                    <div class="metric-value">{perf:.2}x</div>
                     <div class="metric-help">vs libass</div>
-                </div>"#,
-                perf
+                </div>"#
             ));
         }
 
@@ -291,10 +289,7 @@ impl VisualReportGenerator {
         // Categorize results by test name patterns
         for result in &self.results {
             let category = Self::categorize_test(&result.test_name);
-            categories
-                .entry(category)
-                .or_insert_with(Vec::new)
-                .push(result);
+            categories.entry(category).or_default().push(result);
         }
 
         let mut html = String::new();
@@ -307,9 +302,8 @@ impl VisualReportGenerator {
             html.push_str(&format!(
                 r#"
                 <div class="category">
-                    <h3 class="category-title">{}</h3>
-                    <div class="results-grid">"#,
-                category
+                    <h3 class="category-title">{category}</h3>
+                    <div class="results-grid">"#
             ));
 
             for result in results {
@@ -386,9 +380,8 @@ impl VisualReportGenerator {
                     r#"
                     <div class="metric">
                         <span class="label">Performance:</span>
-                        <span class="value">{:.2}x</span>
-                    </div>"#,
-                    perf
+                        <span class="value">{perf:.2}x</span>
+                    </div>"#
                 ));
             }
 
@@ -426,9 +419,9 @@ impl VisualReportGenerator {
         let mut html = String::new();
 
         // Check if thumbnail files exist
-        let our_path = Path::new(&self.output_dir).join(format!("{}_ours.png", test_name));
-        let libass_path = Path::new(&self.output_dir).join(format!("{}_libass.png", test_name));
-        let diff_path = Path::new(&self.output_dir).join(format!("{}_diff.png", test_name));
+        let our_path = Path::new(&self.output_dir).join(format!("{test_name}_ours.png"));
+        let libass_path = Path::new(&self.output_dir).join(format!("{test_name}_libass.png"));
+        let diff_path = Path::new(&self.output_dir).join(format!("{test_name}_diff.png"));
 
         if our_path.exists() || libass_path.exists() || diff_path.exists() {
             html.push_str(
@@ -441,29 +434,27 @@ impl VisualReportGenerator {
                 html.push_str(&format!(
                     r#"
                         <div class="thumbnail">
-                            <img src="{}_ours.png" alt="Our Renderer" title="Our Renderer">
+                            <img src="{test_name}_ours.png" alt="Our Renderer" title="Our Renderer">
                             <label>Ours</label>
-                        </div>"#,
-                    test_name
+                        </div>"#
                 ));
             }
 
             if libass_path.exists() {
                 html.push_str(&format!(r#"
                         <div class="thumbnail">
-                            <img src="{}_libass.png" alt="libass Reference" title="libass Reference">
+                            <img src="{test_name}_libass.png" alt="libass Reference" title="libass Reference">
                             <label>libass</label>
-                        </div>"#, test_name));
+                        </div>"#));
             }
 
             if diff_path.exists() {
                 html.push_str(&format!(
                     r#"
                         <div class="thumbnail">
-                            <img src="{}_diff.png" alt="Difference Map" title="Difference Map">
+                            <img src="{test_name}_diff.png" alt="Difference Map" title="Difference Map">
                             <label>Diff</label>
-                        </div>"#,
-                    test_name
+                        </div>"#
                 ));
             }
 
@@ -1176,18 +1167,18 @@ document.addEventListener('DOMContentLoaded', function() {
             format!(
                 r#"
         <footer style="padding: 20px 30px; background: #f8f9fa; border-top: 1px solid #eee; text-align: center; color: #666;">
-            <p>Report generated on {} by ASS Renderer Compatibility Testing Framework</p>
+            <p>Report generated on {timestamp} by ASS Renderer Compatibility Testing Framework</p>
             <p>Compare with libass reference implementation for pixel-perfect subtitle rendering</p>
         </footer>
     </div>
 </body>
-</html>"#,
-                timestamp
+</html>"#
             )
         }
     }
 
     /// Generate summary JSON for programmatic access
+    #[cfg(feature = "serde")]
     fn generate_summary_json(&self) -> Result<String, RenderError> {
         let total_tests = self.results.len();
         let passed_tests = self.results.iter().filter(|r| r.passed).count();
@@ -1216,7 +1207,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         serde_json::to_string_pretty(&summary)
-            .map_err(|e| RenderError::BackendError(format!("Failed to serialize summary: {}", e)))
+            .map_err(|e| RenderError::BackendError(format!("Failed to serialize summary: {e}")))
     }
 
     /// Categorize test by name pattern

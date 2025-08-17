@@ -175,7 +175,7 @@ impl CompatibilityTester {
         );
 
         let result = CompatibilityResult {
-            test_name: format!("{}_static", test_name),
+            test_name: format!("{test_name}_static"),
             passed: comparison.pixel_diff_percentage <= self.config.significance_threshold,
             pixel_diff_percentage: comparison.pixel_diff_percentage,
             max_pixel_diff: comparison.max_pixel_diff,
@@ -213,10 +213,7 @@ impl CompatibilityTester {
             // Early exit if we find major differences
             if let Some(last_result) = results.last() {
                 if last_result.pixel_diff_percentage > 0.1 {
-                    eprintln!(
-                        "Major difference detected at {}cs, stopping animation test",
-                        time_cs
-                    );
+                    eprintln!("Major difference detected at {time_cs}cs, stopping animation test");
                     break;
                 }
             }
@@ -243,7 +240,7 @@ impl CompatibilityTester {
         );
 
         Ok(CompatibilityResult {
-            test_name: format!("{}_frame_{}", test_name, time_cs),
+            test_name: format!("{test_name}_frame_{time_cs}"),
             passed: comparison.pixel_diff_percentage <= self.config.significance_threshold,
             pixel_diff_percentage: comparison.pixel_diff_percentage,
             max_pixel_diff: comparison.max_pixel_diff,
@@ -307,21 +304,20 @@ impl CompatibilityTester {
     ) -> Result<(), RenderError> {
         // Create output directory
         let output_dir = std::path::Path::new(&self.config.output_dir);
-        std::fs::create_dir_all(output_dir).map_err(|e| {
-            RenderError::IOError(format!("Failed to create output directory: {}", e))
-        })?;
+        std::fs::create_dir_all(output_dir)
+            .map_err(|e| RenderError::IOError(format!("Failed to create output directory: {e}")))?;
 
         // Save our frame
-        let our_path = output_dir.join(format!("{}_ours.png", test_name));
+        let our_path = output_dir.join(format!("{test_name}_ours.png"));
         self.save_frame_as_image(our_frame, &our_path)?;
 
         // Save libass frame
-        let libass_path = output_dir.join(format!("{}_libass.png", test_name));
+        let libass_path = output_dir.join(format!("{test_name}_libass.png"));
         self.save_frame_as_image(libass_frame, &libass_path)?;
 
         // Generate and save diff visualization
         if let Some(diff_map) = &comparison.difference_map {
-            let diff_path = output_dir.join(format!("{}_diff.png", test_name));
+            let diff_path = output_dir.join(format!("{test_name}_diff.png"));
             self.save_diff_visualization(
                 diff_map,
                 our_frame.width(),
@@ -360,7 +356,7 @@ impl CompatibilityTester {
         })?;
 
         img.save(path)
-            .map_err(|e| RenderError::IOError(format!("Failed to save image: {}", e)))?;
+            .map_err(|e| RenderError::IOError(format!("Failed to save image: {e}")))?;
 
         Ok(())
     }
@@ -394,7 +390,7 @@ impl CompatibilityTester {
         })?;
 
         img.save(path)
-            .map_err(|e| RenderError::IOError(format!("Failed to save diff image: {}", e)))?;
+            .map_err(|e| RenderError::IOError(format!("Failed to save diff image: {e}")))?;
 
         Ok(())
     }
@@ -524,7 +520,7 @@ impl CompatibilityTestSuite {
             eprintln!("Running compatibility test: {}", test_case.name);
 
             let script = ass_core::parser::Script::parse(&test_case.script_content)
-                .map_err(|e| RenderError::ParseError(format!("Failed to parse script: {}", e)))?;
+                .map_err(|e| RenderError::ParseError(format!("Failed to parse script: {e}")))?;
 
             let result = self
                 .tester

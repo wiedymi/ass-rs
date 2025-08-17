@@ -81,6 +81,10 @@ env_logger = "0.11"
 [features]
 default = ["analysis-integration", "software-backend", "backend-probing", "simd", "image", "serde", "libass-compare"]
 
+# Main feature sets
+minimal = ["nostd", "analysis-integration"]
+full = ["analysis-integration", "software-backend", "backend-probing", "simd", "image", "serde", "libass-compare"]
+
 # Core features
 analysis-integration = ["ass-core/analysis"]
 libass-compare = [] # Currently a stub - libass integration temporarily disabled

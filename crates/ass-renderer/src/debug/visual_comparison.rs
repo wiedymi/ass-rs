@@ -4,7 +4,7 @@ use crate::utils::RenderError;
 use ass_core::Script;
 use tiny_skia::{Color, Paint, Pixmap, Stroke, Transform};
 
-#[cfg(not(feature = "nostd"))]
+#[cfg(all(not(feature = "nostd"), feature = "serde"))]
 use std::{fs, path::Path};
 
 /// Visual debug info for rendering comparison
@@ -245,7 +245,7 @@ impl VisualComparison {
     #[cfg(all(not(feature = "nostd"), feature = "serde"))]
     pub fn export_debug_info(&self, path: &Path) -> Result<(), RenderError> {
         let json = serde_json::to_string_pretty(&self.debug_info)
-            .map_err(|e| RenderError::BackendError(format!("Serialization failed: {}", e)))?;
+            .map_err(|e| RenderError::BackendError(format!("Serialization failed: {e}")))?;
         fs::write(path, json).map_err(|e| RenderError::IOError(e.to_string()))?;
         Ok(())
     }
@@ -341,7 +341,7 @@ pub fn create_comparison_image(
     let width = our_output.width() + libass_output.width() + diff_map.map_or(0, |d| d.width());
     let height = our_output.height().max(libass_output.height());
 
-    let mut comparison = Pixmap::new(width, height).ok_or_else(|| RenderError::InvalidPixmap)?;
+    let mut comparison = Pixmap::new(width, height).ok_or(RenderError::InvalidPixmap)?;
 
     // Copy our output to left side
     comparison.draw_pixmap(

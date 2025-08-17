@@ -418,7 +418,8 @@ impl SoftwarePipeline {
         // Get text segments with their individual tags
         let segments = segment_text_with_tags(event.text, None)?;
 
-        debug_println!("PROCESS_EVENT: Got {} segments", segments.len());
+        let segment_count = segments.len();
+        debug_println!("PROCESS_EVENT: Got {segment_count} segments");
         for (i, seg) in segments.iter().enumerate() {
             debug_println!(
                 "  Segment {}: text='{}', drawing_mode={:?}",
@@ -638,7 +639,8 @@ impl SoftwarePipeline {
     ) -> Result<Vec<IntermediateLayer>, RenderError> {
         #[cfg(all(debug_assertions, not(feature = "nostd")))]
         if event.text.contains("Чысценькая") {
-            debug_println!("  process_text_segments: {} segments", segments.len());
+            let segment_count = segments.len();
+            debug_println!("  process_text_segments: {segment_count} segments");
             for (i, seg) in segments.iter().enumerate() {
                 debug_println!(
                     "    Segment {}: text='{}', tags={:?}",
@@ -1024,7 +1026,8 @@ impl SoftwarePipeline {
                         color[3]
                     );
                     if let Some(s) = style {
-                        debug_println!("  Style primary_colour: {}", s.primary_colour);
+                        let primary_colour = &s.primary_colour;
+                        debug_println!("  Style primary_colour: {primary_colour}");
                     }
                 }
 
@@ -1042,7 +1045,7 @@ impl SoftwarePipeline {
                     // Alpha is already inverted in parse_alpha (255 = opaque, 0 = transparent)
                     color[3] = alpha;
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    debug_println!("Applied alpha to primary color: {}", color[3]);
+                    debug_println!("Applied alpha to primary color: {alpha}");
                 }
                 if let Some(alpha) = tags.colors.alpha3 {
                     // Alpha is already inverted in parse_alpha
@@ -1158,7 +1161,7 @@ impl SoftwarePipeline {
 
                 // Create text layer
                 #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                if segment_y > 1080.0 || segment_y < -100.0 {
+                if !(-100.0..=1080.0).contains(&segment_y) {
                     debug_println!(
                         "WARNING: Text positioned off-screen at Y={} for text '{}'",
                         segment_y,
