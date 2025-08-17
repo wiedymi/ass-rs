@@ -1,6 +1,5 @@
 //! Pixel-perfect comparison utilities for frame analysis
 
-
 #[cfg(feature = "nostd")]
 use alloc::vec::Vec;
 #[cfg(not(feature = "nostd"))]

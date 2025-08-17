@@ -30,8 +30,8 @@ pub struct TextSegment {
 }
 
 /// Process text with inline tag changes into segments
-pub fn segment_text_with_tags<'a>(
-    text: &'a str,
+pub fn segment_text_with_tags(
+    text: &str,
     _registry: Option<&ExtensionRegistry>,
 ) -> Result<Vec<TextSegment>, RenderError> {
     // Analyze text to get tags and their positions

@@ -30,30 +30,34 @@ pub struct BoundingBox {
     pub height: f32,
 }
 
+/// Configuration for position calculation
+pub struct PositionConfig {
+    pub screen_width: f32,
+    pub screen_height: f32,
+    pub margin_left: f32,
+    pub margin_right: f32,
+    pub margin_vertical: f32,
+    pub default_alignment: u8,
+}
+
 impl PositionInfo {
     /// Calculate position based on alignment and tags
-    pub fn calculate(
-        tags: &ProcessedTags,
-        bbox: &BoundingBox,
-        screen_width: f32,
-        screen_height: f32,
-        margin_left: f32,
-        margin_right: f32,
-        margin_vertical: f32,
-        default_alignment: u8,
-    ) -> Self {
+    pub fn calculate(tags: &ProcessedTags, bbox: &BoundingBox, config: &PositionConfig) -> Self {
         // Get effective alignment
-        let alignment = tags.formatting.alignment.unwrap_or(default_alignment);
+        let alignment = tags
+            .formatting
+            .alignment
+            .unwrap_or(config.default_alignment);
 
         // Calculate anchor point based on alignment
         let (anchor_x, anchor_y) = Self::get_anchor_point(
             alignment,
             bbox,
-            screen_width,
-            screen_height,
-            margin_left,
-            margin_right,
-            margin_vertical,
+            config.screen_width,
+            config.screen_height,
+            config.margin_left,
+            config.margin_right,
+            config.margin_vertical,
         );
 
         // Check for explicit positioning
@@ -165,26 +169,12 @@ impl PositionInfo {
     pub fn calculate_with_movement(
         tags: &ProcessedTags,
         bbox: &BoundingBox,
-        screen_width: f32,
-        screen_height: f32,
-        margin_left: f32,
-        margin_right: f32,
-        margin_vertical: f32,
-        default_alignment: u8,
+        config: &PositionConfig,
         current_time_ms: u32,
         event_start_ms: u32,
     ) -> Self {
         // Get base position
-        let mut pos = Self::calculate(
-            tags,
-            bbox,
-            screen_width,
-            screen_height,
-            margin_left,
-            margin_right,
-            margin_vertical,
-            default_alignment,
-        );
+        let mut pos = Self::calculate(tags, bbox, config);
 
         // Apply movement if present
         if let Some((x1, y1, x2, y2, t1, t2)) = tags.movement {
@@ -203,7 +193,10 @@ impl PositionInfo {
             let current_y = y1 + (y2 - y1) * factor;
 
             // Apply alignment offset
-            let alignment = tags.formatting.alignment.unwrap_or(default_alignment);
+            let alignment = tags
+                .formatting
+                .alignment
+                .unwrap_or(config.default_alignment);
             pos.render_x = current_x - Self::get_alignment_offset_x(alignment, bbox);
             pos.render_y = current_y - Self::get_alignment_offset_y(alignment, bbox);
             pos.explicit_position = true;
@@ -267,7 +260,15 @@ mod tests {
         let tags = ProcessedTags::default();
 
         // Test bottom-center alignment (default)
-        let pos = PositionInfo::calculate(&tags, &bbox, 1920.0, 1080.0, 0.0, 0.0, 0.0, 2);
+        let config = PositionConfig {
+            screen_width: 1920.0,
+            screen_height: 1080.0,
+            margin_left: 0.0,
+            margin_right: 0.0,
+            margin_vertical: 0.0,
+            default_alignment: 2,
+        };
+        let pos = PositionInfo::calculate(&tags, &bbox, &config);
 
         assert_eq!(pos.anchor_x, 910.0); // (1920 - 100) / 2
         assert_eq!(pos.anchor_y, 1030.0); // 1080 - 0 - 50
@@ -282,10 +283,20 @@ mod tests {
             height: 50.0,
         };
 
-        let mut tags = ProcessedTags::default();
-        tags.position = Some((500.0, 300.0));
+        let tags = ProcessedTags {
+            position: Some((500.0, 300.0)),
+            ..ProcessedTags::default()
+        };
 
-        let pos = PositionInfo::calculate(&tags, &bbox, 1920.0, 1080.0, 0.0, 0.0, 0.0, 2);
+        let config = PositionConfig {
+            screen_width: 1920.0,
+            screen_height: 1080.0,
+            margin_left: 0.0,
+            margin_right: 0.0,
+            margin_vertical: 0.0,
+            default_alignment: 2,
+        };
+        let pos = PositionInfo::calculate(&tags, &bbox, &config);
 
         assert!(pos.explicit_position);
         assert_eq!(pos.render_x, 450.0); // 500 - 50 (center offset)
@@ -301,13 +312,21 @@ mod tests {
             height: 50.0,
         };
 
-        let mut tags = ProcessedTags::default();
-        tags.movement = Some((100.0, 100.0, 500.0, 300.0, 0, 1000));
+        let tags = ProcessedTags {
+            movement: Some((100.0, 100.0, 500.0, 300.0, 0, 1000)),
+            ..ProcessedTags::default()
+        };
 
         // Test at halfway point (500ms)
-        let pos = PositionInfo::calculate_with_movement(
-            &tags, &bbox, 1920.0, 1080.0, 0.0, 0.0, 0.0, 2, 500, 0,
-        );
+        let config = PositionConfig {
+            screen_width: 1920.0,
+            screen_height: 1080.0,
+            margin_left: 0.0,
+            margin_right: 0.0,
+            margin_vertical: 0.0,
+            default_alignment: 2,
+        };
+        let pos = PositionInfo::calculate_with_movement(&tags, &bbox, &config, 500, 0);
 
         // Position should be interpolated halfway
         assert_eq!(pos.render_x, 250.0); // 300 - 50 (center offset)

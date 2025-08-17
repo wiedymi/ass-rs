@@ -77,20 +77,16 @@ impl TextWithLineBreaks {
                         }
                         _ => {
                             // Not a special sequence, keep both characters
-                            if !drawing_mode {
-                                plain_text.push(ch);
-                                plain_text.push(next_ch);
-                            }
+                            plain_text.push(ch);
+                            plain_text.push(next_ch);
                             chars.next();
                         }
                     }
                 } else {
                     // Backslash at end of string
-                    if !drawing_mode {
-                        plain_text.push(ch);
-                    }
+                    plain_text.push(ch);
                 }
-            } else if !drawing_mode {
+            } else {
                 plain_text.push(ch);
             }
         }

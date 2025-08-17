@@ -248,7 +248,7 @@ impl RenderBackend for WebGpuBackend {
 
         // Prepare all buffers first (outside render pass)
         let mut buffers_and_counts: Vec<(wgpu::Buffer, wgpu::Buffer, u32)> = Vec::new();
-        
+
         for layer in layers {
             match layer {
                 IntermediateLayer::Text(text_data) => {
@@ -303,10 +303,7 @@ impl RenderBackend for WebGpuBackend {
                 for (vertex_buffer, index_buffer, index_count) in &buffers_and_counts {
                     render_pass.set_pipeline(pipeline);
                     render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-                    render_pass.set_index_buffer(
-                        index_buffer.slice(..),
-                        wgpu::IndexFormat::Uint16,
-                    );
+                    render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                     render_pass.draw_indexed(0..*index_count, 0, 0..1);
                 }
             }

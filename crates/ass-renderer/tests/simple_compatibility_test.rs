@@ -35,7 +35,7 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,Hello World!"#;
     // Basic validation
     assert_eq!(frame.width(), 1920);
     assert_eq!(frame.height(), 1080);
-    assert!(frame.data().len() > 0);
+    assert!(!frame.data().is_empty());
 
     println!("✅ Basic rendering test passed!");
     println!("Frame size: {}x{}", frame.width(), frame.height());
@@ -43,7 +43,7 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,Hello World!"#;
 }
 
 #[test]
-#[cfg(feature = "libass-compare")]
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 fn test_libass_rendering() {
     // Test that libass renderer works
     use ass_renderer::debug::LibassRenderer;
@@ -77,7 +77,7 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,Hello World!"#;
 }
 
 #[test]
-#[cfg(feature = "libass-compare")]
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 fn test_basic_comparison() {
     // Simple pixel comparison test
     use ass_renderer::debug::LibassRenderer;
@@ -131,6 +131,7 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,Test"#;
     }
 }
 
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 fn count_non_transparent_pixels(data: &[u8]) -> usize {
     data.chunks(4)
         .filter(|chunk| chunk.len() == 4 && chunk[3] > 0) // Alpha > 0

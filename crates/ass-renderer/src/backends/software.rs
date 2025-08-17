@@ -182,7 +182,10 @@ impl SoftwareBackend {
         if let Some(path) = &data.path {
             debug_println!(
                 "DRAWING RENDER: Filling path with color RGBA({}, {}, {}, {})",
-                data.color[0], data.color[1], data.color[2], data.color[3]
+                data.color[0],
+                data.color[1],
+                data.color[2],
+                data.color[3]
             );
 
             debug_println!("DRAWING RENDER: Path bounds: {:?}", path.bounds());
@@ -371,7 +374,10 @@ impl SoftwareBackend {
                         #[cfg(all(debug_assertions, not(feature = "nostd")))]
                         debug_println!(
                             "Applied rotation: {} degrees ({} radians) around center ({}, {})",
-                            z, angle_rad, text_center_x, text_center_y
+                            z,
+                            angle_rad,
+                            text_center_x,
+                            text_center_y
                         );
                     }
 
@@ -405,7 +411,9 @@ impl SoftwareBackend {
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
                     debug_println!(
                         "SCALE: Applying scale transform - x={:.2}, y={:.2} for text '{}'",
-                        x_scale, y_scale, data.text
+                        x_scale,
+                        y_scale,
+                        data.text
                     );
 
                     // Apply scale transform
@@ -477,7 +485,8 @@ impl SoftwareBackend {
                 color,
                 x_offset,
                 y_offset,
-            } = effect {
+            } = effect
+            {
                 // Draw shadow first
                 let mut shadow_paint = tiny_skia::Paint::default();
                 shadow_paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
@@ -512,109 +521,102 @@ impl SoftwareBackend {
         // Draw outline if present
         for effect in &data.effects {
             if let crate::pipeline::TextEffect::Outline { color, width } = effect {
-                    let mut outline_paint = tiny_skia::Paint::default();
-                    outline_paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
-                    outline_paint.anti_alias = true;
-                    outline_paint.blend_mode = tiny_skia::BlendMode::SourceOver;
+                let mut outline_paint = tiny_skia::Paint::default();
+                outline_paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
+                outline_paint.anti_alias = true;
+                outline_paint.blend_mode = tiny_skia::BlendMode::SourceOver;
 
-                    // Create stroke configuration for path expansion
-                    let stroke = tiny_skia::Stroke {
-                        width: *width * 0.6, // Further reduce width to match libass
-                        line_cap: tiny_skia::LineCap::Square,
-                        line_join: tiny_skia::LineJoin::Miter,
-                        ..Default::default()
-                    };
+                // Create stroke configuration for path expansion
+                let stroke = tiny_skia::Stroke {
+                    width: *width * 0.6, // Further reduce width to match libass
+                    line_cap: tiny_skia::LineCap::Square,
+                    line_join: tiny_skia::LineJoin::Miter,
+                    ..Default::default()
+                };
 
-                    // If edge blur is needed, render outline to temporary pixmap first
-                    if let Some(blur_radius) = edge_blur_radius {
-                        if blur_radius > 0.0 {
-                            let blur_size = (blur_radius * 2.0).ceil() as u32;
-                            let outline_width =
-                                (shaped.width + blur_size as f32 * 2.0 + *width * 2.0).ceil()
-                                    as u32;
-                            let outline_height =
-                                (shaped.height + blur_size as f32 * 2.0 + *width * 2.0).ceil()
-                                    as u32;
+                // If edge blur is needed, render outline to temporary pixmap first
+                if let Some(blur_radius) = edge_blur_radius {
+                    if blur_radius > 0.0 {
+                        let blur_size = (blur_radius * 2.0).ceil() as u32;
+                        let outline_width =
+                            (shaped.width + blur_size as f32 * 2.0 + *width * 2.0).ceil() as u32;
+                        let outline_height =
+                            (shaped.height + blur_size as f32 * 2.0 + *width * 2.0).ceil() as u32;
 
-                            if let Some(mut temp_pixmap) =
-                                Pixmap::new(outline_width, outline_height)
-                            {
-                                temp_pixmap.fill(tiny_skia::Color::TRANSPARENT);
+                        if let Some(mut temp_pixmap) = Pixmap::new(outline_width, outline_height) {
+                            temp_pixmap.fill(tiny_skia::Color::TRANSPARENT);
 
-                                // Draw outline to temporary pixmap
-                                let temp_transform = Transform::from_translate(
-                                    blur_size as f32 + *width,
-                                    blur_size as f32 + *width,
-                                );
+                            // Draw outline to temporary pixmap
+                            let temp_transform = Transform::from_translate(
+                                blur_size as f32 + *width,
+                                blur_size as f32 + *width,
+                            );
 
-                                let mut stroker = tiny_skia::PathStroker::new();
-                                for path in &paths {
-                                    if let Some(transformed) =
-                                        path.clone().transform(temp_transform)
+                            let mut stroker = tiny_skia::PathStroker::new();
+                            for path in &paths {
+                                if let Some(transformed) = path.clone().transform(temp_transform) {
+                                    // Expand the path to create an outline shape
+                                    if let Some(outlined_path) =
+                                        stroker.stroke(&transformed, &stroke, 1.0)
                                     {
-                                        // Expand the path to create an outline shape
-                                        if let Some(outlined_path) =
-                                            stroker.stroke(&transformed, &stroke, 1.0)
-                                        {
-                                            // Fill the expanded outline path
-                                            temp_pixmap.fill_path(
-                                                &outlined_path,
-                                                &outline_paint,
-                                                tiny_skia::FillRule::Winding,
-                                                Transform::identity(),
-                                                None,
-                                            );
-                                        }
+                                        // Fill the expanded outline path
+                                        temp_pixmap.fill_path(
+                                            &outlined_path,
+                                            &outline_paint,
+                                            tiny_skia::FillRule::Winding,
+                                            Transform::identity(),
+                                            None,
+                                        );
                                     }
                                 }
+                            }
 
-                                // Apply blur to the outline
-                                apply_box_blur(&mut temp_pixmap, blur_radius);
+                            // Apply blur to the outline
+                            apply_box_blur(&mut temp_pixmap, blur_radius);
 
-                                // Draw blurred outline to main pixmap
-                                let blend_transform = base_transform.pre_translate(
-                                    -(blur_size as f32) - *width,
-                                    -(blur_size as f32) - *width,
-                                );
+                            // Draw blurred outline to main pixmap
+                            let blend_transform = base_transform.pre_translate(
+                                -(blur_size as f32) - *width,
+                                -(blur_size as f32) - *width,
+                            );
 
-                                let paint = tiny_skia::PixmapPaint {
-                                    blend_mode: tiny_skia::BlendMode::SourceOver,
-                                    ..Default::default()
-                                };
+                            let paint = tiny_skia::PixmapPaint {
+                                blend_mode: tiny_skia::BlendMode::SourceOver,
+                                ..Default::default()
+                            };
 
-                                self.pixmap.draw_pixmap(
-                                    0,
-                                    0,
-                                    temp_pixmap.as_ref(),
-                                    &paint,
-                                    blend_transform,
+                            self.pixmap.draw_pixmap(
+                                0,
+                                0,
+                                temp_pixmap.as_ref(),
+                                &paint,
+                                blend_transform,
+                                clip_mask.as_ref(),
+                            );
+                        }
+                    }
+                } else {
+                    // Draw outline using path expansion (like libass)
+                    // This creates a filled outline rather than a stroked one
+                    let mut stroker = tiny_skia::PathStroker::new();
+
+                    for path in &paths {
+                        if let Some(transformed) = path.clone().transform(base_transform) {
+                            // Expand the path to create an outline shape
+                            if let Some(outlined_path) = stroker.stroke(&transformed, &stroke, 1.0)
+                            {
+                                // Fill the expanded outline path
+                                self.pixmap.fill_path(
+                                    &outlined_path,
+                                    &outline_paint,
+                                    tiny_skia::FillRule::Winding,
+                                    Transform::identity(),
                                     clip_mask.as_ref(),
                                 );
                             }
                         }
-                    } else {
-                        // Draw outline using path expansion (like libass)
-                        // This creates a filled outline rather than a stroked one
-                        let mut stroker = tiny_skia::PathStroker::new();
-
-                        for path in &paths {
-                            if let Some(transformed) = path.clone().transform(base_transform) {
-                                // Expand the path to create an outline shape
-                                if let Some(outlined_path) =
-                                    stroker.stroke(&transformed, &stroke, 1.0)
-                                {
-                                    // Fill the expanded outline path
-                                    self.pixmap.fill_path(
-                                        &outlined_path,
-                                        &outline_paint,
-                                        tiny_skia::FillRule::Winding,
-                                        Transform::identity(),
-                                        clip_mask.as_ref(),
-                                    );
-                                }
-                            }
-                        }
                     }
+                }
             }
         }
 
@@ -627,7 +629,10 @@ impl SoftwareBackend {
         #[cfg(all(debug_assertions, not(feature = "nostd")))]
         debug_println!(
             "Drawing main text with color: R={}, G={}, B={}, A={}",
-            data.color[0], data.color[1], data.color[2], data.color[3]
+            data.color[0],
+            data.color[1],
+            data.color[2],
+            data.color[3]
         );
 
         // Check for blur effect
@@ -697,7 +702,12 @@ impl SoftwareBackend {
             #[cfg(all(debug_assertions, not(feature = "nostd")))]
             debug_println!(
                 "KARAOKE RENDERING: progress={}, style={}, original color=({},{},{},{})",
-                progress, karaoke_style, data.color[0], data.color[1], data.color[2], data.color[3]
+                progress,
+                karaoke_style,
+                data.color[0],
+                data.color[1],
+                data.color[2],
+                data.color[3]
             );
 
             let mut karaoke_paint = tiny_skia::Paint::default();
@@ -727,7 +737,10 @@ impl SoftwareBackend {
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
                     debug_println!(
                         "KARAOKE COLOR: Not sung - Original ({},{},{},{})",
-                        data.color[0], data.color[1], data.color[2], data.color[3]
+                        data.color[0],
+                        data.color[1],
+                        data.color[2],
+                        data.color[3]
                     );
                 }
             } else {

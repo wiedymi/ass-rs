@@ -112,7 +112,7 @@ impl Renderer {
 
         // Debug: Check what layers we have
         // eprintln!("RENDERER: Got {} layers", layers.len());
-        for (_i, layer) in layers.iter().enumerate() {
+        for layer in layers.iter() {
             match layer {
                 crate::pipeline::IntermediateLayer::Vector(_) => {
                     // eprintln!("RENDERER: Layer {} is VectorData", i);

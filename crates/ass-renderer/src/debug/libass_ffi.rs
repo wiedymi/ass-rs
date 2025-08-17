@@ -207,10 +207,11 @@ impl LibassRenderer {
                 .map(|s| s.as_ptr())
                 .unwrap_or(ptr::null());
 
+            let default_family_cstr = CString::new("sans-serif").unwrap();
             let family = default_family
                 .and_then(|s| CString::new(s).ok())
                 .map(|s| s.as_ptr())
-                .unwrap_or_else(|| CString::new("sans-serif").unwrap().as_ptr());
+                .unwrap_or_else(|| default_family_cstr.as_ptr());
 
             ass_set_fonts(self.ptr, font, family, 1, ptr::null(), 1);
         }

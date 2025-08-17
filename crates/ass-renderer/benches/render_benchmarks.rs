@@ -147,8 +147,7 @@ fn benchmark_event_count(c: &mut Criterion) {
         let mut events = String::new();
         for i in 0..*num_events {
             events.push_str(&format!(
-                "Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,Event {} text\n",
-                i
+                "Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,Event {i} text\n"
             ));
         }
 
@@ -165,8 +164,7 @@ Style: Default,Arial,40,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-{}"#,
-            events
+{events}"#
         );
 
         let script = Script::parse(&script_text).unwrap();
@@ -239,7 +237,7 @@ fn benchmark_animation_evaluation(c: &mut Criterion) {
     for i in 0..5 {
         let timing = AnimationTiming::new(0, 500, 1.0);
         let track = AnimationTrack::new(
-            format!("property_{}", i),
+            format!("property_{i}"),
             timing,
             AnimatedValue::Float {
                 from: 0.0,

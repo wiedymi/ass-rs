@@ -3,17 +3,21 @@
 //! This test suite verifies pixel-perfect compatibility with libass
 //! using a variety of ASS features and edge cases.
 
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 use ass_core::parser::Script;
-#[cfg(feature = "libass-compare")]
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 use ass_renderer::debug::{CompatibilityTestSuite, CompatibilityTester, TestConfig};
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 use ass_renderer::renderer::RenderContext;
 
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 const TEST_WIDTH: u32 = 1920;
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 const TEST_HEIGHT: u32 = 1080;
 
 /// Test basic text rendering compatibility
 #[test]
-#[cfg(feature = "libass-compare")]
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 fn test_basic_text_compatibility() {
     let context = RenderContext::new(TEST_WIDTH, TEST_HEIGHT);
     let config = TestConfig {
@@ -51,7 +55,7 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,Hello World!"#;
 
 /// Test various text effects and formatting
 #[test]
-#[cfg(feature = "libass-compare")]
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 fn test_text_effects_compatibility() {
     let context = RenderContext::new(TEST_WIDTH, TEST_HEIGHT);
     let config = TestConfig::default();
@@ -92,7 +96,7 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,{\fsp10}Spaced text"#;
 
 /// Test animation and movement
 #[test]
-#[cfg(feature = "libass-compare")]
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 fn test_animation_compatibility() {
     let context = RenderContext::new(TEST_WIDTH, TEST_HEIGHT);
     let config = TestConfig {
@@ -134,7 +138,7 @@ Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{\t(0,2000,\fs72)}Growing text
 
 /// Test complex transformations
 #[test]
-#[cfg(feature = "libass-compare")]
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 fn test_transform_compatibility() {
     let context = RenderContext::new(TEST_WIDTH, TEST_HEIGHT);
     let config = TestConfig::default();
@@ -172,7 +176,7 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,{\org(960,540)\frz90}Rotated a
 
 /// Test karaoke effects
 #[test]
-#[cfg(feature = "libass-compare")]
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 fn test_karaoke_compatibility() {
     let context = RenderContext::new(TEST_WIDTH, TEST_HEIGHT);
     let config = TestConfig {
@@ -213,7 +217,7 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,{\kf50}Smooth {\kf50}karaoke"#
 
 /// Test drawing commands
 #[test]
-#[cfg(feature = "libass-compare")]
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 fn test_drawing_compatibility() {
     let context = RenderContext::new(TEST_WIDTH, TEST_HEIGHT);
     let config = TestConfig::default();
@@ -249,7 +253,7 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,{\p1}m 300 300 b 400 250 500 3
 
 /// Test edge cases and error handling
 #[test]
-#[cfg(feature = "libass-compare")]
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 fn test_edge_cases_compatibility() {
     let context = RenderContext::new(TEST_WIDTH, TEST_HEIGHT);
     let config = TestConfig::default();
@@ -288,7 +292,7 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,{\unknown}Unknown tag"#;
 
 /// Run comprehensive test suite
 #[test]
-#[cfg(feature = "libass-compare")]
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 fn test_comprehensive_compatibility_suite() {
     let context = RenderContext::new(TEST_WIDTH, TEST_HEIGHT);
     let config = TestConfig {
@@ -345,6 +349,7 @@ fn test_comprehensive_compatibility_suite() {
 
 // Helper functions to create test scripts
 
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 fn create_basic_dialogue_script() -> String {
     r#"[Script Info]
 Title: Basic Dialogue
@@ -361,6 +366,7 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,This is a basic dialogue line.
 Dialogue: 0,0:00:02.00,0:00:06.00,Default,,0,0,0,,This is another line with different timing."#.to_string()
 }
 
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 fn create_complex_styling_script() -> String {
     r#"[Script Info]
 Title: Complex Styling
@@ -379,6 +385,7 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,{\c&H00FF00&\b1}Green bold tex
 Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,{\blur2\c&HFF0000&}Blurred red text"#.to_string()
 }
 
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 fn create_multi_language_script() -> String {
     r#"[Script Info]
 Title: Multi Language
@@ -397,6 +404,7 @@ Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,中文文本
 Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,العربية النص"#.to_string()
 }
 
+#[cfg(all(feature = "libass-compare", not(feature = "nostd")))]
 fn create_performance_stress_script() -> String {
     let mut script = r#"[Script Info]
 Title: Performance Stress

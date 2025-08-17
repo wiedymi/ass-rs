@@ -13,6 +13,7 @@ use ass_core::analysis::ScriptAnalysis;
 use ass_core::parser::{Event, Script};
 
 /// WebGPU accelerated pipeline (placeholder)
+#[derive(Default)]
 pub struct WebGpuPipeline {
     // Simplified placeholder implementation
 }
@@ -21,12 +22,6 @@ impl WebGpuPipeline {
     /// Create a new WebGPU pipeline
     pub fn new() -> Result<Self, RenderError> {
         Ok(Self {})
-    }
-}
-
-impl Default for WebGpuPipeline {
-    fn default() -> Self {
-        Self {}
     }
 }
 

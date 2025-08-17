@@ -105,7 +105,7 @@ impl MetalBackend {
         let pipeline_descriptor = RenderPipelineDescriptor::new();
         pipeline_descriptor.set_vertex_function(Some(&vertex_function));
         pipeline_descriptor.set_fragment_function(Some(&fragment_function));
-        pipeline_descriptor.set_vertex_descriptor(Some(&vertex_descriptor));
+        pipeline_descriptor.set_vertex_descriptor(Some(vertex_descriptor));
 
         // Configure color attachment
         let color_attachment = pipeline_descriptor
@@ -177,10 +177,10 @@ impl MetalBackend {
         color_attachment.set_clear_color(MTLClearColor::new(0.0, 0.0, 0.0, 0.0));
         color_attachment.set_store_action(MTLStoreAction::Store);
 
-        let encoder = command_buffer.new_render_command_encoder(&render_pass_descriptor);
+        let encoder = command_buffer.new_render_command_encoder(render_pass_descriptor);
 
         if let Some(pipeline_state) = &self.pipeline_state {
-            encoder.set_render_pipeline_state(&pipeline_state);
+            encoder.set_render_pipeline_state(pipeline_state);
 
             // Render each layer
             for layer in layers {
@@ -264,10 +264,9 @@ impl RenderBackend for MetalBackend {
     }
 
     fn supports_feature(&self, feature: BackendFeature) -> bool {
-        match feature {
-            BackendFeature::HardwareAcceleration => true,
-            BackendFeature::ComputeShaders => true,
-            _ => false,
-        }
+        matches!(
+            feature,
+            BackendFeature::HardwareAcceleration | BackendFeature::ComputeShaders
+        )
     }
 }

@@ -287,6 +287,12 @@ struct GlyphKey {
     size: u32, // Font size in fixed point (16.16)
 }
 
+impl Default for GlyphRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GlyphRenderer {
     /// Create new glyph renderer
     pub fn new() -> Self {
@@ -347,7 +353,7 @@ impl GlyphRenderer {
             let size_fixed = (shaped.font_size * 65536.0) as u32; // Convert to 16.16 fixed point
             let key = GlyphKey {
                 font_id,
-                glyph_id: glyph.glyph_id as u32,
+                glyph_id: glyph.glyph_id,
                 size: size_fixed,
             };
 

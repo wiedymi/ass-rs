@@ -1,5 +1,5 @@
 //! Build script for ass-renderer crate
-//! 
+//!
 //! Handles linking libass when the libass-compare feature is enabled,
 //! with platform-specific fallbacks for macOS Homebrew installations.
 

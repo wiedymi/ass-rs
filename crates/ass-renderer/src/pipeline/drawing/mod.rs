@@ -15,6 +15,9 @@ use std::{
 use crate::utils::RenderError;
 use tiny_skia::{Path, PathBuilder};
 
+/// A bezier curve represented as three control points: start, control, end
+type BezierCurve = ((f32, f32), (f32, f32), (f32, f32));
+
 /// Drawing command types
 #[derive(Debug, Clone)]
 pub enum DrawCommand {
@@ -319,10 +322,7 @@ fn parse_coord(s: &str) -> Result<f32, RenderError> {
 /// Parameters:
 /// - points: Control points for the spline
 /// - extended: Whether to use extended spline algorithm (for 'p' command)
-fn spline_to_bezier(
-    points: &[(f32, f32)],
-    extended: bool,
-) -> Vec<((f32, f32), (f32, f32), (f32, f32))> {
+fn spline_to_bezier(points: &[(f32, f32)], extended: bool) -> Vec<BezierCurve> {
     let mut beziers = Vec::new();
 
     if points.len() < 3 {

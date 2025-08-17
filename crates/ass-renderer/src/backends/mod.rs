@@ -144,7 +144,6 @@ impl Default for BackendMetrics {
     }
 }
 
-
 /// Create a backend instance for the given type
 pub fn create_backend(
     backend_type: BackendType,

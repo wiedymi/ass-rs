@@ -157,9 +157,9 @@ impl CollisionResolver {
 
         // Try to find alternative position based on alignment
         let new_bbox = match event.alignment {
-            1 | 2 | 3 => self.find_bottom_position(event.clone(), original_bbox),
-            4 | 5 | 6 => self.find_middle_position(event.clone(), original_bbox),
-            7 | 8 | 9 => self.find_top_position(event.clone(), original_bbox),
+            1..=3 => self.find_bottom_position(event.clone(), original_bbox),
+            4..=6 => self.find_middle_position(event.clone(), original_bbox),
+            7..=9 => self.find_top_position(event.clone(), original_bbox),
             _ => original_bbox,
         };
 

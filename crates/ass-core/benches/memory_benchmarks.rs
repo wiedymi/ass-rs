@@ -44,7 +44,11 @@ fn bench_memory_efficiency(c: &mut Criterion) {
                 b.iter(|| {
                     let script = Script::parse(black_box(text)).unwrap();
                     let ast_size = estimate_ast_memory(&script);
-                    let ratio = ast_size as f64 / input_size as f64;
+                    let ratio = if input_size == 0 {
+                        0
+                    } else {
+                        ast_size * 100 / input_size
+                    };
 
                     // Return tuple to prevent optimization
                     black_box((script, ratio))
@@ -101,7 +105,7 @@ fn bench_real_world_memory(c: &mut Criterion) {
 
     for (name, event_count) in &profiles {
         let script_text = ScriptGenerator::anime_realistic(*event_count).generate();
-        let input_mb = script_text.len() as f64 / 1_048_576.0;
+        let input_mb = script_text.len() / 1_048_576;
 
         group.bench_with_input(
             BenchmarkId::new("memory_overhead", name),
@@ -112,9 +116,13 @@ fn bench_real_world_memory(c: &mut Criterion) {
 
                     // Calculate overhead
                     let ast_memory = estimate_ast_memory(&script);
-                    let overhead_ratio = ast_memory as f64 / text.len() as f64;
+                    let overhead_ratio = if text.is_empty() {
+                        0
+                    } else {
+                        ast_memory * 100 / text.len()
+                    };
 
-                    println!("{name}: {input_mb:.1}MB input, {overhead_ratio:.2}x memory ratio");
+                    println!("{name}: {input_mb}MB input, {overhead_ratio}% memory ratio");
 
                     black_box((script, overhead_ratio))
                 });

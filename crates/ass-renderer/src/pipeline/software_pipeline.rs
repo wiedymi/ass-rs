@@ -135,6 +135,12 @@ pub struct SoftwarePipeline {
     dpi_scale: f32,
 }
 
+impl Default for SoftwarePipeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SoftwarePipeline {
     /// Create a new fixed software pipeline
     pub fn new() -> Self {
@@ -410,13 +416,15 @@ impl SoftwarePipeline {
             event.text
         );
         // Get text segments with their individual tags
-        let segments = segment_text_with_tags(&event.text, None)?;
+        let segments = segment_text_with_tags(event.text, None)?;
 
         debug_println!("PROCESS_EVENT: Got {} segments", segments.len());
-        for (_i, _seg) in segments.iter().enumerate() {
+        for (i, seg) in segments.iter().enumerate() {
             debug_println!(
                 "  Segment {}: text='{}', drawing_mode={:?}",
-                _i, _seg.text, _seg.tags.drawing_mode
+                i,
+                seg.text,
+                seg.tags.drawing_mode
             );
         }
 
@@ -634,7 +642,9 @@ impl SoftwarePipeline {
             for (i, seg) in segments.iter().enumerate() {
                 debug_println!(
                     "    Segment {}: text='{}', tags={:?}",
-                    i, seg.text, seg.tags.position
+                    i,
+                    seg.text,
+                    seg.tags.position
                 );
             }
         }
@@ -780,7 +790,8 @@ impl SoftwarePipeline {
                 if line_text.contains("m ") || line_text.contains("l ") {
                     debug_println!(
                         "DRAWING DEBUG: Found potential drawing text: '{}', drawing_mode: {:?}",
-                        line_text, tags.drawing_mode
+                        line_text,
+                        tags.drawing_mode
                     );
                 }
 
@@ -789,7 +800,8 @@ impl SoftwarePipeline {
                     if drawing_mode > 0 {
                         debug_println!(
                             "DRAWING: Processing drawing segment with mode {} and commands: {}",
-                            drawing_mode, line_text
+                            drawing_mode,
+                            line_text
                         );
 
                         // Process drawing commands
@@ -873,7 +885,7 @@ impl SoftwarePipeline {
                     // For multi-line text, adjust positioning based on alignment
                     let adjusted_y = if num_lines > 1 {
                         match alignment {
-                            1 | 2 | 3 => {
+                            1..=3 => {
                                 // Bottom alignment: stack lines upward from bottom
                                 // First line is at the bottom, subsequent lines above it
                                 let line_offset = (num_lines - 1 - line_index) as f32
@@ -884,7 +896,7 @@ impl SoftwarePipeline {
                                     line_index + 1, num_lines, anchor_y, line_offset, estimated_line_height);
                                 anchor_y - line_offset
                             }
-                            7 | 8 | 9 => {
+                            7..=9 => {
                                 // Top alignment: stack lines downward from top
                                 anchor_y + line_y_offset
                             }
@@ -936,7 +948,7 @@ impl SoftwarePipeline {
 
                     let adjusted_y = if num_lines > 1 {
                         match alignment {
-                            1 | 2 | 3 => {
+                            1..=3 => {
                                 // Bottom alignment: stack lines upward from bottom
                                 let line_offset = (num_lines - 1 - line_index) as f32
                                     * estimated_line_height
@@ -946,7 +958,7 @@ impl SoftwarePipeline {
                                     line_index + 1, num_lines, anchor_y, line_offset, estimated_line_height);
                                 anchor_y - line_offset
                             }
-                            7 | 8 | 9 => {
+                            7..=9 => {
                                 // Top alignment: stack lines downward from top
                                 anchor_y + line_y_offset
                             }
@@ -1005,7 +1017,11 @@ impl SoftwarePipeline {
                 if !line_text.is_empty() {
                     debug_println!(
                         "Text '{}' using color: R={}, G={}, B={}, A={}",
-                        line_text, color[0], color[1], color[2], color[3]
+                        line_text,
+                        color[0],
+                        color[1],
+                        color[2],
+                        color[3]
                     );
                     if let Some(s) = style {
                         debug_println!("  Style primary_colour: {}", s.primary_colour);
@@ -1016,7 +1032,10 @@ impl SoftwarePipeline {
                 #[cfg(all(debug_assertions, not(feature = "nostd")))]
                 debug_println!(
                     "Alpha values: alpha={:?}, alpha1={:?}, alpha3={:?}, alpha4={:?}",
-                    tags.colors.alpha, tags.colors.alpha1, tags.colors.alpha3, tags.colors.alpha4
+                    tags.colors.alpha,
+                    tags.colors.alpha1,
+                    tags.colors.alpha3,
+                    tags.colors.alpha4
                 );
 
                 if let Some(alpha) = tags.colors.alpha1.or(tags.colors.alpha) {
@@ -1065,7 +1084,9 @@ impl SoftwarePipeline {
                         #[cfg(all(debug_assertions, not(feature = "nostd")))]
                         debug_println!(
                             "  Complex fade: progress={:.2}, ass_alpha={:.1}, rgba_alpha={:.1}",
-                            fade_progress, ass_alpha, result
+                            fade_progress,
+                            ass_alpha,
+                            result
                         );
                         result
                     } else {
@@ -1076,16 +1097,21 @@ impl SoftwarePipeline {
                         #[cfg(all(debug_assertions, not(feature = "nostd")))]
                         debug_println!(
                             "  Simple fade: fade_in_end={}, fade_out_start={}",
-                            fade_in_end, fade_out_start
+                            fade_in_end,
+                            fade_out_start
                         );
 
-                        let result = if time_cs < fade_in_end {
+                        if time_cs < fade_in_end {
                             // During fade in
                             let progress = (time_cs.saturating_sub(event_start)) as f32
                                 / fade.time_start.max(1) as f32;
                             let alpha = 255.0 * progress.min(1.0);
                             #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                            debug_println!("  FADE IN: progress={:.2}, alpha={:.1}", progress, alpha);
+                            debug_println!(
+                                "  FADE IN: progress={:.2}, alpha={:.1}",
+                                progress,
+                                alpha
+                            );
                             alpha
                         } else if time_cs >= fade_out_start && fade_out_start < event_end {
                             // During fade out
@@ -1093,24 +1119,27 @@ impl SoftwarePipeline {
                                 / fade.time_end.max(1) as f32;
                             let alpha = 255.0 * progress.min(1.0);
                             #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                            debug_println!("  FADE OUT: progress={:.2}, alpha={:.1}", progress, alpha);
+                            debug_println!(
+                                "  FADE OUT: progress={:.2}, alpha={:.1}",
+                                progress,
+                                alpha
+                            );
                             alpha
                         } else {
                             // Fully visible
                             #[cfg(all(debug_assertions, not(feature = "nostd")))]
                             debug_println!("  FULLY VISIBLE: alpha=255.0");
                             255.0
-                        };
-                        result
+                        }
                     };
 
                     // Apply fade to all color components (primary, outline, shadow)
                     let fade_factor = fade_alpha / 255.0;
 
                     let _old_alpha = color[3];
-                    color[3] = ((color[3] as f32 * fade_factor) as u8).min(255);
-                    outline_color[3] = ((outline_color[3] as f32 * fade_factor) as u8).min(255);
-                    shadow_color[3] = ((shadow_color[3] as f32 * fade_factor) as u8).min(255);
+                    color[3] = (color[3] as f32 * fade_factor) as u8;
+                    outline_color[3] = (outline_color[3] as f32 * fade_factor) as u8;
+                    shadow_color[3] = (shadow_color[3] as f32 * fade_factor) as u8;
 
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
                     debug_println!("  FADE APPLIED: fade_alpha={:.1}, primary: {}→{}, outline: {}→{}, shadow: {}→{}",
@@ -1132,7 +1161,8 @@ impl SoftwarePipeline {
                 if segment_y > 1080.0 || segment_y < -100.0 {
                     debug_println!(
                         "WARNING: Text positioned off-screen at Y={} for text '{}'",
-                        segment_y, line_text
+                        segment_y,
+                        line_text
                     );
                     debug_println!(
                         "  Font size: {}, ScaleY: {}",
@@ -1262,7 +1292,10 @@ impl SoftwarePipeline {
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
                     debug_println!(
                         "ROTATION: Adding rotation effect - x={}, y={}, z={} for text '{}'",
-                        rotation_x, rotation_y, rotation_z, line_text
+                        rotation_x,
+                        rotation_y,
+                        rotation_z,
+                        line_text
                     );
                     layer.effects.push(TextEffect::Rotation {
                         x: rotation_x,
@@ -1295,7 +1328,9 @@ impl SoftwarePipeline {
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
                     debug_println!(
                         "SCALE EFFECT ADDED: x={}, y={} for text '{}'",
-                        font_scale_x_val, font_scale_y_val, line_text
+                        font_scale_x_val,
+                        font_scale_y_val,
+                        line_text
                     );
                 }
 
@@ -1398,8 +1433,8 @@ impl SoftwarePipeline {
             // If LayoutRes is present, positions are in LayoutRes coordinates
             // and need to be scaled to PlayRes first
             if let (Some(layout_x), Some(layout_y)) = (self.layout_res_x, self.layout_res_y) {
-                px = px * (self.play_res_x / layout_x);
-                py = py * (self.play_res_y / layout_y);
+                px *= self.play_res_x / layout_x;
+                py *= self.play_res_y / layout_y;
             }
             // Then scale from script (PlayRes) coordinates to render coordinates
             return (px * scale_x, py * scale_y);
@@ -1409,10 +1444,10 @@ impl SoftwarePipeline {
         if let Some((mut x1, mut y1, mut x2, mut y2, t1, t2)) = tags.movement {
             // If LayoutRes is present, movement coordinates are in LayoutRes coordinates
             if let (Some(layout_x), Some(layout_y)) = (self.layout_res_x, self.layout_res_y) {
-                x1 = x1 * (self.play_res_x / layout_x);
-                y1 = y1 * (self.play_res_y / layout_y);
-                x2 = x2 * (self.play_res_x / layout_x);
-                y2 = y2 * (self.play_res_y / layout_y);
+                x1 *= self.play_res_x / layout_x;
+                y1 *= self.play_res_y / layout_y;
+                x2 *= self.play_res_x / layout_x;
+                y2 *= self.play_res_y / layout_y;
             }
 
             // Movement times are relative to event start
@@ -1434,11 +1469,19 @@ impl SoftwarePipeline {
             {
                 debug_println!(
                     "MOVE DEBUG: x1={}, y1={}, x2={}, y2={}, t1={}, t2={}",
-                    x1, y1, x2, y2, t1, t2
+                    x1,
+                    y1,
+                    x2,
+                    y2,
+                    t1,
+                    t2
                 );
                 debug_println!(
                     "  event_start_cs={}, move_start_cs={}, move_end_cs={}, time_cs={}",
-                    event_start_cs, move_start_cs, move_end_cs, time_cs
+                    event_start_cs,
+                    move_start_cs,
+                    move_end_cs,
+                    time_cs
                 );
             }
 
@@ -1449,7 +1492,11 @@ impl SoftwarePipeline {
             #[cfg(debug_assertions)]
             debug_println!(
                 "  progress={}, calculated x={}, y={}, scale_x={}, scale_y={}",
-                progress, x, y, scale_x, scale_y
+                progress,
+                x,
+                y,
+                scale_x,
+                scale_y
             );
 
             // Scale from script (PlayRes) coordinates to render coordinates
@@ -1548,10 +1595,10 @@ impl SoftwarePipeline {
         // libass uses: (PlayResY - MarginV) * scale_y for bottom alignment
         // Calculate position in script coordinates first, then scale to screen
         let y_script = match mapped_alignment {
-            1 | 2 | 3 => self.play_res_y - margin_v_script, // Bottom row: PlayResY - MarginV
-            4 | 5 | 6 => self.play_res_y / 2.0,             // Middle row: PlayResY / 2
-            7 | 8 | 9 => margin_v_script,                   // Top row: MarginV
-            _ => self.play_res_y - margin_v_script,         // Default bottom
+            1..=3 => self.play_res_y - margin_v_script, // Bottom row: PlayResY - MarginV
+            4..=6 => self.play_res_y / 2.0,             // Middle row: PlayResY / 2
+            7..=9 => margin_v_script,                   // Top row: MarginV
+            _ => self.play_res_y - margin_v_script,     // Default bottom
         };
 
         // Transform from script coordinates to screen coordinates
@@ -1602,15 +1649,15 @@ impl SoftwarePipeline {
         // - Top alignment: top of text box
         // We return the top-left corner position for rendering
         let y = match mapped_alignment {
-            1 | 2 | 3 => {
+            1..=3 => {
                 // Bottom: anchor is where bottom of text should be
                 // Subtract text_height to get top of text box
                 // libass uses font metrics for exact positioning, not hardcoded factors
                 anchor_y - text_height
             }
-            4 | 5 | 6 => anchor_y - text_height / 2.0, // Middle: anchor is center
-            7 | 8 | 9 => anchor_y,                     // Top: anchor is top edge
-            _ => anchor_y - text_height,               // Default bottom
+            4..=6 => anchor_y - text_height / 2.0, // Middle: anchor is center
+            7..=9 => anchor_y,                     // Top: anchor is top edge
+            _ => anchor_y - text_height,           // Default bottom
         };
 
         #[cfg(all(debug_assertions, not(feature = "nostd")))]
@@ -1674,7 +1721,10 @@ impl Pipeline for SoftwarePipeline {
                         #[cfg(all(debug_assertions, not(feature = "nostd")))]
                         debug_println!(
                             "LayoutRes detected: {}x{}, PlayRes: {}x{}",
-                            layout_x, layout_y, self.play_res_x, self.play_res_y
+                            layout_x,
+                            layout_y,
+                            self.play_res_x,
+                            self.play_res_y
                         );
                     }
 
@@ -1754,7 +1804,10 @@ impl Pipeline for SoftwarePipeline {
                             }
 
                             #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                            debug_println!("Scaled style '{}' from LayoutRes to PlayRes", style_name);
+                            debug_println!(
+                                "Scaled style '{}' from LayoutRes to PlayRes",
+                                style_name
+                            );
                         }
 
                         if style_name == "Default" || style_name == "*Default" {

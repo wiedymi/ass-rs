@@ -18,7 +18,7 @@ use std::{
 };
 
 /// Processed tag values ready for rendering
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ProcessedTags {
     /// Position override (x, y)
     pub position: Option<(f32, f32)>,
@@ -175,8 +175,8 @@ pub enum LineBreakType {
 }
 
 /// Process tags from event text
-pub fn process_event_tags<'a>(
-    text: &'a str,
+pub fn process_event_tags(
+    text: &str,
     _registry: Option<&ExtensionRegistry>,
 ) -> Result<(ProcessedTags, String), RenderError> {
     // Analyze text to extract tags
@@ -698,28 +698,4 @@ pub fn parse_fade_args(args: &str) -> Option<FadeData> {
     }
 
     None
-}
-
-impl Default for ProcessedTags {
-    fn default() -> Self {
-        Self {
-            position: None,
-            movement: None,
-            origin: None,
-            colors: ColorOverrides::default(),
-            font: FontOverrides::default(),
-            formatting: FormattingOverrides::default(),
-            transforms: Vec::new(),
-            drawing_mode: None,
-            clip: None,
-            fade: None,
-            karaoke: None,
-            reset: None,
-            baseline_offset: None,
-            shear_x: None,
-            shear_y: None,
-            line_breaks: Vec::new(),
-            nbsp_positions: Vec::new(),
-        }
-    }
 }

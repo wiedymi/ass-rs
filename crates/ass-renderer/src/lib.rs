@@ -10,7 +10,6 @@
 #![allow(missing_docs)] // Allow missing docs for struct fields to reduce noise
 #![allow(dead_code)] // Allow dead code for work-in-progress features
 #![allow(unused_variables)] // Allow unused variables in development code
-#![allow(clippy::all)] // Allow all clippy lints for development
 
 #[cfg(feature = "nostd")]
 extern crate alloc;

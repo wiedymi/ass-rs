@@ -159,7 +159,7 @@ impl EventSelector {
             || self.has_animated_events(&active_events, time_cs)
             || self
                 .last_timestamp
-                .map_or(true, |last| (time_cs as i32 - last as i32).abs() > 100);
+                .is_none_or(|last| (time_cs as i32 - last as i32).abs() > 100);
 
         // Update state
         self.previous_active = current_active;

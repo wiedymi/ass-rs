@@ -7,8 +7,8 @@ use crate::pipeline::{TextData, VectorData};
 use crate::utils::RenderError;
 use wgpu::util::DeviceExt;
 use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, ColorTargetState};
-use wgpu::{FragmentState, MultisampleState, PrimitiveState, VertexState};
 use wgpu::{Device, PipelineLayout, RenderPipeline, ShaderModule, TextureFormat};
+use wgpu::{FragmentState, MultisampleState, PrimitiveState, VertexState};
 
 /// Vertex structure for rendering
 #[repr(C)]

@@ -1,7 +1,7 @@
 //! Error types for rendering
 
 #[cfg(feature = "nostd")]
-use alloc::{string::String};
+use alloc::string::String;
 #[cfg(feature = "nostd")]
 use core::fmt;
 #[cfg(not(feature = "nostd"))]
@@ -157,21 +157,20 @@ impl fmt::Display for RenderError {
             Self::InvalidBufferSize { expected, actual } => {
                 write!(
                     f,
-                    "Invalid buffer size: expected {} bytes, got {}",
-                    expected, actual
+                    "Invalid buffer size: expected {expected} bytes, got {actual}"
                 )
             }
             Self::InvalidPixmap => write!(f, "Failed to create pixmap"),
             Self::NoBackendAvailable => write!(f, "No rendering backend available"),
-            Self::UnsupportedBackend(s) => write!(f, "Unsupported backend: {}", s),
-            Self::BackendInitFailed(s) => write!(f, "Backend initialization failed: {}", s),
+            Self::UnsupportedBackend(s) => write!(f, "Unsupported backend: {s}"),
+            Self::BackendInitFailed(s) => write!(f, "Backend initialization failed: {s}"),
             Self::BackendError(s) => write!(f, "Backend error: {s}"),
-            Self::PipelineError(s) => write!(f, "Pipeline error: {}", s),
-            Self::ShapingError(s) => write!(f, "Text shaping failed: {}", s),
-            Self::DrawingError(s) => write!(f, "Drawing failed: {}", s),
-            Self::InvalidDrawCommand(s) => write!(f, "Invalid draw command: {}", s),
-            Self::EffectError(s) => write!(f, "Effect application failed: {}", s),
-            Self::CompositingError(s) => write!(f, "Compositing failed: {}", s),
+            Self::PipelineError(s) => write!(f, "Pipeline error: {s}"),
+            Self::ShapingError(s) => write!(f, "Text shaping failed: {s}"),
+            Self::DrawingError(s) => write!(f, "Drawing failed: {s}"),
+            Self::InvalidDrawCommand(s) => write!(f, "Invalid draw command: {s}"),
+            Self::EffectError(s) => write!(f, "Effect application failed: {s}"),
+            Self::CompositingError(s) => write!(f, "Compositing failed: {s}"),
             Self::FontError(s) => write!(f, "Font error: {s}"),
             Self::GpuError(s) => write!(f, "GPU error: {s}"),
             #[cfg(target_arch = "wasm32")]

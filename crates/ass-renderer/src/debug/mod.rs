@@ -168,7 +168,7 @@ impl DebugRenderer {
     }
 
     /// Render a frame with full debug instrumentation
-    /// 
+    ///
     /// Returns both the rendered frame and detailed debug information
     pub fn render_frame_debug(
         &mut self,
@@ -389,7 +389,7 @@ impl DebugRenderer {
     }
 
     /// Compare two frames from the history by their indices
-    /// 
+    ///
     /// Returns `None` if either index is out of bounds
     pub fn compare_frames(&self, idx1: usize, idx2: usize) -> Option<FrameComparison> {
         if idx1 >= self.frame_history.len() || idx2 >= self.frame_history.len() {

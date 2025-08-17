@@ -45,7 +45,10 @@ pub fn load_embedded_fonts(script: &Script, font_database: &mut FontDatabase) {
 }
 
 /// Load fonts from file paths specified in script metadata
-pub fn load_font_files(script: &Script, #[cfg_attr(feature = "nostd", allow(unused_variables))] font_database: &mut FontDatabase) {
+pub fn load_font_files(
+    script: &Script,
+    #[cfg_attr(feature = "nostd", allow(unused_variables))] font_database: &mut FontDatabase,
+) {
     // Check Script Info section for font file references
     if let Some(script_info) = script.sections().iter().find_map(|section| {
         if let ass_core::parser::ast::Section::ScriptInfo(info) = section {

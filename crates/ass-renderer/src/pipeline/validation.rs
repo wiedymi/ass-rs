@@ -120,8 +120,7 @@ pub fn validate_karaoke_duration(value: u32) -> Result<u32, RenderError> {
         Ok(value)
     } else {
         Err(RenderError::InvalidScript(format!(
-            "Invalid karaoke duration: {} centiseconds",
-            value
+            "Invalid karaoke duration: {value} centiseconds"
         )))
     }
 }
@@ -165,12 +164,11 @@ pub fn validate_font_encoding(value: u8) -> Result<u8, RenderError> {
 
 /// Validate shear/perspective factor
 pub fn validate_shear(value: f32) -> Result<f32, RenderError> {
-    if value >= -2.0 && value <= 2.0 {
+    if (-2.0..=2.0).contains(&value) {
         Ok(value)
     } else {
         Err(RenderError::InvalidScript(format!(
-            "Invalid shear factor: {}. Should be between -2 and 2",
-            value
+            "Invalid shear factor: {value}. Should be between -2 and 2"
         )))
     }
 }
@@ -181,8 +179,7 @@ pub fn validate_acceleration(value: f32) -> Result<f32, RenderError> {
         Ok(value)
     } else {
         Err(RenderError::InvalidScript(format!(
-            "Invalid acceleration: {}. Must be positive",
-            value
+            "Invalid acceleration: {value}. Must be positive"
         )))
     }
 }

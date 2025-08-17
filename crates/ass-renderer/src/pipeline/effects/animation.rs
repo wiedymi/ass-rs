@@ -136,7 +136,7 @@ impl Effect for AnimationEffect {
 
                 // Apply opacity to alpha channel
                 for pixel in pixels.chunks_exact_mut(4) {
-                    pixel[3] = ((pixel[3] as f32 * opacity) as u8).min(255);
+                    pixel[3] = (pixel[3] as f32 * opacity) as u8;
                 }
             }
             AnimationProperty::Color { start, end } => {
