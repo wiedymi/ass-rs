@@ -1,11 +1,7 @@
-use crate::{Frame, RenderError};
+use crate::Frame;
 
 #[cfg(feature = "nostd")]
-use alloc::collections::BTreeMap as HashMap;
-#[cfg(feature = "nostd")]
 use alloc::vec::Vec;
-#[cfg(not(feature = "nostd"))]
-use std::collections::HashMap;
 
 /// Frame analyzer for detailed text-based debugging
 pub struct FrameAnalyzer {

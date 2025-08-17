@@ -431,11 +431,11 @@ impl CompatibilityTester {
     fn find_representative_time(&self, script: &Script) -> u32 {
         // Find middle of first event that has visible text
         for section in script.sections() {
-            if let ass_core::parser::Section::Events(events_section) = section {
-                for event in events_section.events() {
-                    if !event.text().trim().is_empty() {
-                        let start = event.start().as_centiseconds();
-                        let end = event.end().as_centiseconds();
+            if let ass_core::parser::Section::Events(events) = section {
+                for event in events {
+                    if !event.text.trim().is_empty() {
+                        let start = event.start_time_cs().unwrap_or(0);
+                        let end = event.end_time_cs().unwrap_or(0);
                         return start + (end - start) / 2;
                     }
                 }
@@ -452,10 +452,10 @@ impl CompatibilityTester {
         let mut max_time = 0;
 
         for section in script.sections() {
-            if let ass_core::parser::Section::Events(events_section) = section {
-                for event in events_section.events() {
-                    let start = event.start().as_centiseconds();
-                    let end = event.end().as_centiseconds();
+            if let ass_core::parser::Section::Events(events) = section {
+                for event in events {
+                    let start = event.start_time_cs().unwrap_or(0);
+                    let end = event.end_time_cs().unwrap_or(0);
                     min_time = min_time.min(start);
                     max_time = max_time.max(end);
                 }

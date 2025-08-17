@@ -47,14 +47,15 @@
 //! - [`utils`] - Collection operations like sorting and duration calculations
 
 pub mod dialogue_info;
+pub mod line_breaks;
 pub mod overlap;
 pub mod scoring;
 pub mod tags;
-pub mod line_breaks;
 pub mod text_analysis;
 pub mod utils;
 
 pub use dialogue_info::{DialogueInfo, TimingRelation};
+pub use line_breaks::{LineBreakInfo, LineBreakType, TextWithLineBreaks};
 pub use overlap::{count_overlapping_events, find_overlapping_event_refs, find_overlapping_events};
 pub use scoring::{
     calculate_animation_score, calculate_complexity_score, get_performance_impact,
@@ -63,7 +64,6 @@ pub use scoring::{
 pub use tags::{
     calculate_tag_complexity, parse_override_block, DiagnosticKind, OverrideTag, TagDiagnostic,
 };
-pub use line_breaks::{LineBreakType, LineBreakInfo, TextWithLineBreaks};
 pub use text_analysis::TextAnalysis;
 pub use utils::{
     calculate_average_duration, calculate_total_duration, count_overlapping_dialogue_events,

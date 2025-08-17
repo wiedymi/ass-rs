@@ -6,7 +6,6 @@
 extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::{format, string::ToString};
-#[allow(clippy::missing_docs_in_private_items, clippy::cast_precision_loss)]
 use ass_core::{parser::Script, utils::ScriptGenerator};
 /// Get current process memory usage (RSS) in bytes
 #[cfg(target_os = "macos")]

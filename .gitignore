@@ -6,3 +6,4 @@ cobertura.xml
 tarpaulin-report.html
 test_output/
 examples_output/
+.libass/

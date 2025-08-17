@@ -11,12 +11,6 @@
 extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::{format, string::ToString};
-#[allow(
-    clippy::missing_docs_in_private_items,
-    clippy::option_if_let_else,
-    clippy::range_plus_one,
-    clippy::cast_precision_loss
-)]
 use ass_core::{
     parser::{incremental::TextChange, Script},
     utils::ScriptGenerator,

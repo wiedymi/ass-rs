@@ -1,9 +1,5 @@
 use crate::{Frame, RenderError};
 
-#[cfg(not(feature = "nostd"))]
-use std::collections::HashMap;
-#[cfg(not(feature = "nostd"))]
-use std::path::Path;
 
 #[cfg(feature = "nostd")]
 extern crate alloc;

@@ -80,7 +80,7 @@ impl LibassRenderer {
         time_cs: u32,
     ) -> Result<Frame, RenderError> {
         // Convert our script to ASS format
-        let ass_content = script.to_string();
+        let ass_content = script.to_ass_string();
         self.load_script(&ass_content)?;
 
         let track = self
