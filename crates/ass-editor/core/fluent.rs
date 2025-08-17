@@ -13,11 +13,15 @@
 
 use super::{EditorDocument, Position, Range, Result, StyleBuilder};
 use crate::commands::{
-    AdjustKaraokeCommand, ApplyKaraokeCommand, ApplyStyleCommand, CloneStyleCommand,
-    CreateStyleCommand, DeleteStyleCommand, EditStyleCommand, EditorCommand, EffectOperation,
-    EventEffectCommand, GenerateKaraokeCommand, InsertTagCommand, KaraokeType, MergeEventsCommand,
-    ParseTagCommand, ParsedTag, RemoveTagCommand, ReplaceTagCommand, SplitEventCommand,
-    SplitKaraokeCommand, TimingAdjustCommand, ToggleEventTypeCommand, WrapTagCommand,
+    AddFontCommand, AddGraphicCommand, AdjustKaraokeCommand, ApplyKaraokeCommand,
+    ApplyStyleCommand, BatchDeleteEventsCommand, ClearFontsCommand, ClearGraphicsCommand,
+    CloneStyleCommand, CreateStyleCommand, DeleteEventCommand, DeleteScriptInfoCommand,
+    DeleteStyleCommand, EditStyleCommand, EditorCommand, EffectOperation, EventEffectCommand,
+    GenerateKaraokeCommand, GetAllScriptInfoCommand, GetScriptInfoCommand, InsertTagCommand,
+    KaraokeType, ListFontsCommand, ListGraphicsCommand, MergeEventsCommand, ParseTagCommand,
+    ParsedTag, RemoveFontCommand, RemoveGraphicCommand, RemoveTagCommand, ReplaceTagCommand,
+    SetScriptInfoCommand, SplitEventCommand, SplitKaraokeCommand, TimingAdjustCommand,
+    ToggleEventTypeCommand, WrapTagCommand,
 };
 use crate::core::errors::EditorError;
 use ass_core::parser::ast::{Event, EventType, Section};
@@ -653,6 +657,25 @@ impl<'a> EventOps<'a> {
     /// Get events sorted by time
     pub fn by_time(self) -> EventQuery<'a> {
         EventQuery::new(self.document).sort_by_time()
+    }
+
+    /// Delete a single event by index
+    pub fn delete(self, index: usize) -> Result<&'a mut EditorDocument> {
+        let command = DeleteEventCommand::new(index);
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Delete multiple events by indices
+    pub fn delete_multiple(self, indices: Vec<usize>) -> Result<&'a mut EditorDocument> {
+        let command = BatchDeleteEventsCommand::new(indices);
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Delete all events matching a query
+    pub fn delete_query(self) -> EventDeleter<'a> {
+        EventDeleter::new(self.document)
     }
 
     // ============================================================================
@@ -1301,6 +1324,21 @@ impl EditorDocument {
         KaraokeOps::new(self)
     }
 
+    /// Start fluent script info operations
+    pub fn info(&mut self) -> ScriptInfoOps<'_> {
+        ScriptInfoOps::new(self)
+    }
+
+    /// Start fluent fonts operations
+    pub fn fonts(&mut self) -> FontsOps<'_> {
+        FontsOps::new(self)
+    }
+
+    /// Start fluent graphics operations
+    pub fn graphics(&mut self) -> GraphicsOps<'_> {
+        GraphicsOps::new(self)
+    }
+
     /// Convert a Position to line/column tuple
     #[cfg(feature = "rope")]
     pub fn position_to_line_col(&self, pos: Position) -> Result<(usize, usize)> {
@@ -1859,6 +1897,325 @@ impl<'a> EventQuery<'a> {
         // For now, return a placeholder range. This would need to be implemented
         // by using the event's span information from the parser
         Ok(Range::new(Position::new(0), Position::new(0)))
+    }
+}
+
+/// Fluent API for managing Script Info properties
+pub struct ScriptInfoOps<'a> {
+    document: &'a mut EditorDocument,
+}
+
+impl<'a> ScriptInfoOps<'a> {
+    /// Create new script info operations
+    pub(crate) fn new(document: &'a mut EditorDocument) -> Self {
+        Self { document }
+    }
+
+    /// Set a script info property
+    pub fn set(self, property: &str, value: &str) -> Result<&'a mut EditorDocument> {
+        let command = SetScriptInfoCommand::new(property.to_string(), value.to_string());
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Get a script info property value
+    pub fn get(&self, property: &str) -> Result<Option<String>> {
+        let command = GetScriptInfoCommand::new(property.to_string());
+        command.get_value(self.document)
+    }
+
+    /// Delete a script info property
+    pub fn delete(self, property: &str) -> Result<&'a mut EditorDocument> {
+        let command = DeleteScriptInfoCommand::new(property.to_string());
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Get all script info properties
+    pub fn all(&self) -> Result<Vec<(String, String)>> {
+        let command = GetAllScriptInfoCommand::new();
+        command.get_all(self.document)
+    }
+
+    /// Set the title
+    pub fn title(self, title: &str) -> Result<&'a mut EditorDocument> {
+        self.set("Title", title)
+    }
+
+    /// Get the title
+    pub fn get_title(&self) -> Result<Option<String>> {
+        self.get("Title")
+    }
+
+    /// Set the author
+    pub fn author(self, author: &str) -> Result<&'a mut EditorDocument> {
+        self.set("Original Script", author)
+    }
+
+    /// Get the author
+    pub fn get_author(&self) -> Result<Option<String>> {
+        self.get("Original Script")
+    }
+
+    /// Set the resolution
+    pub fn resolution(self, width: u32, height: u32) -> Result<&'a mut EditorDocument> {
+        let command1 = SetScriptInfoCommand::new("PlayResX".to_string(), width.to_string());
+        let command2 = SetScriptInfoCommand::new("PlayResY".to_string(), height.to_string());
+        command1.execute(self.document)?;
+        command2.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Get the resolution
+    pub fn get_resolution(&self) -> Result<Option<(u32, u32)>> {
+        let width_cmd = GetScriptInfoCommand::new("PlayResX".to_string());
+        let height_cmd = GetScriptInfoCommand::new("PlayResY".to_string());
+
+        let width = width_cmd.get_value(self.document)?;
+        let height = height_cmd.get_value(self.document)?;
+
+        match (width, height) {
+            (Some(w), Some(h)) => {
+                let width_val = w
+                    .parse::<u32>()
+                    .map_err(|_| EditorError::command_failed("Invalid PlayResX value"))?;
+                let height_val = h
+                    .parse::<u32>()
+                    .map_err(|_| EditorError::command_failed("Invalid PlayResY value"))?;
+                Ok(Some((width_val, height_val)))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    /// Set the wrap style
+    pub fn wrap_style(self, style: u8) -> Result<&'a mut EditorDocument> {
+        self.set("WrapStyle", &style.to_string())
+    }
+
+    /// Get the wrap style
+    pub fn get_wrap_style(&self) -> Result<Option<u8>> {
+        self.get("WrapStyle")?
+            .map(|s| {
+                s.parse::<u8>()
+                    .map_err(|_| EditorError::command_failed("Invalid WrapStyle value"))
+            })
+            .transpose()
+    }
+
+    /// Set scaled border and shadow
+    pub fn scaled_border_and_shadow(self, scaled: bool) -> Result<&'a mut EditorDocument> {
+        let value = if scaled { "yes" } else { "no" };
+        self.set("ScaledBorderAndShadow", value)
+    }
+
+    /// Get scaled border and shadow setting
+    pub fn get_scaled_border_and_shadow(&self) -> Result<Option<bool>> {
+        Ok(self
+            .get("ScaledBorderAndShadow")?
+            .map(|s| s.to_lowercase() == "yes" || s == "1"))
+    }
+}
+
+/// Fluent API for managing fonts
+pub struct FontsOps<'a> {
+    document: &'a mut EditorDocument,
+}
+
+impl<'a> FontsOps<'a> {
+    /// Create new fonts operations
+    pub(crate) fn new(document: &'a mut EditorDocument) -> Self {
+        Self { document }
+    }
+
+    /// Add a font from UU-encoded data
+    pub fn add(self, filename: &str, data_lines: Vec<String>) -> Result<&'a mut EditorDocument> {
+        let command = AddFontCommand::new(filename.to_string(), data_lines);
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Add a font from binary data (will UU-encode it)
+    pub fn add_binary(self, filename: &str, data: &[u8]) -> Result<&'a mut EditorDocument> {
+        let command = AddFontCommand::from_binary(filename.to_string(), data);
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Remove a font by filename
+    pub fn remove(self, filename: &str) -> Result<&'a mut EditorDocument> {
+        let command = RemoveFontCommand::new(filename.to_string());
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// List all font filenames
+    pub fn list(&self) -> Result<Vec<String>> {
+        let command = ListFontsCommand::new();
+        command.list(self.document)
+    }
+
+    /// Check if a font exists
+    pub fn exists(&self, filename: &str) -> Result<bool> {
+        Ok(self.list()?.contains(&filename.to_string()))
+    }
+
+    /// Clear all fonts
+    pub fn clear(self) -> Result<&'a mut EditorDocument> {
+        let command = ClearFontsCommand::new();
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Get count of fonts
+    pub fn count(&self) -> Result<usize> {
+        Ok(self.list()?.len())
+    }
+}
+
+/// Fluent API for managing graphics
+pub struct GraphicsOps<'a> {
+    document: &'a mut EditorDocument,
+}
+
+impl<'a> GraphicsOps<'a> {
+    /// Create new graphics operations
+    pub(crate) fn new(document: &'a mut EditorDocument) -> Self {
+        Self { document }
+    }
+
+    /// Add a graphic from UU-encoded data
+    pub fn add(self, filename: &str, data_lines: Vec<String>) -> Result<&'a mut EditorDocument> {
+        let command = AddGraphicCommand::new(filename.to_string(), data_lines);
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Add a graphic from binary data (will UU-encode it)
+    pub fn add_binary(self, filename: &str, data: &[u8]) -> Result<&'a mut EditorDocument> {
+        let command = AddGraphicCommand::from_binary(filename.to_string(), data);
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Remove a graphic by filename
+    pub fn remove(self, filename: &str) -> Result<&'a mut EditorDocument> {
+        let command = RemoveGraphicCommand::new(filename.to_string());
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// List all graphic filenames
+    pub fn list(&self) -> Result<Vec<String>> {
+        let command = ListGraphicsCommand::new();
+        command.list(self.document)
+    }
+
+    /// Check if a graphic exists
+    pub fn exists(&self, filename: &str) -> Result<bool> {
+        Ok(self.list()?.contains(&filename.to_string()))
+    }
+
+    /// Clear all graphics
+    pub fn clear(self) -> Result<&'a mut EditorDocument> {
+        let command = ClearGraphicsCommand::new();
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Get count of graphics
+    pub fn count(&self) -> Result<usize> {
+        Ok(self.list()?.len())
+    }
+}
+
+/// Fluent API for deleting events based on queries
+pub struct EventDeleter<'a> {
+    document: &'a mut EditorDocument,
+    indices: Vec<usize>,
+}
+
+impl<'a> EventDeleter<'a> {
+    /// Create a new event deleter
+    pub(crate) fn new(document: &'a mut EditorDocument) -> Self {
+        Self {
+            document,
+            indices: Vec::new(),
+        }
+    }
+
+    /// Delete events by their indices
+    pub fn by_indices(mut self, indices: Vec<usize>) -> Self {
+        self.indices = indices;
+        self
+    }
+
+    /// Delete all dialogue events
+    pub fn dialogues(self) -> Result<&'a mut EditorDocument> {
+        let indices = EventQuery::new(self.document)
+            .filter_by_type(EventType::Dialogue)
+            .indices()?;
+        let command = BatchDeleteEventsCommand::new(indices);
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Delete all comment events
+    pub fn comments(self) -> Result<&'a mut EditorDocument> {
+        let indices = EventQuery::new(self.document)
+            .filter_by_type(EventType::Comment)
+            .indices()?;
+        let command = BatchDeleteEventsCommand::new(indices);
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Delete events in a time range
+    pub fn in_time_range(self, start_cs: u32, end_cs: u32) -> Result<&'a mut EditorDocument> {
+        let indices = EventQuery::new(self.document)
+            .filter_by_time_range(start_cs, end_cs)
+            .indices()?;
+        let command = BatchDeleteEventsCommand::new(indices);
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Delete events with a specific style
+    pub fn with_style(self, style: &str) -> Result<&'a mut EditorDocument> {
+        let indices = EventQuery::new(self.document)
+            .filter_by_style(style)
+            .indices()?;
+        let command = BatchDeleteEventsCommand::new(indices);
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Delete events containing specific text
+    pub fn containing(self, text: &str) -> Result<&'a mut EditorDocument> {
+        let indices = EventQuery::new(self.document)
+            .filter_by_text(text)
+            .indices()?;
+        let command = BatchDeleteEventsCommand::new(indices);
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Delete all events
+    pub fn all(self) -> Result<&'a mut EditorDocument> {
+        let indices = EventQuery::new(self.document).indices()?;
+        let command = BatchDeleteEventsCommand::new(indices);
+        command.execute(self.document)?;
+        Ok(self.document)
+    }
+
+    /// Execute deletion with the configured indices
+    pub fn execute(self) -> Result<&'a mut EditorDocument> {
+        if self.indices.is_empty() {
+            return Ok(self.document);
+        }
+        let command = BatchDeleteEventsCommand::new(self.indices);
+        command.execute(self.document)?;
+        Ok(self.document)
     }
 }
 
@@ -2913,5 +3270,268 @@ Dialogue: 0,0:00:15.00,0:00:20.00,Default,Speaker,0,0,0,,Final dialogue
         assert!(text.contains("\\k45"));
         // With manual syllables, the original appended text is preserved
         assert!(text.contains("Chain test"));
+    }
+
+    #[test]
+    fn test_event_delete_single() {
+        const TEST_CONTENT: &str = r#"[Script Info]
+Title: Test
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,First event
+Dialogue: 0,0:00:05.00,0:00:10.00,Default,Speaker,0,0,0,,Second event
+Dialogue: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Third event
+"#;
+
+        let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
+
+        // Delete the second event (index 1)
+        doc.events().delete(1).unwrap();
+
+        let events = doc.events().all().unwrap();
+        assert_eq!(events.len(), 2);
+        assert!(doc.text().contains("First event"));
+        assert!(!doc.text().contains("Second event"));
+        assert!(doc.text().contains("Third event"));
+    }
+
+    #[test]
+    fn test_event_delete_multiple() {
+        const TEST_CONTENT: &str = r#"[Script Info]
+Title: Test
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,Event 1
+Dialogue: 0,0:00:05.00,0:00:10.00,Default,Speaker,0,0,0,,Event 2
+Dialogue: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Event 3
+Dialogue: 0,0:00:15.00,0:00:20.00,Default,Speaker,0,0,0,,Event 4
+"#;
+
+        let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
+
+        // Delete events at indices 0 and 2
+        doc.events().delete_multiple(vec![0, 2]).unwrap();
+
+        let events = doc.events().all().unwrap();
+        assert_eq!(events.len(), 2);
+        assert!(!doc.text().contains("Event 1"));
+        assert!(doc.text().contains("Event 2"));
+        assert!(!doc.text().contains("Event 3"));
+        assert!(doc.text().contains("Event 4"));
+    }
+
+    #[test]
+    fn test_event_delete_query() {
+        const TEST_CONTENT: &str = r#"[Script Info]
+Title: Test
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01.00,0:00:05.00,Default,Speaker,0,0,0,,Keep this
+Comment: 0,0:00:05.00,0:00:10.00,Default,Speaker,0,0,0,,Delete this comment
+Dialogue: 0,0:00:10.00,0:00:15.00,Default,Speaker,0,0,0,,Keep this too
+Comment: 0,0:00:15.00,0:00:20.00,Default,Speaker,0,0,0,,Delete this comment too
+"#;
+
+        let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
+
+        // Delete all comment events
+        doc.events().delete_query().comments().unwrap();
+
+        let events = doc.events().all().unwrap();
+        assert_eq!(events.len(), 2);
+        assert!(events
+            .iter()
+            .all(|e| e.event.event_type == EventType::Dialogue));
+        assert!(!doc.text().contains("Delete this comment"));
+    }
+
+    #[test]
+    fn test_script_info_operations() {
+        const TEST_CONTENT: &str = r#"[Script Info]
+Title: Original Title
+ScriptType: v4.00+
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"#;
+
+        let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
+
+        // Test getting existing property
+        let title = doc.info().get_title().unwrap();
+        assert_eq!(title, Some("Original Title".to_string()));
+
+        // Test setting property
+        doc.info().title("New Title").unwrap();
+        let new_title = doc.info().get_title().unwrap();
+        assert_eq!(new_title, Some("New Title".to_string()));
+
+        // Test adding new property
+        doc.info().author("John Doe").unwrap();
+        let author = doc.info().get_author().unwrap();
+        assert_eq!(author, Some("John Doe".to_string()));
+
+        // Test resolution
+        doc.info().resolution(1920, 1080).unwrap();
+        let res = doc.info().get_resolution().unwrap();
+        assert_eq!(res, Some((1920, 1080)));
+
+        // Test getting all properties
+        let all = doc.info().all().unwrap();
+        assert!(all.contains(&("Title".to_string(), "New Title".to_string())));
+        assert!(all.contains(&("Original Script".to_string(), "John Doe".to_string())));
+        assert!(all.contains(&("PlayResX".to_string(), "1920".to_string())));
+        assert!(all.contains(&("PlayResY".to_string(), "1080".to_string())));
+
+        // Test deleting property
+        doc.info().delete("ScriptType").unwrap();
+        let script_type = doc.info().get("ScriptType").unwrap();
+        assert_eq!(script_type, None);
+    }
+
+    #[test]
+    fn test_script_info_special_properties() {
+        const TEST_CONTENT: &str = r#"[Script Info]
+Title: Test
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"#;
+
+        let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
+
+        // Test wrap style
+        doc.info().wrap_style(2).unwrap();
+        let wrap = doc.info().get_wrap_style().unwrap();
+        assert_eq!(wrap, Some(2));
+
+        // Test scaled border and shadow
+        doc.info().scaled_border_and_shadow(true).unwrap();
+        let scaled = doc.info().get_scaled_border_and_shadow().unwrap();
+        assert_eq!(scaled, Some(true));
+
+        // Test with "no" value
+        doc.info().scaled_border_and_shadow(false).unwrap();
+        let not_scaled = doc.info().get_scaled_border_and_shadow().unwrap();
+        assert_eq!(not_scaled, Some(false));
+    }
+
+    #[test]
+    fn test_fonts_operations() {
+        const TEST_CONTENT: &str = r#"[Script Info]
+Title: Test
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"#;
+
+        let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
+
+        // Test adding a font
+        let font_data = vec![
+            "begin 644 custom.ttf".to_string(),
+            "M1234567890".to_string(),
+            "end".to_string(),
+        ];
+        doc.fonts().add("custom.ttf", font_data.clone()).unwrap();
+
+        // Verify font was added
+        let fonts = doc.fonts().list().unwrap();
+        assert_eq!(fonts.len(), 1);
+        assert_eq!(fonts[0], "custom.ttf");
+        assert!(doc.fonts().exists("custom.ttf").unwrap());
+
+        // Test adding another font
+        doc.fonts().add("another.otf", font_data).unwrap();
+        assert_eq!(doc.fonts().count().unwrap(), 2);
+
+        // Test removing a font
+        doc.fonts().remove("custom.ttf").unwrap();
+        assert_eq!(doc.fonts().count().unwrap(), 1);
+        assert!(!doc.fonts().exists("custom.ttf").unwrap());
+        assert!(doc.fonts().exists("another.otf").unwrap());
+
+        // Test clearing all fonts
+        doc.fonts().clear().unwrap();
+        assert_eq!(doc.fonts().count().unwrap(), 0);
+        assert!(doc.fonts().list().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_fonts_binary_add() {
+        let mut doc = EditorDocument::new();
+
+        // Test adding font from binary data
+        let binary_data = b"Hello Font Data!";
+        doc.fonts().add_binary("test.ttf", binary_data).unwrap();
+
+        // Verify font was added
+        assert!(doc.fonts().exists("test.ttf").unwrap());
+        assert!(doc.text().contains("[Fonts]"));
+        assert!(doc.text().contains("fontname: test.ttf"));
+        assert!(doc.text().contains("begin 644 test.ttf"));
+        assert!(doc.text().contains("end"));
+    }
+
+    #[test]
+    fn test_graphics_operations() {
+        const TEST_CONTENT: &str = r#"[Script Info]
+Title: Test
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"#;
+
+        let mut doc = EditorDocument::from_content(TEST_CONTENT).unwrap();
+
+        // Test adding a graphic
+        let graphic_data = vec![
+            "begin 644 logo.png".to_string(),
+            "M89PNG1234".to_string(),
+            "end".to_string(),
+        ];
+        doc.graphics()
+            .add("logo.png", graphic_data.clone())
+            .unwrap();
+
+        // Verify graphic was added
+        let graphics = doc.graphics().list().unwrap();
+        assert_eq!(graphics.len(), 1);
+        assert_eq!(graphics[0], "logo.png");
+        assert!(doc.graphics().exists("logo.png").unwrap());
+
+        // Test adding another graphic
+        doc.graphics().add("banner.jpg", graphic_data).unwrap();
+        assert_eq!(doc.graphics().count().unwrap(), 2);
+
+        // Test removing a graphic
+        doc.graphics().remove("logo.png").unwrap();
+        assert_eq!(doc.graphics().count().unwrap(), 1);
+        assert!(!doc.graphics().exists("logo.png").unwrap());
+        assert!(doc.graphics().exists("banner.jpg").unwrap());
+
+        // Test clearing all graphics
+        doc.graphics().clear().unwrap();
+        assert_eq!(doc.graphics().count().unwrap(), 0);
+        assert!(doc.graphics().list().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_graphics_binary_add() {
+        let mut doc = EditorDocument::new();
+
+        // Test adding graphic from binary data
+        let binary_data = b"PNG Image Data Here!";
+        doc.graphics().add_binary("image.png", binary_data).unwrap();
+
+        // Verify graphic was added
+        assert!(doc.graphics().exists("image.png").unwrap());
+        assert!(doc.text().contains("[Graphics]"));
+        assert!(doc.text().contains("filename: image.png"));
+        assert!(doc.text().contains("begin 644 image.png"));
+        assert!(doc.text().contains("end"));
     }
 }
