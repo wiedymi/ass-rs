@@ -124,7 +124,7 @@ pub fn shape_text_with_style(
     // Parse with ttf-parser for OS/2 table access
     let ttf_face = ttf_parser::Face::parse(font_data.as_ref().as_ref(), index)
         .map_err(|_| RenderError::FontError(format!("Failed to parse font for metrics")))?;
-    
+
     // Get font metrics with VSFilter compatibility
     let metrics = FontMetrics::from_face(&ttf_face);
 
@@ -354,15 +354,12 @@ impl GlyphRenderer {
 
             // Apply spacing to x position (accumulated for all previous glyphs)
             let adjusted_x = glyph.x_position + accumulated_spacing;
-            
+
             // Check cache first
             if let Some(cached_path) = self.glyph_cache.get(&key) {
                 // Transform cached path to glyph position
                 // y_position is already the baseline position
-                let transform = tiny_skia::Transform::from_translate(
-                    adjusted_x,
-                    glyph.y_position,
-                );
+                let transform = tiny_skia::Transform::from_translate(adjusted_x, glyph.y_position);
                 if let Some(transformed) = cached_path.clone().transform(transform) {
                     paths.push(transformed);
                 }
@@ -432,15 +429,12 @@ impl GlyphRenderer {
 
                 // Transform to position with spacing adjustment
                 // y_position is already the baseline position
-                let transform = tiny_skia::Transform::from_translate(
-                    adjusted_x,
-                    glyph.y_position,
-                );
+                let transform = tiny_skia::Transform::from_translate(adjusted_x, glyph.y_position);
                 if let Some(transformed) = path.transform(transform) {
                     paths.push(transformed);
                 }
             }
-            
+
             // Add spacing for next glyph (spacing is added after each character)
             if i < shaped.glyphs.len() - 1 {
                 accumulated_spacing += spacing;

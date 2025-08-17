@@ -13,11 +13,17 @@ use thiserror::Error;
 #[derive(Debug)]
 pub enum RenderError {
     /// Invalid dimensions provided
-    #[cfg_attr(not(feature = "nostd"), error("Invalid dimensions: dimensions must be positive and non-zero"))]
+    #[cfg_attr(
+        not(feature = "nostd"),
+        error("Invalid dimensions: dimensions must be positive and non-zero")
+    )]
     InvalidDimensions,
 
     /// Invalid buffer size
-    #[cfg_attr(not(feature = "nostd"), error("Invalid buffer size: expected {expected} bytes, got {actual}"))]
+    #[cfg_attr(
+        not(feature = "nostd"),
+        error("Invalid buffer size: expected {expected} bytes, got {actual}")
+    )]
     InvalidBufferSize {
         /// Expected size
         expected: usize,
@@ -142,9 +148,16 @@ impl RenderError {
 impl fmt::Display for RenderError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidDimensions => write!(f, "Invalid dimensions: dimensions must be positive and non-zero"),
+            Self::InvalidDimensions => write!(
+                f,
+                "Invalid dimensions: dimensions must be positive and non-zero"
+            ),
             Self::InvalidBufferSize { expected, actual } => {
-                write!(f, "Invalid buffer size: expected {} bytes, got {}", expected, actual)
+                write!(
+                    f,
+                    "Invalid buffer size: expected {} bytes, got {}",
+                    expected, actual
+                )
             }
             Self::InvalidPixmap => write!(f, "Failed to create pixmap"),
             Self::NoBackendAvailable => write!(f, "No rendering backend available"),

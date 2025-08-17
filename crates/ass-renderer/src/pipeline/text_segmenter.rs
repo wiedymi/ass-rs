@@ -86,10 +86,10 @@ pub fn segment_text_with_tags<'a>(
             if brace_depth == 0 {
                 // End of tag block - process tags in this block
                 let tag_content = &text[tag_start + 1..pos];
-                
+
                 // Check if this block contains karaoke tags
                 let has_karaoke = tag_content.contains("\\k") || tag_content.contains("\\K");
-                
+
                 if has_karaoke && !current_text.is_empty() {
                     // If we have karaoke and accumulated text, save it as a segment first
                     segments.push(TextSegment {
@@ -100,7 +100,7 @@ pub fn segment_text_with_tags<'a>(
                     });
                     current_text.clear();
                 }
-                
+
                 process_tag_block(tag_content, &mut current_tags)?;
                 in_tag = false;
                 last_pos = pos + 1;
@@ -150,9 +150,12 @@ fn process_tag_block(
 ) -> Result<(), RenderError> {
     // Parse tags more carefully to handle nested parentheses in \t tags
     let parts = split_tags_carefully(content);
-    
+
     #[cfg(all(debug_assertions, not(feature = "nostd")))]
-    eprintln!("DEBUG: Processing tag block: '{}', parts: {:?}", content, parts);
+    eprintln!(
+        "DEBUG: Processing tag block: '{}', parts: {:?}",
+        content, parts
+    );
 
     for part in &parts {
         if part.is_empty() {
@@ -167,7 +170,10 @@ fn process_tag_block(
             ("fn", &part[2..])
         } else if part.starts_with(|c: char| c.is_ascii_digit()) {
             // Handle tags like 1c, 2c, 3a, 4a
-            if let Some(idx) = part[1..].find(|c: char| !c.is_ascii_alphabetic()).map(|i| i + 1) {
+            if let Some(idx) = part[1..]
+                .find(|c: char| !c.is_ascii_alphabetic())
+                .map(|i| i + 1)
+            {
                 (&part[..idx], &part[idx..])
             } else {
                 (part.as_str(), "")
@@ -177,7 +183,7 @@ fn process_tag_block(
         } else {
             (part.as_str(), "")
         };
-        
+
         #[cfg(all(debug_assertions, not(feature = "nostd")))]
         eprintln!("DEBUG: Tag name='{}', args='{}'", name, args);
 
@@ -261,7 +267,7 @@ fn process_tag_block(
             "s" => {
                 current.formatting.strikeout = Some(args != "0");
             }
-            
+
             // Font scale and spacing tags
             "fscx" => {
                 if let Ok(scale) = args.parse::<f32>() {
@@ -280,7 +286,7 @@ fn process_tag_block(
                     eprintln!("DEBUG text_segmenter: Parsed \\fsp{} tag", spacing);
                 }
             }
-            
+
             // Rotation tags
             "frz" | "fr" => {
                 if let Ok(angle) = args.parse::<f32>() {
@@ -306,7 +312,7 @@ fn process_tag_block(
                     current.formatting.alignment = Some(align);
                 }
             }
-            
+
             // Position tags - these apply to the whole event, not segments
             "pos" => {
                 if let Some((x, y)) = super::tag_processor::parse_pos_args(args) {
@@ -318,7 +324,7 @@ fn process_tag_block(
                     current.movement = Some(data);
                 }
             }
-            
+
             // Fade effects
             "fad" | "fade" => {
                 // Import the parse_fade_args function
@@ -329,7 +335,7 @@ fn process_tag_block(
                     current.fade = Some(fade);
                 }
             }
-            
+
             // Drawing mode
             "p" => {
                 if let Ok(level) = args.parse::<u8>() {
@@ -338,16 +344,19 @@ fn process_tag_block(
                     current.drawing_mode = Some(level);
                 }
             }
-            
+
             // Transform animation
             "t" => {
                 // Transform tags need special handling for nested tags
-                use crate::pipeline::transform::TransformAnimation;
                 use crate::pipeline::tag_processor::TransformData;
+                use crate::pipeline::transform::TransformAnimation;
                 if let Some(animation) = TransformAnimation::parse(args) {
                     current.transforms.push(TransformData { animation });
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("TEXT_SEGMENTER: Added transform animation from args '{}'", args);
+                    eprintln!(
+                        "TEXT_SEGMENTER: Added transform animation from args '{}'",
+                        args
+                    );
                 } else {
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
                     eprintln!("TEXT_SEGMENTER: Failed to parse transform from '{}'", args);
@@ -399,7 +408,7 @@ fn process_tag_block(
                     eprintln!("TEXT_SEGMENTER: Set karaoke K={}", duration);
                 }
             }
-            
+
             _ => {
                 // Other tags can be added as needed
             }
@@ -410,7 +419,7 @@ fn process_tag_block(
 }
 
 // Re-export helper functions from tag_processor
-pub use super::tag_processor::{parse_alpha, parse_color, parse_pos_args, parse_move_args};
+pub use super::tag_processor::{parse_alpha, parse_color, parse_move_args, parse_pos_args};
 
 /// Split tags carefully, handling nested parentheses in \t tags
 fn split_tags_carefully(content: &str) -> Vec<String> {
@@ -418,7 +427,7 @@ fn split_tags_carefully(content: &str) -> Vec<String> {
     let mut current = String::new();
     let mut depth = 0;
     let mut chars = content.chars().peekable();
-    
+
     while let Some(ch) = chars.next() {
         if ch == '\\' && depth == 0 {
             // Start of a new tag
@@ -428,13 +437,13 @@ fn split_tags_carefully(content: &str) -> Vec<String> {
             }
         } else {
             current.push(ch);
-            
+
             // Track parentheses depth for \t tags
             if ch == '(' {
                 depth += 1;
             } else if ch == ')' {
                 depth -= 1;
-                
+
                 // If we closed all parentheses, this tag is complete
                 if depth == 0 && !current.is_empty() {
                     // Check if next char is a backslash (new tag) or continue
@@ -446,10 +455,10 @@ fn split_tags_carefully(content: &str) -> Vec<String> {
             }
         }
     }
-    
+
     if !current.is_empty() {
         parts.push(current);
     }
-    
+
     parts
 }

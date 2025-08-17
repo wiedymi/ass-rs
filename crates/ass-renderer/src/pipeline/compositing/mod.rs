@@ -49,7 +49,7 @@ fn composite_layer(
 }
 
 /// Apply alpha blending using libass-compatible formula
-/// 
+///
 /// Uses integer arithmetic with specific rounding to match libass exactly:
 /// - Multiply and add 255 for rounding bias
 /// - Right shift by 8 instead of division by 255
@@ -57,29 +57,29 @@ fn composite_layer(
 pub fn alpha_blend(src: [u8; 4], dst: [u8; 4]) -> [u8; 4] {
     // Use integer arithmetic matching libass implementation
     let src_alpha = src[3] as u32;
-    
+
     if src_alpha == 0 {
         // Fully transparent source, keep destination
         return dst;
     }
-    
+
     if src_alpha == 255 && dst[3] == 0 {
         // Opaque source over transparent destination
         return src;
     }
-    
+
     // libass uses this formula: ((src * alpha + 255) >> 8)
     // The +255 provides rounding bias to match libass exactly
     let inv_src_alpha = 255 - src_alpha;
-    
+
     // Blend colors using libass formula with rounding
     let out_r = ((src[0] as u32 * src_alpha + dst[0] as u32 * inv_src_alpha + 255) >> 8) as u8;
     let out_g = ((src[1] as u32 * src_alpha + dst[1] as u32 * inv_src_alpha + 255) >> 8) as u8;
     let out_b = ((src[2] as u32 * src_alpha + dst[2] as u32 * inv_src_alpha + 255) >> 8) as u8;
-    
+
     // Alpha calculation using same integer formula
     let dst_alpha = dst[3] as u32;
     let out_alpha = ((src_alpha * 255 + dst_alpha * inv_src_alpha + 255) >> 8) as u8;
-    
+
     [out_r, out_g, out_b, out_alpha]
 }

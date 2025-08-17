@@ -20,17 +20,34 @@ pub mod inspector;
 pub mod player;
 pub mod visual_comparison;
 
+pub mod benchmarking;
+#[cfg(feature = "libass-compare")]
+pub mod libass_compatibility;
 #[cfg(feature = "libass-compare")]
 pub mod libass_ffi;
 #[cfg(feature = "libass-compare")]
 pub mod libass_renderer;
-// #[cfg(feature = "libass-compare")]
-// pub mod pixel_perfect_comparison;
+#[cfg(feature = "libass-compare")]
+pub mod pixel_perfect_comparison;
+#[cfg(not(feature = "nostd"))]
+pub mod visual_reporting;
 
 pub use analyzer::{AnalysisReport, FrameAnalyzer};
+pub use benchmarking::{
+    quick_benchmark, BenchmarkConfig, BenchmarkResult, PerformanceBenchmark, PerformanceMetrics,
+};
 pub use inspector::FrameInspector;
 #[cfg(feature = "libass-compare")]
+pub use libass_compatibility::{
+    CompatibilityResult, CompatibilityTestSuite, CompatibilityTester, DiffRegion, DiffType,
+    TestConfig,
+};
+#[cfg(feature = "libass-compare")]
 pub use libass_renderer::LibassRenderer;
+#[cfg(feature = "libass-compare")]
+pub use pixel_perfect_comparison::PixelPerfectComparison;
+#[cfg(not(feature = "nostd"))]
+pub use visual_reporting::{generate_compatibility_report, ReportConfig, VisualReportGenerator};
 // #[cfg(feature = "libass-compare")]
 // pub use pixel_perfect_comparison::{
 //     PixelPerfectComparator, PixelComparisonResult, ComparisonConfig,

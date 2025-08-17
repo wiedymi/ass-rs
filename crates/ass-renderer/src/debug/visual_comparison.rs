@@ -85,18 +85,20 @@ impl VisualComparison {
         // Clear debug info
         self.debug_info.clear();
 
-        // Get script info  
+        // Get script info
         use ass_core::parser::ast::SectionType;
-        let play_res_x = if let Some(ass_core::parser::ast::Section::ScriptInfo(info)) = 
-            script.find_section(SectionType::ScriptInfo) {
+        let play_res_x = if let Some(ass_core::parser::ast::Section::ScriptInfo(info)) =
+            script.find_section(SectionType::ScriptInfo)
+        {
             info.get_field("PlayResX")
                 .and_then(|v| v.parse::<u32>().ok())
                 .unwrap_or(384)
         } else {
             384
         };
-        let play_res_y = if let Some(ass_core::parser::ast::Section::ScriptInfo(info)) = 
-            script.find_section(SectionType::ScriptInfo) {
+        let play_res_y = if let Some(ass_core::parser::ast::Section::ScriptInfo(info)) =
+            script.find_section(SectionType::ScriptInfo)
+        {
             info.get_field("PlayResY")
                 .and_then(|v| v.parse::<u32>().ok())
                 .unwrap_or(288)
@@ -105,16 +107,15 @@ impl VisualComparison {
         };
 
         // Create a basic pixmap for now - full rendering would require more setup
-        let mut pixmap = Pixmap::new(self.width, self.height)
-            .ok_or(RenderError::InvalidPixmap)?;
+        let mut pixmap = Pixmap::new(self.width, self.height).ok_or(RenderError::InvalidPixmap)?;
 
         if self.debug_enabled {
             // Add debug overlay
             self.draw_debug_overlay(&mut pixmap, &self.debug_info)?;
-            
+
             // Add grid for alignment reference
             self.draw_alignment_grid(&mut pixmap, play_res_x, play_res_y)?;
-            
+
             // Add color reference
             self.draw_color_reference(&mut pixmap)?;
         }
@@ -145,7 +146,7 @@ impl VisualComparison {
                 info.color_rgba[2],
                 info.color_rgba[3],
             );
-            
+
             // Draw text background for readability
             let mut bg_paint = Paint::default();
             bg_paint.set_color(Color::from_rgba8(0, 0, 0, 180));
@@ -213,7 +214,7 @@ impl VisualComparison {
         // Draw common ASS colors for reference
         let colors = [
             ("White", [255, 255, 255, 255]),
-            ("Cyan", [255, 255, 0, 255]),  // In BBGGRR: &H00FFFF&
+            ("Cyan", [255, 255, 0, 255]),   // In BBGGRR: &H00FFFF&
             ("Yellow", [0, 255, 255, 255]), // In BBGGRR: &H00FFFF&
             ("Red", [0, 0, 255, 255]),      // In BBGGRR: &H0000FF&
             ("Blue", [255, 0, 0, 255]),     // In BBGGRR: &HFF0000&
@@ -271,7 +272,7 @@ impl VisualComparison {
                 let a_diff = (our_pixel.alpha() as i32 - lib_pixel.alpha() as i32).abs() as f32;
 
                 let pixel_diff = (r_diff + g_diff + b_diff + a_diff) / 4.0;
-                
+
                 if pixel_diff > 10.0 {
                     differences.push(PixelDifference {
                         x,
@@ -293,12 +294,16 @@ impl VisualComparison {
                 }
 
                 total_diff += pixel_diff;
-                max_diff = if pixel_diff > max_diff { pixel_diff } else { max_diff };
+                max_diff = if pixel_diff > max_diff {
+                    pixel_diff
+                } else {
+                    max_diff
+                };
             }
         }
 
         let pixel_count = (our_output.width() * our_output.height()) as f32;
-        
+
         ComparisonResult {
             average_difference: total_diff / pixel_count,
             max_difference: max_diff,
@@ -335,9 +340,8 @@ pub fn create_comparison_image(
 ) -> Result<Pixmap, RenderError> {
     let width = our_output.width() + libass_output.width() + diff_map.map_or(0, |d| d.width());
     let height = our_output.height().max(libass_output.height());
-    
-    let mut comparison = Pixmap::new(width, height)
-        .ok_or_else(|| RenderError::InvalidPixmap)?;
+
+    let mut comparison = Pixmap::new(width, height).ok_or_else(|| RenderError::InvalidPixmap)?;
 
     // Copy our output to left side
     comparison.draw_pixmap(

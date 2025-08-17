@@ -106,7 +106,7 @@ impl Renderer {
         let layers = self
             .pipeline
             .process_events(&events, time_cs, &self.context)?;
-        
+
         // Debug: Check what layers we have
         eprintln!("RENDERER: Got {} layers", layers.len());
         for (i, layer) in layers.iter().enumerate() {
@@ -122,7 +122,7 @@ impl Renderer {
                 }
             }
         }
-        
+
         let frame_data = self.backend.composite_layers(&layers, &self.context)?;
 
         Ok(Frame::new(
@@ -235,13 +235,13 @@ pub struct PerformanceMetrics {
     #[cfg(not(feature = "nostd"))]
     pub total_time: Duration,
     #[cfg(feature = "nostd")]
-    pub parse_time: u64,  // milliseconds
+    pub parse_time: u64, // milliseconds
     #[cfg(feature = "nostd")]
-    pub shape_time: u64,  // milliseconds
+    pub shape_time: u64, // milliseconds
     #[cfg(feature = "nostd")]
     pub render_time: u64, // milliseconds
     #[cfg(feature = "nostd")]
-    pub total_time: u64,  // milliseconds
+    pub total_time: u64, // milliseconds
 }
 
 /// Cache statistics

@@ -44,10 +44,18 @@ impl PositionInfo {
     ) -> Self {
         // Get effective alignment
         let alignment = tags.formatting.alignment.unwrap_or(default_alignment);
-        
+
         // Calculate anchor point based on alignment
-        let (anchor_x, anchor_y) = Self::get_anchor_point(alignment, bbox, screen_width, screen_height, margin_left, margin_right, margin_vertical);
-        
+        let (anchor_x, anchor_y) = Self::get_anchor_point(
+            alignment,
+            bbox,
+            screen_width,
+            screen_height,
+            margin_left,
+            margin_right,
+            margin_vertical,
+        );
+
         // Check for explicit positioning
         let (render_x, render_y, explicit) = if let Some((pos_x, pos_y)) = tags.position {
             // Explicit \pos tag
@@ -64,7 +72,7 @@ impl PositionInfo {
             // Use alignment-based positioning
             (anchor_x, anchor_y, false)
         };
-        
+
         // Calculate rotation origin
         let (origin_x, origin_y) = if let Some((org_x, org_y)) = tags.origin {
             // Explicit \org tag
@@ -73,7 +81,7 @@ impl PositionInfo {
             // Default to anchor point (libass behavior)
             (anchor_x + bbox.width / 2.0, anchor_y + bbox.height / 2.0)
         };
-        
+
         Self {
             render_x,
             render_y,
@@ -84,7 +92,7 @@ impl PositionInfo {
             explicit_position: explicit,
         }
     }
-    
+
     /// Get anchor point based on alignment value
     fn get_anchor_point(
         alignment: u8,
@@ -110,7 +118,7 @@ impl PositionInfo {
                 screen_width - margin_right - bbox.width
             }
         };
-        
+
         // Vertical position based on alignment
         let y = match alignment {
             1..=3 => {
@@ -130,19 +138,19 @@ impl PositionInfo {
                 screen_height - margin_vertical - bbox.height
             }
         };
-        
+
         (x, y)
     }
-    
+
     /// Get horizontal offset for alignment anchor
     fn get_alignment_offset_x(alignment: u8, bbox: &BoundingBox) -> f32 {
         match alignment % 3 {
             1 => 0.0,                  // Left
             2 | 0 => bbox.width / 2.0, // Center
-            _ => bbox.width,            // Right
+            _ => bbox.width,           // Right
         }
     }
-    
+
     /// Get vertical offset for alignment anchor
     fn get_alignment_offset_y(alignment: u8, bbox: &BoundingBox) -> f32 {
         match alignment {
@@ -152,7 +160,7 @@ impl PositionInfo {
             _ => bbox.height,           // Default to bottom
         }
     }
-    
+
     /// Calculate position with movement interpolation
     pub fn calculate_with_movement(
         tags: &ProcessedTags,
@@ -177,11 +185,11 @@ impl PositionInfo {
             margin_vertical,
             default_alignment,
         );
-        
+
         // Apply movement if present
         if let Some((x1, y1, x2, y2, t1, t2)) = tags.movement {
             let event_time = current_time_ms.saturating_sub(event_start_ms);
-            
+
             // Calculate interpolation factor
             let factor = if t2 > t1 {
                 let progress = (event_time.saturating_sub(t1)) as f32 / (t2 - t1) as f32;
@@ -189,18 +197,18 @@ impl PositionInfo {
             } else {
                 1.0 // Instant movement
             };
-            
+
             // Interpolate position
             let current_x = x1 + (x2 - x1) * factor;
             let current_y = y1 + (y2 - y1) * factor;
-            
+
             // Apply alignment offset
             let alignment = tags.formatting.alignment.unwrap_or(default_alignment);
             pos.render_x = current_x - Self::get_alignment_offset_x(alignment, bbox);
             pos.render_y = current_y - Self::get_alignment_offset_y(alignment, bbox);
             pos.explicit_position = true;
         }
-        
+
         pos
     }
 }
@@ -225,28 +233,28 @@ pub fn convert_ssa_alignment(ssa_align: u8) -> u8 {
     // +0=sub, +4=title, +8=top, +128=mid-title
     let h_align = ssa_align & 3;
     let v_align = (ssa_align >> 2) & 3;
-    
+
     let h_part = match h_align {
         1 => 1, // Left
         2 => 2, // Center
         3 => 3, // Right
         _ => 2, // Default center
     };
-    
+
     let v_part = match v_align {
-        0 => 0, // Bottom
+        0 => 0,     // Bottom
         1 | 3 => 3, // Middle (title or mid-title)
-        2 => 6, // Top
-        _ => 0, // Default bottom
+        2 => 6,     // Top
+        _ => 0,     // Default bottom
     };
-    
+
     h_part + v_part
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_alignment_positions() {
         let bbox = BoundingBox {
@@ -255,25 +263,16 @@ mod tests {
             width: 100.0,
             height: 50.0,
         };
-        
+
         let tags = ProcessedTags::default();
-        
+
         // Test bottom-center alignment (default)
-        let pos = PositionInfo::calculate(
-            &tags,
-            &bbox,
-            1920.0,
-            1080.0,
-            0.0,
-            0.0,
-            0.0,
-            2,
-        );
-        
+        let pos = PositionInfo::calculate(&tags, &bbox, 1920.0, 1080.0, 0.0, 0.0, 0.0, 2);
+
         assert_eq!(pos.anchor_x, 910.0); // (1920 - 100) / 2
         assert_eq!(pos.anchor_y, 1030.0); // 1080 - 0 - 50
     }
-    
+
     #[test]
     fn test_explicit_position() {
         let bbox = BoundingBox {
@@ -282,26 +281,17 @@ mod tests {
             width: 100.0,
             height: 50.0,
         };
-        
+
         let mut tags = ProcessedTags::default();
         tags.position = Some((500.0, 300.0));
-        
-        let pos = PositionInfo::calculate(
-            &tags,
-            &bbox,
-            1920.0,
-            1080.0,
-            0.0,
-            0.0,
-            0.0,
-            2,
-        );
-        
+
+        let pos = PositionInfo::calculate(&tags, &bbox, 1920.0, 1080.0, 0.0, 0.0, 0.0, 2);
+
         assert!(pos.explicit_position);
         assert_eq!(pos.render_x, 450.0); // 500 - 50 (center offset)
         assert_eq!(pos.render_y, 250.0); // 300 - 50 (bottom offset)
     }
-    
+
     #[test]
     fn test_movement_interpolation() {
         let bbox = BoundingBox {
@@ -310,24 +300,15 @@ mod tests {
             width: 100.0,
             height: 50.0,
         };
-        
+
         let mut tags = ProcessedTags::default();
         tags.movement = Some((100.0, 100.0, 500.0, 300.0, 0, 1000));
-        
+
         // Test at halfway point (500ms)
         let pos = PositionInfo::calculate_with_movement(
-            &tags,
-            &bbox,
-            1920.0,
-            1080.0,
-            0.0,
-            0.0,
-            0.0,
-            2,
-            500,
-            0,
+            &tags, &bbox, 1920.0, 1080.0, 0.0, 0.0, 0.0, 2, 500, 0,
         );
-        
+
         // Position should be interpolated halfway
         assert_eq!(pos.render_x, 250.0); // 300 - 50 (center offset)
         assert_eq!(pos.render_y, 150.0); // 200 - 50 (bottom offset)

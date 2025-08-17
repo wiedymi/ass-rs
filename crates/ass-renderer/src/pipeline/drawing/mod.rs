@@ -119,7 +119,7 @@ pub fn parse_draw_commands(text: &str) -> Result<Vec<DrawCommand>, RenderError> 
                     let y = parse_coord(&tokens[i + 1])?;
                     commands.push(DrawCommand::MoveTo { x, y });
                     i += 2;
-                    
+
                     // Additional coordinate pairs become LineTo
                     while i + 1 < tokens.len() && !is_command(&tokens[i]) {
                         let x = parse_coord(&tokens[i])?;
@@ -142,8 +142,10 @@ pub fn parse_draw_commands(text: &str) -> Result<Vec<DrawCommand>, RenderError> 
                     commands.push(DrawCommand::MoveToNoDraw { x, y });
                     i += 2;
                 }
-                
-                if commands.is_empty() || !matches!(commands.last(), Some(DrawCommand::MoveToNoDraw { .. })) {
+
+                if commands.is_empty()
+                    || !matches!(commands.last(), Some(DrawCommand::MoveToNoDraw { .. }))
+                {
                     return Err(RenderError::InvalidDrawCommand(
                         "Incomplete move command".to_string(),
                     ));
@@ -158,8 +160,10 @@ pub fn parse_draw_commands(text: &str) -> Result<Vec<DrawCommand>, RenderError> 
                     commands.push(DrawCommand::LineTo { x, y });
                     i += 2;
                 }
-                
-                if commands.is_empty() || !matches!(commands.last(), Some(DrawCommand::LineTo { .. })) {
+
+                if commands.is_empty()
+                    || !matches!(commands.last(), Some(DrawCommand::LineTo { .. }))
+                {
                     return Err(RenderError::InvalidDrawCommand(
                         "Incomplete line command".to_string(),
                     ));
@@ -185,8 +189,10 @@ pub fn parse_draw_commands(text: &str) -> Result<Vec<DrawCommand>, RenderError> 
                     });
                     i += 6;
                 }
-                
-                if commands.is_empty() || !matches!(commands.last(), Some(DrawCommand::BezierTo { .. })) {
+
+                if commands.is_empty()
+                    || !matches!(commands.last(), Some(DrawCommand::BezierTo { .. }))
+                {
                     return Err(RenderError::InvalidDrawCommand(
                         "Incomplete bezier command".to_string(),
                     ));

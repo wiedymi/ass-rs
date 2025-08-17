@@ -1,7 +1,10 @@
 //! Animation system for ASS subtitle effects
 
 #[cfg(feature = "nostd")]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 #[cfg(not(feature = "nostd"))]
 use std::{string::String, vec::Vec};
 

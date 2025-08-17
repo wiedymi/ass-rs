@@ -102,9 +102,12 @@ impl TransformAnimation {
 
         let params = &inner[..tag_start];
         let tags = &inner[tag_start..];
-        
+
         #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        eprintln!("TransformAnimation::parse - params: '{}', tags: '{}'", params, tags);
+        eprintln!(
+            "TransformAnimation::parse - params: '{}', tags: '{}'",
+            params, tags
+        );
 
         // Parse parameters - need to be careful since last param might be tags not accel
         let parts: Vec<&str> = params
@@ -148,7 +151,10 @@ impl TransformAnimation {
         let target_tags = parse_animatable_tags(tags);
 
         #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        eprintln!("TransformAnimation::parse - parsed {} target tags", target_tags.len());
+        eprintln!(
+            "TransformAnimation::parse - parsed {} target tags",
+            target_tags.len()
+        );
 
         if target_tags.is_empty() {
             #[cfg(all(debug_assertions, not(feature = "nostd")))]
@@ -230,7 +236,7 @@ fn apply_acceleration_curve(t: f32, accel: f32) -> f32 {
 fn parse_animatable_tags(tag_string: &str) -> Vec<AnimatableTag> {
     #[cfg(all(debug_assertions, not(feature = "nostd")))]
     eprintln!("parse_animatable_tags: input='{}'", tag_string);
-    
+
     let mut tags = Vec::new();
     let mut pos = 0;
     let chars: Vec<char> = tag_string.chars().collect();
@@ -242,7 +248,11 @@ fn parse_animatable_tags(tag_string: &str) -> Vec<AnimatableTag> {
 
             // Parse tag name - stop at first non-letter character after initial letter(s)
             // unless it's a tag that starts with a digit (like 1c, 2c, 3a, 4a)
-            let first_char = if tag_start < chars.len() { chars[tag_start] } else { ' ' };
+            let first_char = if tag_start < chars.len() {
+                chars[tag_start]
+            } else {
+                ' '
+            };
             if first_char.is_ascii_digit() {
                 // Tags like 1c, 2c, 3a, 4a
                 pos += 1; // Skip the digit
@@ -266,7 +276,7 @@ fn parse_animatable_tags(tag_string: &str) -> Vec<AnimatableTag> {
                 }
 
                 let args = chars[arg_start..pos].iter().collect::<String>();
-                
+
                 #[cfg(all(debug_assertions, not(feature = "nostd")))]
                 eprintln!("  Found tag: name='{}', args='{}'", tag_name, args);
 
@@ -317,7 +327,9 @@ fn parse_alpha_arg(args: &str) -> Option<u8> {
     let hex = args.trim_start_matches("&H").trim_start_matches("&h");
     // ASS uses inverted alpha: 0 = opaque, 255 = transparent
     // We need to invert it to match standard RGBA: 255 = opaque, 0 = transparent
-    u8::from_str_radix(hex, 16).ok().map(|ass_alpha| 255 - ass_alpha)
+    u8::from_str_radix(hex, 16)
+        .ok()
+        .map(|ass_alpha| 255 - ass_alpha)
 }
 
 /// Interpolate between two values based on progress

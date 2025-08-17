@@ -210,11 +210,13 @@ fn process_single_tag(tag: &OverrideTag, processed: &mut ProcessedTags) -> Resul
         "move" => {
             #[cfg(debug_assertions)]
             eprintln!("PARSING MOVE TAG: args = '{}'", tag.args());
-            
+
             if let Some(data) = parse_move_args(tag.args()) {
                 #[cfg(debug_assertions)]
-                eprintln!("  Parsed move: x1={}, y1={}, x2={}, y2={}, t1={}, t2={}", 
-                    data.0, data.1, data.2, data.3, data.4, data.5);
+                eprintln!(
+                    "  Parsed move: x1={}, y1={}, x2={}, y2={}, t1={}, t2={}",
+                    data.0, data.1, data.2, data.3, data.4, data.5
+                );
                 processed.movement = Some(data);
             } else {
                 #[cfg(debug_assertions)]
@@ -434,11 +436,11 @@ fn process_single_tag(tag: &OverrideTag, processed: &mut ProcessedTags) -> Resul
         "k" => {
             #[cfg(all(debug_assertions, not(feature = "nostd")))]
             eprintln!("TAG PROCESSOR: Found \\k tag with args: '{}'", tag.args());
-            
+
             if let Ok(duration) = tag.args().parse::<u32>() {
                 #[cfg(all(debug_assertions, not(feature = "nostd")))]
                 eprintln!("TAG PROCESSOR: Parsed karaoke duration: {}", duration);
-                
+
                 processed.karaoke = Some(KaraokeData {
                     duration, // Already in centiseconds
                     style: KaraokeStyle::Basic,
@@ -446,7 +448,10 @@ fn process_single_tag(tag: &OverrideTag, processed: &mut ProcessedTags) -> Resul
                 });
             } else {
                 #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                eprintln!("TAG PROCESSOR: Failed to parse karaoke duration from '{}'", tag.args());
+                eprintln!(
+                    "TAG PROCESSOR: Failed to parse karaoke duration from '{}'",
+                    tag.args()
+                );
             }
         }
         "kf" => {
@@ -570,7 +575,9 @@ pub fn parse_alpha(args: &str) -> Option<u8> {
         .trim_end_matches('&');
     // ASS uses inverted alpha: 0 = opaque, 255 = transparent
     // We need to invert it to match standard RGBA: 255 = opaque, 0 = transparent
-    u8::from_str_radix(hex, 16).ok().map(|ass_alpha| 255 - ass_alpha)
+    u8::from_str_radix(hex, 16)
+        .ok()
+        .map(|ass_alpha| 255 - ass_alpha)
 }
 
 fn parse_clip_args(args: &str) -> Option<ClipData> {
@@ -604,7 +611,7 @@ pub fn parse_fade_args(args: &str) -> Option<FadeData> {
         if parts.len() == 2 {
             let fade_in_ms = parts[0].trim().parse::<u32>().ok()?;
             let fade_out_ms = parts[1].trim().parse::<u32>().ok()?;
-            
+
             // Convert milliseconds to centiseconds
             let time_start = fade_in_ms / 10;
             let time_end = fade_out_ms / 10;
@@ -612,10 +619,10 @@ pub fn parse_fade_args(args: &str) -> Option<FadeData> {
             // For simple fade, we store durations not alpha values
             // The actual alpha calculation happens during rendering
             return Some(FadeData {
-                alpha_start: 0,   // Not used for simple fade
-                alpha_end: 0,     // Not used for simple fade
-                time_start,       // Fade-in duration in centiseconds
-                time_end,         // Fade-out duration in centiseconds
+                alpha_start: 0, // Not used for simple fade
+                alpha_end: 0,   // Not used for simple fade
+                time_start,     // Fade-in duration in centiseconds
+                time_end,       // Fade-out duration in centiseconds
                 alpha_middle: None,
                 time_fade_in: None,
                 time_fade_out: None,
@@ -625,7 +632,7 @@ pub fn parse_fade_args(args: &str) -> Option<FadeData> {
         // Complex fade: alpha1, alpha2, alpha3, t1, t2, t3, t4
         // In ASS format, alpha values are INVERTED: 00=opaque, FF=transparent
         // alpha1: alpha before fade in (00-FF in hex, where 00=opaque, FF=transparent)
-        // alpha2: alpha during main display 
+        // alpha2: alpha during main display
         // alpha3: alpha after fade out
         // t1-t2: fade in period (in milliseconds)
         // t2-t3: fully visible period (in milliseconds)
@@ -638,7 +645,7 @@ pub fn parse_fade_args(args: &str) -> Option<FadeData> {
             let t2_ms = parts[4].trim().parse::<u32>().ok()?;
             let t3_ms = parts[5].trim().parse::<u32>().ok()?;
             let t4_ms = parts[6].trim().parse::<u32>().ok()?;
-            
+
             // Convert milliseconds to centiseconds
             let t1 = t1_ms / 10;
             let t2 = t2_ms / 10;

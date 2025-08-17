@@ -4,9 +4,9 @@ use crate::utils::RenderError;
 use ahash::AHashMap;
 
 #[cfg(feature = "nostd")]
-use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, string::{String, ToString}, sync::Arc, vec::Vec};
 #[cfg(not(feature = "nostd"))]
-use std::{boxed::Box, string::String, sync::Arc, vec::Vec};
+use std::{boxed::Box, string::{String, ToString}, sync::Arc, vec::Vec};
 
 pub mod effects;
 

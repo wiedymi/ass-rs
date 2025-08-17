@@ -1,7 +1,7 @@
 //! Color diagnostic tool for debugging rendering issues
 
-use ass_core::Script;
 use ass_core::parser::ast::{Section, SectionType};
+use ass_core::Script;
 
 /// Diagnose color issues in ASS scripts
 pub struct ColorDiagnostic;
@@ -10,7 +10,7 @@ impl ColorDiagnostic {
     /// Analyze colors in a script and report potential issues
     pub fn analyze_script(script: &Script) -> ColorReport {
         let mut report = ColorReport::default();
-        
+
         // Check styles section
         if let Some(Section::Styles(styles)) = script.find_section(SectionType::Styles) {
             for style in styles {
@@ -19,7 +19,7 @@ impl ColorDiagnostic {
                 let secondary = style.secondary_colour;
                 let outline = style.outline_colour;
                 let back = style.back_colour;
-                
+
                 report.styles.push(StyleColors {
                     name: name.to_string(),
                     primary_raw: primary.to_string(),
@@ -30,7 +30,7 @@ impl ColorDiagnostic {
                 });
             }
         }
-        
+
         // Check events for color overrides
         if let Some(Section::Events(events)) = script.find_section(SectionType::Events) {
             for event in events {
@@ -39,10 +39,10 @@ impl ColorDiagnostic {
                 }
             }
         }
-        
+
         report
     }
-    
+
     /// Create a test script with white text
     pub fn create_white_text_test() -> String {
         r#"[Script Info]
@@ -58,7 +58,7 @@ Style: WhiteText,Arial,50,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,10
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:05.00,WhiteText,,0,0,0,,This should be WHITE text"#.to_string()
     }
-    
+
     /// Create a color reference test with multiple colors
     pub fn create_color_reference_test() -> String {
         r#"[Script Info]
@@ -117,10 +117,10 @@ pub struct ColorDebugInfo {
 
 fn parse_color_debug(color: &str) -> ColorDebugInfo {
     let color_trimmed = color.trim_end_matches('&');
-    
+
     if let Some(hex) = color_trimmed.strip_prefix("&H") {
         let has_alpha = hex.len() >= 8;
-        
+
         if let Ok(value) = u32::from_str_radix(hex, 16) {
             let (alpha, bgr_value) = if has_alpha {
                 let alpha = ((value >> 24) & 0xFF) as u8;
@@ -128,11 +128,11 @@ fn parse_color_debug(color: &str) -> ColorDebugInfo {
             } else {
                 (0x00, value) // Default to opaque
             };
-            
+
             let r = (bgr_value & 0xFF) as u8;
             let g = ((bgr_value >> 8) & 0xFF) as u8;
             let b = ((bgr_value >> 16) & 0xFF) as u8;
-            
+
             let expected = match (r, g, b) {
                 (255, 255, 255) => "WHITE",
                 (255, 0, 0) => "RED",
@@ -144,7 +144,7 @@ fn parse_color_debug(color: &str) -> ColorDebugInfo {
                 (0, 0, 0) => "BLACK",
                 _ => "CUSTOM",
             };
-            
+
             return ColorDebugInfo {
                 hex_value: hex.to_string(),
                 has_alpha,
@@ -156,7 +156,7 @@ fn parse_color_debug(color: &str) -> ColorDebugInfo {
             };
         }
     }
-    
+
     ColorDebugInfo {
         hex_value: "INVALID".to_string(),
         has_alpha: false,
@@ -171,32 +171,36 @@ fn parse_color_debug(color: &str) -> ColorDebugInfo {
 impl ColorReport {
     pub fn print_diagnostic(&self) {
         println!("=== ASS Color Diagnostic Report ===\n");
-        
+
         for style in &self.styles {
             println!("Style: {}", style.name);
             println!("  Primary Color: {}", style.primary_raw);
             println!("    Hex: {}", style.primary_parsed.hex_value);
-            println!("    RGBA: ({}, {}, {}, {})", 
+            println!(
+                "    RGBA: ({}, {}, {}, {})",
                 style.primary_parsed.red,
                 style.primary_parsed.green,
                 style.primary_parsed.blue,
-                if style.primary_parsed.has_alpha { 
+                if style.primary_parsed.has_alpha {
                     format!("{}", 255 - style.primary_parsed.alpha) // Convert ASS to RGBA alpha
-                } else { 
-                    "255".to_string() 
+                } else {
+                    "255".to_string()
                 }
             );
             println!("    Expected: {}", style.primary_parsed.expected_color);
-            
+
             // Diagnostic for common issues
             if style.primary_parsed.expected_color == "YELLOW" && style.name.contains("White") {
-                println!("    ⚠️  WARNING: Style named '{}' is YELLOW but should probably be WHITE!", style.name);
+                println!(
+                    "    ⚠️  WARNING: Style named '{}' is YELLOW but should probably be WHITE!",
+                    style.name
+                );
                 println!("       Correct white: &H00FFFFFF");
                 println!("       Current value might be: &H0000FFFF (yellow)");
             }
             println!();
         }
-        
+
         if self.has_color_overrides {
             println!("Note: Script contains color override tags (\\c or \\1c) in events");
         }

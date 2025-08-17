@@ -83,7 +83,9 @@ impl SoftwareBackend {
 
             if !found_japanese {
                 #[cfg(not(feature = "nostd"))]
-                eprintln!("Warning: No Japanese fonts found. Japanese text may not render correctly.");
+                eprintln!(
+                    "Warning: No Japanese fonts found. Japanese text may not render correctly."
+                );
             }
         }
 
@@ -142,22 +144,19 @@ impl SoftwareBackend {
         // Use SourceOver blend mode for proper alpha compositing
         let mut paint = tiny_skia::PixmapPaint::default();
         paint.blend_mode = tiny_skia::BlendMode::SourceOver;
-        
-        self.pixmap.draw_pixmap(
-            0,
-            0,
-            src_pixmap.as_ref(),
-            &paint,
-            transform,
-            None,
-        );
+
+        self.pixmap
+            .draw_pixmap(0, 0, src_pixmap.as_ref(), &paint, transform, None);
 
         Ok(())
     }
 
     fn draw_vector_layer(&mut self, data: &crate::pipeline::VectorData) -> Result<(), RenderError> {
-        eprintln!("DRAWING RENDER: draw_vector_layer called with color {:?}", data.color);
-        
+        eprintln!(
+            "DRAWING RENDER: draw_vector_layer called with color {:?}",
+            data.color
+        );
+
         let mut paint = tiny_skia::Paint::default();
         // Ensure we're setting color with proper alpha handling
         // tiny-skia expects premultiplied alpha internally
@@ -166,11 +165,13 @@ impl SoftwareBackend {
         paint.blend_mode = tiny_skia::BlendMode::SourceOver;
 
         if let Some(path) = &data.path {
-            eprintln!("DRAWING RENDER: Filling path with color RGBA({}, {}, {}, {})", 
-                data.color[0], data.color[1], data.color[2], data.color[3]);
-            
+            eprintln!(
+                "DRAWING RENDER: Filling path with color RGBA({}, {}, {}, {})",
+                data.color[0], data.color[1], data.color[2], data.color[3]
+            );
+
             eprintln!("DRAWING RENDER: Path bounds: {:?}", path.bounds());
-            
+
             self.pixmap.fill_path(
                 path,
                 &paint,
@@ -270,10 +271,13 @@ impl SoftwareBackend {
         })?;
 
         // Render glyphs to paths using cached renderer with spacing
-        let paths =
-            self.glyph_renderer
-                .render_shaped_text(&*shaped, font_id, &self.font_database, data.spacing)?;
-        
+        let paths = self.glyph_renderer.render_shaped_text(
+            &*shaped,
+            font_id,
+            &self.font_database,
+            data.spacing,
+        )?;
+
         #[cfg(all(debug_assertions, not(feature = "nostd")))]
         if data.text.contains("Чысценькая") {
             eprintln!("  Rendered {} glyph paths", paths.len());
@@ -283,7 +287,7 @@ impl SoftwareBackend {
         // The data.x and data.y are the top-left corner of the text box
         // But glyphs are positioned from their baseline, so we need to adjust y by adding the baseline offset
         let baseline_y = data.y + (*shaped).baseline;
-        
+
         #[cfg(all(debug_assertions, not(feature = "nostd")))]
         {
             // Safely truncate text for debug output, respecting UTF-8 boundaries
@@ -296,14 +300,24 @@ impl SoftwareBackend {
             } else {
                 &data.text
             };
-            eprintln!("Drawing text: '{}' at ({}, {}), baseline={}, baseline_y={}", 
-                debug_text, data.x, data.y, (*shaped).baseline, baseline_y);
+            eprintln!(
+                "Drawing text: '{}' at ({}, {}), baseline={}, baseline_y={}",
+                debug_text,
+                data.x,
+                data.y,
+                (*shaped).baseline,
+                baseline_y
+            );
             if baseline_y > 1080.0 || baseline_y < -100.0 {
-                eprintln!("WARNING: Baseline off-screen! data.y={}, baseline={}, baseline_y={}", 
-                    data.y, (*shaped).baseline, baseline_y);
+                eprintln!(
+                    "WARNING: Baseline off-screen! data.y={}, baseline={}, baseline_y={}",
+                    data.y,
+                    (*shaped).baseline,
+                    baseline_y
+                );
             }
         }
-        
+
         let mut base_transform = Transform::from_translate(data.x, baseline_y);
 
         // Check for rotation, scaling, and shear effects
@@ -314,7 +328,7 @@ impl SoftwareBackend {
                 eprintln!("    Effect: {:?}", effect);
             }
         }
-        
+
         for effect in &data.effects {
             match effect {
                 crate::pipeline::TextEffect::Rotation { x, y, z } => {
@@ -330,16 +344,18 @@ impl SoftwareBackend {
                         // relative to the text's actual bounding box
                         let text_center_x = (*shaped).width / 2.0;
                         let text_center_y = (*shaped).height / 2.0;
-                        
+
                         // Move center to origin, rotate, then move back
                         base_transform = base_transform
                             .pre_translate(text_center_x, text_center_y)
                             .pre_rotate(angle_rad)
                             .pre_translate(-text_center_x, -text_center_y);
-                        
+
                         #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                        eprintln!("Applied rotation: {} degrees ({} radians) around center ({}, {})", 
-                            z, angle_rad, text_center_x, text_center_y);
+                        eprintln!(
+                            "Applied rotation: {} degrees ({} radians) around center ({}, {})",
+                            z, angle_rad, text_center_x, text_center_y
+                        );
                     }
 
                     // Approximate 3D rotations with skew transformations
@@ -368,11 +384,13 @@ impl SoftwareBackend {
                     // Apply X-scale transform if it's different from Y-scale
                     let x_scale = *x / 100.0;
                     let y_scale = *y / 100.0;
-                    
+
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("SCALE: Applying scale transform - x={:.2}, y={:.2} for text '{}'", 
-                        x_scale, y_scale, data.text);
-                    
+                    eprintln!(
+                        "SCALE: Applying scale transform - x={:.2}, y={:.2} for text '{}'",
+                        x_scale, y_scale, data.text
+                    );
+
                     // Apply scale transform
                     // Note: Y-scale is already partially applied to font size during shaping,
                     // but we still need to apply the transform for proper scaling
@@ -380,10 +398,10 @@ impl SoftwareBackend {
                         // Get the center of the text for scaling
                         let text_center_x = (*shaped).width / 2.0;
                         let text_center_y = (*shaped).height / 2.0 - (*shaped).baseline;
-                        
+
                         base_transform = base_transform
                             .pre_translate(text_center_x, text_center_y)
-                            .pre_scale(x_scale, 1.0)  // X-scale, Y is in font size already
+                            .pre_scale(x_scale, 1.0) // X-scale, Y is in font size already
                             .pre_translate(-text_center_x, -text_center_y);
                     }
                 }
@@ -520,7 +538,9 @@ impl SoftwareBackend {
                                         path.clone().transform(temp_transform)
                                     {
                                         // Expand the path to create an outline shape
-                                        if let Some(outlined_path) = stroker.stroke(&transformed, &stroke, 1.0) {
+                                        if let Some(outlined_path) =
+                                            stroker.stroke(&transformed, &stroke, 1.0)
+                                        {
                                             // Fill the expanded outline path
                                             temp_pixmap.fill_path(
                                                 &outlined_path,
@@ -544,7 +564,7 @@ impl SoftwareBackend {
 
                                 let mut paint = tiny_skia::PixmapPaint::default();
                                 paint.blend_mode = tiny_skia::BlendMode::SourceOver;
-                                
+
                                 self.pixmap.draw_pixmap(
                                     0,
                                     0,
@@ -559,11 +579,13 @@ impl SoftwareBackend {
                         // Draw outline using path expansion (like libass)
                         // This creates a filled outline rather than a stroked one
                         let mut stroker = tiny_skia::PathStroker::new();
-                        
+
                         for path in &paths {
                             if let Some(transformed) = path.clone().transform(base_transform) {
                                 // Expand the path to create an outline shape
-                                if let Some(outlined_path) = stroker.stroke(&transformed, &stroke, 1.0) {
+                                if let Some(outlined_path) =
+                                    stroker.stroke(&transformed, &stroke, 1.0)
+                                {
                                     // Fill the expanded outline path
                                     self.pixmap.fill_path(
                                         &outlined_path,
@@ -586,10 +608,12 @@ impl SoftwareBackend {
         text_paint.set_color_rgba8(data.color[0], data.color[1], data.color[2], data.color[3]);
         text_paint.anti_alias = true;
         text_paint.blend_mode = tiny_skia::BlendMode::SourceOver;
-        
+
         #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        eprintln!("Drawing main text with color: R={}, G={}, B={}, A={}", 
-            data.color[0], data.color[1], data.color[2], data.color[3]);
+        eprintln!(
+            "Drawing main text with color: R={}, G={}, B={}, A={}",
+            data.color[0], data.color[1], data.color[2], data.color[3]
+        );
 
         // Check for blur effect
         let blur_radius = data.effects.iter().find_map(|e| {
@@ -646,30 +670,27 @@ impl SoftwareBackend {
                     Transform::from_translate(data.x - blur_size as f32, data.y - blur_size as f32);
                 let mut paint = tiny_skia::PixmapPaint::default();
                 paint.blend_mode = tiny_skia::BlendMode::SourceOver;
-                
-                self.pixmap.draw_pixmap(
-                    0,
-                    0,
-                    temp_pixmap.as_ref(),
-                    &paint,
-                    blend_transform,
-                    None,
-                );
+
+                self.pixmap
+                    .draw_pixmap(0, 0, temp_pixmap.as_ref(), &paint, blend_transform, None);
             }
         } else if let Some((progress, karaoke_style)) = karaoke_info {
             // Draw with karaoke effect based on style
-            
+
             #[cfg(all(debug_assertions, not(feature = "nostd")))]
-            eprintln!("KARAOKE RENDERING: progress={}, style={}, original color=({},{},{},{})", 
-                progress, karaoke_style, data.color[0], data.color[1], data.color[2], data.color[3]);
-            
+            eprintln!(
+                "KARAOKE RENDERING: progress={}, style={}, original color=({},{},{},{})",
+                progress, karaoke_style, data.color[0], data.color[1], data.color[2], data.color[3]
+            );
+
             let mut karaoke_paint = tiny_skia::Paint::default();
-            
+
             // For basic karaoke (\k), it's binary: either sung or not sung
             // Progress > 0 means the syllable timing has started
             // For \kf and \K, we'd need sweep effect (not fully implemented yet)
-            
-            if karaoke_style == 0 {  // Basic karaoke (\k)
+
+            if karaoke_style == 0 {
+                // Basic karaoke (\k)
                 // Binary switching based on progress
                 // During the syllable duration (0 < progress < 1), show as sung
                 // After (progress >= 1), keep as sung
@@ -679,11 +700,18 @@ impl SoftwareBackend {
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
                     eprintln!("KARAOKE COLOR: Sung - Yellow (255,255,0,{})", data.color[3]);
                 } else {
-                    // Not yet sung - use original color  
-                    karaoke_paint.set_color_rgba8(data.color[0], data.color[1], data.color[2], data.color[3]);
+                    // Not yet sung - use original color
+                    karaoke_paint.set_color_rgba8(
+                        data.color[0],
+                        data.color[1],
+                        data.color[2],
+                        data.color[3],
+                    );
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("KARAOKE COLOR: Not sung - Original ({},{},{},{})", 
-                        data.color[0], data.color[1], data.color[2], data.color[3]);
+                    eprintln!(
+                        "KARAOKE COLOR: Not sung - Original ({},{},{},{})",
+                        data.color[0], data.color[1], data.color[2], data.color[3]
+                    );
                 }
             } else {
                 // For other styles (fill, outline, sweep), use simple approach for now
@@ -691,7 +719,12 @@ impl SoftwareBackend {
                 if progress >= 1.0 {
                     karaoke_paint.set_color_rgba8(255, 255, 0, data.color[3]);
                 } else if progress <= 0.0 {
-                    karaoke_paint.set_color_rgba8(data.color[0], data.color[1], data.color[2], data.color[3]);
+                    karaoke_paint.set_color_rgba8(
+                        data.color[0],
+                        data.color[1],
+                        data.color[2],
+                        data.color[3],
+                    );
                 } else {
                     // Simple interpolation as placeholder
                     let r = (data.color[0] as f32 * (1.0 - progress) + 255.0 * progress) as u8;
@@ -702,7 +735,7 @@ impl SoftwareBackend {
             }
             karaoke_paint.anti_alias = true;
             karaoke_paint.blend_mode = tiny_skia::BlendMode::SourceOver;
-            
+
             // Draw text with karaoke color
             for path in &paths {
                 if let Some(transformed) = path.clone().transform(text_transform) {
@@ -715,27 +748,39 @@ impl SoftwareBackend {
                     );
                 }
             }
-            
         } else {
             // Draw without blur or karaoke
             #[cfg(all(debug_assertions, not(feature = "nostd")))]
-            eprintln!("Drawing {} paths for main text at transform ({}, {})", 
-                paths.len(), text_transform.tx, text_transform.ty);
-            
+            eprintln!(
+                "Drawing {} paths for main text at transform ({}, {})",
+                paths.len(),
+                text_transform.tx,
+                text_transform.ty
+            );
+
             for (i, path) in paths.iter().enumerate() {
                 if let Some(transformed) = path.clone().transform(text_transform) {
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
                     {
                         if data.text.contains("Чысценькая") {
                             let bounds = transformed.bounds();
-                            eprintln!("  Glyph {}: bounds = ({:.1}, {:.1}, {:.1}, {:.1})", 
-                                i, bounds.left(), bounds.top(), bounds.right(), bounds.bottom());
+                            eprintln!(
+                                "  Glyph {}: bounds = ({:.1}, {:.1}, {:.1}, {:.1})",
+                                i,
+                                bounds.left(),
+                                bounds.top(),
+                                bounds.right(),
+                                bounds.bottom()
+                            );
                         }
                         if i == 0 {
-                            eprintln!("Drawing path 0 for main text, bounds: {:?}", transformed.bounds());
+                            eprintln!(
+                                "Drawing path 0 for main text, bounds: {:?}",
+                                transformed.bounds()
+                            );
                         }
                     }
-                    
+
                     self.pixmap.fill_path(
                         &transformed,
                         &text_paint,
@@ -907,23 +952,31 @@ impl RenderBackend for SoftwareBackend {
 
         // Return RGBA data
         let data = backend.pixmap.data().to_vec();
-        
+
         #[cfg(all(debug_assertions, not(feature = "nostd")))]
         {
             // Sample some pixels to check alpha
             if data.len() >= 4 {
                 let sample1 = &data[0..4];
-                let sample2 = if data.len() >= 4000 { &data[4000..4004] } else { &data[0..4] };
+                let sample2 = if data.len() >= 4000 {
+                    &data[4000..4004]
+                } else {
+                    &data[0..4]
+                };
                 eprintln!("PIXMAP SAMPLES: [0]={:?}, [1000]={:?}", sample1, sample2);
-                
+
                 // Count non-opaque pixels
                 let non_opaque = data.chunks_exact(4).filter(|p| p[3] != 255).count();
                 let transparent = data.chunks_exact(4).filter(|p| p[3] == 0).count();
-                eprintln!("PIXMAP ALPHA STATS: {} non-opaque pixels, {} transparent pixels out of {}", 
-                    non_opaque, transparent, data.len() / 4);
+                eprintln!(
+                    "PIXMAP ALPHA STATS: {} non-opaque pixels, {} transparent pixels out of {}",
+                    non_opaque,
+                    transparent,
+                    data.len() / 4
+                );
             }
         }
-        
+
         Ok(data)
     }
 

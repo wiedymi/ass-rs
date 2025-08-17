@@ -20,7 +20,7 @@ pub fn load_embedded_fonts(script: &Script, font_database: &mut FontDatabase) {
     }) {
         #[cfg(all(debug_assertions, not(feature = "nostd")))]
         eprintln!("Found {} embedded fonts in script", fonts.len());
-        
+
         // Process each embedded font
         for font in fonts {
             // Decode the UU-encoded font data
@@ -28,11 +28,15 @@ pub fn load_embedded_fonts(script: &Script, font_database: &mut FontDatabase) {
                 Ok(font_data) => {
                     // Load the font into the database
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("Loading embedded font: {} ({} bytes)", font.filename, font_data.len());
-                    
+                    eprintln!(
+                        "Loading embedded font: {} ({} bytes)",
+                        font.filename,
+                        font_data.len()
+                    );
+
                     // fontdb's load_font_data takes ownership of the data
                     font_database.load_font_data(font_data);
-                    
+
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
                     eprintln!("Successfully loaded embedded font: {}", font.filename);
                 }
@@ -60,7 +64,7 @@ pub fn load_font_files(script: &Script, font_database: &mut FontDatabase) {
             // Some scripts use "Font:" or "Fontname:" fields to specify external fonts
             if key.to_lowercase().contains("font") {
                 let font_path = value.trim();
-                
+
                 #[cfg(not(feature = "nostd"))]
                 {
                     // Try to load as a file path if it exists
@@ -68,7 +72,7 @@ pub fn load_font_files(script: &Script, font_database: &mut FontDatabase) {
                     if path.exists() && path.is_file() {
                         #[cfg(all(debug_assertions, not(feature = "nostd")))]
                         eprintln!("Loading external font file: {}", font_path);
-                        
+
                         if let Err(e) = font_database.load_font_file(path) {
                             #[cfg(all(debug_assertions, not(feature = "nostd")))]
                             eprintln!("Failed to load font file {}: {:?}", font_path, e);
@@ -84,7 +88,7 @@ pub fn load_font_files(script: &Script, font_database: &mut FontDatabase) {
 pub fn load_script_fonts(script: &Script, font_database: &mut FontDatabase) {
     // Load embedded fonts from [Fonts] section
     load_embedded_fonts(script, font_database);
-    
+
     // Load external font files if referenced
     load_font_files(script, font_database);
 }

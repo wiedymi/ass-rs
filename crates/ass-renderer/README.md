@@ -1,5 +1,7 @@
 # ass-renderer
 
+> **⚠️ WORK IN PROGRESS** - This renderer is currently under active development. While the software backend is functional, some features may be incomplete and the API is subject to change.
+
 High-performance ASS (Advanced SubStation Alpha) subtitle renderer with modular backend support.
 
 ## Features

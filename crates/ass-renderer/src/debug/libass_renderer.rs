@@ -73,8 +73,40 @@ impl LibassRenderer {
         self.load_script(&content)
     }
 
-    /// Render a frame at the given time (in milliseconds)
-    pub fn render_frame(&mut self, time_ms: i64) -> Result<Vec<u8>, RenderError> {
+    /// Render a frame at the given time (in centiseconds for compatibility)
+    pub fn render_frame(
+        &mut self,
+        script: &ass_core::parser::Script,
+        time_cs: u32,
+    ) -> Result<Frame, RenderError> {
+        // Convert our script to ASS format
+        let ass_content = script.to_string();
+        self.load_script(&ass_content)?;
+
+        let track = self
+            .track
+            .as_mut()
+            .ok_or_else(|| RenderError::InvalidState("No script loaded".into()))?;
+
+        // Convert centiseconds to milliseconds
+        let time_ms = time_cs as i64 * 10;
+
+        // Create RGBA buffer
+        let mut buffer = vec![0u8; (self.width * self.height * 4) as usize];
+
+        // Render with libass
+        if let Some(images) = self.renderer.render_frame(track, time_ms) {
+            // Blend libass images onto buffer
+            for image in images {
+                self.blend_image(&mut buffer, &image);
+            }
+        }
+
+        Ok(Frame::new(buffer, self.width, self.height, time_cs))
+    }
+
+    /// Render a frame at the given time (in milliseconds) - legacy method
+    pub fn render_frame_ms(&mut self, time_ms: i64) -> Result<Vec<u8>, RenderError> {
         let track = self
             .track
             .as_mut()
@@ -94,10 +126,15 @@ impl LibassRenderer {
         Ok(buffer)
     }
 
-    /// Render and return as Frame
+    /// Render and return as Frame - legacy method
     pub fn render_to_frame(&mut self, time_ms: i64) -> Result<Frame, RenderError> {
-        let buffer = self.render_frame(time_ms)?;
-        Ok(Frame::from_rgba(buffer, self.width, self.height))
+        let buffer = self.render_frame_ms(time_ms)?;
+        Ok(Frame::new(
+            buffer,
+            self.width,
+            self.height,
+            (time_ms / 10) as u32,
+        ))
     }
 
     /// Blend a libass image onto the buffer
@@ -108,7 +145,7 @@ impl LibassRenderer {
         // In libass, color is stored as 0xRRGGBBAA where:
         // - bits 0-7 (0xFF) = Alpha (0 = opaque, 255 = transparent, needs inversion)
         // - bits 8-15 (0xFF00) = Blue
-        // - bits 16-23 (0xFF0000) = Green  
+        // - bits 16-23 (0xFF0000) = Green
         // - bits 24-31 (0xFF000000) = Red
         let libass_alpha = (image.color & 0xFF) as u8;
         let a = 255 - libass_alpha; // Invert: libass uses 0=opaque, we need 255=opaque
@@ -156,8 +193,9 @@ impl LibassRenderer {
                         (buffer[dst_idx + 1] as f32 * inv_alpha + g as f32 * src_alpha) as u8;
                     buffer[dst_idx + 2] =
                         (buffer[dst_idx + 2] as f32 * inv_alpha + b as f32 * src_alpha) as u8;
-                    buffer[dst_idx + 3] =
-                        ((buffer[dst_idx + 3] as f32 * (1.0 - inv_alpha) + src_alpha * 255.0).min(255.0)) as u8;
+                    buffer[dst_idx + 3] = ((buffer[dst_idx + 3] as f32 * (1.0 - inv_alpha)
+                        + src_alpha * 255.0)
+                        .min(255.0)) as u8;
                 }
             }
         }

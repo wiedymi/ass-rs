@@ -9,7 +9,6 @@
 extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::{format, string::ToString};
-#[allow(clippy::missing_docs_in_private_items)]
 use std::{
     env,
     fs::File,

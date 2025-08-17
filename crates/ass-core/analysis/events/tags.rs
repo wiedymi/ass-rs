@@ -63,6 +63,7 @@ pub struct OverrideTag<'a> {
 
 impl<'a> OverrideTag<'a> {
     /// Create a new override tag
+    #[must_use]
     pub const fn new(name: &'a str, args: &'a str, complexity: u8, position: usize) -> Self {
         Self {
             name,
@@ -71,7 +72,7 @@ impl<'a> OverrideTag<'a> {
             position,
         }
     }
-    
+
     /// Get tag name
     #[must_use]
     pub const fn name(&self) -> &'a str {

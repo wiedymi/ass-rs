@@ -6,7 +6,6 @@
 extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
-#[allow(clippy::missing_docs_in_private_items, clippy::cast_precision_loss)]
 use ass_core::{parser::Script, utils::ScriptGenerator};
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 /// Estimate memory usage of parsed AST

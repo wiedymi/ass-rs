@@ -3,12 +3,15 @@
 pub mod positioning;
 
 #[cfg(feature = "nostd")]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 #[cfg(not(feature = "nostd"))]
 use std::{string::String, vec::Vec};
 
 use crate::pipeline::shaping::ShapedText;
-pub use positioning::{PositionInfo, BoundingBox, scale_coordinates, convert_ssa_alignment};
+pub use positioning::{convert_ssa_alignment, scale_coordinates, BoundingBox, PositionInfo};
 
 /// Alignment types for subtitle positioning
 #[derive(Debug, Clone, Copy, PartialEq)]

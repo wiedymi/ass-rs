@@ -161,56 +161,55 @@ pub fn create_backend(
             if let Ok(backend) = create_backend(BackendType::WebGPU, width, height) {
                 return Ok(backend);
             }
-            
+
             #[cfg(all(feature = "hardware-backend", feature = "vulkan"))]
             if let Ok(backend) = create_backend(BackendType::Vulkan, width, height) {
                 return Ok(backend);
             }
-            
+
             #[cfg(all(feature = "hardware-backend", feature = "metal", target_os = "macos"))]
             if let Ok(backend) = create_backend(BackendType::Metal, width, height) {
                 return Ok(backend);
             }
-            
+
             #[cfg(feature = "software-backend")]
             return create_backend(BackendType::Software, width, height);
-            
+
             #[allow(unreachable_code)]
             Err(RenderError::BackendError("No backend available".into()))
         }
-        
+
         #[cfg(feature = "software-backend")]
         BackendType::Software => {
             let context = crate::renderer::RenderContext::new(width, height);
             let backend = software::SoftwareBackend::new(&context)?;
             Ok(Arc::new(backend))
         }
-        
+
         #[cfg(all(feature = "hardware-backend", feature = "vulkan"))]
         BackendType::Vulkan => {
             // TODO: Implement VulkanBackend
             Err(RenderError::BackendError("Vulkan backend not yet implemented".to_string()))
         }
-        
+
         #[cfg(all(feature = "hardware-backend", feature = "metal", target_os = "macos"))]
         BackendType::Metal => {
             let backend = hardware::metal::MetalBackend::new(width, height)?;
             Ok(Arc::new(backend))
         }
-        
+
         #[cfg(feature = "web-backend")]
         BackendType::WebGPU => {
             // TODO: Implement WebGPUBackend
             Err(RenderError::BackendError("WebGPU backend not yet implemented".to_string()))
         }
-        
         BackendType::WebGL => {
             Err(RenderError::BackendError(
                 "WebGL backend is not supported. Please use the Software backend instead, \
                  which provides full feature support and works in all environments including web browsers.".into()
             ))
         }
-        
+
         #[allow(unreachable_patterns)]
         _ => Err(RenderError::BackendError(format!(
             "{} backend not available in this build",
