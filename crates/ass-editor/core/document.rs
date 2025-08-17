@@ -2190,7 +2190,7 @@ impl<'a> DocumentPosition<'a> {
 
 impl EditorDocument {
     /// Get fluent API for position-based operations
-    pub fn at(&mut self, pos: Position) -> DocumentPosition {
+    pub fn at(&mut self, pos: Position) -> DocumentPosition<'_> {
         DocumentPosition {
             document: self,
             position: pos,

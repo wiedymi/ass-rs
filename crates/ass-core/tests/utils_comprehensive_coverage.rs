@@ -189,8 +189,7 @@ mod utils_comprehensive_coverage_tests {
 
         for (input, expected) in valid_cases {
             let result = decode_uu_data(input.lines());
-            if result.is_ok() {
-                let decoded = result.unwrap();
+            if let Ok(decoded) = result {
                 assert_eq!(decoded, expected);
             }
         }

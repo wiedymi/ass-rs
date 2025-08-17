@@ -234,7 +234,11 @@ impl DocumentSearch for FstSearchIndex {
         self.build_index(document)
     }
 
-    fn search(&self, pattern: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
+    fn search<'a>(
+        &'a self,
+        pattern: &str,
+        options: &SearchOptions,
+    ) -> Result<Vec<SearchResult<'a>>> {
         #[cfg(feature = "std")]
         let _start_time = Instant::now();
         let mut results = Vec::new();
@@ -284,13 +288,13 @@ impl DocumentSearch for FstSearchIndex {
         Ok(results)
     }
 
-    fn find_replace(
-        &self,
+    fn find_replace<'a>(
+        &'a self,
         document: &mut EditorDocument,
         pattern: &str,
         replacement: &str,
         options: &SearchOptions,
-    ) -> Result<Vec<SearchResult>> {
+    ) -> Result<Vec<SearchResult<'a>>> {
         let results = self.search(pattern, options)?;
 
         // Apply replacements in reverse order to maintain position validity
@@ -422,7 +426,7 @@ impl DocumentSearch for LinearSearchIndex {
         self.build_index(document)
     }
 
-    fn search(&self, pattern: &str, _options: &SearchOptions) -> Result<Vec<SearchResult>> {
+    fn search(&self, pattern: &str, _options: &SearchOptions) -> Result<Vec<SearchResult<'_>>> {
         let query = pattern.to_lowercase();
         let mut results = Vec::new();
 
@@ -445,13 +449,13 @@ impl DocumentSearch for LinearSearchIndex {
         Ok(results)
     }
 
-    fn find_replace(
-        &self,
+    fn find_replace<'a>(
+        &'a self,
         document: &mut EditorDocument,
         pattern: &str,
         replacement: &str,
         options: &SearchOptions,
-    ) -> Result<Vec<SearchResult>> {
+    ) -> Result<Vec<SearchResult<'a>>> {
         let results = self.search(pattern, options)?;
 
         for result in &results {

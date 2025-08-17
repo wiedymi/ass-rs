@@ -296,8 +296,7 @@ fn test_ass_format_validation() {
     for content in edge_cases {
         let result = EditorDocument::from_content(content);
         // Document creation might succeed even if not valid ASS
-        if result.is_ok() {
-            let doc = result.unwrap();
+        if let Ok(doc) = result {
             // Should be able to get text back
             assert_eq!(doc.text(), content);
         }
