@@ -6,8 +6,10 @@
 
 pub mod delta_commands;
 pub mod event_commands;
+pub mod fonts_graphics_commands;
 pub mod karaoke_commands;
 pub mod macros;
+pub mod script_info_commands;
 pub mod style_commands;
 pub mod tag_commands;
 
@@ -16,10 +18,12 @@ use crate::core::{EditorDocument, EditorError, Position, Range, Result};
 #[cfg(feature = "stream")]
 use ass_core::parser::ScriptDeltaOwned;
 
-// Re-export delta commands, event commands, karaoke commands, style commands, and tag commands
+// Re-export all command modules
 pub use delta_commands::*;
 pub use event_commands::*;
+pub use fonts_graphics_commands::*;
 pub use karaoke_commands::*;
+pub use script_info_commands::*;
 pub use style_commands::*;
 pub use tag_commands::*;
 
