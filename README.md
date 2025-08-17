@@ -5,9 +5,9 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/wiedymi/ass-rs/workflows/CI/badge.svg)](https://github.com/wiedymi/ass-rs/actions)
 
-A modular, high-performance Rust implementation of the ASS (Advanced SubStation Alpha) subtitle format, surpassing libass in efficiency, extensibility, and safety.
+A modular, high-performance Rust implementation of the ASS (Advanced SubStation Alpha) subtitle format.
 
-## 🚀 Key Advantages Over libass
+## 🚀 Key Advantages
 
 - **Memory Safety**: 100% safe Rust with zero unsafe code
 - **Modularity**: Trait-based plugin system vs. monolithic C codebase
@@ -22,7 +22,7 @@ A modular, high-performance Rust implementation of the ASS (Advanced SubStation 
 This implementation adheres to official ASS/SSA specifications:
 
 - **[TCax ASS Specification](http://www.tcax.org/docs/ass-specs.htm)** - Official ASS format documentation
-- **[Aegisub ASS Tags](https://aegisub.org/docs/latest/ass_tags/)** - Comprehensive tag reference
+- **[Aegisub ASS Tags](https://aegisub.org/docs/latest/ass_tags/)** -  Tag reference
 - **[libass ASS Guide](https://github.com/libass/libass/wiki/ASS-File-Format-Guide)** - Extensions and implementation notes
 - **[SSA v4.00 Original](http://www.eswat.demon.co.uk/)** - Legacy SSA compatibility
 
