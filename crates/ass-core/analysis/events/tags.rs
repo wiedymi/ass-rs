@@ -126,68 +126,76 @@ pub fn parse_override_block<'a>(
     tags: &mut Vec<OverrideTag<'a>>,
     diagnostics: &mut Vec<TagDiagnostic<'a>>,
 ) {
-    let mut pos = 0;
+    let mut char_pos = 0;
+    let mut byte_pos = 0;
     let chars: Vec<char> = content.chars().collect();
 
-    while pos < chars.len() {
-        if chars[pos] == '\\' {
-            let tag_start = pos;
-            pos += 1;
+    while char_pos < chars.len() {
+        if chars[char_pos] == '\\' {
+            let tag_start = byte_pos;
+            byte_pos += 1; // '\' is ascii, 1 byte in utf8
+            char_pos += 1;
 
-            let name_start = pos;
+            let name_char_start = char_pos;
+            let name_start = byte_pos;
             // Tags can start with digits (e.g., \1c, \2c, \3c, \4c for colors, \1a, \2a for alpha)
             // But after the initial characters, only continue if alphabetic to avoid consuming arguments
             let mut tag_name_len = 0;
-            while pos < chars.len() {
-                if tag_name_len == 0 && chars[pos].is_ascii_digit() {
+            while char_pos < chars.len() {
+                if tag_name_len == 0 && chars[char_pos].is_ascii_digit() {
                     // Allow digit as first character (for \1c, \2c, etc.)
-                    pos += 1;
+                    byte_pos += 1;
+                    char_pos += 1;
                     tag_name_len += 1;
-                } else if chars[pos].is_ascii_alphabetic() {
-                    pos += 1;
+                } else if chars[char_pos].is_ascii_alphabetic() {
+                    byte_pos += 1;
+                    char_pos += 1;
                     tag_name_len += 1;
                 } else {
                     break;
                 }
             }
 
-            if pos > name_start {
-                let name_end = pos;
-                let args_start = pos;
+            if char_pos > name_char_start {
+                let name_end = byte_pos;
+                let args_start = byte_pos;
 
                 // Special handling for \t tag which can contain nested tags in parentheses
                 let tag_name_preview = &content[name_start..name_end];
-                if tag_name_preview == "t" && pos < chars.len() && chars[pos] == '(' {
+                if tag_name_preview == "t" && char_pos < chars.len() && chars[char_pos] == '(' {
                     // For \t tag with parentheses, we need to find the matching closing parenthesis
                     // and include everything inside, even if it contains backslashes
                     let mut paren_depth = 0;
-                    while pos < chars.len() {
-                        if chars[pos] == '(' {
+                    while char_pos < chars.len() {
+                        if chars[char_pos] == '(' {
                             paren_depth += 1;
-                        } else if chars[pos] == ')' {
+                        } else if chars[char_pos] == ')' {
                             paren_depth -= 1;
                             if paren_depth == 0 {
-                                pos += 1; // Include the closing parenthesis
+                                byte_pos += 1; // Include the closing parenthesis
+                                char_pos += 1; // Include the closing parenthesis
                                 break;
                             }
                         }
-                        pos += 1;
+                        byte_pos += chars[char_pos].len_utf8();
+                        char_pos += 1;
                     }
                 } else {
                     // For other tags, stop at the next backslash
-                    while pos < chars.len() && chars[pos] != '\\' {
-                        pos += 1;
+                    while char_pos < chars.len() && chars[char_pos] != '\\' {
+                        byte_pos += chars[char_pos].len_utf8();
+                        char_pos += 1;
                     }
                 }
 
                 let tag_name = &content[name_start..name_end];
-                let args = &content[args_start..pos];
+                let args = &content[args_start..byte_pos];
 
                 let complexity = calculate_tag_complexity(tag_name);
 
                 if tag_name.trim().is_empty() {
                     diagnostics.push(TagDiagnostic {
-                        span: &content[tag_start..pos],
+                        span: &content[tag_start..byte_pos],
                         offset: start_pos + tag_start,
                         kind: DiagnosticKind::EmptyOverride,
                     });
@@ -206,10 +214,12 @@ pub fn parse_override_block<'a>(
                     offset: start_pos + tag_start,
                     kind: DiagnosticKind::EmptyOverride,
                 });
-                pos += 1;
+                byte_pos += chars[char_pos].len_utf8();
+                char_pos += 1;
             }
         } else {
-            pos += 1;
+            byte_pos += chars[char_pos].len_utf8();
+            char_pos += 1;
         }
     }
 }
@@ -235,62 +245,70 @@ pub fn parse_override_block_with_registry<'a>(
     diagnostics: &mut Vec<TagDiagnostic<'a>>,
     registry: Option<&ExtensionRegistry>,
 ) {
-    let mut pos = 0;
+    let mut char_pos = 0;
+    let mut byte_pos = 0;
     let chars: Vec<char> = content.chars().collect();
 
-    while pos < chars.len() {
-        if chars[pos] == '\\' {
-            let tag_start = pos;
-            pos += 1;
+    while char_pos < chars.len() {
+        if chars[char_pos] == '\\' {
+            let tag_start = byte_pos;
+            byte_pos += 1;
+            char_pos += 1;
 
-            let name_start = pos;
+            let name_char_start = char_pos;
+            let name_start = byte_pos;
             // Tags can start with digits (e.g., \1c, \2c, \3c, \4c for colors, \1a, \2a for alpha)
             // But after the initial characters, only continue if alphabetic to avoid consuming arguments
             let mut tag_name_len = 0;
-            while pos < chars.len() {
-                if tag_name_len == 0 && chars[pos].is_ascii_digit() {
+            while char_pos < chars.len() {
+                if tag_name_len == 0 && chars[char_pos].is_ascii_digit() {
                     // Allow digit as first character (for \1c, \2c, etc.)
-                    pos += 1;
+                    byte_pos += 1;
+                    char_pos += 1;
                     tag_name_len += 1;
-                } else if chars[pos].is_ascii_alphabetic() {
-                    pos += 1;
+                } else if chars[char_pos].is_ascii_alphabetic() {
+                    byte_pos += 1;
+                    char_pos += 1;
                     tag_name_len += 1;
                 } else {
                     break;
                 }
             }
 
-            if pos > name_start {
-                let name_end = pos;
-                let args_start = pos;
+            if char_pos > name_char_start {
+                let name_end = byte_pos;
+                let args_start = byte_pos;
 
                 // Special handling for \t tag which can contain nested tags in parentheses
                 let tag_name_preview = &content[name_start..name_end];
-                if tag_name_preview == "t" && pos < chars.len() && chars[pos] == '(' {
+                if tag_name_preview == "t" && char_pos < chars.len() && chars[char_pos] == '(' {
                     // For \t tag with parentheses, we need to find the matching closing parenthesis
                     // and include everything inside, even if it contains backslashes
                     let mut paren_depth = 0;
-                    while pos < chars.len() {
-                        if chars[pos] == '(' {
+                    while char_pos < chars.len() {
+                        if chars[char_pos] == '(' {
                             paren_depth += 1;
-                        } else if chars[pos] == ')' {
+                        } else if chars[char_pos] == ')' {
                             paren_depth -= 1;
                             if paren_depth == 0 {
-                                pos += 1; // Include the closing parenthesis
+                                byte_pos += 1;
+                                char_pos += 1; // Include the closing parenthesis
                                 break;
                             }
                         }
-                        pos += 1;
+                        byte_pos += chars[char_pos].len_utf8();
+                        char_pos += 1;
                     }
                 } else {
                     // For other tags, stop at the next backslash
-                    while pos < chars.len() && chars[pos] != '\\' {
-                        pos += 1;
+                    while char_pos < chars.len() && chars[char_pos] != '\\' {
+                        byte_pos += chars[char_pos].len_utf8();
+                        char_pos += 1;
                     }
                 }
 
                 let tag_name = &content[name_start..name_end];
-                let args = &content[args_start..pos];
+                let args = &content[args_start..byte_pos];
 
                 // Try to process with registry first
                 let mut handled_by_plugin = false;
@@ -312,7 +330,7 @@ pub fn parse_override_block_with_registry<'a>(
                             TagResult::Failed(_msg) => {
                                 // Plugin failed to process the tag
                                 diagnostics.push(TagDiagnostic {
-                                    span: &content[tag_start..pos],
+                                    span: &content[tag_start..byte_pos],
                                     offset: start_pos + tag_start,
                                     kind: DiagnosticKind::MalformedTag,
                                 });
@@ -330,7 +348,7 @@ pub fn parse_override_block_with_registry<'a>(
 
                     if tag_name.trim().is_empty() {
                         diagnostics.push(TagDiagnostic {
-                            span: &content[tag_start..pos],
+                            span: &content[tag_start..byte_pos],
                             offset: start_pos + tag_start,
                             kind: DiagnosticKind::EmptyOverride,
                         });
@@ -350,10 +368,12 @@ pub fn parse_override_block_with_registry<'a>(
                     offset: start_pos + tag_start,
                     kind: DiagnosticKind::EmptyOverride,
                 });
-                pos += 1;
+                byte_pos += chars[char_pos].len_utf8();
+                char_pos += 1;
             }
         } else {
-            pos += 1;
+            byte_pos += chars[char_pos].len_utf8();
+            char_pos += 1;
         }
     }
 }
