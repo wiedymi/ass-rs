@@ -533,4 +533,23 @@ mod tests {
         assert_eq!(tags[0].position(), 5);
         assert_eq!(diagnostics.len(), 0);
     }
+
+    #[test]
+    fn test_parse_override_block_non_ascii_tag_args() {
+        let mut tags = Vec::new();
+        let mut diagnostics = Vec::new();
+        parse_override_block("\\fn微软雅黑", 0, &mut tags, &mut diagnostics);
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].complexity(), 1);
+        assert_eq!(tags[0].name(), "fn");
+        assert_eq!(tags[0].args(), "微软雅黑");
+
+        let mut tags = Vec::new();
+        let mut diagnostics = Vec::new();
+        parse_override_block_with_registry("\\fn微软雅黑", 0, &mut tags, &mut diagnostics, None);
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].complexity(), 1);
+        assert_eq!(tags[0].name(), "fn");
+        assert_eq!(tags[0].args(), "微软雅黑");
+    }
 }
