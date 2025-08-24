@@ -196,8 +196,9 @@ pub fn create_backend(
 
         #[cfg(all(feature = "hardware-backend", feature = "vulkan"))]
         BackendType::Vulkan => {
-            // TODO: Implement VulkanBackend
-            Err(RenderError::BackendError("Vulkan backend not yet implemented".to_string()))
+            let _context = crate::renderer::RenderContext::new(width, height);
+            let backend = hardware::vulkan::VulkanBackend::new()?;
+            Ok(Arc::new(backend))
         }
 
         #[cfg(all(feature = "hardware-backend", feature = "metal", target_os = "macos"))]

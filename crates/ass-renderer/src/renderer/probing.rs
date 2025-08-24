@@ -89,11 +89,13 @@ impl BackendProber {
                 Ok(Arc::new(VulkanBackend::new()?))
             }
 
-            #[cfg(feature = "metal")]
+            #[cfg(all(feature = "metal", target_os = "macos"))]
             BackendType::Metal => {
                 use crate::backends::hardware::metal::MetalBackend;
                 Ok(Arc::new(MetalBackend::new(context)?))
             }
+            #[cfg(any(not(feature = "metal"), all(feature = "metal", not(target_os = "macos"))))]
+            BackendType::Metal => Err(RenderError::UnsupportedBackend("Metal")),
 
             #[cfg(feature = "web-backend")]
             BackendType::WebGPU => {
