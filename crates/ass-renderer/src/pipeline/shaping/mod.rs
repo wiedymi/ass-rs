@@ -89,8 +89,8 @@ pub fn shape_text_with_style(
     italic: bool,
     font_database: &FontDatabase,
 ) -> Result<ShapedText, RenderError> {
-    // Find matching font
-    let font_id = find_font(font_database, font_family, bold, italic)?;
+    // Find best matching font, taking the input text into account for coverage (CJK/Hangul, etc.)
+    let font_id = find_font_for_text(font_database, font_family, bold, italic, text)?;
 
     // Get font data using face_source
     let (source, index) = font_database
@@ -180,7 +180,7 @@ pub fn shape_text_with_style(
     })
 }
 
-/// Find matching font in database with fallback support for CJK text
+/// Find matching font in database with fallback support for CJK/Chinese/Japanese/Korean text
 fn find_font(
     font_database: &FontDatabase,
     family: &str,
@@ -274,10 +274,184 @@ fn find_font(
     })
 }
 
+/// Determine if text contains significant CJK/Hangul content
+fn text_has_cjk_or_hangul(text: &str) -> bool {
+    text.chars().any(|ch| {
+        let u = ch as u32;
+        // CJK Unified Ideographs
+        (0x4E00..=0x9FFF).contains(&u)
+            // CJK Unified Ideographs Extension A/B (basic check)
+            || (0x3400..=0x4DBF).contains(&u)
+            || (0x20000..=0x2A6DF).contains(&u)
+            // Hangul Syllables + Jamo
+            || (0xAC00..=0xD7AF).contains(&u)
+            || (0x1100..=0x11FF).contains(&u)
+            // Hiragana, Katakana
+            || (0x3040..=0x30FF).contains(&u)
+    })
+}
+
+/// Check how many characters of `text` are supported by the font face
+fn font_support_count(
+    font_database: &FontDatabase,
+    font_id: FontId,
+    text: &str,
+) -> Result<usize, RenderError> {
+    let (source, index) = font_database
+        .face_source(font_id)
+        .ok_or_else(|| RenderError::FontError("Failed to load font data".to_string()))?;
+
+    let data: std::sync::Arc<dyn AsRef<[u8]> + Send + Sync> = match source {
+        fontdb::Source::Binary(data) => data,
+        fontdb::Source::File(path) => {
+            #[cfg(not(feature = "nostd"))]
+            {
+                std::sync::Arc::new(std::fs::read(&path).map_err(|e| {
+                    RenderError::FontError(format!("Failed to read font file: {e}"))
+                })?)
+            }
+            #[cfg(feature = "nostd")]
+            {
+                return Err(RenderError::FontError(
+                    "File reading not supported in no_std mode".into(),
+                ));
+            }
+        }
+        fontdb::Source::SharedFile(_, data) => data,
+    };
+
+    let face = ttf_parser::Face::parse(data.as_ref().as_ref(), index)
+        .map_err(|_| RenderError::FontError("Failed to parse font".to_string()))?;
+
+    // Count support for BMP chars in text
+    let mut count = 0usize;
+    for ch in text.chars() {
+        if face.glyph_index(ch).is_some() {
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
+/// Attempt to pick a font that best covers the input text while respecting the requested family if possible
+fn find_font_for_text(
+    font_database: &FontDatabase,
+    family: &str,
+    bold: bool,
+    italic: bool,
+    text: &str,
+) -> Result<FontId, RenderError> {
+    // First, try the requested font (or its immediate fallback in find_font)
+    let primary = find_font(font_database, family, bold, italic)?;
+    let primary_support = font_support_count(font_database, primary, text)?;
+    let text_len = text.chars().count().max(1);
+
+    if primary_support == text_len {
+        return Ok(primary);
+    }
+
+    // If the text contains CJK/Hangul, try curated fallback lists first
+    if text_has_cjk_or_hangul(text) {
+        let curated_lists: &[&[&str]] = &[
+            // Simplified Chinese
+            &[
+                "Noto Sans CJK SC",
+                "Noto Sans SC",
+                "Source Han Sans CN",
+                "PingFang SC",
+                "Microsoft YaHei",
+                "SimHei",
+                "SimSun",
+            ],
+            // Traditional Chinese
+            &[
+                "Noto Sans CJK TC",
+                "Noto Sans TC",
+                "Source Han Sans TW",
+                "PingFang TC",
+                "Heiti TC",
+            ],
+            // Japanese
+            &[
+                "Noto Sans CJK JP",
+                "Noto Sans JP",
+                "Hiragino Sans",
+                "Hiragino Kaku Gothic Pro",
+                "Yu Gothic",
+                "MS Gothic",
+                "Meiryo",
+            ],
+            // Korean
+            &[
+                "Noto Sans CJK KR",
+                "Noto Sans KR",
+                "Apple SD Gothic Neo",
+                "Malgun Gothic",
+            ],
+            // Generic CJK
+            &[
+                "Source Han Sans",
+                "Noto Sans CJK",
+            ],
+        ];
+
+        let mut best_font = None;
+        let mut best_support = primary_support;
+
+        for list in curated_lists {
+            for &name in *list {
+                let query = fontdb::Query {
+                    families: &[fontdb::Family::Name(name)],
+                    weight: if bold { fontdb::Weight::BOLD } else { fontdb::Weight::NORMAL },
+                    stretch: fontdb::Stretch::Normal,
+                    style: if italic { fontdb::Style::Italic } else { fontdb::Style::Normal },
+                };
+                if let Some(id) = font_database.query(&query) {
+                    let support = font_support_count(font_database, id, text)?;
+                    if support == text_len {
+                        return Ok(id);
+                    }
+                    if support > best_support {
+                        best_support = support;
+                        best_font = Some(id);
+                    }
+                }
+            }
+        }
+
+        if let Some(id) = best_font {
+            return Ok(id);
+        }
+    }
+
+    // As a last resort, scan all faces to find the best coverage
+    let mut best_font = primary;
+    let mut best_support = primary_support;
+    for face in font_database.faces() {
+        // Skip if it's the same font
+        if face.id == primary {
+            continue;
+        }
+        let id = face.id;
+        let support = font_support_count(font_database, id, text)?;
+        if support > best_support {
+            best_support = support;
+            best_font = id;
+            if best_support == text_len {
+                break;
+            }
+        }
+    }
+
+    Ok(best_font)
+}
+
 /// Glyph rendering context for caching
 pub struct GlyphRenderer {
     glyph_cache: AHashMap<GlyphKey, Path>,
     font_cache: AHashMap<FontId, Arc<dyn AsRef<[u8]> + Send + Sync>>,
+    // Cache TTC/OTF face index so we render outlines from the correct subface
+    font_index_cache: AHashMap<FontId, u32>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -299,6 +473,7 @@ impl GlyphRenderer {
         Self {
             glyph_cache: AHashMap::new(),
             font_cache: AHashMap::new(),
+            font_index_cache: AHashMap::new(),
         }
     }
 
@@ -310,11 +485,12 @@ impl GlyphRenderer {
         font_database: &FontDatabase,
         spacing: f32,
     ) -> Result<Vec<Path>, RenderError> {
-        // Get or cache font data
-        let font_data = if let Some(data) = self.font_cache.get(&font_id) {
-            data.clone()
+        // Get or cache font data and face index
+        let (font_data, face_index) = if let Some(data) = self.font_cache.get(&font_id) {
+            let idx = *self.font_index_cache.get(&font_id).unwrap_or(&0);
+            (data.clone(), idx)
         } else {
-            let (source, _index) = font_database
+            let (source, index) = font_database
                 .face_source(font_id)
                 .ok_or_else(|| RenderError::FontError("Failed to load font data".to_string()))?;
 
@@ -338,11 +514,12 @@ impl GlyphRenderer {
             };
 
             self.font_cache.insert(font_id, data.clone());
-            data
+            self.font_index_cache.insert(font_id, index);
+            (data, index)
         };
 
-        // Parse font with ttf-parser
-        let font = ttf_parser::Face::parse(font_data.as_ref().as_ref(), 0)
+        // Parse font with ttf-parser using the correct subface index
+        let font = ttf_parser::Face::parse(font_data.as_ref().as_ref(), face_index)
             .map_err(|_| RenderError::FontError("Failed to parse font".to_string()))?;
 
         let mut paths = Vec::new();
