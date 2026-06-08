@@ -78,11 +78,11 @@ pretty_assertions = "1.4"
 env_logger = "0.11"
 
 [features]
-default = ["analysis-integration", "software-backend", "backend-probing", "simd", "image", "serde", "libass-compare"]
+default = ["analysis-integration", "software-backend", "backend-probing", "simd", "image", "serde"]
 
 # Main feature sets
 minimal = ["nostd", "analysis-integration"]
-full = ["analysis-integration", "software-backend", "backend-probing", "simd", "image", "serde", "libass-compare"]
+full = ["analysis-integration", "software-backend", "backend-probing", "simd", "image", "serde"]
 
 # Core features
 analysis-integration = ["ass-core/analysis"]

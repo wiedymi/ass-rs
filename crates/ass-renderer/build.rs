@@ -23,7 +23,12 @@ fn main() {
 
             #[cfg(not(target_os = "macos"))]
             {
-                panic!("Cannot find libass. Please install libass development files. Error: {e}");
+                println!(
+                    "cargo:warning=Cannot find libass ({e}). \
+                     The libass-compare feature is currently a stub and does not link libass yet, \
+                     so the build will continue. Install libass development files to enable \
+                     comparison once libass integration is restored."
+                );
             }
         }
     }
