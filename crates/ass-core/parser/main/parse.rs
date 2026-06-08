@@ -11,7 +11,7 @@ use crate::{
     },
     utils::errors::{encoding::validate_bom_handling, resource::check_input_size_limit},
 };
-use alloc::{format, vec::Vec};
+use alloc::{format, string::ToString, vec::Vec};
 
 impl<'a> Parser<'a> {
     /// Parse complete script

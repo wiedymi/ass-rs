@@ -5,7 +5,7 @@ use super::*;
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 #[cfg(not(feature = "std"))]
-use alloc::{format, string::ToString, vec};
+use alloc::{format, string::ToString, vec, vec::Vec};
 #[cfg(not(feature = "std"))]
 use hashbrown::HashSet;
 #[cfg(feature = "std")]

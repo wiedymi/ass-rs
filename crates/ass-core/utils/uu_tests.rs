@@ -2,7 +2,7 @@
 
 use super::*;
 #[cfg(not(feature = "std"))]
-use alloc::{format, vec};
+use alloc::{format, vec, vec::Vec};
 
 #[test]
 fn decode_uu_data_empty_input() {

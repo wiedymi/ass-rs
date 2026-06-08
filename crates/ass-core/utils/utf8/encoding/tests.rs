@@ -3,7 +3,7 @@
 use super::super::bom::BomType;
 use super::*;
 #[cfg(not(feature = "std"))]
-use alloc::format;
+use alloc::{format, string::ToString};
 
 #[test]
 fn encoding_info_creation() {

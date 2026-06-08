@@ -5,7 +5,7 @@
 //! gated behind the `async` feature.
 
 use super::channel::EventChannel;
-use super::{DocumentEvent, EventHandler};
+use super::DocumentEvent;
 use crate::core::Result;
 
 #[cfg(not(feature = "std"))]

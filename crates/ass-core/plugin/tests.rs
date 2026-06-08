@@ -3,7 +3,7 @@
 use super::*;
 use alloc::boxed::Box;
 #[cfg(not(feature = "std"))]
-use alloc::{format, vec};
+use alloc::{format, string::ToString, vec};
 
 /// Mock tag handler for testing
 struct MockTagHandler {

@@ -7,7 +7,6 @@ use crate::core::Result;
 
 use super::command::{ExtensionResult, ExtensionState};
 use super::context::ExtensionContext;
-use super::extension::EditorExtension;
 use super::manager::ExtensionManager;
 
 #[cfg(feature = "std")]
