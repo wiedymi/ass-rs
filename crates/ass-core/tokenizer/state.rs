@@ -12,12 +12,13 @@ extern crate alloc;
 /// Tracks current parsing context to enable context-sensitive tokenization
 /// of ASS script elements that have different lexical rules in different
 /// contexts.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TokenContext {
     /// Top-level document parsing
     ///
     /// Default state for processing section headers, comments, and
     /// top-level document structure.
+    #[default]
     Document,
 
     /// Inside section header like `[Events]`
@@ -84,12 +85,6 @@ impl TokenContext {
     /// Reset to document context (typically after newline)
     #[must_use]
     pub const fn reset_to_document(self) -> Self {
-        Self::Document
-    }
-}
-
-impl Default for TokenContext {
-    fn default() -> Self {
         Self::Document
     }
 }

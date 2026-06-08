@@ -120,6 +120,42 @@ impl<'a> OverrideTag<'a> {
 /// parse_override_block("\\b1\\i1", 0, &mut tags, &mut diagnostics);
 /// assert_eq!(tags.len(), 2);
 /// ```
+/// Scan an override tag name, returning the position just past it
+///
+/// A tag name is an optional leading digit (for color/alpha tags like `\1c`)
+/// followed by ASCII letters. `\r` (reset style) and `\fn` (font name) are the
+/// only tags whose arguments may begin with ASCII letters without a delimiter
+/// (e.g. `\fnArial`, `\rDefault`), so scanning stops as soon as either name is
+/// matched to avoid swallowing the argument into the name.
+fn scan_tag_name(
+    content: &str,
+    chars: &[char],
+    mut char_pos: usize,
+    mut byte_pos: usize,
+    name_start: usize,
+) -> (usize, usize) {
+    let mut tag_name_len = 0;
+    while char_pos < chars.len() {
+        if tag_name_len == 0 && chars[char_pos].is_ascii_digit() {
+            byte_pos += 1;
+            char_pos += 1;
+            tag_name_len += 1;
+        } else if chars[char_pos].is_ascii_alphabetic() {
+            byte_pos += 1;
+            char_pos += 1;
+            tag_name_len += 1;
+
+            let name_so_far = &content[name_start..byte_pos];
+            if name_so_far == "r" || name_so_far == "fn" {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    (char_pos, byte_pos)
+}
+
 pub fn parse_override_block<'a>(
     content: &'a str,
     start_pos: usize,
@@ -138,32 +174,7 @@ pub fn parse_override_block<'a>(
 
             let name_char_start = char_pos;
             let name_start = byte_pos;
-            // Tags can start with digits (e.g., \1c, \2c, \3c, \4c for colors, \1a, \2a for alpha)
-            // But after the initial characters, only continue if alphabetic to avoid consuming arguments
-            let mut tag_name_len = 0;
-            while char_pos < chars.len() {
-                if tag_name_len == 0 && chars[char_pos].is_ascii_digit() {
-                    // Allow digit as first character (for \1c, \2c, etc.)
-                    byte_pos += 1;
-                    char_pos += 1;
-                    tag_name_len += 1;
-                } else if chars[char_pos].is_ascii_alphabetic() {
-                    byte_pos += 1;
-                    char_pos += 1;
-                    tag_name_len += 1;
-
-                    // `\r` (reset style) and `\fn` (font name) are the only tags
-                    // whose arguments may begin with ASCII letters without a
-                    // delimiter (e.g. `\fnArial`, `\rDefault`), so their names must
-                    // stop as soon as they are recognized to avoid swallowing args.
-                    let name_so_far = &content[name_start..byte_pos];
-                    if name_so_far == "r" || name_so_far == "fn" {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
+            (char_pos, byte_pos) = scan_tag_name(content, &chars, char_pos, byte_pos, name_start);
 
             if char_pos > name_char_start {
                 let name_end = byte_pos;
@@ -268,32 +279,7 @@ pub fn parse_override_block_with_registry<'a>(
 
             let name_char_start = char_pos;
             let name_start = byte_pos;
-            // Tags can start with digits (e.g., \1c, \2c, \3c, \4c for colors, \1a, \2a for alpha)
-            // But after the initial characters, only continue if alphabetic to avoid consuming arguments
-            let mut tag_name_len = 0;
-            while char_pos < chars.len() {
-                if tag_name_len == 0 && chars[char_pos].is_ascii_digit() {
-                    // Allow digit as first character (for \1c, \2c, etc.)
-                    byte_pos += 1;
-                    char_pos += 1;
-                    tag_name_len += 1;
-                } else if chars[char_pos].is_ascii_alphabetic() {
-                    byte_pos += 1;
-                    char_pos += 1;
-                    tag_name_len += 1;
-
-                    // `\r` (reset style) and `\fn` (font name) are the only tags
-                    // whose arguments may begin with ASCII letters without a
-                    // delimiter (e.g. `\fnArial`, `\rDefault`), so their names must
-                    // stop as soon as they are recognized to avoid swallowing args.
-                    let name_so_far = &content[name_start..byte_pos];
-                    if name_so_far == "r" || name_so_far == "fn" {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
+            (char_pos, byte_pos) = scan_tag_name(content, &chars, char_pos, byte_pos, name_start);
 
             if char_pos > name_char_start {
                 let name_end = byte_pos;
