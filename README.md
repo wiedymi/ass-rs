@@ -44,12 +44,12 @@ The ASS-RS ecosystem consists of modular, interoperable crates:
               └─────────────────────────┘
 ```
 
-- **`ass-core`**: Zero-copy parsing, analysis, and AST manipulation
-- **`ass-renderer`**: Multiple rendering backends (software, GPU, web)
-- **`ass-editor`**: Interactive editing APIs with incremental updates
-- **`ass-cli`**: Command-line tools for processing and conversion
-- **`ass-wasm`**: WebAssembly bindings for browser integration
-- **`ass-benchmarks`**: Performance testing and libass comparisons
+- **`ass-core`**: Zero-copy parsing, analysis, and AST manipulation — *available, stable*
+- **`ass-editor`**: Interactive editing APIs with incremental updates — *available, stable*
+- **`ass-renderer`**: Multiple rendering backends (software, GPU, web) — *work in progress; software backend functional, GPU backends experimental*
+- **`ass-cli`**: Command-line tools for processing and conversion — *planned*
+- **`ass-wasm`**: WebAssembly bindings for browser integration — *planned*
+- **`ass-benchmarks`**: Performance testing and libass comparisons — *planned*
 
 ## ⚡ Performance Targets
 
@@ -190,9 +190,9 @@ cargo bench
 - [x] Full spec compliance testing
 
 ### v0.2.0 - Rendering Pipeline (In Progress)
-- [ ] Software rasterizer backend
-- [ ] WebGPU rendering support
-- [ ] Advanced typography (shaping, kerning)
+- [x] Software rasterizer backend (tiny-skia)
+- [x] Text shaping via rustybuzz
+- [ ] WebGPU / Vulkan / Metal GPU backends (experimental)
 - [ ] Animation timeline evaluation
 
 ### v0.3.0 - Editor Integration ✅
