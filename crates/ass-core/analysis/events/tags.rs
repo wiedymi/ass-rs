@@ -151,6 +151,15 @@ pub fn parse_override_block<'a>(
                     byte_pos += 1;
                     char_pos += 1;
                     tag_name_len += 1;
+
+                    // `\r` (reset style) and `\fn` (font name) are the only tags
+                    // whose arguments may begin with ASCII letters without a
+                    // delimiter (e.g. `\fnArial`, `\rDefault`), so their names must
+                    // stop as soon as they are recognized to avoid swallowing args.
+                    let name_so_far = &content[name_start..byte_pos];
+                    if name_so_far == "r" || name_so_far == "fn" {
+                        break;
+                    }
                 } else {
                     break;
                 }
@@ -214,8 +223,10 @@ pub fn parse_override_block<'a>(
                     offset: start_pos + tag_start,
                     kind: DiagnosticKind::EmptyOverride,
                 });
-                byte_pos += chars[char_pos].len_utf8();
-                char_pos += 1;
+                if char_pos < chars.len() {
+                    byte_pos += chars[char_pos].len_utf8();
+                    char_pos += 1;
+                }
             }
         } else {
             byte_pos += chars[char_pos].len_utf8();
@@ -270,6 +281,15 @@ pub fn parse_override_block_with_registry<'a>(
                     byte_pos += 1;
                     char_pos += 1;
                     tag_name_len += 1;
+
+                    // `\r` (reset style) and `\fn` (font name) are the only tags
+                    // whose arguments may begin with ASCII letters without a
+                    // delimiter (e.g. `\fnArial`, `\rDefault`), so their names must
+                    // stop as soon as they are recognized to avoid swallowing args.
+                    let name_so_far = &content[name_start..byte_pos];
+                    if name_so_far == "r" || name_so_far == "fn" {
+                        break;
+                    }
                 } else {
                     break;
                 }
@@ -368,8 +388,10 @@ pub fn parse_override_block_with_registry<'a>(
                     offset: start_pos + tag_start,
                     kind: DiagnosticKind::EmptyOverride,
                 });
-                byte_pos += chars[char_pos].len_utf8();
-                char_pos += 1;
+                if char_pos < chars.len() {
+                    byte_pos += chars[char_pos].len_utf8();
+                    char_pos += 1;
+                }
             }
         } else {
             byte_pos += chars[char_pos].len_utf8();
@@ -571,5 +593,81 @@ mod tests {
         assert_eq!(tags[0].complexity(), 1);
         assert_eq!(tags[0].name(), "fn");
         assert_eq!(tags[0].args(), "微软雅黑");
+    }
+
+    #[test]
+    fn test_parse_fn_tag_with_ascii_font_name() {
+        for input in ["\\fnArial", "\\fnTimes New Roman"] {
+            let expected_args = &input[3..];
+
+            let mut tags = Vec::new();
+            let mut diagnostics = Vec::new();
+            parse_override_block(input, 0, &mut tags, &mut diagnostics);
+            assert_eq!(tags.len(), 1);
+            assert_eq!(tags[0].name(), "fn");
+            assert_eq!(tags[0].args(), expected_args);
+            assert_eq!(diagnostics.len(), 0);
+
+            let mut tags = Vec::new();
+            let mut diagnostics = Vec::new();
+            parse_override_block_with_registry(input, 0, &mut tags, &mut diagnostics, None);
+            assert_eq!(tags.len(), 1);
+            assert_eq!(tags[0].name(), "fn");
+            assert_eq!(tags[0].args(), expected_args);
+            assert_eq!(diagnostics.len(), 0);
+        }
+    }
+
+    #[test]
+    fn test_parse_r_tag_with_and_without_ascii_style() {
+        for (input, expected_args) in [("\\rAlternate", "Alternate"), ("\\r", "")] {
+            let mut tags = Vec::new();
+            let mut diagnostics = Vec::new();
+            parse_override_block(input, 0, &mut tags, &mut diagnostics);
+            assert_eq!(tags.len(), 1);
+            assert_eq!(tags[0].name(), "r");
+            assert_eq!(tags[0].args(), expected_args);
+
+            let mut tags = Vec::new();
+            let mut diagnostics = Vec::new();
+            parse_override_block_with_registry(input, 0, &mut tags, &mut diagnostics, None);
+            assert_eq!(tags.len(), 1);
+            assert_eq!(tags[0].name(), "r");
+            assert_eq!(tags[0].args(), expected_args);
+        }
+    }
+
+    #[test]
+    fn test_parse_fn_and_r_followed_by_more_tags() {
+        let mut tags = Vec::new();
+        let mut diagnostics = Vec::new();
+        parse_override_block("\\fnArial\\fs20\\b1", 0, &mut tags, &mut diagnostics);
+        assert_eq!(tags.len(), 3);
+        assert_eq!((tags[0].name(), tags[0].args()), ("fn", "Arial"));
+        assert_eq!((tags[1].name(), tags[1].args()), ("fs", "20"));
+        assert_eq!((tags[2].name(), tags[2].args()), ("b", "1"));
+
+        let mut tags = Vec::new();
+        let mut diagnostics = Vec::new();
+        parse_override_block("\\rStyle\\b1", 0, &mut tags, &mut diagnostics);
+        assert_eq!(tags.len(), 2);
+        assert_eq!((tags[0].name(), tags[0].args()), ("r", "Style"));
+        assert_eq!((tags[1].name(), tags[1].args()), ("b", "1"));
+    }
+
+    #[test]
+    fn test_fn_break_does_not_affect_other_f_or_r_tags() {
+        let mut tags = Vec::new();
+        let mut diagnostics = Vec::new();
+        parse_override_block(
+            "\\frz45\\fscx150\\fad(100,200)",
+            0,
+            &mut tags,
+            &mut diagnostics,
+        );
+        assert_eq!(tags.len(), 3);
+        assert_eq!((tags[0].name(), tags[0].args()), ("frz", "45"));
+        assert_eq!((tags[1].name(), tags[1].args()), ("fscx", "150"));
+        assert_eq!((tags[2].name(), tags[2].args()), ("fad", "(100,200)"));
     }
 }
