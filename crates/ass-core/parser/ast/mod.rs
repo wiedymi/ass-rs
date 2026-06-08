@@ -50,6 +50,7 @@ pub use style::Style;
 
 /// Represents a span in the source text with position information
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Span {
     /// Byte offset in source where span starts
     pub start: usize,

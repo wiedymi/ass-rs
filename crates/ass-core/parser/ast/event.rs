@@ -34,6 +34,7 @@ use core::ops::Range;
 /// assert!(event.is_dialogue());
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Event<'a> {
     /// Event type (Dialogue, Comment, etc.)
     pub event_type: EventType,
@@ -83,6 +84,7 @@ pub struct Event<'a> {
 /// Determines how the event is processed during subtitle rendering.
 /// Different types have different behaviors during playback.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum EventType {
     /// Dialogue line (displayed during playback)
     Dialogue,

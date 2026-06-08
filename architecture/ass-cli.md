@@ -1,4 +1,6 @@
 
+> **Status (2026-06): PLANNED — not yet implemented.** This crate does not exist in the workspace yet; this document is a design target. The workspace currently ships only ass-core, ass-editor, and ass-renderer.
+
 ## Overview
 
 `ass-cli` is a high-performance, modular command-line tool for working with ASS (Advanced SubStation Alpha) subtitle scripts. It serves as the user-facing entrypoint in the `ass-rs` ecosystem, leveraging `ass-core` for parsing, analysis, and manipulation. It supports validation, linting, format conversion (e.g., ASS to SRT/JSON), tag extraction, style optimization, and basic editing (e.g., timing shifts, font embedding). Designed for speed (<10ms for ~~1-10KB scripts) and low memory footprint (~~input size + minimal overhead), it targets subtitlers, video encoders, and automation scripts.

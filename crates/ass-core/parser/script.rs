@@ -187,6 +187,7 @@ impl<'a> ChangeTracker<'a> {
 /// Uses `&'a str` spans throughout the AST to avoid allocations during parsing.
 /// Thread-safe via immutable design after construction.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Script<'a> {
     /// Input source text for span validation
     source: &'a str,
@@ -198,6 +199,11 @@ pub struct Script<'a> {
     sections: Vec<Section<'a>>,
 
     /// Parse warnings and recoverable errors
+    ///
+    /// Transient parse diagnostics are not part of the canonical script
+    /// content and are skipped during (de)serialization; re-parse the
+    /// source to recompute them.
+    #[cfg_attr(feature = "serde", serde(skip))]
     issues: Vec<ParseIssue>,
 
     /// Format fields for [V4+ Styles] section
@@ -207,6 +213,9 @@ pub struct Script<'a> {
     events_format: Option<Vec<&'a str>>,
 
     /// Change tracker for incremental updates
+    ///
+    /// Internal incremental-edit state; reset to default on deserialization.
+    #[cfg_attr(feature = "serde", serde(skip))]
     change_tracker: ChangeTracker<'a>,
 }
 

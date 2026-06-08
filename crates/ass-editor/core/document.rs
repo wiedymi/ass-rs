@@ -740,12 +740,10 @@ impl EditorDocument {
         }
         #[cfg(not(feature = "std"))]
         {
-            static mut COUNTER: u32 = 0;
-            #[allow(static_mut_refs)]
-            unsafe {
-                COUNTER += 1;
-                format!("doc_{COUNTER}")
-            }
+            use core::sync::atomic::{AtomicU32, Ordering};
+            static COUNTER: AtomicU32 = AtomicU32::new(0);
+            let id = COUNTER.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
+            format!("doc_{id}")
         }
     }
 

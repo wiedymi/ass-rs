@@ -34,6 +34,7 @@ use core::ops::Range;
 /// assert_eq!(style.fontname, "Arial");
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Style<'a> {
     /// Style name (must be unique within script)
     pub name: &'a str,

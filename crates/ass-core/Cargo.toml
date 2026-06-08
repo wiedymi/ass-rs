@@ -25,8 +25,13 @@ bitflags.workspace = true
 hashbrown = { version = "0.14", optional = true, features = ["ahash"] }
 bumpalo = { version = "3.14", optional = true }
 wide = { version = "0.7", optional = true }
-serde = { version = "1.0", optional = true, features = ["derive"] }
+unicode-linebreak = { version = "0.1", optional = true }
+serde = { version = "1.0", optional = true, default-features = false, features = ["derive", "alloc"] }
 criterion = { version = "0.5", optional = true, features = ["html_reports"] }
+
+[dev-dependencies]
+# JSON (de)serialization used only by serde round-trip tests
+serde_json = "1.0"
 
 [features]
 # Default: Full-featured parser for desktop applications (matches ass-editor)
@@ -62,7 +67,7 @@ full = [
 # --- Granular Features (typically enabled by 'minimal' or 'full') ---
 
 # Platform support (mutually exclusive)
-std = []                  # Standard library support (enabled by 'full')
+std = ["serde?/std"]      # Standard library support (enabled by 'full')
 nostd = ["dep:hashbrown"] # nostd compatibility (mutually exclusive with std)
 
 # Core functionality (enabled by 'minimal')
@@ -71,7 +76,7 @@ plugins = []      # Extension registry support
 stream = []       # Chunked/streaming input support
 
 # Advanced features (enabled by 'full')
-unicode-wrap = [] # Unicode linebreak support for libass 0.17.4+ compatibility
+unicode-wrap = ["dep:unicode-linebreak"] # Unicode linebreak support (UAX #14) for libass 0.17.4+ compatibility
 serde = ["dep:serde"]       # Serialization support
 
 # Performance optimizations (enabled by 'full')

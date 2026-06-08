@@ -52,6 +52,8 @@ pub mod overlap;
 pub mod scoring;
 pub mod tags;
 pub mod text_analysis;
+#[cfg(feature = "unicode-wrap")]
+pub mod unicode_wrap;
 pub mod utils;
 
 pub use dialogue_info::{DialogueInfo, TimingRelation};
@@ -65,6 +67,8 @@ pub use tags::{
     calculate_tag_complexity, parse_override_block, DiagnosticKind, OverrideTag, TagDiagnostic,
 };
 pub use text_analysis::TextAnalysis;
+#[cfg(feature = "unicode-wrap")]
+pub use unicode_wrap::{soft_wrap_offsets, wrap_opportunities, WrapOpportunity};
 pub use utils::{
     calculate_average_duration, calculate_total_duration, count_overlapping_dialogue_events,
     find_events_in_range, find_overlapping_dialogue_events, sort_events_by_time,

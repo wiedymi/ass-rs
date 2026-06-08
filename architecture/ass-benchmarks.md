@@ -1,3 +1,5 @@
+> **Status (2026-06): PLANNED — not yet implemented.** This crate does not exist in the workspace yet; this document is a design target. The workspace currently ships only ass-core, ass-editor, and ass-renderer.
+
 ## Overview
 
 `ass-benchmarks` is a dedicated benchmarking suite for the `ass-rs` ecosystem, providing comprehensive performance and memory profiling across `ass-core`, `ass-renderer`, `ass-editor`, and `ass-cli`. It leverages Criterion.rs for micro-benchmarks (e.g., tag parsing hot paths) and custom harnesses for end-to-end scenarios (e.g., full-script rendering at 4K), with optional comparisons to libass (via Rust bindings or external subprocesses to avoid FFI overhead). Critically, it exposes flaws in libass like CPU-bound blurs (50-100ms/frame on complex karaoke) vs. our GPU-accelerated <5ms, while highlighting our own weaknesses (e.g., WASM overhead in web backends, ~20% slower without SIMD). Designed as a reusable tool (e.g., `ass-bench parse --input-dir samples/` for CI), it's extensible via plugins for custom metrics (e.g., VRAM usage on Vulkan) and modular to isolate components (e.g., bench only shaping without full pipeline).

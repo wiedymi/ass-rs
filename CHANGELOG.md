@@ -20,6 +20,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full editor functionality with undo/redo support
 - Format conversion support (SRT, WebVTT)
 - FST-based search indexing for large documents
+- ass-core: JSON export for the AST via the `serde` feature (`Serialize` only;
+  borrowed zero-copy deserialization is intentionally unsupported)
+- ass-core: Unicode line-break opportunities (UAX #14) via the `unicode-wrap`
+  feature, exposed as `analysis::events::unicode_wrap` (libass
+  `ASS_FEATURE_WRAP_UNICODE` parity, backed by the `unicode-linebreak` crate)
+
+### Changed
+- ass-core: `serde` is now no_std-aware (`alloc`-only by default; `std`
+  propagates through the crate's `std` feature)
+
+### Fixed
+- ass-editor: no_std document ID generation now uses `AtomicU32` instead of
+  `unsafe static mut`, restoring the project's zero-unsafe guarantee
+
+### Removed
+- ass-editor: dead `extensions/mod_backup.rs` scaffolding file
 
 ### ass-core Features
 - Complete ASS v4+ and SSA v4 format support

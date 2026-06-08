@@ -25,25 +25,53 @@ Targets: Edits <1ms, session switches <100µs; memory ~input + minimal overhead.
 
 - **External Dependencies** (minimal):
   - `ass-core = { path = "../ass-core" }`: Core parsing/analysis.
-  - `ropey = "1.7"`: Lighter rope for text edits (~100KB vs xi-rope's 200KB); feature-gated.
+  - `ropey = "1.6.1"`: Lighter rope for text edits (~100KB vs xi-rope's 200KB); feature-gated.
   - `bumpalo = "3.14"`: Arenas for pooling (histories, deltas).
   - `thiserror = "1.0"`: Error handling (no anyhow to reduce bloat).
   - `fst = "0.4.7"`: Trie-based search indexing for regex-heavy queries (WASM perf notes: fallback linear search on mobile).
   - Avoid heavy deps like tokio unless "async" featured.
 
+  > **Status (2026-06):** Beyond this minimal list, several deps are present
+  > (all feature-gated): `parking_lot` (multi-thread), `futures` + `tokio`
+  > (async), `regex` (formats), `fst` (search-index), `hashbrown` (nostd maps),
+  > `serde`, and `static_assertions` (concurrency compile-time checks). `ropey`
+  > is pinned at `1.6.1` (not `1.7`).
+
 - **Feature Flags** (mirror core's for consistency):
-  - `"analysis"` (default): Core linting/validation.
-  - `"plugins"` (default): Shared registry.
+
+  > **Status (2026-06):** The crate uses a two-tier feature model, not a flat
+  > flag set. Main flavors select bundles of granular features:
+  > - `"default"` = `"full"`.
+  > - `"minimal"`: alloc-only core editing (`rope`, `arena`, `stream`,
+  >   `hashbrown`); `nostd`-compatible.
+  > - `"full"`: builds on `minimal` + `std`, `analysis`, `plugins`, `formats`,
+  >   `search-index`, `concurrency`, `serde`, `thiserror`.
+
+  Granular features (typically pulled in by `minimal`/`full`):
+  - `"std"`: Standard library support (propagates to core/ropey/bumpalo).
+    Mutually exclusive with `"nostd"`.
+  - `"analysis"`: Core linting/validation.
+  - `"plugins"`: Shared registry.
+  - `"stream"`: Incremental parsing (essential for editing performance).
   - `"rope"`: Ropey for text editing (lighter than xi-rope alternative).
-  - `"undo-limit=50"`: Configurable undo depth (arena-pooled to cap memory).
-  - `"serde"`: Derives for export.
-  - `"simd"`: Core SIMD passthrough.
   - `"arena"`: Bumpalo for sessions with arena reset on close.
+  - `"formats"`: SRT/WebVTT import/export (requires `std`; pulls `regex`).
+  - `"search-index"`: Trie-based indexing for fast regex/fuzzy search
+    (requires `std`; pulls `fst`).
+  - `"serde"`: Derives for export (requires `std`).
+  - `"concurrency"`: Bundles `multi-thread` + `async` (requires `std`).
+  - `"multi-thread"`: `parking_lot`-backed sessions.
   - `"async"` (careful): Async commands for UIs only when needed (avoid bloat).
-  - `"multi-thread"`: Arc/Mutex for sessions.
-  - `"search-index"`: Trie-based indexing for fast regex/fuzzy search.
+
+  Optional/specialized:
+  - `"simd"` / `"simd-full"`: Core SIMD passthrough.
   - `"nostd"`: Alloc-only (hashbrown for maps, core spans for <100KB savings).
-  - `"benches"`: Criterion for perf tests.
+    Mutually exclusive with `"std"`.
+  - `"dev-benches"`: Development benchmarking features.
+
+  > **Status (2026-06):** There is **no** compile-time `"undo-limit=50"`
+  > feature. Undo depth is configured at **runtime** via `UndoStackConfig`,
+  > e.g. `doc.undo_manager_mut().set_config(UndoStackConfig { max_entries, .. })`.
 
 Expectations: Lean crate (~80KB with ropey vs 150KB with xi-rope); aggressive nostd saves ~100KB for WASM editors.
 
@@ -119,8 +147,13 @@ crates/ass-editor/
 ├── lib.rs      # Re-exports (e.g., pub mod core; pub use core::EditorDocument;)
 ├── core/       # Base structures
 │   ├── mod.rs  # EditorDocument<'a> { script: Script<'a>, text_rope: Rope (ropey), ... }
+│   ├── document.rs  # EditorDocument impl, doc-id generation
+│   ├── fluent.rs    # Fluent edit API (doc.at(pos).insert_text() etc.)
+│   ├── builders.rs  # Position/command builders
+│   ├── thread_safety.rs # Send+Sync assertions (static_assertions)
+│   ├── incremental.rs   # Incremental re-parse glue (stream feature)
 │   ├── position.rs  # PositionBuilder, DocumentPosition
-│   ├── history.rs   # UndoStack with core Delta pooling in arena. Limit UndoStack depth=50; reset arena on exceed to prevent accumulation
+│   ├── history.rs   # UndoStack with core Delta pooling in arena. Depth configured at runtime via UndoStackConfig (not a compile-time limit)
 │   └── errors.rs    # EditorError (wraps CoreError, no anyhow)
 ├── commands/   # Editable actions
 │   ├── mod.rs  # EditorCommand trait; fluent TextCommand
@@ -130,13 +163,14 @@ crates/ass-editor/
 │   └── memory.rs    # Arena reset logic to prevent libass-style leaks
 ├── extensions/ # Hooks
 │   ├── mod.rs  # EditorExtension trait (impl core TagHandler + extras)
-│   └── builtins/  # e.g., syntax_highlight.rs, auto_complete.rs
+│   └── builtin/   # e.g., syntax_highlight.rs, auto_complete.rs
 ├── formats/    # IO
 │   ├── mod.rs  # Importer/Exporter traits (proxy core parse/serialize)
-│   └── ass.rs     # AssImporter, AssExporter
+│   ├── ass/       # AssImporter, AssExporter
+│   ├── srt/       # SRT import/export
+│   └── webvtt/    # WebVTT import/export
 ├── events/     # Reactivity
-│   ├── mod.rs  # DocumentEvent enum, EventChannel (mpsc)
-│   └── extension.rs  # ExtensionEvent enum
+│   └── mod.rs  # DocumentEvent + ExtensionEvent enums, EventChannel (mpsc)
 ├── utils/      # Helpers
 │   ├── mod.rs  # SearchOptions builder
 │   ├── search.rs   # DocumentSearch trait with trie-based indexing. WASM opt: If fst regex slow, fallback to core linear (benchmark <1ms)
@@ -144,6 +178,16 @@ crates/ass-editor/
 │   └── validator.rs  # LazyValidator implementation wrapping core's ScriptAnalysis. Support core's unicode-wrap feature; lint LayoutRes mismatches
 └── benches/    # Perf tests (criterion: multi-session edits)
 ```
+
+> **Status (2026-06):** The actual tree drifts from this spec in a few places:
+> there is **no** `events/extension.rs` (the `ExtensionEvent` enum lives in
+> `events/mod.rs`); `formats/` uses per-format subdirs (`ass/`, `srt/`,
+> `webvtt/`) rather than flat files; the built-ins directory is `extensions/builtin/`
+> (singular); and `core/` carries extra modules beyond the spec (`document.rs`,
+> `fluent.rs`, `builders.rs`, `thread_safety.rs`, `incremental.rs`).
+>
+> The `<200 LOC per file` modularity target is aspirational and currently
+> exceeded by several files (notably `core/fluent.rs` and `core/document.rs`).
 
 ## Interactions with ASS-Core
 
@@ -164,3 +208,4 @@ Based on ass-core analysis:
 - **LazyValidator**: Not provided by core; implement in editor as wrapper around `ScriptAnalysis` for on-demand validation
 - **Thread-safety**: Core's `Script<'a>` has immutable design but lacks explicit Send+Sync bounds (would require unsafe); rely on implicit safety
 - **All other features ready**: Delta tracking, plugin system, incremental parsing, SIMD, arenas all available in core
+- **Document ID generation (no_std)**: Now uses `core::sync::atomic::AtomicU32` (see `core/document.rs`); the earlier `unsafe static mut` counter is gone, so the crate is once again unsafe-free, consistent with the project's "no unsafe" rule.

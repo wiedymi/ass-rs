@@ -1,4 +1,9 @@
 
+> **Status (2026-06):** Work in progress; the software backend (tiny-skia) is
+> functional, while the GPU/web backends are experimental scaffolding. GPU/renderer
+> completion is intentionally deferred. Much of the design below is aspirational —
+> treat backend-specific and GPU sections as targets, not as shipped behavior.
+
 ## Overview
 
 `ass-renderer` is the rendering-focused crate in the `ass-rs` ecosystem, building on `ass-core` to transform parsed ASS scripts into rasterized subtitle frames. It handles text shaping, vector drawing, effect application (e.g., blur, fade, karaoke), and compositing, producing output suitable for video overlay (e.g., RGBA buffers).
@@ -46,14 +51,27 @@ For WASM, we've prioritized fallbacks (WebGPU → WebGL → software) for reliab
 ### External Dependencies
 
 - `ass-core = { path = "../ass-core" }`
-- `rustybuzz = "0.12"`
-- `tiny-skia = "0.12"`
-- `fontdb = "0.17"`
-- `rayon = "1.10"`
-- `ash = "0.38"` (Vulkan)
-- `metal = "0.30"` (Metal)
-- `wgpu = "0.24"` (WebGPU/WebGL; updated for 2025 WASM atomics support)
+- `rustybuzz = "0.11"`
+- `tiny-skia = "0.11"`
+- `fontdb = "0.16"`
+- `ttf-parser = "0.20"`
+- `rayon = "1.10"` (optional, `software-backend`)
+- `ash = "0.37"` (Vulkan, optional)
+- `metal = "0.27"` (Metal, optional; macOS/iOS target only)
+- `wgpu = "0.19"` (WebGPU, optional)
+- `pollster = "0.3"`, `bytemuck = "1.14"` (web-backend support, optional)
 - `smallvec = "1.14"` (Effect chain optimization)
+- `bumpalo = "3.16"` (arena temps, optional `arena`)
+- `image = "0.24"` (debug/visualization, optional)
+- `ahash = "0.8"`, `thiserror = "1.0"`
+- `serde = "1.0"`, `serde_json = "1.0"` (optional `serde`)
+
+> **Status (2026-06):** These pinned versions trail the aspirational spec above.
+> The crate currently builds against the versions shown here, which are older than
+> the originally documented targets (the doc previously listed rustybuzz 0.12,
+> tiny-skia 0.12, fontdb 0.17, ash 0.38, metal 0.30, wgpu 0.24). The list also
+> omitted several real dependencies (`ttf-parser`, `bumpalo`, `image`, `bytemuck`,
+> `pollster`, `ahash`, `thiserror`, `serde_json`), now included above.
 
 ### Feature Flags
 
@@ -78,6 +96,18 @@ For WASM, we've prioritized fallbacks (WebGPU → WebGL → software) for reliab
 - CI thresholds: <10% regression, fail if WebGL >2x slower than WebGPU
 
 ## Architecture
+
+> **Status (2026-06) — actual backend state:**
+> - **Software backend (tiny-skia):** FUNCTIONAL. This is the working default
+>   used by `create_backend`; only minor TODOs remain.
+> - **Vulkan / Metal / WebGPU backends:** SCAFFOLDING only. Device/adapter init
+>   exists, but rasterization is unimplemented — `create_backend()` returns a
+>   `BackendError("… backend not yet implemented")` for Vulkan and WebGPU.
+> - **WebGL:** NOT a working fallback. It is explicitly rejected in
+>   `create_backend()` (returns "WebGL backend is not supported … use the Software
+>   backend instead"). The "WebGPU → WebGL → software" fallback narrative below is
+>   aspirational; WebGL is currently absent, so the real chain is effectively
+>   WebGPU/Vulkan/Metal (when implemented) → software.
 
 ### High-Level Flow
 
@@ -105,6 +135,15 @@ graph TD
 - **Optimization Hooks**: WebGPU compute (WGSL kernels); caches (`wgpu` BindGroups); SmallVec for effect chains to reduce allocations.
 
 ## Folder Structure and Modules
+
+> **Status (2026-06):** The actual `crates/ass-renderer/src/` tree contains
+> several directories not shown in the layout below:
+> - `debug/` — profiling and frame-inspection suite.
+> - `layout/` — line/glyph positioning and placement.
+> - `cache/` — render/glyph/atlas caching.
+> There are also top-level `animation.rs` and `collision.rs` modules alongside
+> `lib.rs`. The tree below reflects the original plan, not the current source
+> layout one-for-one.
 
 Root: `lib.rs` re-exports (`pub mod renderer; pub use renderer::Renderer;`).
 

@@ -100,6 +100,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// assert!(ScriptVersion::AssV4Plus.supports_extensions());
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum ScriptVersion {
     /// SSA v4.00 (`SubStation` Alpha legacy format).
     ///

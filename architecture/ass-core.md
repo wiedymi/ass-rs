@@ -34,7 +34,9 @@ Minimal, pinned for consistency:
 
 - `thiserror = "1.0.63"`: For custom error enums (e.g., `ParseError`). Avoid `anyhow` in core to reduce bloat (~50KB saved).
 - `ahash = "0.8.11"`: Fast, deterministic hashing for HashMap in registry (WASM-friendly). DoS fixes in 0.8.11+.
-- No others in core; avoid `serde` unless featured.
+- `bitflags` (workspace dep): Compact bitflag sets used across parsing/analysis.
+- `unicode-linebreak = "0.1"` (optional, gated by `unicode-wrap`): Pure-Rust UAX #14 line-breaking, no_std-compatible.
+- Otherwise nothing in core; `serde` is optional and feature-gated (see below).
 
 ### Feature Flags
 
@@ -42,8 +44,8 @@ In `Cargo.toml`, default to minimal set:
 
 - `"analysis"` (default): Enables linting and deep analysis (e.g., `ScriptAnalysis` struct). Disable for parse-only use.
 - `"plugins"` (default): Includes registry and trait impls for extensibility.
-- `"unicode-wrap"`: Unicode linebreak support for libass 0.17.4 Unicode wrapping (dep: libunibreak if enabled).
-- `"serde"`: Adds `Serialize`/`Deserialize` derives on AST (e.g., for JSON export).
+- `"unicode-wrap"`: Unicode linebreak support for libass 0.17.4 Unicode wrapping. **Status (2026-06):** Implemented (no longer a stub) via the pure-Rust `unicode-linebreak` crate (UAX #14), not the C `libunibreak` originally named here. no_std-compatible. Adds the `analysis::events::unicode_wrap` module exposing `wrap_opportunities()`, `soft_wrap_offsets()`, and the `WrapOpportunity` type.
+- `"serde"`: **Status (2026-06):** Derives **only** `serde::Serialize` (JSON **export** only) on the AST types (`Span`, `SectionType`, `Section`, `Style`, `Event`, `EventType`, `ScriptInfo`, `Font`, `Graphic`, `ScriptVersion`, and `Script`). Borrowed `Deserialize` is intentionally **not** provided: the AST borrows source text via `&'a str` spans, and a borrowed `&str` cannot be deserialized from escaped JSON (ASS dialogue routinely contains `\` override tags), so zero-copy deserialization would be unsound. The optional `serde` dep is configured `default-features = false, features = ["derive", "alloc"]` and is no_std-aware (the `std` feature propagates `serde?/std`).
 - `"simd"`: Enables `wide` crate for SIMD optimizations (e.g., `scan_delimiters_simd` in `tokenizer/mod.rs`). Fallback to scalar code.
 - `"arena"`: Uses `bumpalo` for allocation pooling during parse (drop after for zero overhead).
 - `"nostd"` (aggressive): Disables `std`, requires `alloc` (use `hashbrown` for `HashMap`, `arrayvec` for fixed `Vec`s). Analysis remains enabled via nostd-compatible crates. Defaults to `std` for simplicity; `nostd` for embedded/WASM efficiency (e.g., ~100KB binary savings, no `std` overhead).
@@ -87,6 +89,18 @@ graph TD
 ## Folder Structure and Modules
 
 Crate root: `lib.rs` re-exports (e.g., `pub mod parser; pub use parser::Script;`).
+
+> **Status (2026-06):** The aspirational tree below is kept for intent, but the
+> real layout is more granular. Notably: `parser/` is split into subdirs
+> `ast/` (`mod.rs`, `section.rs`, `style.rs`, `event.rs`, `script_info.rs`,
+> `media.rs`), `sections/`, `streaming/`, and `errors/` (not single files);
+> `tokenizer/` has a `scanner/` subdir; `utils/` has `errors/` and `utf8/`
+> subdirs. **Tags are grouped by family** into ~13 files
+> (`color.rs`, `transform.rs`, `animation.rs`, `position.rs`, `karaoke.rs`,
+> `formatting.rs`, `font.rs`, `clipping.rs`, `alignment.rs`, `advanced.rs`,
+> `special.rs`, `misc.rs`, ...) rather than ~50 one-file-per-tag.
+> **Fonts/Graphics parsing lives in the parser** (`parser/ast/media.rs` plus
+> `parser/binary_data.rs`), not as `plugin/sections/` handlers.
 
 ```plaintext
 crates/ass-core/
@@ -139,6 +153,7 @@ crates/ass-core/
 ### Expectations
 
 - Files <200 LOC each for maintainability.
+- **Caveat (2026-06):** The <200 LOC target is aspirational and not enforced; several hot files already exceed it (e.g., `parser/script.rs`).
 - Tests in `tests/` (e.g., per-tag: `test_parse_alpha_hex`).
 - Benches in `benches/` (criterion: parse_full vs. libass equiv).
 

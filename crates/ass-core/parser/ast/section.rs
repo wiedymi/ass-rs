@@ -28,6 +28,7 @@ use core::ops::Range;
 /// assert!(section_types.contains(&SectionType::ScriptInfo));
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum SectionType {
     /// [Script Info] section identifier
     ScriptInfo,
@@ -57,6 +58,7 @@ pub enum SectionType {
 /// assert_eq!(section.section_type(), SectionType::ScriptInfo);
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Section<'a> {
     /// [Script Info] section with metadata
     ///

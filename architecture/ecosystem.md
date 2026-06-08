@@ -1,5 +1,13 @@
 # Ecosystem Integration
 
+> **Status (2026-06):** Only three crates are implemented today: `ass-core`,
+> `ass-editor`, and `ass-renderer`. The `ass-cli`, `ass-wasm`, and
+> `ass-benchmarks` crates described below are planned/aspirational — they do
+> not exist in the workspace yet. Treat this document as the ecosystem vision;
+> references to the unbuilt crates (workspace members, data-flow diagrams,
+> feature matrices, CI matrices, compatibility tables) are design targets, not
+> the current state.
+
 ## Overview
 
 The `ass-rs` ecosystem is designed as a cohesive workspace of interrelated crates that share common principles, dependencies, and performance standards. This document outlines workspace configuration, cross-crate integration patterns, CI/CD requirements, and ecosystem-wide standards that ensure consistent performance, memory efficiency, and maintainability across all components.

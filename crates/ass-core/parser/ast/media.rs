@@ -36,6 +36,7 @@ use core::ops::Range;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Font<'a> {
     /// Font filename as it appears in the `[Fonts\]` section
     pub filename: &'a str,
@@ -145,6 +146,7 @@ impl Font<'_> {
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Graphic<'a> {
     /// Graphic filename as it appears in the `[Graphics\]` section
     pub filename: &'a str,

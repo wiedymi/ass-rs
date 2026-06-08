@@ -31,6 +31,7 @@ use core::ops::Range;
 /// assert_eq!(info.script_type(), Some("v4.00+"));
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ScriptInfo<'a> {
     /// Key-value pairs as zero-copy spans
     pub fields: Vec<(&'a str, &'a str)>,
