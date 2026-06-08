@@ -389,10 +389,7 @@ fn find_font_for_text(
                 "Malgun Gothic",
             ],
             // Generic CJK
-            &[
-                "Source Han Sans",
-                "Noto Sans CJK",
-            ],
+            &["Source Han Sans", "Noto Sans CJK"],
         ];
 
         let mut best_font = None;
@@ -402,9 +399,17 @@ fn find_font_for_text(
             for &name in *list {
                 let query = fontdb::Query {
                     families: &[fontdb::Family::Name(name)],
-                    weight: if bold { fontdb::Weight::BOLD } else { fontdb::Weight::NORMAL },
+                    weight: if bold {
+                        fontdb::Weight::BOLD
+                    } else {
+                        fontdb::Weight::NORMAL
+                    },
                     stretch: fontdb::Stretch::Normal,
-                    style: if italic { fontdb::Style::Italic } else { fontdb::Style::Normal },
+                    style: if italic {
+                        fontdb::Style::Italic
+                    } else {
+                        fontdb::Style::Normal
+                    },
                 };
                 if let Some(id) = font_database.query(&query) {
                     let support = font_support_count(font_database, id, text)?;
