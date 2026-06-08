@@ -345,7 +345,7 @@ fn font_support_count(
 }
 
 /// Attempt to pick a font that best covers the input text while respecting the requested family if possible
-fn find_font_for_text(
+pub fn find_font_for_text(
     font_database: &FontDatabase,
     family: &str,
     bold: bool,

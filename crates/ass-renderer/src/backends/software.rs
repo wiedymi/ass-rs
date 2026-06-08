@@ -222,7 +222,7 @@ impl SoftwareBackend {
     }
 
     fn draw_text_layer(&mut self, data: &crate::pipeline::TextData) -> Result<(), RenderError> {
-        use crate::pipeline::shaping::shape_text_with_style;
+        use crate::pipeline::shaping::{find_font_for_text, shape_text_with_style};
 
         // Extract bold/italic from effects
         let bold = data
@@ -267,28 +267,15 @@ impl SoftwareBackend {
             self.cache.store_shaped_text(cache_key, shaped_text)
         };
 
-        // Find font for rendering
-        let query = fontdb::Query {
-            families: &[
-                fontdb::Family::Name(&data.font_family),
-                fontdb::Family::SansSerif,
-            ],
-            weight: if bold {
-                fontdb::Weight::BOLD
-            } else {
-                fontdb::Weight::NORMAL
-            },
-            stretch: fontdb::Stretch::Normal,
-            style: if italic {
-                fontdb::Style::Italic
-            } else {
-                fontdb::Style::Normal
-            },
-        };
-
-        let font_id = self.font_database.query(&query).ok_or_else(|| {
-            RenderError::FontError(format!("Font '{}' not found", data.font_family))
-        })?;
+        // Resolve the same font used for shaping, with robust fallback to any
+        // loaded face when the requested family is unavailable.
+        let font_id = find_font_for_text(
+            &self.font_database,
+            &data.font_family,
+            bold,
+            italic,
+            &data.text,
+        )?;
 
         // Render glyphs to paths using cached renderer with spacing
         let paths = self.glyph_renderer.render_shaped_text(
