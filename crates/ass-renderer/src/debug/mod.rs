@@ -4,7 +4,6 @@
 //! - Frame analysis and benchmarking
 //! - Visual comparison tools
 //! - Performance profiling
-//! - Compatibility testing with libass
 
 #![allow(missing_docs)] // Debug module with many internal structures
 
@@ -32,43 +31,12 @@ pub mod visual_comparison;
 
 /// Performance benchmarking tools
 pub mod benchmarking;
-/// libass compatibility testing
-#[cfg(feature = "libass-compare")]
-pub mod libass_compatibility;
-/// libass FFI bindings
-#[cfg(feature = "libass-compare")]
-pub mod libass_ffi;
-/// libass renderer wrapper
-#[cfg(feature = "libass-compare")]
-pub mod libass_renderer;
-/// Pixel-perfect comparison tools
-#[cfg(feature = "libass-compare")]
-pub mod pixel_perfect_comparison;
-/// Visual report generation
-#[cfg(all(not(feature = "nostd"), feature = "libass-compare"))]
-pub mod visual_reporting;
 
 pub use analyzer::{AnalysisReport, FrameAnalyzer};
 pub use benchmarking::{
     quick_benchmark, BenchmarkConfig, BenchmarkResult, PerformanceBenchmark, PerformanceMetrics,
 };
 pub use inspector::FrameInspector;
-#[cfg(feature = "libass-compare")]
-pub use libass_compatibility::{
-    CompatibilityResult, CompatibilityTestSuite, CompatibilityTester, DiffRegion, DiffType,
-    TestConfig,
-};
-#[cfg(feature = "libass-compare")]
-pub use libass_renderer::LibassRenderer;
-#[cfg(feature = "libass-compare")]
-pub use pixel_perfect_comparison::PixelPerfectComparison;
-#[cfg(all(not(feature = "nostd"), feature = "libass-compare"))]
-pub use visual_reporting::{generate_compatibility_report, ReportConfig, VisualReportGenerator};
-// #[cfg(feature = "libass-compare")]
-// pub use pixel_perfect_comparison::{
-//     PixelPerfectComparator, PixelComparisonResult, ComparisonConfig,
-//     LibassCompatibilityTester, TestReport
-// };
 pub use player::{DebugPlayer, PlayerFrame};
 
 /// Debug information for a rendered frame

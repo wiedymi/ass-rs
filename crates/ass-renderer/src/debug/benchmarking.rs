@@ -1,7 +1,5 @@
-//! Benchmarking and performance analysis for compatibility testing
+//! Benchmarking and performance analysis for the renderer
 
-#[cfg(feature = "libass-compare")]
-use crate::debug::LibassRenderer;
 use crate::renderer::{RenderContext, Renderer};
 use crate::utils::RenderError;
 use ass_core::parser::Script;
@@ -15,9 +13,6 @@ use std::{format, string::String, time::Instant, vec::Vec};
 pub struct PerformanceBenchmark {
     /// Our renderer instance
     our_renderer: Renderer,
-    /// Libass renderer for comparison
-    #[cfg(feature = "libass-compare")]
-    libass_renderer: LibassRenderer,
     /// Benchmark configuration
     config: BenchmarkConfig,
     /// Historical results for regression analysis
@@ -67,10 +62,7 @@ pub struct BenchmarkResult {
     pub resolution: (u32, u32),
     /// Our renderer performance
     pub our_performance: PerformanceMetrics,
-    /// libass performance for comparison
-    #[cfg(feature = "libass-compare")]
-    pub libass_performance: Option<PerformanceMetrics>,
-    /// Performance ratio (our_time / libass_time)
+    /// Performance ratio (our_time / reference_time), if a reference is available
     pub performance_ratio: Option<f64>,
     /// Memory usage comparison
     pub memory_ratio: Option<f64>,
@@ -101,21 +93,6 @@ pub struct PerformanceMetrics {
 
 impl PerformanceBenchmark {
     /// Create new performance benchmark
-    #[cfg(feature = "libass-compare")]
-    pub fn new(context: RenderContext, config: BenchmarkConfig) -> Result<Self, RenderError> {
-        let our_renderer = Renderer::new(crate::backends::BackendType::Software, context.clone())?;
-        let libass_renderer = LibassRenderer::new(context.width(), context.height())?;
-
-        Ok(Self {
-            our_renderer,
-            libass_renderer,
-            config,
-            historical_results: Vec::new(),
-        })
-    }
-
-    /// Create benchmark without libass comparison
-    #[cfg(not(feature = "libass-compare"))]
     pub fn new(context: RenderContext, config: BenchmarkConfig) -> Result<Self, RenderError> {
         let our_renderer = Renderer::new(crate::backends::BackendType::Software, context)?;
 
@@ -145,12 +122,6 @@ impl PerformanceBenchmark {
             let context = RenderContext::new(resolution.0, resolution.1);
             self.our_renderer = Renderer::new(crate::backends::BackendType::Software, context)?;
 
-            #[cfg(feature = "libass-compare")]
-            {
-                self.libass_renderer
-                    .set_frame_size(resolution.0, resolution.1);
-            }
-
             let result = self.benchmark_single_resolution(script, test_name, resolution)?;
             results.push(result);
         }
@@ -173,26 +144,8 @@ impl PerformanceBenchmark {
         // Benchmark our renderer
         let our_performance = self.benchmark_our_renderer(script, test_time_cs)?;
 
-        // Benchmark libass if available
-        #[cfg(feature = "libass-compare")]
-        let libass_performance = self.benchmark_libass_renderer(script, test_time_cs).ok();
-        #[cfg(not(feature = "libass-compare"))]
-        let libass_performance: Option<PerformanceMetrics> = None;
-
-        // Calculate ratios
-        let (performance_ratio, memory_ratio) = if let Some(ref libass_perf) = libass_performance {
-            let perf_ratio = our_performance.avg_render_time_ms / libass_perf.avg_render_time_ms;
-            let mem_ratio = match (
-                our_performance.avg_memory_bytes,
-                libass_perf.avg_memory_bytes,
-            ) {
-                (Some(our_mem), Some(libass_mem)) => Some(our_mem as f64 / libass_mem as f64),
-                _ => None,
-            };
-            (Some(perf_ratio), mem_ratio)
-        } else {
-            (None, None)
-        };
+        // No reference renderer to compare against, so ratios are unavailable.
+        let (performance_ratio, memory_ratio): (Option<f64>, Option<f64>) = (None, None);
 
         // Calculate compatibility score (simplified - would need actual pixel comparison)
         let compatibility_score = 0.95; // Placeholder
@@ -201,8 +154,6 @@ impl PerformanceBenchmark {
             test_name: format!("{test_name}_{}_{}x{}", "single", resolution.0, resolution.1),
             resolution,
             our_performance,
-            #[cfg(feature = "libass-compare")]
-            libass_performance,
             performance_ratio,
             memory_ratio,
             compatibility_score,
@@ -240,47 +191,6 @@ impl PerformanceBenchmark {
             let end_memory = self.measure_memory_usage();
 
             render_times.push(elapsed.as_secs_f64() * 1000.0); // Convert to milliseconds
-
-            if let (Some(start), Some(end)) = (start_memory, end_memory) {
-                memory_usage.push(end.saturating_sub(start));
-            }
-        }
-
-        self.calculate_performance_metrics(render_times, memory_usage)
-    }
-
-    /// Benchmark libass renderer performance
-    #[cfg(feature = "libass-compare")]
-    fn benchmark_libass_renderer(
-        &mut self,
-        script: &Script,
-        time_cs: u32,
-    ) -> Result<PerformanceMetrics, RenderError> {
-        let mut render_times = Vec::new();
-        let mut memory_usage = Vec::new();
-
-        // Warmup
-        for _ in 0..self.config.warmup_iterations {
-            let _ = self.libass_renderer.render_frame(script, time_cs)?;
-        }
-
-        // Actual measurements
-        for _ in 0..self.config.iterations {
-            let start_memory = self.measure_memory_usage();
-
-            #[cfg(not(feature = "nostd"))]
-            let start_time = Instant::now();
-
-            let _frame = self.libass_renderer.render_frame(script, time_cs)?;
-
-            #[cfg(not(feature = "nostd"))]
-            let elapsed = start_time.elapsed();
-            #[cfg(feature = "nostd")]
-            let elapsed = std::time::Duration::from_millis(1); // Placeholder for no_std
-
-            let end_memory = self.measure_memory_usage();
-
-            render_times.push(elapsed.as_secs_f64() * 1000.0);
 
             if let (Some(start), Some(end)) = (start_memory, end_memory) {
                 memory_usage.push(end.saturating_sub(start));
@@ -454,8 +364,6 @@ impl PerformanceBenchmark {
                 self.our_renderer.context().height(),
             ),
             our_performance,
-            #[cfg(feature = "libass-compare")]
-            libass_performance: None, // TODO: Implement libass animation benchmark
             performance_ratio: None,
             memory_ratio: None,
             compatibility_score: 1.0, // Placeholder

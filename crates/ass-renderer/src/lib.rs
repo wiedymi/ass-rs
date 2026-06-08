@@ -28,8 +28,6 @@ pub mod renderer;
 pub mod utils;
 
 pub use backends::{BackendType, RenderBackend};
-#[cfg(all(not(feature = "nostd"), feature = "libass-compare"))]
-pub use debug::LibassRenderer;
 #[cfg(not(feature = "nostd"))]
 pub use debug::{DebugPlayer, FrameAnalyzer, FrameInspector, PlayerFrame};
 pub use pipeline::{Pipeline, PipelineStage};
