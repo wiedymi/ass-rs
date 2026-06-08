@@ -65,6 +65,18 @@ jobs:
           - full
           - minimal,nostd
           - full,simd-full
+        # ass-renderer is std-only (fontdb, tiny-skia, rustybuzz), so the
+        # no_std-flavored feature combos are scoped to the no_std-capable
+        # crates. `full` combos still exercise the whole workspace.
+        include:
+          - features: minimal
+            scope: -p ass-core -p ass-editor
+          - features: minimal,nostd
+            scope: -p ass-core -p ass-editor
+          - features: full
+            scope: --workspace
+          - features: full,simd-full
+            scope: --workspace
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -73,8 +85,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run tests
         run: |
-          cargo test --workspace --no-default-features --features ${{ matrix.features }}
-          cargo test --workspace --no-default-features --features ${{ matrix.features }} --release
+          cargo test ${{ matrix.scope }} --no-default-features --features ${{ matrix.features }}
+          cargo test ${{ matrix.scope }} --no-default-features --features ${{ matrix.features }} --release
 
   # Test no_std builds
   no-std:
