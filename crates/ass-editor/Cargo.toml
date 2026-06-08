@@ -2,7 +2,7 @@
 name = "ass-editor"
 version = "0.1.1"
 edition = "2021"
-rust-version = "1.75"
+rust-version.workspace = true
 license = "MIT"
 repository = "https://github.com/wiedymi/ass-rs"
 description = "High-performance, ergonomic editor layer for ASS subtitles"
