@@ -24,8 +24,9 @@ fn get_memory_usage() -> Option<usize> {
     Some(rss_kb * 1024) // Convert KB to bytes
 }
 
+/// Get current process memory usage (RSS) in bytes
 #[cfg(not(target_os = "macos"))]
-fn get_memory_usage() -> Option<usize> {
+const fn get_memory_usage() -> Option<usize> {
     // Linux version would read from /proc/self/status
     None
 }

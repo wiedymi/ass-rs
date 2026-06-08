@@ -445,11 +445,9 @@ fn bench_large_scale_anime(c: &mut Criterion) {
 
                     // Estimate memory usage (in real implementation would use actual measurements)
                     let estimated_memory = input_size + change.new_text.len();
-                    let memory_ratio = if input_size == 0 {
-                        0
-                    } else {
-                        estimated_memory * 100 / input_size
-                    };
+                    let memory_ratio = (estimated_memory * 100)
+                        .checked_div(input_size)
+                        .unwrap_or(0);
 
                     std_black_box((result, duration, memory_ratio))
                 });

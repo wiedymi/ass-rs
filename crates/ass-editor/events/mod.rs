@@ -575,7 +575,7 @@ impl EventChannel {
 
             handlers.push(handler_info);
             // Sort by priority (highest first)
-            handlers.sort_by(|a, b| b.priority.cmp(&a.priority));
+            handlers.sort_by_key(|h| core::cmp::Reverse(h.priority));
         }
 
         #[cfg(not(feature = "multi-thread"))]
@@ -590,7 +590,7 @@ impl EventChannel {
 
             handlers.push(handler_info);
             // Sort by priority (highest first)
-            handlers.sort_by(|a, b| b.priority.cmp(&a.priority));
+            handlers.sort_by_key(|h| core::cmp::Reverse(h.priority));
         }
 
         self.stats.handlers_count += 1;
@@ -639,7 +639,7 @@ impl EventChannel {
         self.stats.events_dispatched += 1;
 
         let mut filtered_count = 0;
-        #[allow(unused_variables, unused_assignments)]
+        #[cfg(feature = "std")]
         let mut processed_count = 0;
 
         #[cfg(feature = "multi-thread")]
@@ -655,7 +655,10 @@ impl EventChannel {
                 if handler_info.filter.matches(&event) {
                     handler_info.handler.handle_event(&event)?;
                     handler_info.events_processed += 1;
-                    processed_count += 1;
+                    #[cfg(feature = "std")]
+                    {
+                        processed_count += 1;
+                    }
                 } else {
                     filtered_count += 1;
                 }
@@ -670,7 +673,10 @@ impl EventChannel {
                 if handler_info.filter.matches(&event) {
                     handler_info.handler.handle_event(&event)?;
                     handler_info.events_processed += 1;
-                    processed_count += 1;
+                    #[cfg(feature = "std")]
+                    {
+                        processed_count += 1;
+                    }
                 } else {
                     filtered_count += 1;
                 }

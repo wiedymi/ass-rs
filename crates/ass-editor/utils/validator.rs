@@ -23,9 +23,10 @@ use alloc::{
 use std::time::Instant;
 
 /// Validation severity levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum ValidationSeverity {
     /// Informational message
+    #[default]
     Info,
     /// Warning that doesn't prevent script execution
     Warning,
@@ -33,12 +34,6 @@ pub enum ValidationSeverity {
     Error,
     /// Critical error that prevents script execution
     Critical,
-}
-
-impl Default for ValidationSeverity {
-    fn default() -> Self {
-        Self::Info
-    }
 }
 
 /// A validation issue found in the document

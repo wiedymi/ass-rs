@@ -44,11 +44,7 @@ fn bench_memory_efficiency(c: &mut Criterion) {
                 b.iter(|| {
                     let script = Script::parse(black_box(text)).unwrap();
                     let ast_size = estimate_ast_memory(&script);
-                    let ratio = if input_size == 0 {
-                        0
-                    } else {
-                        ast_size * 100 / input_size
-                    };
+                    let ratio = (ast_size * 100).checked_div(input_size).unwrap_or(0);
 
                     // Return tuple to prevent optimization
                     black_box((script, ratio))
@@ -82,7 +78,7 @@ fn bench_zero_copy_efficiency(c: &mut Criterion) {
     group.bench_function("parse_with_copy_simulation", |b| {
         b.iter(|| {
             // Simulate what a copying parser would do
-            let owned_copy = script_text.to_string();
+            let owned_copy = script_text.clone();
             let script = Script::parse(black_box(&owned_copy)).unwrap();
             let sections_count = script.sections().len();
             black_box((owned_copy, sections_count))

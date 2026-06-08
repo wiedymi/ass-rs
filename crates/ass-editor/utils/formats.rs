@@ -99,9 +99,10 @@ impl Default for ConversionOptions {
 }
 
 /// Format-specific conversion options
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum FormatOptions {
     /// No format-specific options
+    #[default]
     None,
 
     /// SRT-specific options
@@ -121,12 +122,6 @@ pub enum FormatOptions {
         /// Use cue settings for positioning
         use_cue_settings: bool,
     },
-}
-
-impl Default for FormatOptions {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// Format converter for subtitle import/export

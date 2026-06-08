@@ -299,7 +299,7 @@ impl DocumentSearch for FstSearchIndex {
 
         // Apply replacements in reverse order to maintain position validity
         let mut sorted_results = results.clone();
-        sorted_results.sort_by(|a, b| b.start.offset.cmp(&a.start.offset));
+        sorted_results.sort_by_key(|r| core::cmp::Reverse(r.start.offset));
 
         for result in &sorted_results {
             let range = Range::new(result.start, result.end);
