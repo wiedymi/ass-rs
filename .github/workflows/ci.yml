@@ -28,11 +28,19 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        features:
-          - minimal
-          - full
-          - minimal,nostd
-          - full,simd-full
+        # ass-renderer depends on std-only crates (fontdb, tiny-skia, rustybuzz),
+        # so the no_std-flavored combos are scoped to the no_std-capable crates,
+        # matching the dedicated nostd build job below. The renderer is still
+        # fully linted by the `full` / `full,simd-full` (--workspace) combos.
+        include:
+          - features: minimal
+            scope: -p ass-core -p ass-editor
+          - features: minimal,nostd
+            scope: -p ass-core -p ass-editor
+          - features: full
+            scope: --workspace
+          - features: full,simd-full
+            scope: --workspace
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -41,8 +49,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run clippy
         run: |
-          cargo clippy --workspace --no-default-features --features ${{ matrix.features }} -- -D warnings
-          cargo clippy --workspace --all-targets --no-default-features --features ${{ matrix.features }} -- -D warnings
+          cargo clippy ${{ matrix.scope }} --no-default-features --features ${{ matrix.features }} -- -D warnings
+          cargo clippy ${{ matrix.scope }} --all-targets --no-default-features --features ${{ matrix.features }} -- -D warnings
 
   # Run tests on multiple platforms
   test:
