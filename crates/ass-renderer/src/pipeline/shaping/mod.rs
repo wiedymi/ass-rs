@@ -267,11 +267,22 @@ fn find_font(
         },
     };
 
-    font_database.query(&final_query).ok_or_else(|| {
-        RenderError::FontError(format!(
-            "Font '{family}' not found and no fallback available"
-        ))
-    })
+    if let Some(id) = font_database.query(&final_query) {
+        return Ok(id);
+    }
+
+    // Last resort: any face actually loaded in the database. fontdb resolves the
+    // generic SansSerif/Serif families to platform default names (e.g. "Arial")
+    // that may not exist on the host, so fall back to whatever font is present.
+    font_database
+        .faces()
+        .next()
+        .map(|face| face.id)
+        .ok_or_else(|| {
+            RenderError::FontError(format!(
+                "Font '{family}' not found and no fallback available"
+            ))
+        })
 }
 
 /// Determine if text contains significant CJK/Hangul content
