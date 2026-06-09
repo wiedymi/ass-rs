@@ -92,12 +92,6 @@ impl EventSelector {
                 None
             }
         }) {
-            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-            eprintln!(
-                "EventSelector: Checking {} events at time {}",
-                events_section.len(),
-                time_cs
-            );
             for (idx, event) in events_section.iter().enumerate() {
                 // Include both Dialogue and optionally Comment events
                 let should_include = match event.event_type {
@@ -109,25 +103,6 @@ impl EventSelector {
                 if should_include {
                     let start = event.start_time_cs().unwrap_or(0);
                     let end = event.end_time_cs().unwrap_or(0);
-
-                    // Debug output for fade events
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    if event.text.contains("\\fad") {
-                        eprintln!("EventSelector: Fade event - start={}cs, end={}cs, time_cs={}cs, active={}", 
-                            start, end, time_cs, start <= time_cs && end >= time_cs);
-                    }
-
-                    // Debug output for the specific dialogue we're looking for
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    if event.text.contains("Чысценькая") {
-                        eprintln!(
-                            "Found target dialogue: start={}, end={}, current_time={}, active={}",
-                            start,
-                            end,
-                            time_cs,
-                            start <= time_cs && end >= time_cs
-                        );
-                    }
 
                     // Events are active from start time (inclusive) to end time (inclusive)
                     // This matches ASS/SSA specification and libass behavior

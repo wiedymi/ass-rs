@@ -110,22 +110,6 @@ impl Renderer {
             .pipeline
             .process_events(&events, time_cs, &self.context)?;
 
-        // Debug: Check what layers we have
-        // eprintln!("RENDERER: Got {} layers", layers.len());
-        for layer in layers.iter() {
-            match layer {
-                crate::pipeline::IntermediateLayer::Vector(_) => {
-                    // eprintln!("RENDERER: Layer {} is VectorData", i);
-                }
-                crate::pipeline::IntermediateLayer::Text(_) => {
-                    // eprintln!("RENDERER: Layer {} is TextData", i);
-                }
-                crate::pipeline::IntermediateLayer::Raster(_) => {
-                    // eprintln!("RENDERER: Layer {} is RasterData", i);
-                }
-            }
-        }
-
         let frame_data = self.backend.composite_layers(&layers, &self.context)?;
 
         Ok(Frame::new(

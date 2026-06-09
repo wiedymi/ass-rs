@@ -62,13 +62,8 @@ impl TransformAnimation {
         // \t(t1,t2,tags) - with time range
         // \t(t1,t2,accel,tags) - with time range and acceleration
 
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        eprintln!("TransformAnimation::parse called with args: '{args}'");
-
         let args = args.trim();
         if !args.starts_with('(') || !args.ends_with(')') {
-            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-            eprintln!("TransformAnimation::parse failed - missing parentheses");
             return None;
         }
 
@@ -92,16 +87,11 @@ impl TransformAnimation {
         }
 
         if tag_start == 0 {
-            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-            eprintln!("TransformAnimation::parse failed - no tags found");
             return None;
         }
 
         let params = &inner[..tag_start];
         let tags = &inner[tag_start..];
-
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        eprintln!("TransformAnimation::parse - params: '{params}', tags: '{tags}'");
 
         // Parse parameters - need to be careful since last param might be tags not accel
         let parts: Vec<&str> = params
@@ -144,15 +134,7 @@ impl TransformAnimation {
         // Parse target tags
         let target_tags = parse_animatable_tags(tags);
 
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        eprintln!(
-            "TransformAnimation::parse - parsed {} target tags",
-            target_tags.len()
-        );
-
         if target_tags.is_empty() {
-            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-            eprintln!("TransformAnimation::parse failed - no target tags found");
             return None;
         }
 
@@ -228,9 +210,6 @@ fn apply_acceleration_curve(t: f32, accel: f32) -> f32 {
 
 /// Parse tags that can be animated
 fn parse_animatable_tags(tag_string: &str) -> Vec<AnimatableTag> {
-    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-    eprintln!("parse_animatable_tags: input='{tag_string}'");
-
     let mut tags = Vec::new();
     let mut pos = 0;
     let chars: Vec<char> = tag_string.chars().collect();
@@ -271,17 +250,9 @@ fn parse_animatable_tags(tag_string: &str) -> Vec<AnimatableTag> {
 
                 let args = chars[arg_start..pos].iter().collect::<String>();
 
-                #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                eprintln!("  Found tag: name='{tag_name}', args='{args}'");
-
                 // Create animatable tag
                 if let Some(tag) = create_animatable_tag(&tag_name, &args) {
                     tags.push(tag);
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("  Created animatable tag for '{tag_name}'");
-                } else {
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("  Failed to create animatable tag for '{tag_name}'");
                 }
             }
         } else {

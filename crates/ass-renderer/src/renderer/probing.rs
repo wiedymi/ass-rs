@@ -52,18 +52,9 @@ impl BackendProber {
         for backend_type in &self.preferred_order {
             match self.try_create_backend(*backend_type, context) {
                 Ok(backend) => {
-                    #[cfg(not(feature = "nostd"))]
-                    eprintln!("Selected {} backend for rendering", backend_type.as_str());
                     return Ok(backend);
                 }
-                Err(_e) => {
-                    #[cfg(not(feature = "nostd"))]
-                    eprintln!(
-                        "Failed to initialize {} backend: {}",
-                        backend_type.as_str(),
-                        _e
-                    );
-                }
+                Err(_e) => {}
             }
         }
 
