@@ -610,7 +610,9 @@ pub fn parse_alpha(args: &str) -> Option<u8> {
         .map(|ass_alpha| 255 - ass_alpha)
 }
 
-fn parse_clip_args(args: &str) -> Option<ClipData> {
+/// Parse rectangular clip arguments from an ASS `\clip`/`\iclip` tag
+/// (`(x1,y1,x2,y2)`). Vector (drawing) clips are not handled here.
+pub fn parse_clip_args(args: &str) -> Option<ClipData> {
     let args = args.trim_start_matches('(').trim_end_matches(')');
     let parts: Vec<&str> = args.split(',').collect();
 

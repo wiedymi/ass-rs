@@ -300,6 +300,12 @@ fn process_tag_block(
                     current.formatting.blur_edges = Some(radius);
                 }
             }
+            "clip" | "iclip" => {
+                if let Some(mut clip) = super::tag_processor::parse_clip_args(args) {
+                    clip.inverse = name == "iclip";
+                    current.clip = Some(clip);
+                }
+            }
 
             // Rotation tags
             "frz" | "fr" => {

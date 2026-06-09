@@ -433,23 +433,30 @@ impl SoftwareBackend {
                 let height = self.pixmap.height();
 
                 if let Some(mut mask) = tiny_skia::Mask::new(width, height) {
-                    // Fill the mask with the clipping region
                     let mut builder = tiny_skia::PathBuilder::new();
+                    // The clip rectangle itself.
                     builder.move_to(*x1, *y1);
                     builder.line_to(*x2, *y1);
                     builder.line_to(*x2, *y2);
                     builder.line_to(*x1, *y2);
                     builder.close();
 
-                    if let Some(clip_path) = builder.finish() {
-                        // Fill the mask with the appropriate pattern
-                        mask.fill_path(
-                            &clip_path,
-                            tiny_skia::FillRule::Winding,
-                            !*inverse, // For normal clip, fill inside; for inverse, fill outside
-                            Transform::identity(),
-                        );
+                    // For \iclip, also add a full-canvas rectangle and use the
+                    // even-odd rule so coverage is left *outside* the clip rect
+                    // (the rect ends up with winding count 2 => uncovered).
+                    let fill_rule = if *inverse {
+                        builder.move_to(0.0, 0.0);
+                        builder.line_to(width as f32, 0.0);
+                        builder.line_to(width as f32, height as f32);
+                        builder.line_to(0.0, height as f32);
+                        builder.close();
+                        tiny_skia::FillRule::EvenOdd
+                    } else {
+                        tiny_skia::FillRule::Winding
+                    };
 
+                    if let Some(clip_path) = builder.finish() {
+                        mask.fill_path(&clip_path, fill_rule, true, Transform::identity());
                         return Some(mask);
                     }
                 }

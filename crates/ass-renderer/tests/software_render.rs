@@ -182,3 +182,33 @@ fn blur_tag_spreads_coverage() {
         "\\blur should spread coverage (blurred {blur_cov}px vs plain {plain_cov}px)"
     );
 }
+
+#[test]
+fn clip_and_iclip_partition_the_text() {
+    // Regression: `\clip`/`\iclip` were dropped by the segmenter (no-op), and the
+    // inverse flag only toggled mask anti-aliasing. `\clip` keeps pixels inside the
+    // rect, `\iclip` keeps those outside; together they reconstruct the full text.
+    // The Default style is centre-aligned (an5), so it straddles (640,360).
+    let (_, _, full) = render("CLIPPED");
+    let (_, _, clipped) = render("{\\clip(0,0,640,360)}CLIPPED");
+    let (_, _, iclipped) = render("{\\iclip(0,0,640,360)}CLIPPED");
+    let full_cov = count_covered(&full);
+    let clip_cov = count_covered(&clipped);
+    let iclip_cov = count_covered(&iclipped);
+
+    assert!(full_cov > 0, "unclipped text should render");
+    assert!(
+        clip_cov > 0 && clip_cov < full_cov,
+        "clip should remove some pixels ({clip_cov} of {full_cov})"
+    );
+    assert!(
+        iclip_cov > 0 && iclip_cov < full_cov,
+        "iclip should remove some pixels ({iclip_cov} of {full_cov})"
+    );
+    assert_ne!(clip_cov, iclip_cov, "clip and iclip must differ");
+    let sum = clip_cov + iclip_cov;
+    assert!(
+        sum.abs_diff(full_cov) <= full_cov / 20,
+        "clip ({clip_cov}) + iclip ({iclip_cov}) should reconstruct full ({full_cov})"
+    );
+}
