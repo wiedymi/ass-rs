@@ -339,45 +339,40 @@ impl SoftwareBackend {
         for effect in &data.effects {
             match effect {
                 crate::pipeline::TextEffect::Rotation { x, y, z } => {
-                    // Apply Z rotation (2D rotation) around the text centre.
-                    // NOTE: tiny-skia's `pre_rotate` takes DEGREES, so pass `z`
-                    // directly (passing radians here was the long-standing bug that
-                    // made `\frz` rotations look nearly flat).
-                    if *z != 0.0 {
-                        let text_center_x = shaped.width / 2.0;
-                        let text_center_y = shaped.height / 2.0;
+                    // All three rotations are applied around the text centre. Doing
+                    // them in local space keeps the glyphs in place; the skews used
+                    // to approximate \frx/\fry previously sheared around the screen
+                    // origin, which flung the text off-frame (it vanished entirely
+                    // for larger angles).
+                    let text_center_x = shaped.width / 2.0;
+                    let text_center_y = shaped.height / 2.0;
 
+                    // Z rotation (true 2D rotation). tiny-skia's pre_rotate takes
+                    // DEGREES, so pass `z` directly (passing radians made rotations
+                    // look nearly flat).
+                    if *z != 0.0 {
                         base_transform = base_transform
                             .pre_translate(text_center_x, text_center_y)
                             .pre_rotate(*z)
                             .pre_translate(-text_center_x, -text_center_y);
-
-                        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                        debug_println!(
-                            "Applied rotation: {} degrees around center ({}, {})",
-                            z,
-                            text_center_x,
-                            text_center_y
-                        );
                     }
 
-                    // Approximate 3D rotations with skew transformations
-                    // X rotation (rotation around horizontal axis) - affects vertical skew
+                    // X rotation -> vertical skew (perspective approximation).
                     if *x != 0.0 {
-                        let angle_rad = x * core::f32::consts::PI / 180.0;
-                        // Use perspective approximation: tan(angle) for small angles
-                        let skew_y = angle_rad.sin() * 0.5; // Scale down for visual effect
-                        base_transform =
-                            Transform::from_skew(0.0, skew_y).pre_concat(base_transform);
+                        let skew_y = (x * core::f32::consts::PI / 180.0).sin() * 0.5;
+                        base_transform = base_transform
+                            .pre_translate(text_center_x, text_center_y)
+                            .pre_concat(Transform::from_skew(0.0, skew_y))
+                            .pre_translate(-text_center_x, -text_center_y);
                     }
 
-                    // Y rotation (rotation around vertical axis) - affects horizontal skew
+                    // Y rotation -> horizontal skew (perspective approximation).
                     if *y != 0.0 {
-                        let angle_rad = y * core::f32::consts::PI / 180.0;
-                        // Use perspective approximation
-                        let skew_x = angle_rad.sin() * 0.5; // Scale down for visual effect
-                        base_transform =
-                            Transform::from_skew(skew_x, 0.0).pre_concat(base_transform);
+                        let skew_x = (y * core::f32::consts::PI / 180.0).sin() * 0.5;
+                        base_transform = base_transform
+                            .pre_translate(text_center_x, text_center_y)
+                            .pre_concat(Transform::from_skew(skew_x, 0.0))
+                            .pre_translate(-text_center_x, -text_center_y);
                     }
                 }
                 crate::pipeline::TextEffect::Scale { x, y } => {

@@ -212,3 +212,22 @@ fn clip_and_iclip_partition_the_text() {
         "clip ({clip_cov}) + iclip ({iclip_cov}) should reconstruct full ({full_cov})"
     );
 }
+
+#[test]
+fn frx_fry_rotation_does_not_vanish() {
+    // Regression: \frx/\fry sheared around the screen origin, flinging text
+    // off-frame (it vanished entirely for angles >= ~30deg). They now shear around
+    // the text centre, so the glyphs stay on screen.
+    let (pw, _, plain) = render("FLIPME");
+    let (_, _, frx) = render("{\\frx55}FLIPME");
+    let (_, _, fry) = render("{\\fry55}FLIPME");
+    let plain_h = opaque_bbox_height(&plain, pw);
+
+    assert!(count_covered(&frx) > 0, "\\frx55 text vanished off-screen");
+    assert!(count_covered(&fry) > 0, "\\fry55 text vanished off-screen");
+    let frx_h = opaque_bbox_height(&frx, pw);
+    assert!(
+        frx_h > plain_h,
+        "\\frx should add vertical skew ({frx_h}px vs unrotated {plain_h}px)"
+    );
+}
