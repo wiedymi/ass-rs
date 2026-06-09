@@ -521,8 +521,10 @@ impl SoftwarePipeline {
 
         if let Some(path) = path_opt {
             debug_println!("DRAWING: Creating VectorData layer");
-            // Get color from tags or style
-            let color = if let Some(c) = tags.colors.primary {
+            // Get color from tags or style. `\c` overrides only RGB, so inherit the
+            // alpha from the style (parse_bgr_color leaves alpha at 0 for 6-digit tags).
+            let color = if let Some(mut c) = tags.colors.primary {
+                c[3] = style.map_or(255, |s| Self::parse_ass_color(&s.primary_colour)[3]);
                 c
             } else if let Some(s) = style {
                 Self::parse_ass_color(&s.primary_colour)
@@ -1013,6 +1015,14 @@ impl SoftwarePipeline {
                 let mut color = tags.colors.primary.unwrap_or(default_primary_color);
                 let mut outline_color = tags.colors.outline.unwrap_or(default_outline_color);
                 let mut shadow_color = tags.colors.shadow.unwrap_or(default_back_color);
+
+                // `\c`/`\3c`/`\4c` override only RGB; their 6-digit form carries no
+                // alpha (parse_bgr_color yields 0). Alpha is inherited from the style
+                // and may be overridden by `\alpha`/`\1a`-family tags below, so restore
+                // the inherited alpha here rather than letting the override zero it out.
+                color[3] = default_primary_color[3];
+                outline_color[3] = default_outline_color[3];
+                shadow_color[3] = default_back_color[3];
 
                 // Debug: Print color being used for text
                 #[cfg(all(debug_assertions, not(feature = "nostd")))]
