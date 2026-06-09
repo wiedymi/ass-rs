@@ -336,3 +336,28 @@ fn reset_tag_clears_inline_overrides() {
     );
     assert!(red < 50, "after \\r there should be ~no red left ({red})");
 }
+
+#[test]
+fn complex_fade_holds_visible_then_fades_out() {
+    // \fade(a1,a2,a3,t1,t2,t3,t4): invisible before t1, fade in t1..t2, fully
+    // visible t2..t3, fade out t3..t4, invisible after. (The old code lerped
+    // a1->a3 = 255->255, leaving the text permanently invisible.) Times in ms;
+    // the event spans 0..10000ms.
+    let fade = "{\\fade(255,0,255,0,1000,4000,5000)}FADE";
+    let visible = |d: &[u8]| count_opaque(d, |_, _, _| true);
+
+    // Hold region t2..t3 (t = 2000ms = 200cs): fully visible.
+    let (_, _, mid) = render_at(200, fade);
+    assert!(
+        visible(&mid) > 500,
+        "complex fade should be visible during the hold ({})",
+        visible(&mid)
+    );
+    // After t4 (t = 6000ms = 600cs): faded out / invisible.
+    let (_, _, after) = render_at(600, fade);
+    assert!(
+        visible(&after) < 50,
+        "complex fade should be invisible after t4 ({})",
+        visible(&after)
+    );
+}

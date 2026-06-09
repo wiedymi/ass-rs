@@ -13,7 +13,7 @@ use std::{
 };
 
 use crate::pipeline::{
-    animation::{calculate_fade_progress, calculate_move_progress},
+    animation::calculate_move_progress,
     drawing::process_drawing_commands,
     shaping::{shape_text_with_style, GlyphRenderer},
     tag_processor::{KaraokeStyle, ProcessedTags},
@@ -919,14 +919,32 @@ impl SoftwarePipeline {
                     let event_start = event.start_time_cs().unwrap_or(0);
                     let event_end = event.end_time_cs().unwrap_or(u32::MAX);
 
-                    let fade_alpha = if fade.alpha_middle.is_some() {
-                        // Complex fade with 7 parameters - times are absolute
-                        let fade_progress =
-                            calculate_fade_progress(time_cs, fade.time_start, fade.time_end);
-                        // Interpolate between ASS alpha values (00=opaque, FF=transparent)
-                        let ass_alpha = fade.alpha_start as f32
-                            + (fade.alpha_end as f32 - fade.alpha_start as f32) * fade_progress;
-                        // Convert to RGBA alpha (00=transparent, FF=opaque)
+                    let fade_alpha = if let Some(alpha_mid) = fade.alpha_middle {
+                        // Complex \fade(a1,a2,a3,t1,t2,t3,t4): a 5-segment piecewise
+                        // alpha over event-relative times (a1 before t1, ramp a1->a2
+                        // over t1..t2, hold a2 over t2..t3, ramp a2->a3 over t3..t4,
+                        // a3 after t4). ASS alphas are inverted (00=opaque).
+                        let (a1, a2, a3) = (
+                            fade.alpha_start as f32,
+                            alpha_mid as f32,
+                            fade.alpha_end as f32,
+                        );
+                        let t1 = event_start + fade.time_start;
+                        let t2 = t1 + fade.time_fade_in.unwrap_or(0);
+                        let t4 = event_start + fade.time_end;
+                        let t3 = t4.saturating_sub(fade.time_fade_out.unwrap_or(0));
+                        let ass_alpha = if time_cs <= t1 {
+                            a1
+                        } else if time_cs < t2 {
+                            a1 + (a2 - a1) * (time_cs - t1) as f32 / (t2 - t1).max(1) as f32
+                        } else if time_cs <= t3 {
+                            a2
+                        } else if time_cs < t4 {
+                            a2 + (a3 - a2) * (time_cs - t3) as f32 / (t4 - t3).max(1) as f32
+                        } else {
+                            a3
+                        };
+                        // Convert ASS alpha (00=opaque, FF=transparent) to opacity.
                         255.0 - ass_alpha
                     } else {
                         // Simple fade - times are durations
