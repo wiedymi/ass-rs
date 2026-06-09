@@ -33,6 +33,23 @@ fn count_opaque<P: Fn(u8, u8, u8) -> bool>(data: &[u8], pred: P) -> u64 {
         .count() as u64
 }
 
+/// Width in pixels of the bounding box of opaque (alpha >= 128) pixels.
+fn opaque_bbox_width(data: &[u8], width: usize) -> usize {
+    let (mut min_x, mut max_x) = (usize::MAX, 0usize);
+    for (i, px) in data.chunks_exact(4).enumerate() {
+        if px[3] >= 128 {
+            let x = i % width;
+            min_x = min_x.min(x);
+            max_x = max_x.max(x);
+        }
+    }
+    if min_x == usize::MAX {
+        0
+    } else {
+        max_x - min_x + 1
+    }
+}
+
 #[test]
 fn inline_color_tag_renders_opaque_and_colored() {
     // Regression: `\c&Hbbggrr&` is 6-digit (no alpha); the fill must stay opaque
@@ -65,4 +82,19 @@ fn style_primary_color_renders_opaque() {
     let (_, _, w) = render("White Text");
     let white = count_opaque(&w, |r, g, b| r > 200 && g > 200 && b > 200);
     assert!(white > 200, "expected opaque white text, got {white}");
+}
+
+#[test]
+fn inline_tag_does_not_add_horizontal_gap() {
+    // Regression: a mid-line override (e.g. `\c`) must not double-advance the pen
+    // and leave a one-segment-width gap before the following run.
+    let (pw, _, plain) = render("HelloWorld");
+    let (sw, _, split) = render("Hello{\\c&H00FF00&}World");
+    let plain_w = opaque_bbox_width(&plain, pw);
+    let split_w = opaque_bbox_width(&split, sw);
+    assert!(plain_w > 0 && split_w > 0, "both lines should render");
+    assert!(
+        split_w <= plain_w * 6 / 5,
+        "inline color split widened the line ({split_w}px vs plain {plain_w}px) — gap regression"
+    );
 }

@@ -939,7 +939,10 @@ impl SoftwarePipeline {
 
                     #[cfg(all(debug_assertions, not(feature = "nostd")))]
                     debug_println!("Result from apply_alignment_offset: y={}", y);
-                    current_x = x + shaped.width; // Set position for next segment
+                    // Start the pen at this segment's left edge; the post-draw
+                    // advance below moves current_x past it (adding the width here
+                    // too would double-advance and leave a gap before the next run).
+                    current_x = x;
                     needs_initial_position = false;
                     (x, y)
                 } else {
