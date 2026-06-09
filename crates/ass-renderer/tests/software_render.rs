@@ -361,3 +361,15 @@ fn complex_fade_holds_visible_then_fades_out() {
         visible(&after)
     );
 }
+
+#[test]
+fn kf_sweep_shows_primary_and_secondary_together() {
+    // \kf sweeps left-to-right: mid-syllable the sung (left) part is primary
+    // (white) and the unsung (right) part is secondary (red) AT THE SAME TIME —
+    // not one uniform blended colour. \kf100 = a 1s syllable; t=50cs is 50% in.
+    let (_, _, mid) = render_at(50, "{\\kf100}KARAOKE");
+    let white = count_opaque(&mid, |r, g, b| r > 200 && g > 200 && b > 200);
+    let red = count_opaque(&mid, |r, g, b| r > 150 && g < 90 && b < 90);
+    assert!(white > 100, "swept (sung) part should be white ({white})");
+    assert!(red > 100, "un-swept part should be secondary red ({red})");
+}

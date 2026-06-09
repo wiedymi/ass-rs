@@ -616,56 +616,121 @@ impl SoftwareBackend {
                     .draw_pixmap(0, 0, temp_pixmap.as_ref(), &paint, blend_transform, None);
             }
         } else if let Some((progress, karaoke_style, karaoke_secondary)) = karaoke_info {
-            // Draw with karaoke effect based on style
-
-            let mut karaoke_paint = tiny_skia::Paint::default();
-
-            // For basic karaoke (\k), it's binary: either sung or not sung
-            // Progress > 0 means the syllable timing has started
-            // For \kf and \K, we'd need sweep effect (not fully implemented yet)
-
             // ASS karaoke colours: a syllable is the secondary colour until it is
             // "sung", then the primary colour (the layer's `data.color`).
             let primary = data.color;
             let secondary = karaoke_secondary;
-            if karaoke_style == 0 {
-                // Basic karaoke (\k): binary switch once the syllable has started.
-                let c = if progress > 0.0 { primary } else { secondary };
-                karaoke_paint.set_color_rgba8(c[0], c[1], c[2], c[3]);
-            } else if progress >= 1.0 {
-                karaoke_paint.set_color_rgba8(primary[0], primary[1], primary[2], primary[3]);
-            } else if progress <= 0.0 {
-                karaoke_paint.set_color_rgba8(
-                    secondary[0],
-                    secondary[1],
-                    secondary[2],
-                    secondary[3],
-                );
-            } else {
-                // \kf/\K sweep: approximate the partial fill by interpolating
-                // secondary -> primary (a left-to-right pixel sweep is not yet
-                // implemented). Keeps the colours correct rather than hard-coding.
-                let lerp = |s: u8, e: u8| (s as f32 * (1.0 - progress) + e as f32 * progress) as u8;
-                karaoke_paint.set_color_rgba8(
-                    lerp(secondary[0], primary[0]),
-                    lerp(secondary[1], primary[1]),
-                    lerp(secondary[2], primary[2]),
-                    primary[3],
-                );
-            }
-            karaoke_paint.anti_alias = true;
-            karaoke_paint.blend_mode = tiny_skia::BlendMode::SourceOver;
 
-            // Draw text with karaoke color
-            for path in &paths {
-                if let Some(transformed) = path.clone().transform(text_transform) {
-                    self.pixmap.fill_path(
-                        &transformed,
-                        &karaoke_paint,
-                        tiny_skia::FillRule::Winding,
-                        Transform::identity(),
-                        clip_mask.as_ref(),
-                    );
+            let mut paint = tiny_skia::Paint {
+                anti_alias: true,
+                blend_mode: tiny_skia::BlendMode::SourceOver,
+                ..Default::default()
+            };
+
+            // For \kf/\K mid-syllable, compute the left-to-right sweep boundary
+            // from the glyph bounds. (Skipped when a \clip is active — combining
+            // the sweep with an arbitrary clip mask is left to the colour blend.)
+            let sweeping = karaoke_style != 0 && progress > 0.0 && progress < 1.0;
+            let sweep_bounds = if sweeping && clip_mask.is_none() {
+                let mut b: Option<tiny_skia::Rect> = None;
+                for path in &paths {
+                    if let Some(t) = path.clone().transform(text_transform) {
+                        let pb = t.bounds();
+                        b = Some(match b {
+                            None => pb,
+                            Some(acc) => tiny_skia::Rect::from_ltrb(
+                                acc.left().min(pb.left()),
+                                acc.top().min(pb.top()),
+                                acc.right().max(pb.right()),
+                                acc.bottom().max(pb.bottom()),
+                            )
+                            .unwrap_or(acc),
+                        });
+                    }
+                }
+                b
+            } else {
+                None
+            };
+
+            if let Some(b) = sweep_bounds {
+                // Secondary base across the whole syllable.
+                paint.set_color_rgba8(secondary[0], secondary[1], secondary[2], secondary[3]);
+                for path in &paths {
+                    if let Some(t) = path.clone().transform(text_transform) {
+                        self.pixmap.fill_path(
+                            &t,
+                            &paint,
+                            tiny_skia::FillRule::Winding,
+                            Transform::identity(),
+                            None,
+                        );
+                    }
+                }
+                // Primary on the already-sung left portion, clipped to the sweep rect.
+                let sweep_x = b.left() + progress * (b.right() - b.left());
+                if let (Some(rect), Some(mut mask)) = (
+                    tiny_skia::Rect::from_ltrb(b.left(), b.top(), sweep_x, b.bottom()),
+                    tiny_skia::Mask::new(self.pixmap.width(), self.pixmap.height()),
+                ) {
+                    let mut pb = tiny_skia::PathBuilder::new();
+                    pb.push_rect(rect);
+                    if let Some(rect_path) = pb.finish() {
+                        mask.fill_path(
+                            &rect_path,
+                            tiny_skia::FillRule::Winding,
+                            true,
+                            Transform::identity(),
+                        );
+                        paint.set_color_rgba8(primary[0], primary[1], primary[2], primary[3]);
+                        for path in &paths {
+                            if let Some(t) = path.clone().transform(text_transform) {
+                                self.pixmap.fill_path(
+                                    &t,
+                                    &paint,
+                                    tiny_skia::FillRule::Winding,
+                                    Transform::identity(),
+                                    Some(&mask),
+                                );
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Single-colour fill: binary \k, a finished/not-started sweep, or a
+                // sweep under an active \clip (approximated by a secondary->primary
+                // colour blend).
+                let c = if karaoke_style == 0 {
+                    if progress > 0.0 {
+                        primary
+                    } else {
+                        secondary
+                    }
+                } else if progress >= 1.0 {
+                    primary
+                } else if progress <= 0.0 {
+                    secondary
+                } else {
+                    let lerp =
+                        |s: u8, e: u8| (s as f32 * (1.0 - progress) + e as f32 * progress) as u8;
+                    [
+                        lerp(secondary[0], primary[0]),
+                        lerp(secondary[1], primary[1]),
+                        lerp(secondary[2], primary[2]),
+                        primary[3],
+                    ]
+                };
+                paint.set_color_rgba8(c[0], c[1], c[2], c[3]);
+                for path in &paths {
+                    if let Some(t) = path.clone().transform(text_transform) {
+                        self.pixmap.fill_path(
+                            &t,
+                            &paint,
+                            tiny_skia::FillRule::Winding,
+                            Transform::identity(),
+                            clip_mask.as_ref(),
+                        );
+                    }
                 }
             }
         } else {
