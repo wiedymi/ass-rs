@@ -136,21 +136,7 @@
 //! - **`nostd`**: No-standard library support for embedded/WASM
 //! - **`dev-benches`**: Development benchmarking
 //!
-//! ## Usage Examples
-//!
-//! ```toml
-//! # Full-featured desktop editor (default)
-//! ass-editor = "0.1"
-//!
-//! # Minimal editor for lightweight integrations
-//! ass-editor = { version = "0.1", default-features = false, features = ["minimal"] }
-//!
-//! # Maximum performance with SIMD
-//! ass-editor = { version = "0.1", features = ["full", "simd"] }
-//!
-//! # WASM/embedded build
-//! ass-editor = { version = "0.1", default-features = false, features = ["minimal", "nostd"] }
-//! ```
+//! See the README for `Cargo.toml` dependency snippets for each flavor.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
