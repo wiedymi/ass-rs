@@ -338,14 +338,17 @@ impl SoftwareBackend {
 
         for effect in &data.effects {
             match effect {
-                crate::pipeline::TextEffect::Rotation { x, y, z } => {
-                    // All three rotations are applied around the text centre. Doing
-                    // them in local space keeps the glyphs in place; the skews used
-                    // to approximate \frx/\fry previously sheared around the screen
-                    // origin, which flung the text off-frame (it vanished entirely
-                    // for larger angles).
-                    let text_center_x = shaped.width / 2.0;
-                    let text_center_y = shaped.height / 2.0;
+                crate::pipeline::TextEffect::Rotation { x, y, z, origin } => {
+                    // Rotations are applied around a centre in local space. By
+                    // default that is the text's own centre; `\org` overrides it with
+                    // an explicit screen-space point (converted to local coords).
+                    // Doing this in local space keeps the glyphs in place; the skews
+                    // used to approximate \frx/\fry previously sheared around the
+                    // screen origin, which flung the text off-frame.
+                    let (text_center_x, text_center_y) = match origin {
+                        Some((ox, oy)) => (ox - data.x, oy - baseline_y),
+                        None => (shaped.width / 2.0, shaped.height / 2.0),
+                    };
 
                     // Z rotation (true 2D rotation). tiny-skia's pre_rotate takes
                     // DEGREES, so pass `z` directly (passing radians made rotations

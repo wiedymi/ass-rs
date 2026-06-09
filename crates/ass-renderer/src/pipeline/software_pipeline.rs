@@ -1323,10 +1323,14 @@ impl SoftwarePipeline {
                         rotation_z,
                         line_text
                     );
+                    // `\org` sets the rotation centre in script coordinates; scale
+                    // it to screen space for the backend.
+                    let origin = tags.origin.map(|(ox, oy)| (ox * scale_x, oy * scale_y));
                     layer.effects.push(TextEffect::Rotation {
                         x: rotation_x,
                         y: rotation_y,
                         z: rotation_z,
+                        origin,
                     });
                 }
 

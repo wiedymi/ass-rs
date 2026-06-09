@@ -194,8 +194,14 @@ pub enum TextEffect {
         style: u8,
         secondary: [u8; 4],
     },
-    /// 3D rotation (in degrees)
-    Rotation { x: f32, y: f32, z: f32 },
+    /// 3D rotation (in degrees). `origin`, when set, is the rotation centre in
+    /// screen-space pixels (`\org`); otherwise the text's own centre is used.
+    Rotation {
+        x: f32,
+        y: f32,
+        z: f32,
+        origin: Option<(f32, f32)>,
+    },
     /// Shear/skew transformation
     Shear { x: f32, y: f32 },
     /// Scale transformation

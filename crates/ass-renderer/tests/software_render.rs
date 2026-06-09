@@ -286,3 +286,18 @@ fn borderstyle3_draws_opaque_box() {
     let white = count_opaque(data, |r, g, b| r > 200 && g > 200 && b > 200);
     assert!(white > 200, "expected white text over the box, got {white}");
 }
+
+#[test]
+fn org_changes_rotation_pivot() {
+    // Regression: \org was dropped by the segmenter and rotation always used the
+    // text's own centre. Rotating around an explicit far-off origin displaces the
+    // text differently than rotating around its centre.
+    let (w, _, centre) = render("{\\frz40}PIVOT");
+    let (_, _, orged) = render("{\\org(300,200)\\frz40}PIVOT");
+    assert!(count_covered(&orged) > 0, "\\org text vanished");
+    let dx = bbox_min_x(&centre, w).abs_diff(bbox_min_x(&orged, w));
+    assert!(
+        dx > 30,
+        "\\org should move the rotation pivot (delta min_x = {dx}px)"
+    );
+}

@@ -316,6 +316,11 @@ fn process_tag_block(
                     current.shear_y = Some(shear);
                 }
             }
+            "org" => {
+                if let Some((x, y)) = super::tag_processor::parse_pos_args(args) {
+                    current.origin = Some((x, y));
+                }
+            }
 
             // Rotation tags
             "frz" | "fr" => {
