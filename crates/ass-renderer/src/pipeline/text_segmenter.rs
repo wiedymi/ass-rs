@@ -306,6 +306,16 @@ fn process_tag_block(
                     current.clip = Some(clip);
                 }
             }
+            "fax" => {
+                if let Ok(shear) = args.parse::<f32>() {
+                    current.shear_x = Some(shear);
+                }
+            }
+            "fay" => {
+                if let Ok(shear) = args.parse::<f32>() {
+                    current.shear_y = Some(shear);
+                }
+            }
 
             // Rotation tags
             "frz" | "fr" => {

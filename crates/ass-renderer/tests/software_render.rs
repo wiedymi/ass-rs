@@ -60,6 +60,21 @@ fn count_covered(data: &[u8]) -> u64 {
     data.chunks_exact(4).filter(|px| px[3] > 0).count() as u64
 }
 
+/// Left edge (min x) of the bounding box of opaque (alpha >= 128) pixels.
+fn bbox_min_x(data: &[u8], width: usize) -> usize {
+    let mut min_x = usize::MAX;
+    for (i, px) in data.chunks_exact(4).enumerate() {
+        if px[3] >= 128 {
+            min_x = min_x.min(i % width);
+        }
+    }
+    if min_x == usize::MAX {
+        0
+    } else {
+        min_x
+    }
+}
+
 /// Height in pixels of the bounding box of opaque (alpha >= 128) pixels.
 fn opaque_bbox_height(data: &[u8], width: usize) -> usize {
     let (mut min_y, mut max_y) = (usize::MAX, 0usize);
@@ -229,5 +244,25 @@ fn frx_fry_rotation_does_not_vanish() {
     assert!(
         frx_h > plain_h,
         "\\frx should add vertical skew ({frx_h}px vs unrotated {plain_h}px)"
+    );
+}
+
+#[test]
+fn fax_shear_applies_and_stays_centered() {
+    // Regression: \fax/\fay were dropped by the segmenter, and once applied the
+    // shear ran around the screen origin, shoving the text hundreds of px sideways.
+    let (pw, _, plain) = render("SHEARME");
+    let (sw, _, fax) = render("{\\fax0.6}SHEARME");
+    assert!(count_covered(&fax) > 0, "\\fax text vanished");
+    let plain_w = opaque_bbox_width(&plain, pw);
+    let fax_w = opaque_bbox_width(&fax, sw);
+    assert!(
+        fax_w > plain_w,
+        "\\fax should widen the line via slant ({fax_w}px vs {plain_w}px)"
+    );
+    let dx = bbox_min_x(&plain, pw).abs_diff(bbox_min_x(&fax, sw));
+    assert!(
+        dx < 150,
+        "\\fax shifted the line by {dx}px (origin-shear regression)"
     );
 }

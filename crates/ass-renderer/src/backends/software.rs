@@ -406,8 +406,15 @@ impl SoftwareBackend {
                     }
                 }
                 crate::pipeline::TextEffect::Shear { x, y } => {
-                    // Apply shear transformation (for \fax and \fay tags)
-                    base_transform = Transform::from_skew(*x, *y).pre_concat(base_transform);
+                    // Apply shear (\fax/\fay) around the text centre. Shearing around
+                    // the screen origin displaced the text by skew*position, shoving
+                    // it far across the frame.
+                    let text_center_x = shaped.width / 2.0;
+                    let text_center_y = shaped.height / 2.0;
+                    base_transform = base_transform
+                        .pre_translate(text_center_x, text_center_y)
+                        .pre_concat(Transform::from_skew(*x, *y))
+                        .pre_translate(-text_center_x, -text_center_y);
                 }
                 _ => {}
             }
