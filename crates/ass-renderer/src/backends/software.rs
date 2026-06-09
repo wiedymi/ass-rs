@@ -339,30 +339,23 @@ impl SoftwareBackend {
         for effect in &data.effects {
             match effect {
                 crate::pipeline::TextEffect::Rotation { x, y, z } => {
-                    // Apply Z rotation (2D rotation) - convert degrees to radians
+                    // Apply Z rotation (2D rotation) around the text centre.
+                    // NOTE: tiny-skia's `pre_rotate` takes DEGREES, so pass `z`
+                    // directly (passing radians here was the long-standing bug that
+                    // made `\frz` rotations look nearly flat).
                     if *z != 0.0 {
-                        let angle_rad = z * core::f32::consts::PI / 180.0;
-                        // To rotate around text center, we need to:
-                        // 1. Translate back to origin
-                        // 2. Rotate
-                        // 3. Translate back to position
-                        // Get the center of the text for rotation
-                        // The text is positioned at its baseline, so we need to calculate center
-                        // relative to the text's actual bounding box
                         let text_center_x = shaped.width / 2.0;
                         let text_center_y = shaped.height / 2.0;
 
-                        // Move center to origin, rotate, then move back
                         base_transform = base_transform
                             .pre_translate(text_center_x, text_center_y)
-                            .pre_rotate(angle_rad)
+                            .pre_rotate(*z)
                             .pre_translate(-text_center_x, -text_center_y);
 
                         #[cfg(all(debug_assertions, not(feature = "nostd")))]
                         debug_println!(
-                            "Applied rotation: {} degrees ({} radians) around center ({}, {})",
+                            "Applied rotation: {} degrees around center ({}, {})",
                             z,
-                            angle_rad,
                             text_center_x,
                             text_center_y
                         );

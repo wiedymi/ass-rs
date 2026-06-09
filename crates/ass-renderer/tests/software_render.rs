@@ -50,6 +50,23 @@ fn opaque_bbox_width(data: &[u8], width: usize) -> usize {
     }
 }
 
+/// Height in pixels of the bounding box of opaque (alpha >= 128) pixels.
+fn opaque_bbox_height(data: &[u8], width: usize) -> usize {
+    let (mut min_y, mut max_y) = (usize::MAX, 0usize);
+    for (i, px) in data.chunks_exact(4).enumerate() {
+        if px[3] >= 128 {
+            let y = i / width;
+            min_y = min_y.min(y);
+            max_y = max_y.max(y);
+        }
+    }
+    if min_y == usize::MAX {
+        0
+    } else {
+        max_y - min_y + 1
+    }
+}
+
 #[test]
 fn inline_color_tag_renders_opaque_and_colored() {
     // Regression: `\c&Hbbggrr&` is 6-digit (no alpha); the fill must stay opaque
@@ -96,5 +113,21 @@ fn inline_tag_does_not_add_horizontal_gap() {
     assert!(
         split_w <= plain_w * 6 / 5,
         "inline color split widened the line ({split_w}px vs plain {plain_w}px) — gap regression"
+    );
+}
+
+#[test]
+fn frz_rotation_changes_geometry() {
+    // Regression: `\frz` must actually rotate. tiny-skia's pre_rotate takes
+    // degrees; passing radians made rotations ~flat. A wide line rotated 45°
+    // spans far more vertically than the unrotated line.
+    let (pw, _, plain) = render("ROTATME");
+    let (rw, _, rot) = render("{\\frz45}ROTATME");
+    let plain_h = opaque_bbox_height(&plain, pw);
+    let rot_h = opaque_bbox_height(&rot, rw);
+    assert!(plain_h > 0 && rot_h > 0, "both lines should render");
+    assert!(
+        rot_h >= plain_h * 3 / 2,
+        "expected \\frz45 to increase vertical extent (rotated {rot_h}px vs plain {plain_h}px)"
     );
 }
