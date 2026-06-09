@@ -290,6 +290,16 @@ fn process_tag_block(
                     eprintln!("DEBUG text_segmenter: Parsed \\fsp{spacing} tag");
                 }
             }
+            "blur" => {
+                if let Ok(radius) = args.parse::<f32>() {
+                    current.formatting.blur = Some(radius);
+                }
+            }
+            "be" => {
+                if let Ok(radius) = args.parse::<f32>() {
+                    current.formatting.blur_edges = Some(radius);
+                }
+            }
 
             // Rotation tags
             "frz" | "fr" => {

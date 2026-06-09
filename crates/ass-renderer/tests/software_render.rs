@@ -55,6 +55,11 @@ fn opaque_bbox_width(data: &[u8], width: usize) -> usize {
     }
 }
 
+/// Count pixels with any coverage (alpha > 0).
+fn count_covered(data: &[u8]) -> u64 {
+    data.chunks_exact(4).filter(|px| px[3] > 0).count() as u64
+}
+
 /// Height in pixels of the bounding box of opaque (alpha >= 128) pixels.
 fn opaque_bbox_height(data: &[u8], width: usize) -> usize {
     let (mut min_y, mut max_y) = (usize::MAX, 0usize);
@@ -160,5 +165,20 @@ fn karaoke_uses_primary_and_secondary_not_yellow() {
     assert!(
         white > 200,
         "sung karaoke should be primary white, got {white}"
+    );
+}
+
+#[test]
+fn blur_tag_spreads_coverage() {
+    // Regression: `\blur` was silently dropped by the segmenter (output identical
+    // to no blur). A strong blur must spread coverage well beyond the sharp text.
+    let (_, _, plain) = render("BLURME");
+    let (_, _, blurred) = render("{\\blur15}BLURME");
+    let plain_cov = count_covered(&plain);
+    let blur_cov = count_covered(&blurred);
+    assert!(plain_cov > 0, "plain text should render");
+    assert!(
+        blur_cov >= plain_cov * 3 / 2,
+        "\\blur should spread coverage (blurred {blur_cov}px vs plain {plain_cov}px)"
     );
 }

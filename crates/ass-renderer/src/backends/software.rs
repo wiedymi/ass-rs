@@ -670,9 +670,13 @@ impl SoftwareBackend {
                 // Apply simple box blur
                 apply_box_blur(&mut temp_pixmap, radius);
 
-                // Draw blurred result to main pixmap
-                let blend_transform =
-                    Transform::from_translate(data.x - blur_size as f32, data.y - blur_size as f32);
+                // Draw blurred result to main pixmap. Use baseline_y (the same
+                // vertical origin as the sharp path) so the blurred glyphs land on
+                // the text rather than floating above it as a halo.
+                let blend_transform = Transform::from_translate(
+                    data.x - blur_size as f32,
+                    baseline_y - blur_size as f32,
+                );
                 let paint = tiny_skia::PixmapPaint {
                     blend_mode: tiny_skia::BlendMode::SourceOver,
                     ..Default::default()
