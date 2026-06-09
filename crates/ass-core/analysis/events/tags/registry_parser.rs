@@ -12,7 +12,7 @@ use alloc::vec::Vec;
 
 /// Parse override block with extension registry support
 ///
-/// Enhanced version of [`parse_override_block`] that can use custom tag handlers
+/// Enhanced version of [`parse_override_block`](super::parse_override_block) that can use custom tag handlers
 /// from an extension registry. Unknown tags are first checked against the registry
 /// before falling back to standard processing.
 ///
