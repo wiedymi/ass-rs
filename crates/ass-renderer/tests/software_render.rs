@@ -373,3 +373,63 @@ fn kf_sweep_shows_primary_and_secondary_together() {
     assert!(white > 100, "swept (sung) part should be white ({white})");
     assert!(red > 100, "un-swept part should be secondary red ({red})");
 }
+
+#[test]
+fn blur_softens_outline_and_fill_together() {
+    // Outlined style (Outline=4) + strong \blur: the outline must blur with the
+    // fill, so almost no fully-opaque pixels remain. The old code blurred only the
+    // fill and kept a sharp (fully opaque) outline ring.
+    let head = "[Script Info]\nPlayResX: 1280\nPlayResY: 720\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Outlined,Arial,64,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,4,0,5,30,30,30,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";
+    let render_outlined = |text: &str| {
+        let s = format!("{head}Dialogue: 0,0:00:00.00,0:00:10.00,Outlined,,0,0,0,,{text}\n");
+        let script = Script::parse(&s).expect("parse");
+        let ctx = RenderContext::new(1280, 720);
+        let mut r = Renderer::new(BackendType::Software, ctx).expect("renderer");
+        r.render_frame(&script, 200).expect("render").data().to_vec()
+    };
+    let solid = |d: &[u8]| d.chunks_exact(4).filter(|p| p[3] >= 250).count() as u64;
+
+    let sharp = render_outlined("OUTLINE");
+    let blurred = render_outlined("{\\blur20}OUTLINE");
+    assert!(
+        solid(&sharp) > 500,
+        "sharp outlined text should have many opaque pixels ({})",
+        solid(&sharp)
+    );
+    assert!(
+        solid(&blurred) < solid(&sharp) / 5,
+        "\\blur should soften the outline too ({} blurred vs {} sharp)",
+        solid(&blurred),
+        solid(&sharp)
+    );
+}
+
+#[test]
+fn blur_softens_shadow_and_fill_together() {
+    // Shadowed style (Shadow=8, no outline) + strong \blur: the offset shadow
+    // must blur with the fill, leaving almost no fully-opaque pixels. The old
+    // code blurred only the fill and kept the sharp offset shadow block opaque.
+    let head = "[Script Info]\nPlayResX: 1280\nPlayResY: 720\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Shadowed,Arial,64,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,8,5,30,30,30,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";
+    let render_shadowed = |text: &str| {
+        let s = format!("{head}Dialogue: 0,0:00:00.00,0:00:10.00,Shadowed,,0,0,0,,{text}\n");
+        let script = Script::parse(&s).expect("parse");
+        let ctx = RenderContext::new(1280, 720);
+        let mut r = Renderer::new(BackendType::Software, ctx).expect("renderer");
+        r.render_frame(&script, 200).expect("render").data().to_vec()
+    };
+    let solid = |d: &[u8]| d.chunks_exact(4).filter(|p| p[3] >= 250).count() as u64;
+
+    let sharp = render_shadowed("SHADOW");
+    let blurred = render_shadowed("{\\blur20}SHADOW");
+    assert!(
+        solid(&sharp) > 500,
+        "sharp shadowed text should have many opaque pixels ({})",
+        solid(&sharp)
+    );
+    assert!(
+        solid(&blurred) < solid(&sharp) / 5,
+        "\\blur should soften the shadow too ({} blurred vs {} sharp)",
+        solid(&blurred),
+        solid(&sharp)
+    );
+}

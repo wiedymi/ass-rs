@@ -358,21 +358,47 @@ impl SoftwareBackend {
             }
         });
 
-        // Apply effects in order: shadow, outline, then main text
-        for effect in &data.effects {
+        // \blur radius, outline and shadow, detected up front. When \blur is
+        // active the outline and shadow are rendered into the blur temp (below)
+        // and softened together with the fill, rather than drawn sharp here.
+        let blur_radius = data.effects.iter().find_map(|e| {
+            if let crate::pipeline::TextEffect::Blur { radius } = e {
+                Some(*radius)
+            } else {
+                None
+            }
+        });
+        let outline_info = data.effects.iter().find_map(|e| {
+            if let crate::pipeline::TextEffect::Outline { color, width } = e {
+                Some((*color, *width))
+            } else {
+                None
+            }
+        });
+        let shadow_info = data.effects.iter().find_map(|e| {
             if let crate::pipeline::TextEffect::Shadow {
                 color,
                 x_offset,
                 y_offset,
-            } = effect
+            } = e
             {
-                // Draw shadow first
+                Some((*color, *x_offset, *y_offset))
+            } else {
+                None
+            }
+        });
+
+        // Apply effects in order: shadow, outline, then main text. The sharp
+        // shadow is skipped when \blur is active (it is folded into the blur
+        // temp below so it softens together with the outline and fill).
+        if blur_radius.is_none() {
+            if let Some((color, x_offset, y_offset)) = shadow_info {
                 let mut shadow_paint = tiny_skia::Paint::default();
                 shadow_paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
                 shadow_paint.anti_alias = true;
                 shadow_paint.blend_mode = tiny_skia::BlendMode::SourceOver;
 
-                let shadow_transform = base_transform.pre_translate(*x_offset, *y_offset);
+                let shadow_transform = base_transform.pre_translate(x_offset, y_offset);
 
                 for path in &paths {
                     if let Some(transformed) = path.clone().transform(shadow_transform) {
@@ -516,9 +542,11 @@ impl SoftwareBackend {
                             );
                         }
                     }
-                } else {
-                    // Draw outline using path expansion (like libass)
-                    // This creates a filled outline rather than a stroked one
+                } else if blur_radius.is_none() {
+                    // Draw outline using path expansion (like libass).
+                    // This creates a filled outline rather than a stroked one.
+                    // (When \blur is active this is skipped — the outline goes into
+                    // the blur temp below so it blurs together with the fill.)
                     let mut stroker = tiny_skia::PathStroker::new();
 
                     for path in &paths {
@@ -547,15 +575,6 @@ impl SoftwareBackend {
         text_paint.anti_alias = true;
         text_paint.blend_mode = tiny_skia::BlendMode::SourceOver;
 
-        // Check for blur effect
-        let blur_radius = data.effects.iter().find_map(|e| {
-            if let crate::pipeline::TextEffect::Blur { radius } = e {
-                Some(*radius)
-            } else {
-                None
-            }
-        });
-
         // Check for karaoke effect
         let karaoke_info = data.effects.iter().find_map(|e| {
             if let crate::pipeline::TextEffect::Karaoke {
@@ -583,8 +602,58 @@ impl SoftwareBackend {
             if let Some(mut temp_pixmap) = Pixmap::new(text_width, text_height) {
                 temp_pixmap.fill(tiny_skia::Color::TRANSPARENT);
 
-                // Draw text to temporary pixmap
+                // Draw shadow (if any) then outline then text into the temp
+                // pixmap, so the box blur below softens shadow, outline and fill
+                // together. The shadow goes down first as it sits behind the rest.
                 let temp_transform = Transform::from_translate(blur_size as f32, blur_size as f32);
+                if let Some((scolor, sx, sy)) = shadow_info {
+                    let mut shadow_paint = tiny_skia::Paint {
+                        anti_alias: true,
+                        blend_mode: tiny_skia::BlendMode::SourceOver,
+                        ..Default::default()
+                    };
+                    shadow_paint.set_color_rgba8(scolor[0], scolor[1], scolor[2], scolor[3]);
+                    let shadow_transform = temp_transform.pre_translate(sx, sy);
+                    for path in &paths {
+                        if let Some(transformed) = path.clone().transform(shadow_transform) {
+                            temp_pixmap.fill_path(
+                                &transformed,
+                                &shadow_paint,
+                                tiny_skia::FillRule::Winding,
+                                Transform::identity(),
+                                None,
+                            );
+                        }
+                    }
+                }
+                if let Some((ocolor, owidth)) = outline_info {
+                    let mut outline_paint = tiny_skia::Paint {
+                        anti_alias: true,
+                        blend_mode: tiny_skia::BlendMode::SourceOver,
+                        ..Default::default()
+                    };
+                    outline_paint.set_color_rgba8(ocolor[0], ocolor[1], ocolor[2], ocolor[3]);
+                    let stroke = tiny_skia::Stroke {
+                        width: owidth * 0.6,
+                        line_cap: tiny_skia::LineCap::Square,
+                        line_join: tiny_skia::LineJoin::Miter,
+                        ..Default::default()
+                    };
+                    let mut stroker = tiny_skia::PathStroker::new();
+                    for path in &paths {
+                        if let Some(transformed) = path.clone().transform(temp_transform) {
+                            if let Some(outlined) = stroker.stroke(&transformed, &stroke, 1.0) {
+                                temp_pixmap.fill_path(
+                                    &outlined,
+                                    &outline_paint,
+                                    tiny_skia::FillRule::Winding,
+                                    Transform::identity(),
+                                    None,
+                                );
+                            }
+                        }
+                    }
+                }
                 for path in &paths {
                     if let Some(transformed) = path.clone().transform(temp_transform) {
                         temp_pixmap.fill_path(
