@@ -1,0 +1,14 @@
+#!/bin/sh
+# Project policy: commit messages must NOT contain AI "Co-authored-by" trailers
+# (e.g. Claude / Anthropic). Reject any such trailer so it can never be added.
+#
+# Enable in a fresh clone with:  git config core.hooksPath .githooks
+#
+# $1 is the path to the prepared commit message file.
+
+if grep -qiE '^[[:space:]]*Co-authored-by:.*(claude|anthropic|noreply@anthropic)' "$1"; then
+    echo "commit-msg: refusing commit — remove the AI 'Co-authored-by' trailer (project policy)." >&2
+    exit 1
+fi
+
+exit 0
