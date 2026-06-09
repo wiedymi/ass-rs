@@ -301,3 +301,38 @@ fn org_changes_rotation_pivot() {
         "\\org should move the rotation pivot (delta min_x = {dx}px)"
     );
 }
+
+#[test]
+fn bord_and_shad_were_parsed_and_applied() {
+    // Regression: the segmenter dropped \bord and \shad entirely. The Default
+    // style has Outline=0 / Shadow=0, so these tags must visibly add coverage.
+    let (_, _, plain) = render("BORD");
+    let (_, _, bord) = render("{\\bord10}BORD");
+    let (_, _, shad) = render("{\\shad14}BORD");
+    let plain_cov = count_covered(&plain);
+    assert!(plain_cov > 0, "plain text should render");
+    assert!(
+        count_covered(&bord) >= plain_cov * 3 / 2,
+        "\\bord10 should add a thick outline ({} vs {plain_cov})",
+        count_covered(&bord)
+    );
+    assert!(
+        count_covered(&shad) > plain_cov,
+        "\\shad14 should add a shadow ({} vs {plain_cov})",
+        count_covered(&shad)
+    );
+}
+
+#[test]
+fn reset_tag_clears_inline_overrides() {
+    // Regression: \r was dropped by the segmenter. \r must reset inline overrides
+    // back to the style: red set before \r reverts to the white style colour.
+    let (_, _, data) = render("{\\c&H0000FF&\\r}RESET");
+    let red = count_opaque(&data, |r, g, b| r > 150 && g < 90 && b < 90);
+    let white = count_opaque(&data, |r, g, b| r > 200 && g > 200 && b > 200);
+    assert!(
+        white > 200,
+        "after \\r text should be the white style colour ({white})"
+    );
+    assert!(red < 50, "after \\r there should be ~no red left ({red})");
+}

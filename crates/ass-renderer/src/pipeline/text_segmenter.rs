@@ -326,6 +326,49 @@ fn process_tag_block(
                 }
             }
 
+            // Border / outline width
+            "bord" => {
+                if let Ok(w) = args.parse::<f32>() {
+                    current.formatting.border = Some(w);
+                }
+            }
+            "xbord" => {
+                if let Ok(w) = args.parse::<f32>() {
+                    current.formatting.border_x = Some(w);
+                }
+            }
+            "ybord" => {
+                if let Ok(w) = args.parse::<f32>() {
+                    current.formatting.border_y = Some(w);
+                }
+            }
+            // Shadow depth
+            "shad" => {
+                if let Ok(d) = args.parse::<f32>() {
+                    current.formatting.shadow = Some(d);
+                }
+            }
+            "xshad" => {
+                if let Ok(d) = args.parse::<f32>() {
+                    current.formatting.shadow_x = Some(d);
+                }
+            }
+            "yshad" => {
+                if let Ok(d) = args.parse::<f32>() {
+                    current.formatting.shadow_y = Some(d);
+                }
+            }
+            // Wrap style
+            "q" => {
+                if let Ok(wrap) = args.parse::<u8>() {
+                    current.formatting.wrap_style = Some(wrap);
+                }
+            }
+            // \r resets all inline overrides back to the line's style.
+            "r" => {
+                *current = super::tag_processor::ProcessedTags::default();
+            }
+
             // Alignment tags
             "a" | "an" => {
                 if let Ok(align) = args.parse::<u8>() {
