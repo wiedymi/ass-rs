@@ -13,12 +13,17 @@ const HEAD: &str = "[Script Info]\nPlayResX: 1280\nPlayResY: 720\n\n[V4+ Styles]
 
 /// Render a single dialogue line at t=2s and return (width, height, RGBA bytes).
 fn render(dialogue_text: &str) -> (usize, usize, Vec<u8>) {
+    render_at(200, dialogue_text)
+}
+
+/// Render a single dialogue line at `time_cs` and return (width, height, RGBA bytes).
+fn render_at(time_cs: u32, dialogue_text: &str) -> (usize, usize, Vec<u8>) {
     let script_text =
         format!("{HEAD}Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{dialogue_text}\n");
     let script = Script::parse(&script_text).expect("parse");
     let ctx = RenderContext::new(1280, 720);
     let mut renderer = Renderer::new(BackendType::Software, ctx).expect("renderer");
-    let frame = renderer.render_frame(&script, 200).expect("render");
+    let frame = renderer.render_frame(&script, time_cs).expect("render");
     (
         frame.width() as usize,
         frame.height() as usize,
@@ -129,5 +134,31 @@ fn frz_rotation_changes_geometry() {
     assert!(
         rot_h >= plain_h * 3 / 2,
         "expected \\frz45 to increase vertical extent (rotated {rot_h}px vs plain {plain_h}px)"
+    );
+}
+
+#[test]
+fn karaoke_uses_primary_and_secondary_not_yellow() {
+    // Default style: primary white, secondary red (&H000000FF). A `\k` syllable
+    // is the secondary colour until sung, then the primary colour — and never the
+    // old hard-coded yellow.
+    let is_yellow = |r: u8, g: u8, b: u8| r > 150 && g > 150 && b < 100;
+
+    // Before the syllable's time: secondary (red).
+    let (_, _, early) = render_at(0, "{\\k100}KARAOKE");
+    assert_eq!(count_opaque(&early, is_yellow), 0, "no yellow karaoke fill");
+    let red = count_opaque(&early, |r, g, b| r > 150 && g < 110 && b < 110);
+    assert!(
+        red > 200,
+        "unsung karaoke should be secondary red, got {red}"
+    );
+
+    // After the syllable's time: primary (white).
+    let (_, _, late) = render_at(500, "{\\k100}KARAOKE");
+    assert_eq!(count_opaque(&late, is_yellow), 0, "no yellow karaoke fill");
+    let white = count_opaque(&late, |r, g, b| r > 200 && g > 200 && b > 200);
+    assert!(
+        white > 200,
+        "sung karaoke should be primary white, got {white}"
     );
 }

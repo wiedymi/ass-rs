@@ -187,8 +187,13 @@ pub enum TextEffect {
     Blur { radius: f32 },
     /// Edge blur effect (only blurs outline/edges)
     EdgeBlur { radius: f32 },
-    /// Karaoke effect
-    Karaoke { progress: f32, style: u8 },
+    /// Karaoke effect. `secondary` is the not-yet-sung (secondary) colour;
+    /// the sung colour is the layer's primary `color`.
+    Karaoke {
+        progress: f32,
+        style: u8,
+        secondary: [u8; 4],
+    },
     /// 3D rotation (in degrees)
     Rotation { x: f32, y: f32, z: f32 },
     /// Shear/skew transformation

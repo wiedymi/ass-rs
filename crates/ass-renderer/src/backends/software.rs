@@ -626,10 +626,15 @@ impl SoftwareBackend {
 
         // Check for karaoke effect
         let karaoke_info = data.effects.iter().find_map(|e| {
-            if let crate::pipeline::TextEffect::Karaoke { progress, style } = e {
+            if let crate::pipeline::TextEffect::Karaoke {
+                progress,
+                style,
+                secondary,
+            } = e
+            {
                 #[cfg(all(debug_assertions, not(feature = "nostd")))]
                 debug_println!("KARAOKE DETECTED: progress={}, style={}", progress, style);
-                Some((*progress, *style))
+                Some((*progress, *style, *secondary))
             } else {
                 None
             }
@@ -676,7 +681,7 @@ impl SoftwareBackend {
                 self.pixmap
                     .draw_pixmap(0, 0, temp_pixmap.as_ref(), &paint, blend_transform, None);
             }
-        } else if let Some((progress, karaoke_style)) = karaoke_info {
+        } else if let Some((progress, karaoke_style, karaoke_secondary)) = karaoke_info {
             // Draw with karaoke effect based on style
 
             #[cfg(all(debug_assertions, not(feature = "nostd")))]
@@ -696,52 +701,34 @@ impl SoftwareBackend {
             // Progress > 0 means the syllable timing has started
             // For \kf and \K, we'd need sweep effect (not fully implemented yet)
 
+            // ASS karaoke colours: a syllable is the secondary colour until it is
+            // "sung", then the primary colour (the layer's `data.color`).
+            let primary = data.color;
+            let secondary = karaoke_secondary;
             if karaoke_style == 0 {
-                // Basic karaoke (\k)
-                // Binary switching based on progress
-                // During the syllable duration (0 < progress < 1), show as sung
-                // After (progress >= 1), keep as sung
-                if progress > 0.0 {
-                    // Sung - use highlight color (typically secondary color, we'll use yellow)
-                    karaoke_paint.set_color_rgba8(255, 255, 0, data.color[3]); // Yellow
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    debug_println!("KARAOKE COLOR: Sung - Yellow (255,255,0,{})", data.color[3]);
-                } else {
-                    // Not yet sung - use original color
-                    karaoke_paint.set_color_rgba8(
-                        data.color[0],
-                        data.color[1],
-                        data.color[2],
-                        data.color[3],
-                    );
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    debug_println!(
-                        "KARAOKE COLOR: Not sung - Original ({},{},{},{})",
-                        data.color[0],
-                        data.color[1],
-                        data.color[2],
-                        data.color[3]
-                    );
-                }
+                // Basic karaoke (\k): binary switch once the syllable has started.
+                let c = if progress > 0.0 { primary } else { secondary };
+                karaoke_paint.set_color_rgba8(c[0], c[1], c[2], c[3]);
+            } else if progress >= 1.0 {
+                karaoke_paint.set_color_rgba8(primary[0], primary[1], primary[2], primary[3]);
+            } else if progress <= 0.0 {
+                karaoke_paint.set_color_rgba8(
+                    secondary[0],
+                    secondary[1],
+                    secondary[2],
+                    secondary[3],
+                );
             } else {
-                // For other styles (fill, outline, sweep), use simple approach for now
-                // TODO: Implement proper sweep effect
-                if progress >= 1.0 {
-                    karaoke_paint.set_color_rgba8(255, 255, 0, data.color[3]);
-                } else if progress <= 0.0 {
-                    karaoke_paint.set_color_rgba8(
-                        data.color[0],
-                        data.color[1],
-                        data.color[2],
-                        data.color[3],
-                    );
-                } else {
-                    // Simple interpolation as placeholder
-                    let r = (data.color[0] as f32 * (1.0 - progress) + 255.0 * progress) as u8;
-                    let g = (data.color[1] as f32 * (1.0 - progress) + 255.0 * progress) as u8;
-                    let b = (data.color[2] as f32 * (1.0 - progress) + 0.0 * progress) as u8;
-                    karaoke_paint.set_color_rgba8(r, g, b, data.color[3]);
-                }
+                // \kf/\K sweep: approximate the partial fill by interpolating
+                // secondary -> primary (a left-to-right pixel sweep is not yet
+                // implemented). Keeps the colours correct rather than hard-coding.
+                let lerp = |s: u8, e: u8| (s as f32 * (1.0 - progress) + e as f32 * progress) as u8;
+                karaoke_paint.set_color_rgba8(
+                    lerp(secondary[0], primary[0]),
+                    lerp(secondary[1], primary[1]),
+                    lerp(secondary[2], primary[2]),
+                    primary[3],
+                );
             }
             karaoke_paint.anti_alias = true;
             karaoke_paint.blend_mode = tiny_skia::BlendMode::SourceOver;

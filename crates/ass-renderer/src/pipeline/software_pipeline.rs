@@ -1395,6 +1395,12 @@ impl SoftwarePipeline {
                     debug_println!("KARAOKE TIMING: syllable_start={}, syllable_end={}, time_cs={}, progress={}", 
                         syllable_start, syllable_end, time_cs, progress);
 
+                    // Unsung syllables use the secondary colour. `\2c` overrides are
+                    // 6-digit (no alpha), so inherit alpha from the style default.
+                    let mut karaoke_secondary =
+                        tags.colors.secondary.unwrap_or(default_secondary_color);
+                    karaoke_secondary[3] = default_secondary_color[3];
+
                     // Add karaoke effect with correct progress
                     layer.effects.push(TextEffect::Karaoke {
                         progress,
@@ -1404,6 +1410,7 @@ impl SoftwarePipeline {
                             KaraokeStyle::Outline => 2,
                             KaraokeStyle::Sweep => 3,
                         },
+                        secondary: karaoke_secondary,
                     });
 
                     // Accumulate time for next syllable
