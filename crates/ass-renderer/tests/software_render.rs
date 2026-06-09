@@ -266,3 +266,23 @@ fn fax_shear_applies_and_stays_centered() {
         "\\fax shifted the line by {dx}px (origin-shear regression)"
     );
 }
+
+#[test]
+fn borderstyle3_draws_opaque_box() {
+    // Regression: BorderStyle 3 was ignored (rendered as an outline). It must fill
+    // an opaque box behind the text in the outline colour (here blue, &H00FF0000).
+    let script_text = "[Script Info]\nPlayResX: 1280\nPlayResY: 720\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Box,Arial,64,&H00FFFFFF,&H000000FF,&H00FF0000,&H00FF0000,0,0,0,0,100,100,0,0,3,6,0,5,30,30,30,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:10.00,Box,,0,0,0,,BOX\n";
+    let script = Script::parse(script_text).expect("parse");
+    let ctx = RenderContext::new(1280, 720);
+    let mut renderer = Renderer::new(BackendType::Software, ctx).expect("renderer");
+    let frame = renderer.render_frame(&script, 200).expect("render");
+    let data = frame.data();
+
+    let blue_box = count_opaque(data, |r, g, b| b > 150 && r < 120 && g < 120);
+    assert!(
+        blue_box > 3000,
+        "BorderStyle 3 should fill a large opaque box, got {blue_box} blue px"
+    );
+    let white = count_opaque(data, |r, g, b| r > 200 && g > 200 && b > 200);
+    assert!(white > 200, "expected white text over the box, got {white}");
+}

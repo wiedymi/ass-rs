@@ -498,6 +498,48 @@ impl SoftwareBackend {
             }
         }
 
+        // Draw opaque box (BorderStyle 3) behind the text, covering the glyph
+        // bounds expanded by the padding, in the outline colour.
+        for effect in &data.effects {
+            if let crate::pipeline::TextEffect::OpaqueBox { color, padding } = effect {
+                let mut bounds: Option<tiny_skia::Rect> = None;
+                for path in &paths {
+                    if let Some(t) = path.clone().transform(base_transform) {
+                        let b = t.bounds();
+                        bounds = Some(match bounds {
+                            None => b,
+                            Some(acc) => tiny_skia::Rect::from_ltrb(
+                                acc.left().min(b.left()),
+                                acc.top().min(b.top()),
+                                acc.right().max(b.right()),
+                                acc.bottom().max(b.bottom()),
+                            )
+                            .unwrap_or(acc),
+                        });
+                    }
+                }
+                if let Some(b) = bounds {
+                    if let Some(rect) = tiny_skia::Rect::from_ltrb(
+                        b.left() - *padding,
+                        b.top() - *padding,
+                        b.right() + *padding,
+                        b.bottom() + *padding,
+                    ) {
+                        let mut box_paint = tiny_skia::Paint::default();
+                        box_paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
+                        box_paint.anti_alias = true;
+                        box_paint.blend_mode = tiny_skia::BlendMode::SourceOver;
+                        self.pixmap.fill_rect(
+                            rect,
+                            &box_paint,
+                            Transform::identity(),
+                            clip_mask.as_ref(),
+                        );
+                    }
+                }
+            }
+        }
+
         // Check for edge blur effect (applies to outline only)
         let edge_blur_radius = data.effects.iter().find_map(|e| {
             if let crate::pipeline::TextEffect::EdgeBlur { radius } = e {

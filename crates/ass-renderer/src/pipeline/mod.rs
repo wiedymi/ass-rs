@@ -208,4 +208,7 @@ pub enum TextEffect {
         y2: f32,
         inverse: bool,
     },
+    /// Opaque box behind the text (`BorderStyle: 3`), drawn in the outline
+    /// colour with `padding` pixels around the glyph bounds.
+    OpaqueBox { color: [u8; 4], padding: f32 },
 }

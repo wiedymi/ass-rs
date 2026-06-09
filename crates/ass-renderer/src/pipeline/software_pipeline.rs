@@ -1244,10 +1244,20 @@ impl SoftwarePipeline {
                         .or(tags.formatting.border)
                         .unwrap_or(default_outline)
                 };
-                if outline_width_x > 0.0 || outline_width_y > 0.0 {
+                let border_style = style
+                    .and_then(|s| s.border_style.trim().parse::<u8>().ok())
+                    .unwrap_or(1);
+                let border_width = outline_width_x.max(outline_width_y);
+                if border_style == 3 {
+                    // BorderStyle 3: opaque box behind the text in the outline colour.
+                    layer.effects.push(TextEffect::OpaqueBox {
+                        color: outline_color,
+                        padding: border_width,
+                    });
+                } else if outline_width_x > 0.0 || outline_width_y > 0.0 {
                     layer.effects.push(TextEffect::Outline {
                         color: outline_color,
-                        width: outline_width_x.max(outline_width_y), // Use max for now
+                        width: border_width, // Use max for now
                     });
                 }
 
