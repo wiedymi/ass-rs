@@ -1,18 +1,5 @@
 //! Fixed software pipeline implementation with proper style resolution
 
-// Debug macro that only works with std
-#[cfg(not(feature = "nostd"))]
-macro_rules! debug_println {
-    ($($arg:tt)*) => {
-        eprintln!($($arg)*)
-    };
-}
-
-#[cfg(feature = "nostd")]
-macro_rules! debug_println {
-    ($($arg:tt)*) => {};
-}
-
 #[cfg(feature = "nostd")]
 use alloc::{
     string::{String, ToString},
@@ -184,10 +171,6 @@ impl SoftwarePipeline {
 
             // Calculate animation progress (expects milliseconds)
             let progress = animation.calculate_progress(relative_time_ms);
-
-            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-            debug_println!("TRANSFORM: event_start_cs={}, current_time_cs={}, relative_time_ms={}, progress={}", 
-                event_start_cs, current_time_cs, relative_time_ms, progress);
 
             // If animation hasn't started or has finished, we might not need to interpolate
             if progress <= 0.0 || progress >= 1.0 {
@@ -411,23 +394,8 @@ impl SoftwarePipeline {
         time_cs: u32,
         context: &RenderContext,
     ) -> Result<Vec<IntermediateLayer>, RenderError> {
-        debug_println!(
-            "PROCESS_EVENT: Processing event with text: '{}'",
-            event.text
-        );
         // Get text segments with their individual tags
         let segments = segment_text_with_tags(event.text, None)?;
-
-        let segment_count = segments.len();
-        debug_println!("PROCESS_EVENT: Got {segment_count} segments");
-        for (i, seg) in segments.iter().enumerate() {
-            debug_println!(
-                "  Segment {}: text='{}', drawing_mode={:?}",
-                i,
-                seg.text,
-                seg.tags.drawing_mode
-            );
-        }
 
         if segments.is_empty() {
             return Ok(Vec::new());
@@ -435,12 +403,6 @@ impl SoftwarePipeline {
 
         // Check if this is a drawing command
         if let Some(draw_level) = segments[0].tags.drawing_mode {
-            debug_println!(
-                "DRAWING: Found drawing mode level {} for text: '{}'",
-                draw_level,
-                segments[0].text.chars().take(50).collect::<String>()
-            );
-
             if draw_level > 0 {
                 // Clone the style to avoid borrow issues
                 let style_cloned = self
@@ -448,8 +410,6 @@ impl SoftwarePipeline {
                     .get(event.style)
                     .or(self.default_style.as_ref())
                     .cloned();
-
-                debug_println!("DRAWING: Processing drawing command");
 
                 return self.process_drawing_command(
                     &segments[0],
@@ -468,18 +428,6 @@ impl SoftwarePipeline {
             .or(self.default_style.as_ref())
             .cloned();
 
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        if event.text.contains("Чысценькая") {
-            debug_println!(
-                "  Style '{}' found: {}",
-                event.style,
-                style_cloned.is_some()
-            );
-            if let Some(ref style) = style_cloned {
-                debug_println!("    Font: {}, Size: {}", style.fontname, style.fontsize);
-            }
-        }
-
         // Process text segments with proper style inheritance
         self.process_text_segments(segments, event, style_cloned.as_ref(), time_cs, context)
     }
@@ -495,32 +443,20 @@ impl SoftwarePipeline {
         let plain_text = &segment.text;
         let tags = &segment.tags;
 
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        debug_println!(
-            "DRAWING: process_drawing_command called with text: '{}'",
-            plain_text
-        );
-
         // Try to get drawing path from cache
         let draw_cache_key = crate::cache::DrawingCacheKey {
             commands: plain_text.clone(),
         };
 
         let path_opt = if let Some(cached) = self.cache.get_drawing_path(&draw_cache_key) {
-            debug_println!("DRAWING: Got cached path");
             cached
         } else {
             let path = process_drawing_commands(plain_text)?;
-            debug_println!(
-                "DRAWING: Parsed drawing commands, got path: {}",
-                path.is_some()
-            );
             self.cache.store_drawing_path(draw_cache_key, path.clone());
             path
         };
 
         if let Some(path) = path_opt {
-            debug_println!("DRAWING: Creating VectorData layer");
             // Get color from tags or style. `\c` overrides only RGB, so inherit the
             // alpha from the style (parse_bgr_color leaves alpha at 0 for 6-digit tags).
             let color = if let Some(mut c) = tags.colors.primary {
@@ -607,19 +543,6 @@ impl SoftwarePipeline {
                 y + align_y_offset,
             ));
 
-            debug_println!(
-                "DRAWING: Alignment={}, offset=({:.2}, {:.2}), final pos=({:.2}, {:.2})",
-                alignment,
-                align_x_offset,
-                align_y_offset,
-                x + align_x_offset,
-                y + align_y_offset
-            );
-            debug_println!(
-                "DRAWING: Created transformed path, returning VectorData with color {:?}",
-                color
-            );
-
             return Ok(vec![IntermediateLayer::Vector(VectorData {
                 path: transformed_path,
                 color,
@@ -639,20 +562,6 @@ impl SoftwarePipeline {
         time_cs: u32,
         context: &RenderContext,
     ) -> Result<Vec<IntermediateLayer>, RenderError> {
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        if event.text.contains("Чысценькая") {
-            let segment_count = segments.len();
-            debug_println!("  process_text_segments: {segment_count} segments");
-            for (i, seg) in segments.iter().enumerate() {
-                debug_println!(
-                    "    Segment {}: text='{}', tags={:?}",
-                    i,
-                    seg.text,
-                    seg.tags.position
-                );
-            }
-        }
-
         let mut all_layers = Vec::new();
         let mut line_height = 48.0; // Default from styles
 
@@ -773,9 +682,6 @@ impl SoftwarePipeline {
         // Line height for spacing between lines (not affected by DPI scale in libass)
         let estimated_line_height = default_font_size_base * scale_y;
 
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        debug_println!("Line height calculation: font_size_base={}, scale_y={}, dpi_scale={}, estimated_line_height={}", 
-            default_font_size_base, scale_y, self.dpi_scale, estimated_line_height);
         let _total_text_height = estimated_line_height * num_lines as f32 * line_spacing_multiplier;
 
         // Process each logical line
@@ -790,24 +696,9 @@ impl SoftwarePipeline {
                 let mut tags = segment.tags.clone();
                 let line_text = &segment.text;
 
-                // Debug: Check what's in tags
-                if line_text.contains("m ") || line_text.contains("l ") {
-                    debug_println!(
-                        "DRAWING DEBUG: Found potential drawing text: '{}', drawing_mode: {:?}",
-                        line_text,
-                        tags.drawing_mode
-                    );
-                }
-
                 // Check if this segment is in drawing mode
                 if let Some(drawing_mode) = tags.drawing_mode {
                     if drawing_mode > 0 {
-                        debug_println!(
-                            "DRAWING: Processing drawing segment with mode {} and commands: {}",
-                            drawing_mode,
-                            line_text
-                        );
-
                         // Process drawing commands
                         if let Ok(drawing_layers) =
                             self.process_drawing_command(&segment, event, style, time_cs, context)
@@ -822,14 +713,6 @@ impl SoftwarePipeline {
 
                 // Apply transform animations if present
                 let event_start_cs = event.start_time_cs().unwrap_or(0);
-                #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                if !tags.transforms.is_empty() {
-                    debug_println!(
-                        "TRANSFORM: Found {} transform(s) for text segment at time {}cs",
-                        tags.transforms.len(),
-                        time_cs
-                    );
-                }
                 let default_colors = (
                     default_primary_color,
                     default_secondary_color,
@@ -895,9 +778,6 @@ impl SoftwarePipeline {
                                 let line_offset = (num_lines - 1 - line_index) as f32
                                     * estimated_line_height
                                     * line_spacing_multiplier;
-                                #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                                debug_println!("Multi-line bottom align: line {} of {}, anchor_y={}, line_offset={}, estimated_line_height={}", 
-                                    line_index + 1, num_lines, anchor_y, line_offset, estimated_line_height);
                                 anchor_y - line_offset
                             }
                             7..=9 => {
@@ -925,10 +805,6 @@ impl SoftwarePipeline {
                         shaped.height
                     };
 
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    debug_println!("Calling apply_alignment_offset: adjusted_y={}, height_for_positioning={} (shaped.height={})", 
-                        adjusted_y, height_for_positioning, shaped.height);
-
                     let (x, y) = self.apply_alignment_offset(
                         anchor_x,
                         adjusted_y,
@@ -937,8 +813,6 @@ impl SoftwarePipeline {
                         alignment,
                     );
 
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    debug_println!("Result from apply_alignment_offset: y={}", y);
                     // Start the pen at this segment's left edge; the post-draw
                     // advance below moves current_x past it (adding the width here
                     // too would double-advance and leave a gap before the next run).
@@ -960,9 +834,6 @@ impl SoftwarePipeline {
                                 let line_offset = (num_lines - 1 - line_index) as f32
                                     * estimated_line_height
                                     * line_spacing_multiplier;
-                                #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                                debug_println!("Multi-line bottom align (else branch): line {} of {}, anchor_y={}, line_offset={}, estimated_line_height={}", 
-                                    line_index + 1, num_lines, anchor_y, line_offset, estimated_line_height);
                                 anchor_y - line_offset
                             }
                             7..=9 => {
@@ -1027,38 +898,10 @@ impl SoftwarePipeline {
                 outline_color[3] = default_outline_color[3];
                 shadow_color[3] = default_back_color[3];
 
-                // Debug: Print color being used for text
-                #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                if !line_text.is_empty() {
-                    debug_println!(
-                        "Text '{}' using color: R={}, G={}, B={}, A={}",
-                        line_text,
-                        color[0],
-                        color[1],
-                        color[2],
-                        color[3]
-                    );
-                    if let Some(s) = style {
-                        let primary_colour = &s.primary_colour;
-                        debug_println!("  Style primary_colour: {primary_colour}");
-                    }
-                }
-
                 // Apply individual alpha overrides (ASS alpha is inverted: 00=opaque, FF=transparent)
-                #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                debug_println!(
-                    "Alpha values: alpha={:?}, alpha1={:?}, alpha3={:?}, alpha4={:?}",
-                    tags.colors.alpha,
-                    tags.colors.alpha1,
-                    tags.colors.alpha3,
-                    tags.colors.alpha4
-                );
-
                 if let Some(alpha) = tags.colors.alpha1.or(tags.colors.alpha) {
                     // Alpha is already inverted in parse_alpha (255 = opaque, 0 = transparent)
                     color[3] = alpha;
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    debug_println!("Applied alpha to primary color: {alpha}");
                 }
                 if let Some(alpha) = tags.colors.alpha3 {
                     // Alpha is already inverted in parse_alpha
@@ -1076,18 +919,6 @@ impl SoftwarePipeline {
                     let event_start = event.start_time_cs().unwrap_or(0);
                     let event_end = event.end_time_cs().unwrap_or(u32::MAX);
 
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    debug_println!(
-                        "FADE DEBUG: Found fade tag for '{}' at time_cs={}",
-                        line_text.chars().take(30).collect::<String>(),
-                        time_cs
-                    );
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    debug_println!("  Event times: start={}, end={}", event_start, event_end);
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    debug_println!("  Fade params: time_start={}, time_end={}, alpha_start={}, alpha_end={}, alpha_middle={:?}", 
-                        fade.time_start, fade.time_end, fade.alpha_start, fade.alpha_end, fade.alpha_middle);
-
                     let fade_alpha = if fade.alpha_middle.is_some() {
                         // Complex fade with 7 parameters - times are absolute
                         let fade_progress =
@@ -1096,55 +927,24 @@ impl SoftwarePipeline {
                         let ass_alpha = fade.alpha_start as f32
                             + (fade.alpha_end as f32 - fade.alpha_start as f32) * fade_progress;
                         // Convert to RGBA alpha (00=transparent, FF=opaque)
-                        let result = 255.0 - ass_alpha;
-                        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                        debug_println!(
-                            "  Complex fade: progress={:.2}, ass_alpha={:.1}, rgba_alpha={:.1}",
-                            fade_progress,
-                            ass_alpha,
-                            result
-                        );
-                        result
+                        255.0 - ass_alpha
                     } else {
                         // Simple fade - times are durations
                         let fade_in_end = event_start + fade.time_start;
                         let fade_out_start = event_end.saturating_sub(fade.time_end);
 
-                        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                        debug_println!(
-                            "  Simple fade: fade_in_end={}, fade_out_start={}",
-                            fade_in_end,
-                            fade_out_start
-                        );
-
                         if time_cs < fade_in_end {
                             // During fade in
                             let progress = (time_cs.saturating_sub(event_start)) as f32
                                 / fade.time_start.max(1) as f32;
-                            let alpha = 255.0 * progress.min(1.0);
-                            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                            debug_println!(
-                                "  FADE IN: progress={:.2}, alpha={:.1}",
-                                progress,
-                                alpha
-                            );
-                            alpha
+                            255.0 * progress.min(1.0)
                         } else if time_cs >= fade_out_start && fade_out_start < event_end {
                             // During fade out
                             let progress = (event_end.saturating_sub(time_cs)) as f32
                                 / fade.time_end.max(1) as f32;
-                            let alpha = 255.0 * progress.min(1.0);
-                            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                            debug_println!(
-                                "  FADE OUT: progress={:.2}, alpha={:.1}",
-                                progress,
-                                alpha
-                            );
-                            alpha
+                            255.0 * progress.min(1.0)
                         } else {
                             // Fully visible
-                            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                            debug_println!("  FULLY VISIBLE: alpha=255.0");
                             255.0
                         }
                     };
@@ -1152,41 +952,15 @@ impl SoftwarePipeline {
                     // Apply fade to all color components (primary, outline, shadow)
                     let fade_factor = fade_alpha / 255.0;
 
-                    let _old_alpha = color[3];
                     color[3] = (color[3] as f32 * fade_factor) as u8;
                     outline_color[3] = (outline_color[3] as f32 * fade_factor) as u8;
                     shadow_color[3] = (shadow_color[3] as f32 * fade_factor) as u8;
-
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    debug_println!("  FADE APPLIED: fade_alpha={:.1}, primary: {}→{}, outline: {}→{}, shadow: {}→{}",
-                        fade_alpha, _old_alpha, color[3],
-                        (outline_color[3] as f32 / fade_factor) as u8, outline_color[3],
-                        (shadow_color[3] as f32 / fade_factor) as u8, shadow_color[3]);
                 }
 
                 // Get spacing value (from tags or default style)
                 let spacing = tags.font.spacing.unwrap_or(default_spacing);
-                #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                if spacing != 0.0 || tags.font.spacing.is_some() {
-                    debug_println!("DEBUG: tags.font.spacing={:?}, default_spacing={}, final spacing={} for text '{}'", 
-                        tags.font.spacing, default_spacing, spacing, line_text);
-                }
 
                 // Create text layer
-                #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                if !(-100.0..=1080.0).contains(&segment_y) {
-                    debug_println!(
-                        "WARNING: Text positioned off-screen at Y={} for text '{}'",
-                        segment_y,
-                        line_text
-                    );
-                    debug_println!(
-                        "  Font size: {}, ScaleY: {}",
-                        font_size,
-                        tags.font.scale_y.unwrap_or(default_scale_y)
-                    );
-                }
-
                 let mut layer = TextData {
                     text: line_text.to_string(),
                     font_family: font_family.to_string(),
@@ -1197,12 +971,6 @@ impl SoftwarePipeline {
                     effects: SmallVec::new(),
                     spacing,
                 };
-
-                #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                if event.text.contains("Чысценькая") {
-                    debug_println!("    Layer created: pos=({:.1}, {:.1}), font_size={:.1}, color={:?}, text='{}'", 
-                        segment_x, segment_y, font_size, color, line_text);
-                }
 
                 // Add effects
                 if bold {
@@ -1315,14 +1083,6 @@ impl SoftwarePipeline {
                 let rotation_y = tags.font.rotation_y.unwrap_or(0.0);
                 let rotation_z = tags.font.rotation_z.or(tags.font.angle).unwrap_or(0.0);
                 if rotation_x != 0.0 || rotation_y != 0.0 || rotation_z != 0.0 {
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    debug_println!(
-                        "ROTATION: Adding rotation effect - x={}, y={}, z={} for text '{}'",
-                        rotation_x,
-                        rotation_y,
-                        rotation_z,
-                        line_text
-                    );
                     // `\org` sets the rotation centre in script coordinates; scale
                     // it to screen space for the backend.
                     let origin = tags.origin.map(|(ox, oy)| (ox * scale_x, oy * scale_y));
@@ -1355,13 +1115,6 @@ impl SoftwarePipeline {
                         x: font_scale_x_val,
                         y: font_scale_y_val,
                     });
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    debug_println!(
-                        "SCALE EFFECT ADDED: x={}, y={} for text '{}'",
-                        font_scale_x_val,
-                        font_scale_y_val,
-                        line_text
-                    );
                 }
 
                 // Add clip region if present (scale from script coordinates)
@@ -1382,15 +1135,6 @@ impl SoftwarePipeline {
 
                 // Handle karaoke - track per-syllable timing
                 if let Some(karaoke) = &tags.karaoke {
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    debug_println!(
-                        "KARAOKE FOUND: duration={}, style={:?}, time_cs={}, event_start={}",
-                        karaoke.duration,
-                        karaoke.style,
-                        time_cs,
-                        event.start_time_cs().unwrap_or(0)
-                    );
-
                     // Calculate progress for THIS syllable based on cumulative timing
                     let syllable_start =
                         event.start_time_cs().unwrap_or(0) + karaoke_accumulated_time;
@@ -1404,10 +1148,6 @@ impl SoftwarePipeline {
                         // In progress
                         (time_cs - syllable_start) as f32 / karaoke.duration as f32
                     };
-
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    debug_println!("KARAOKE TIMING: syllable_start={}, syllable_end={}, time_cs={}, progress={}", 
-                        syllable_start, syllable_end, time_cs, progress);
 
                     // Unsung syllables use the secondary colour. `\2c` overrides are
                     // 6-digit (no alpha), so inherit alpha from the style default.
@@ -1502,39 +1242,9 @@ impl SoftwarePipeline {
                 (event_start_cs + t1_cs, event_start_cs + t2_cs)
             };
 
-            #[cfg(debug_assertions)]
-            {
-                debug_println!(
-                    "MOVE DEBUG: x1={}, y1={}, x2={}, y2={}, t1={}, t2={}",
-                    x1,
-                    y1,
-                    x2,
-                    y2,
-                    t1,
-                    t2
-                );
-                debug_println!(
-                    "  event_start_cs={}, move_start_cs={}, move_end_cs={}, time_cs={}",
-                    event_start_cs,
-                    move_start_cs,
-                    move_end_cs,
-                    time_cs
-                );
-            }
-
             let progress = calculate_move_progress(time_cs, move_start_cs, move_end_cs);
             let x = x1 + (x2 - x1) * progress;
             let y = y1 + (y2 - y1) * progress;
-
-            #[cfg(debug_assertions)]
-            debug_println!(
-                "  progress={}, calculated x={}, y={}, scale_x={}, scale_y={}",
-                progress,
-                x,
-                y,
-                scale_x,
-                scale_y
-            );
 
             // Scale from script (PlayRes) coordinates to render coordinates
             return (x * scale_x, y * scale_y);
@@ -1596,7 +1306,6 @@ impl SoftwarePipeline {
         // Scale margins to screen coordinates
         let margin_l = margin_l_script * scale_x;
         let margin_r = margin_r_script * scale_x;
-        let _margin_v = margin_v_script * scale_y;
 
         // ASS alignment uses numpad layout
         // SubStation numpad-style alignment:
@@ -1640,10 +1349,6 @@ impl SoftwarePipeline {
 
         // Transform from script coordinates to screen coordinates
         let y = y_script * scale_y;
-
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        debug_println!("calculate_position_from_alignment: alignment={}, margins=(L:{:.1}, R:{:.1}, V:{:.1}), screen={}x{} -> anchor=({:.1}, {:.1})",
-            mapped_alignment, margin_l, margin_r, _margin_v, width as u32, height as u32, x, y);
 
         (x, y)
     }
@@ -1696,10 +1401,6 @@ impl SoftwarePipeline {
             7..=9 => anchor_y,                     // Top: anchor is top edge
             _ => anchor_y - text_height,           // Default bottom
         };
-
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        debug_println!("apply_alignment_offset: alignment={}, anchor=({:.1}, {:.1}), size=({:.1}x{:.1}) -> pos=({:.1}, {:.1})",
-            mapped_alignment, anchor_x, anchor_y, text_width, text_height, x, y);
 
         (x, y)
     }
@@ -1755,14 +1456,6 @@ impl Pipeline for SoftwarePipeline {
 
                         // If LayoutRes differs from PlayRes, we need to scale styles
                         // This is done later when processing styles
-                        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                        debug_println!(
-                            "LayoutRes detected: {}x{}, PlayRes: {}x{}",
-                            layout_x,
-                            layout_y,
-                            self.play_res_x,
-                            self.play_res_y
-                        );
                     }
 
                     // Extract ScaledBorderAndShadow setting
@@ -1839,12 +1532,6 @@ impl Pipeline for SoftwarePipeline {
                                 owned_style.spacing =
                                     (spacing * layout_to_play_scale_x).to_string();
                             }
-
-                            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                            debug_println!(
-                                "Scaled style '{}' from LayoutRes to PlayRes",
-                                style_name
-                            );
                         }
 
                         if style_name == "Default" || style_name == "*Default" {
@@ -1896,21 +1583,7 @@ impl Pipeline for SoftwarePipeline {
 
         // Process each event
         for event in sorted_events {
-            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-            if event.text.contains("Чысценькая") {
-                debug_println!(
-                    "Processing target event: style={}, text_len={}",
-                    event.style,
-                    event.text.len()
-                );
-            }
-
             let event_layers = self.process_event(event, time_cs, context)?;
-
-            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-            if event.text.contains("Чысценькая") {
-                debug_println!("  Generated {} layers for target event", event_layers.len());
-            }
 
             all_layers.extend(event_layers);
         }

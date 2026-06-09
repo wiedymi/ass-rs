@@ -12,7 +12,6 @@ use ass_core::ExtensionRegistry;
 #[cfg(not(feature = "nostd"))]
 #[cfg(not(feature = "nostd"))]
 use std::{
-    eprintln,
     string::{String, ToString},
     vec::Vec,
 };
@@ -234,19 +233,8 @@ fn process_single_tag(tag: &OverrideTag, processed: &mut ProcessedTags) -> Resul
             }
         }
         "move" => {
-            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-            eprintln!("PARSING MOVE TAG: args = '{}'", tag.args());
-
             if let Some(data) = parse_move_args(tag.args()) {
-                #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                eprintln!(
-                    "  Parsed move: x1={}, y1={}, x2={}, y2={}, t1={}, t2={}",
-                    data.0, data.1, data.2, data.3, data.4, data.5
-                );
                 processed.movement = Some(data);
-            } else {
-                #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                eprintln!("  Failed to parse move args!");
             }
         }
         "org" => {
@@ -451,33 +439,18 @@ fn process_single_tag(tag: &OverrideTag, processed: &mut ProcessedTags) -> Resul
         // Fade effects
         "fad" | "fade" => {
             if let Some(fade) = parse_fade_args(tag.args()) {
-                #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                eprintln!("FADE PARSE: Parsed fade tag with args '{}' -> FadeData {{ alpha_start: {}, alpha_end: {}, time_start: {}, time_end: {}, alpha_middle: {:?} }}", 
-                    tag.args(), fade.alpha_start, fade.alpha_end, fade.time_start, fade.time_end, fade.alpha_middle);
                 processed.fade = Some(fade);
             }
         }
 
         // Karaoke (durations are already in centiseconds in ASS format)
         "k" => {
-            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-            eprintln!("TAG PROCESSOR: Found \\k tag with args: '{}'", tag.args());
-
             if let Ok(duration) = tag.args().parse::<u32>() {
-                #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                eprintln!("TAG PROCESSOR: Parsed karaoke duration: {duration}");
-
                 processed.karaoke = Some(KaraokeData {
                     duration, // Already in centiseconds
                     style: KaraokeStyle::Basic,
                     start_time: None,
                 });
-            } else {
-                #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                eprintln!(
-                    "TAG PROCESSOR: Failed to parse karaoke duration from '{}'",
-                    tag.args()
-                );
             }
         }
         "kf" => {

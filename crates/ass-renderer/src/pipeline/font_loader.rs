@@ -13,32 +13,16 @@ pub fn load_embedded_fonts(script: &Script, font_database: &mut FontDatabase) {
             None
         }
     }) {
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        eprintln!("Found {} embedded fonts in script", fonts.len());
-
         // Process each embedded font
         for font in fonts {
             // Decode the UU-encoded font data
             match font.decode_data() {
                 Ok(font_data) => {
                     // Load the font into the database
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!(
-                        "Loading embedded font: {} ({} bytes)",
-                        font.filename,
-                        font_data.len()
-                    );
-
                     // fontdb's load_font_data takes ownership of the data
                     font_database.load_font_data(font_data);
-
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("Successfully loaded embedded font: {}", font.filename);
                 }
-                Err(_e) => {
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("Failed to decode embedded font {}: {:?}", font.filename, _e);
-                }
+                Err(_e) => {}
             }
         }
     }
@@ -68,13 +52,7 @@ pub fn load_font_files(
                     // Try to load as a file path if it exists
                     let path = std::path::Path::new(_font_path);
                     if path.exists() && path.is_file() {
-                        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                        eprintln!("Loading external font file: {_font_path}");
-
-                        if let Err(_e) = font_database.load_font_file(path) {
-                            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                            eprintln!("Failed to load font file {_font_path}: {_e:?}");
-                        }
+                        let _ = font_database.load_font_file(path);
                     }
                 }
             }

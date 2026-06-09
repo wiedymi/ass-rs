@@ -1,18 +1,5 @@
 //! Software (CPU) rendering backend using tiny-skia
 
-// Debug macro that only works with std
-#[cfg(not(feature = "nostd"))]
-macro_rules! debug_println {
-    ($($arg:tt)*) => {
-        eprintln!($($arg)*)
-    };
-}
-
-#[cfg(feature = "nostd")]
-macro_rules! debug_println {
-    ($($arg:tt)*) => {};
-}
-
 #[cfg(feature = "nostd")]
 use alloc::{boxed::Box, format, vec, vec::Vec};
 #[cfg(not(feature = "nostd"))]
@@ -65,40 +52,6 @@ impl SoftwareBackend {
                         font_database.load_fonts_dir(dir);
                     }
                 }
-            }
-        }
-
-        // Check for common Japanese fonts (silently)
-        #[cfg(debug_assertions)]
-        {
-            let japanese_fonts = [
-                "Noto Sans CJK JP",
-                "Hiragino Sans",
-                "Hiragino Kaku Gothic Pro",
-                "Yu Gothic",
-                "MS Gothic",
-                "Meiryo",
-                "Noto Sans JP",
-            ];
-            let mut found_japanese = false;
-            for font_name in &japanese_fonts {
-                let query = fontdb::Query {
-                    families: &[fontdb::Family::Name(font_name)],
-                    weight: fontdb::Weight::NORMAL,
-                    stretch: fontdb::Stretch::Normal,
-                    style: fontdb::Style::Normal,
-                };
-                if font_database.query(&query).is_some() {
-                    found_japanese = true;
-                    break;
-                }
-            }
-
-            if !found_japanese {
-                #[cfg(not(feature = "nostd"))]
-                debug_println!(
-                    "Warning: No Japanese fonts found. Japanese text may not render correctly."
-                );
             }
         }
 
@@ -167,11 +120,6 @@ impl SoftwareBackend {
     }
 
     fn draw_vector_layer(&mut self, data: &crate::pipeline::VectorData) -> Result<(), RenderError> {
-        debug_println!(
-            "DRAWING RENDER: draw_vector_layer called with color {:?}",
-            data.color
-        );
-
         let mut paint = tiny_skia::Paint::default();
         // Ensure we're setting color with proper alpha handling
         // tiny-skia expects premultiplied alpha internally
@@ -180,16 +128,6 @@ impl SoftwareBackend {
         paint.blend_mode = tiny_skia::BlendMode::SourceOver;
 
         if let Some(path) = &data.path {
-            debug_println!(
-                "DRAWING RENDER: Filling path with color RGBA({}, {}, {}, {})",
-                data.color[0],
-                data.color[1],
-                data.color[2],
-                data.color[3]
-            );
-
-            debug_println!("DRAWING RENDER: Path bounds: {:?}", path.bounds());
-
             self.pixmap.fill_path(
                 path,
                 &paint,
@@ -285,57 +223,14 @@ impl SoftwareBackend {
             data.spacing,
         )?;
 
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        if data.text.contains("Чысценькая") {
-            debug_println!("  Rendered {} glyph paths", paths.len());
-        }
-
         // Build base transform with rotation and scaling
         // The data.x and data.y are the top-left corner of the text box
         // But glyphs are positioned from their baseline, so we need to adjust y by adding the baseline offset
         let baseline_y = data.y + shaped.baseline;
 
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        {
-            // Safely truncate text for debug output, respecting UTF-8 boundaries
-            let debug_text = if data.text.len() > 20 {
-                let mut end = 20;
-                while !data.text.is_char_boundary(end) && end > 0 {
-                    end -= 1;
-                }
-                &data.text[..end]
-            } else {
-                &data.text
-            };
-            debug_println!(
-                "Drawing text: '{}' at ({}, {}), baseline={}, baseline_y={}",
-                debug_text,
-                data.x,
-                data.y,
-                shaped.baseline,
-                baseline_y
-            );
-            if !(-100.0..=1080.0).contains(&baseline_y) {
-                debug_println!(
-                    "WARNING: Baseline off-screen! data.y={}, baseline={}, baseline_y={}",
-                    data.y,
-                    shaped.baseline,
-                    baseline_y
-                );
-            }
-        }
-
         let mut base_transform = Transform::from_translate(data.x, baseline_y);
 
         // Check for rotation, scaling, and shear effects
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        if data.text.contains("Чысценькая") {
-            debug_println!("  Applying {} effects to text", data.effects.len());
-            for effect in &data.effects {
-                debug_println!("    Effect: {:?}", effect);
-            }
-        }
-
         for effect in &data.effects {
             match effect {
                 crate::pipeline::TextEffect::Rotation { x, y, z, origin } => {
@@ -385,14 +280,6 @@ impl SoftwareBackend {
                     // Apply X-scale transform if it's different from Y-scale
                     let x_scale = *x / 100.0;
                     let y_scale = *y / 100.0;
-
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    debug_println!(
-                        "SCALE: Applying scale transform - x={:.2}, y={:.2} for text '{}'",
-                        x_scale,
-                        y_scale,
-                        data.text
-                    );
 
                     // Apply scale transform
                     // Note: Y-scale is already partially applied to font size during shaping,
@@ -660,15 +547,6 @@ impl SoftwareBackend {
         text_paint.anti_alias = true;
         text_paint.blend_mode = tiny_skia::BlendMode::SourceOver;
 
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        debug_println!(
-            "Drawing main text with color: R={}, G={}, B={}, A={}",
-            data.color[0],
-            data.color[1],
-            data.color[2],
-            data.color[3]
-        );
-
         // Check for blur effect
         let blur_radius = data.effects.iter().find_map(|e| {
             if let crate::pipeline::TextEffect::Blur { radius } = e {
@@ -686,8 +564,6 @@ impl SoftwareBackend {
                 secondary,
             } = e
             {
-                #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                debug_println!("KARAOKE DETECTED: progress={}, style={}", progress, style);
                 Some((*progress, *style, *secondary))
             } else {
                 None
@@ -742,17 +618,6 @@ impl SoftwareBackend {
         } else if let Some((progress, karaoke_style, karaoke_secondary)) = karaoke_info {
             // Draw with karaoke effect based on style
 
-            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-            debug_println!(
-                "KARAOKE RENDERING: progress={}, style={}, original color=({},{},{},{})",
-                progress,
-                karaoke_style,
-                data.color[0],
-                data.color[1],
-                data.color[2],
-                data.color[3]
-            );
-
             let mut karaoke_paint = tiny_skia::Paint::default();
 
             // For basic karaoke (\k), it's binary: either sung or not sung
@@ -805,37 +670,8 @@ impl SoftwareBackend {
             }
         } else {
             // Draw without blur or karaoke
-            #[cfg(all(debug_assertions, not(feature = "nostd")))]
-            debug_println!(
-                "Drawing {} paths for main text at transform ({}, {})",
-                paths.len(),
-                text_transform.tx,
-                text_transform.ty
-            );
-
-            for (i, path) in paths.iter().enumerate() {
+            for path in &paths {
                 if let Some(transformed) = path.clone().transform(text_transform) {
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    {
-                        if data.text.contains("Чысценькая") {
-                            let bounds = transformed.bounds();
-                            debug_println!(
-                                "  Glyph {}: bounds = ({:.1}, {:.1}, {:.1}, {:.1})",
-                                i,
-                                bounds.left(),
-                                bounds.top(),
-                                bounds.right(),
-                                bounds.bottom()
-                            );
-                        }
-                        if i == 0 {
-                            debug_println!(
-                                "Drawing path 0 for main text, bounds: {:?}",
-                                transformed.bounds()
-                            );
-                        }
-                    }
-
                     self.pixmap.fill_path(
                         &transformed,
                         &text_paint,
@@ -1012,30 +848,6 @@ impl RenderBackend for SoftwareBackend {
 
         // Return RGBA data
         let data = backend.pixmap.data().to_vec();
-
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        {
-            // Sample some pixels to check alpha
-            if data.len() >= 4 {
-                let sample1 = &data[0..4];
-                let sample2 = if data.len() >= 4000 {
-                    &data[4000..4004]
-                } else {
-                    &data[0..4]
-                };
-                debug_println!("PIXMAP SAMPLES: [0]={:?}, [1000]={:?}", sample1, sample2);
-
-                // Count non-opaque pixels
-                let non_opaque = data.chunks_exact(4).filter(|p| p[3] != 255).count();
-                let transparent = data.chunks_exact(4).filter(|p| p[3] == 0).count();
-                debug_println!(
-                    "PIXMAP ALPHA STATS: {} non-opaque pixels, {} transparent pixels out of {}",
-                    non_opaque,
-                    transparent,
-                    data.len() / 4
-                );
-            }
-        }
 
         Ok(data)
     }

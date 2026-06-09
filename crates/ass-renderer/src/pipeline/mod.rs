@@ -24,7 +24,6 @@ pub mod transform;
 pub mod validation;
 
 mod software_pipeline;
-// mod software_pipeline_new;  // Not currently used - fixes are already in main pipeline
 pub use software_pipeline::SoftwarePipeline;
 
 /// Pipeline trait for processing events

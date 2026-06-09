@@ -158,9 +158,6 @@ fn process_tag_block(
     // Parse tags more carefully to handle nested parentheses in \t tags
     let parts = split_tags_carefully(content);
 
-    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-    eprintln!("DEBUG: Processing tag block: '{content}', parts: {parts:?}");
-
     for part in &parts {
         if part.is_empty() {
             continue;
@@ -188,9 +185,6 @@ fn process_tag_block(
             (part.as_str(), "")
         };
 
-        #[cfg(all(debug_assertions, not(feature = "nostd")))]
-        eprintln!("DEBUG: Tag name='{name}', args='{args}'");
-
         // Process based on tag name
         match name {
             // Color tags
@@ -217,11 +211,6 @@ fn process_tag_block(
             "alpha" => {
                 if let Some(alpha) = super::tag_processor::parse_alpha(args) {
                     current.colors.alpha = Some(alpha);
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("TEXT_SEGMENTER: Set alpha={alpha} from args '{args}'");
-                } else {
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("TEXT_SEGMENTER: Failed to parse alpha from '{args}'");
                 }
             }
             "1a" => {
@@ -286,8 +275,6 @@ fn process_tag_block(
             "fsp" => {
                 if let Ok(spacing) = args.parse::<f32>() {
                     current.font.spacing = Some(spacing);
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("DEBUG text_segmenter: Parsed \\fsp{spacing} tag");
                 }
             }
             "blur" => {
@@ -326,8 +313,6 @@ fn process_tag_block(
             "frz" | "fr" => {
                 if let Ok(angle) = args.parse::<f32>() {
                     current.font.rotation_z = Some(angle);
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("TEXT_SEGMENTER: Set rotation_z={angle} from \\frz");
                 }
             }
             "frx" => {
@@ -364,9 +349,6 @@ fn process_tag_block(
             "fad" | "fade" => {
                 // Import the parse_fade_args function
                 if let Some(fade) = super::tag_processor::parse_fade_args(args) {
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("TEXT_SEGMENTER: Parsed fade tag with args '{}' -> FadeData {{ time_start: {}, time_end: {} }}", 
-                        args, fade.time_start, fade.time_end);
                     current.fade = Some(fade);
                 }
             }
@@ -374,8 +356,6 @@ fn process_tag_block(
             // Drawing mode
             "p" => {
                 if let Ok(level) = args.parse::<u8>() {
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("TEXT_SEGMENTER: Parsed drawing mode \\p{level}");
                     current.drawing_mode = Some(level);
                 }
             }
@@ -387,11 +367,6 @@ fn process_tag_block(
                 use crate::pipeline::transform::TransformAnimation;
                 if let Some(animation) = TransformAnimation::parse(args) {
                     current.transforms.push(TransformData { animation });
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("TEXT_SEGMENTER: Added transform animation from args '{args}'");
-                } else {
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("TEXT_SEGMENTER: Failed to parse transform from '{args}'");
                 }
             }
 
@@ -403,8 +378,6 @@ fn process_tag_block(
                         style: super::tag_processor::KaraokeStyle::Basic,
                         start_time: None,
                     });
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("TEXT_SEGMENTER: Set karaoke k={duration}");
                 }
             }
             "kf" => {
@@ -414,8 +387,6 @@ fn process_tag_block(
                         style: super::tag_processor::KaraokeStyle::Fill,
                         start_time: None,
                     });
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("TEXT_SEGMENTER: Set karaoke kf={duration}");
                 }
             }
             "ko" => {
@@ -425,8 +396,6 @@ fn process_tag_block(
                         style: super::tag_processor::KaraokeStyle::Outline,
                         start_time: None,
                     });
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("TEXT_SEGMENTER: Set karaoke ko={duration}");
                 }
             }
             "K" => {
@@ -436,8 +405,6 @@ fn process_tag_block(
                         style: super::tag_processor::KaraokeStyle::Sweep,
                         start_time: None,
                     });
-                    #[cfg(all(debug_assertions, not(feature = "nostd")))]
-                    eprintln!("TEXT_SEGMENTER: Set karaoke K={duration}");
                 }
             }
 
