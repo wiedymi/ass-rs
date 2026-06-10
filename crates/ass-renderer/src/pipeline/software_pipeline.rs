@@ -466,6 +466,87 @@ impl SoftwarePipeline {
         }
     }
 
+    /// Resolve a margin (script coordinates): the event margin overrides the style
+    /// margin, but `0`/empty means "use the style".
+    fn margin_or_style(event_margin: &str, style_margin: Option<&str>) -> f32 {
+        let style = style_margin
+            .and_then(|m| m.parse::<f32>().ok())
+            .unwrap_or(0.0);
+        if event_margin.is_empty() || event_margin == "0" {
+            style
+        } else {
+            event_margin.parse::<f32>().unwrap_or(style)
+        }
+    }
+
+    /// Word-wrap `text` to fit `max_width` (render pixels), balancing line widths
+    /// to approximate libass smart wrapping (WrapStyle 0). Returns one entry per
+    /// wrapped line; a single line that already fits is returned unchanged.
+    fn wrap_text(
+        &self,
+        text: &str,
+        font: &str,
+        size: f32,
+        bold: bool,
+        italic: bool,
+        max_width: f32,
+    ) -> Vec<String> {
+        let words: Vec<&str> = text.split(' ').filter(|w| !w.is_empty()).collect();
+        if words.len() <= 1 {
+            return vec![text.to_string()];
+        }
+        let measure = |s: &str| {
+            shape_text_with_style(s, font, size, bold, italic, &self.font_database)
+                .map_or(0.0, |shaped| shaped.width)
+        };
+        let word_w: Vec<f32> = words.iter().map(|w| measure(w)).collect();
+        let space_w = (measure("x x") - measure("xx")).max(0.0);
+
+        // Greedily pack word indices into lines under a width `limit`.
+        let fill = |limit: f32| -> Vec<usize> {
+            let mut break_after: Vec<usize> = Vec::new();
+            let mut cur_w = 0.0;
+            for (i, &ww) in word_w.iter().enumerate() {
+                let add = if cur_w == 0.0 { ww } else { space_w + ww };
+                if cur_w > 0.0 && cur_w + add > limit {
+                    break_after.push(i - 1);
+                    cur_w = ww;
+                } else {
+                    cur_w += add;
+                }
+            }
+            break_after
+        };
+
+        let base_breaks = fill(max_width).len();
+        if base_breaks == 0 {
+            return vec![text.to_string()];
+        }
+
+        // Balance: find the smallest width limit that still yields the same number
+        // of lines (minimises the widest line, biasing earlier lines wider).
+        let max_word = word_w.iter().copied().fold(0.0_f32, f32::max);
+        let (mut lo, mut hi) = (max_word, max_width);
+        for _ in 0..24 {
+            let mid = (lo + hi) / 2.0;
+            if fill(mid).len() <= base_breaks {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+
+        let breaks = fill(hi);
+        let mut lines = Vec::with_capacity(breaks.len() + 1);
+        let mut start = 0;
+        for &b in &breaks {
+            lines.push(words[start..=b].join(" "));
+            start = b + 1;
+        }
+        lines.push(words[start..].join(" "));
+        lines
+    }
+
     fn process_event(
         &mut self,
         event: &Event,
@@ -746,6 +827,44 @@ impl SoftwarePipeline {
         // Add the last line
         if !current_line_segments.is_empty() {
             logical_lines.push(current_line_segments);
+        }
+
+        // Width-based auto-wrap (libass smart wrapping). Break single-segment
+        // logical lines that exceed the available width into balanced lines.
+        // Positioned events (\pos/\move) keep their explicit layout.
+        if !Self::event_is_positioned(event) {
+            let margin_l =
+                Self::margin_or_style(event.margin_l, style.map(|s| s.margin_l.as_str()));
+            let margin_r =
+                Self::margin_or_style(event.margin_r, style.map(|s| s.margin_r.as_str()));
+            let available = (context.width() as f32 - (margin_l + margin_r) * scale_x).max(1.0);
+            let mut wrapped: Vec<Vec<TextSegment>> = Vec::with_capacity(logical_lines.len());
+            for line in logical_lines {
+                if let [seg] = line.as_slice() {
+                    let font = seg.tags.font.name.as_deref().unwrap_or(default_font_name);
+                    let render_size = seg.tags.font.size.unwrap_or(default_font_size_base)
+                        * scale_y
+                        * (seg.tags.font.scale_y.unwrap_or(default_scale_y) / 100.0)
+                        * self.dpi_scale;
+                    let bold = seg.tags.formatting.bold.unwrap_or(default_bold);
+                    let italic = seg.tags.formatting.italic.unwrap_or(default_italic);
+                    let pieces =
+                        self.wrap_text(&seg.text, font, render_size, bold, italic, available);
+                    if pieces.len() > 1 {
+                        for piece in pieces {
+                            wrapped.push(vec![TextSegment {
+                                text: piece,
+                                start: seg.start,
+                                end: seg.end,
+                                tags: seg.tags.clone(),
+                            }]);
+                        }
+                        continue;
+                    }
+                }
+                wrapped.push(line);
+            }
+            logical_lines = wrapped;
         }
 
         // Calculate total height for multi-line text

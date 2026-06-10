@@ -595,3 +595,33 @@ fn p_drawing_renders_filled_shape() {
         "filled \\p rectangle should produce a large opaque region, got {opaque}px"
     );
 }
+
+#[test]
+fn long_line_auto_wraps() {
+    // A line wider than the frame must auto-wrap (libass smart wrapping) into
+    // multiple lines that fit, instead of overflowing as a single clipped line.
+    let long =
+        "This is a very long subtitle line that certainly exceeds the available width and must wrap";
+    let (w, h, data) = render(long);
+    let mut bands = 0;
+    let mut in_band = false;
+    for y in 0..h {
+        let lit = (0..w).filter(|x| data[(y * w + x) * 4 + 3] >= 128).count();
+        let on = lit >= 3;
+        if on && !in_band {
+            bands += 1;
+            in_band = true;
+        } else if !on && in_band {
+            in_band = false;
+        }
+    }
+    assert!(
+        bands >= 2,
+        "long line should auto-wrap into >= 2 lines, got {bands}"
+    );
+    let bbox_w = opaque_bbox_width(&data, w);
+    assert!(
+        bbox_w < w,
+        "wrapped text must fit within the frame width ({bbox_w} vs {w})"
+    );
+}
