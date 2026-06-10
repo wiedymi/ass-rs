@@ -112,3 +112,7 @@ plugins = []
 name = "render_benchmarks"
 harness = false
 required-features = ["benches"]
+
+[[example]]
+name = "libass_compare"
+required-features = ["software-backend", "image", "analysis-integration"]
