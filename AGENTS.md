@@ -13,15 +13,55 @@ same instructions.
 - Build (workspace): `cargo build` — builds all three crates with default features.
 - Build single crate: `cargo build -p ass-core` (or `-p ass-editor`, `-p ass-renderer`).
 - Build with extras: `cargo build [--release] [--features="simd,arena"]`
-- Test all: `cargo test --all-features`
 - Test single: `cargo test test_name`
 - Test file: `cargo test --test file_name`
-- Format: `cargo fmt --all`
-- Lint: `cargo clippy --all-targets --all-features -- -D warnings`
+- Format: `cargo fmt --all` (gate: `cargo fmt --all -- --check`)
 - Benchmarks: `cargo bench --features="benches"`
 - WASM tests: `wasm-pack test --chrome`
 - Fuzzing: `cargo +nightly fuzz run tokenizer`
-- Coverage: `cargo tarpaulin --all-features`
+
+> **IMPORTANT — do not use `--all-features` on this workspace.** `ass-renderer`
+> is std-only (it links `fontdb`, `tiny-skia`, `rustybuzz`, `rayon`), so its
+> `nostd` feature is mutually exclusive with `software-backend`/`web-backend`.
+> `--all-features` turns both on at once and fails to compile — this is by
+> design, not a regression. Use the scoped feature matrix below (it mirrors
+> `.github/workflows/ci.yml`), which is the real supported surface.
+
+### Test (full supported matrix)
+The renderer is exercised by the `full`/`full,simd-full` `--workspace` combos;
+the `no_std`-flavored combos are scoped to the `no_std`-capable crates
+(`ass-core`, `ass-editor`). Each combo also runs under `--release` in CI.
+```bash
+# Whole workspace (includes ass-renderer):
+cargo test --workspace --no-default-features --features full
+cargo test --workspace --no-default-features --features full,simd-full
+# no_std-capable crates only:
+cargo test -p ass-core -p ass-editor --no-default-features --features minimal
+cargo test -p ass-core -p ass-editor --no-default-features --features minimal,nostd
+```
+
+### Lint (full supported matrix)
+Same scoping as Test; run each with and without `--all-targets`.
+```bash
+cargo clippy --workspace --no-default-features --features full -- -D warnings
+cargo clippy --workspace --all-targets --no-default-features --features full -- -D warnings
+cargo clippy --workspace --all-targets --no-default-features --features full,simd-full -- -D warnings
+cargo clippy -p ass-core -p ass-editor --all-targets --no-default-features --features minimal -- -D warnings
+cargo clippy -p ass-core -p ass-editor --all-targets --no-default-features --features minimal,nostd -- -D warnings
+```
+
+### Other CI gates
+```bash
+# no_std build (core + editor only):
+cargo build -p ass-core --no-default-features --features minimal,nostd
+cargo build -p ass-editor --no-default-features --features minimal,nostd
+# Docs (warnings are errors) — curated, working feature surface:
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --no-default-features --features full,analysis,plugins,simd,serde,unicode-wrap
+# MSRV (1.82):
+cargo check --workspace --no-default-features --features full,analysis,plugins,simd,serde,unicode-wrap
+# Coverage (scope to a working combo, not --all-features):
+cargo tarpaulin --workspace --no-default-features --features full
+```
 
 > **Renderer note:** `ass-renderer`'s `libass-compare` feature is a stub
 > (the `libass` crate dependency is commented out and its FFI shim in
