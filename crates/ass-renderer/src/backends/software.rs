@@ -240,18 +240,22 @@ impl SoftwareBackend {
                     // Doing this in local space keeps the glyphs in place; the skews
                     // used to approximate \frx/\fry previously sheared around the
                     // screen origin, which flung the text off-frame.
+                    // Local origin sits on the baseline (see base_transform), so the
+                    // text's vertical centre is `height/2 - baseline` above it (matching
+                    // the Scale effect); using `height/2` rotated about a point ~one
+                    // ascent too low.
                     let (text_center_x, text_center_y) = match origin {
                         Some((ox, oy)) => (ox - data.x, oy - baseline_y),
-                        None => (shaped.width / 2.0, shaped.height / 2.0),
+                        None => (shaped.width / 2.0, shaped.height / 2.0 - shaped.baseline),
                     };
 
                     // Z rotation (true 2D rotation). tiny-skia's pre_rotate takes
-                    // DEGREES, so pass `z` directly (passing radians made rotations
-                    // look nearly flat).
+                    // DEGREES and turns clockwise in screen space, but ASS `\frz` is
+                    // counter-clockwise for positive angles, so negate to match libass.
                     if *z != 0.0 {
                         base_transform = base_transform
                             .pre_translate(text_center_x, text_center_y)
-                            .pre_rotate(*z)
+                            .pre_rotate(-*z)
                             .pre_translate(-text_center_x, -text_center_y);
                     }
 

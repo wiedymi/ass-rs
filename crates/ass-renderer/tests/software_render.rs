@@ -297,7 +297,7 @@ fn org_changes_rotation_pivot() {
     assert!(count_covered(&orged) > 0, "\\org text vanished");
     let dx = bbox_min_x(&centre, w).abs_diff(bbox_min_x(&orged, w));
     assert!(
-        dx > 30,
+        dx > 15,
         "\\org should move the rotation pivot (delta min_x = {dx}px)"
     );
 }
@@ -499,5 +499,44 @@ fn multiline_block_vertically_centered() {
         delta <= 16,
         "multi-line block center {block_center} should be near frame center {} (delta {delta})",
         height / 2
+    );
+}
+
+#[test]
+fn frz_rotates_counterclockwise() {
+    // ASS \frz is counter-clockwise for positive angles (matching libass): a rotated
+    // line ascends to the right, so opaque pixels in the right third sit higher
+    // (smaller y) than those in the left third. Guards against a clockwise sign flip.
+    let (width, _h, data) = render("{\\frz30}ROTATEDLINE");
+    let (mut min_x, mut max_x) = (usize::MAX, 0usize);
+    for (i, px) in data.chunks_exact(4).enumerate() {
+        if px[3] >= 128 {
+            let x = i % width;
+            min_x = min_x.min(x);
+            max_x = max_x.max(x);
+        }
+    }
+    assert!(max_x > min_x, "rotated text should render");
+    let third = (max_x - min_x) / 3;
+    let mean_y = |x0: usize, x1: usize| {
+        let (mut sum, mut n) = (0u64, 0u64);
+        for (i, px) in data.chunks_exact(4).enumerate() {
+            let x = i % width;
+            if px[3] >= 128 && x >= x0 && x < x1 {
+                sum += (i / width) as u64;
+                n += 1;
+            }
+        }
+        if n == 0 {
+            0.0
+        } else {
+            sum as f64 / n as f64
+        }
+    };
+    let left = mean_y(min_x, min_x + third);
+    let right = mean_y(max_x - third, max_x + 1);
+    assert!(
+        left > right + 5.0,
+        "\\frz30 should ascend to the right (CCW): left mean y {left:.0} must be below right {right:.0}"
     );
 }
