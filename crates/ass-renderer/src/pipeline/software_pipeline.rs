@@ -678,8 +678,17 @@ impl SoftwarePipeline {
         // - ScaleY affects glyph size but NOT line spacing
         let line_spacing_multiplier = 1.0; // Match libass line spacing
 
-        // Line height for spacing between lines (not affected by DPI scale in libass)
-        let estimated_line_height = default_font_size_base * scale_y;
+        // Line height for spacing between lines (not affected by the glyph DPI
+        // scale in libass). libass advances by the line's font size, so use the
+        // largest font size across the event (covering inline `\fs` overrides)
+        // rather than only the style default, which packed large-`\fs` lines too
+        // tightly.
+        let max_font_size = logical_lines
+            .iter()
+            .flatten()
+            .filter_map(|seg| seg.tags.font.size)
+            .fold(default_font_size_base, f32::max);
+        let estimated_line_height = max_font_size * scale_y;
 
         let _total_text_height = estimated_line_height * num_lines as f32 * line_spacing_multiplier;
 
