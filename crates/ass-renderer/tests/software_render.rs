@@ -439,3 +439,37 @@ fn blur_softens_shadow_and_fill_together() {
         solid(&sharp)
     );
 }
+
+#[test]
+fn multiline_lines_spaced_by_font_size() {
+    // Regression: the `\N` line advance must equal the nominal font size (libass's
+    // baseline-to-baseline spacing), not the dpi-scaled glyph size (~0.9x). The old
+    // code advanced by the scaled glyph size, packing lines ~11% too tight. The
+    // Default style font is 64 and PlayResY == frame height, so spacing should be ~64.
+    let (width, height, data) = render("Line one\\NLine two");
+    let mut band_tops = Vec::new();
+    let mut in_band = false;
+    for y in 0..height {
+        let lit = (0..width)
+            .filter(|x| data[(y * width + x) * 4 + 3] >= 128)
+            .count();
+        let on = lit >= 3;
+        if on && !in_band {
+            band_tops.push(y);
+            in_band = true;
+        } else if !on && in_band {
+            in_band = false;
+        }
+    }
+    assert_eq!(
+        band_tops.len(),
+        2,
+        "expected two text lines, got {} bands",
+        band_tops.len()
+    );
+    let spacing = band_tops[1] - band_tops[0];
+    assert!(
+        (58..=70).contains(&spacing),
+        "multi-line advance should be ~font size 64, got {spacing}px"
+    );
+}

@@ -563,7 +563,6 @@ impl SoftwarePipeline {
         context: &RenderContext,
     ) -> Result<Vec<IntermediateLayer>, RenderError> {
         let mut all_layers = Vec::new();
-        let mut line_height = 48.0; // Default from styles
 
         // Calculate scaling factors for sizes
         let scale_x = context.width() as f32 / self.play_res_x;
@@ -875,7 +874,6 @@ impl SoftwarePipeline {
                 // Font size was already calculated above for shaping
                 // Use the same value here for consistency
                 let font_size = actual_font_size;
-                line_height = font_size;
 
                 // Get formatting with inheritance from style
                 let bold = tags.formatting.bold.unwrap_or(default_bold);
@@ -1204,8 +1202,11 @@ impl SoftwarePipeline {
                 all_layers.push(IntermediateLayer::Text(layer));
             }
 
-            // Move to next line (using same multiplier as above)
-            line_y_offset += line_height * line_spacing_multiplier;
+            // Move to next line. Advance by the nominal line height (font size in
+            // render resolution), matching libass's baseline-to-baseline spacing.
+            // `line_height` carries the 0.9 glyph dpi_scale, which libass does not
+            // apply to line advance, so it must not be used here.
+            line_y_offset += estimated_line_height * line_spacing_multiplier;
         }
 
         Ok(all_layers)
