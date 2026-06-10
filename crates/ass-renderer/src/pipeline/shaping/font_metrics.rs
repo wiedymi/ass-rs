@@ -33,8 +33,11 @@ impl FontMetrics {
             let win_ascender = os2.windows_ascender();
             if win_ascender != 0 {
                 return FontMetrics {
-                    ascender: f32::from(win_ascender),
-                    descender: -f32::from(os2.windows_descender()),
+                    ascender: f32::from(win_ascender.abs()),
+                    // usWinDescent is a positive distance below the baseline;
+                    // normalize to a conventional negative descender regardless of
+                    // the sign ttf-parser reports.
+                    descender: -f32::from(os2.windows_descender().abs()),
                     line_gap: 0.0, // OS/2 Windows metrics carry no line gap
                     units_per_em,
                     uses_os2: true,
