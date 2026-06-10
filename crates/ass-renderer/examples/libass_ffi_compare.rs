@@ -151,34 +151,27 @@ fn pixel_diff(a: &[u8], b: &[u8], w: u32, h: u32, tol: u8) -> PixelDiff {
     }
 }
 
-/// Cluster libass bitmap rects into vertical line bands and return each band's
-/// (top, bottom, center) — exposing libass's actual line positions/spacing.
-fn line_bands(rects: &[LibassRect]) -> Vec<(i32, i32, i32)> {
-    let mut centers: Vec<(i32, i32, i32)> = rects
-        .iter()
-        .filter(|r| r.w > 0 && r.h > 0)
-        .map(|r| (r.y, r.y + r.h, r.y + r.h / 2))
-        .collect();
-    centers.sort_by_key(|c| c.2);
-    if centers.is_empty() {
-        return Vec::new();
-    }
-    let mut heights: Vec<i32> = rects.iter().filter(|r| r.h > 0).map(|r| r.h).collect();
-    heights.sort_unstable();
-    let median_h = heights[heights.len() / 2].max(2);
-    let gap = median_h / 2;
-    let mut bands: Vec<(i32, i32, i32)> = Vec::new();
-    for (top, bottom, center) in centers {
-        match bands.last_mut() {
-            Some(b) if center - b.2 <= gap => {
-                b.0 = b.0.min(top);
-                b.1 = b.1.max(bottom);
-                b.2 = (b.0 + b.1) / 2;
-            }
-            _ => bands.push((top, bottom, center)),
+/// Print line bands with each band's height, inter-line spacing, and (when a
+/// reference is given) the center delta vs that reference (+ = lower).
+fn print_bands(label: &str, bands: &[(u32, u32)], reference: Option<&[(u32, u32)]>) {
+    for (n, &(top, bottom)) in bands.iter().enumerate() {
+        let center = (top + bottom) / 2;
+        let mut extra = String::new();
+        if n > 0 {
+            let prev = (bands[n - 1].0 + bands[n - 1].1) / 2;
+            extra.push_str(&format!("  spacing={}", center - prev));
         }
+        if let Some(&(rt, rb)) = reference.and_then(|r| r.get(n)) {
+            extra.push_str(&format!(
+                "  vs_libass={}",
+                i64::from(center) - i64::from((rt + rb) / 2)
+            ));
+        }
+        println!(
+            "  {label} line {n}: y[{top}..{bottom}] h={} center={center}{extra}",
+            bottom - top
+        );
     }
-    bands
 }
 
 /// Detect vertical coverage bands (text lines) in a packed-RGB frame by finding
@@ -219,7 +212,11 @@ fn run() -> Result<(), String> {
     let ours = render_ours(&cfg, &script)?;
     let (libass, rects) = render_libass(&cfg, &text)?;
     let diff = pixel_diff(&ours, &libass, cfg.width, cfg.height, cfg.tol);
+    // Measure both sides with the SAME method (thresholded ink on the composited
+    // frame) so the geometry comparison is apples-to-apples. The raw ASS_Image
+    // rects below include faint AA fringe and are reported only as context.
     let ours_bands = frame_line_bands(&ours, cfg.width, cfg.height);
+    let libass_bands = frame_line_bands(&libass, cfg.width, cfg.height);
 
     RgbImage::from_raw(cfg.width, cfg.height, ours)
         .ok_or_else(|| "build ours image".to_string())?
@@ -246,36 +243,9 @@ fn run() -> Result<(), String> {
         Some((x0, y0, x1, y1)) => println!("region: bbox x[{x0}..{x1}] y[{y0}..{y1}]"),
         None => println!("region: (identical within tol)"),
     }
-    let bands = line_bands(&rects);
-    println!(
-        "libass: {} bitmaps, {} line band(s)",
-        rects.len(),
-        bands.len()
-    );
-    for (n, (top, bottom, center)) in bands.iter().enumerate() {
-        let spacing = if n > 0 {
-            format!("  spacing={}", center - bands[n - 1].2)
-        } else {
-            String::new()
-        };
-        println!("  libass line {n}: y[{top}..{bottom}] center={center}{spacing}");
-    }
-    for (n, (top, bottom)) in ours_bands.iter().enumerate() {
-        let center = (top + bottom) / 2;
-        let (spacing, delta) = if n > 0 {
-            let prev = (ours_bands[n - 1].0 + ours_bands[n - 1].1) / 2;
-            let d = bands.get(n).map_or(String::new(), |b| {
-                format!("  vs_libass={}", center as i32 - b.2)
-            });
-            (format!("  spacing={}", center - prev), d)
-        } else {
-            let d = bands.first().map_or(String::new(), |b| {
-                format!("  vs_libass={}", center as i32 - b.2)
-            });
-            (String::new(), d)
-        };
-        println!("  ours   line {n}: y[{top}..{bottom}] center={center}{spacing}{delta}");
-    }
+    print_bands("libass", &libass_bands, None);
+    print_bands("ours  ", &ours_bands, Some(&libass_bands));
+    println!("libass raw bitmaps: {}", rects.len());
     println!("wrote: {}/{{ours,libass}}.png", cfg.out.display());
     Ok(())
 }
