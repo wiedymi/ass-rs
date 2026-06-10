@@ -640,3 +640,36 @@ fn t_animates_font_size_from_base() {
         "\\t \\fs should grow text from the base size (mid {mid_h} vs base {base_h})"
     );
 }
+
+#[test]
+fn multiseg_long_line_wraps_and_colors() {
+    // A long line with a mid-line colour change must wrap (preserving the coloured
+    // segment) and lay out its segments left-to-right without overlapping.
+    let text = "This is a long subtitle line with a {\\c&H00FF00&}green word{\\c&HFFFFFF&} placed in the middle of it";
+    let (w, h, data) = render(text);
+    let mut bands = 0;
+    let mut in_band = false;
+    for y in 0..h {
+        let lit = (0..w).filter(|x| data[(y * w + x) * 4 + 3] >= 128).count();
+        let on = lit >= 3;
+        if on && !in_band {
+            bands += 1;
+            in_band = true;
+        } else if !on && in_band {
+            in_band = false;
+        }
+    }
+    assert!(
+        bands >= 2,
+        "multi-segment long line should wrap, got {bands} bands"
+    );
+    let green = count_opaque(&data, |r, g, b| g > 150 && r < 120 && b < 120);
+    assert!(
+        green > 100,
+        "the coloured segment should render green, got {green}px"
+    );
+    assert!(
+        opaque_bbox_width(&data, w) < w,
+        "wrapped multi-segment line must fit within the frame width"
+    );
+}

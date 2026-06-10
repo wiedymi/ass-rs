@@ -486,22 +486,51 @@ impl SoftwarePipeline {
         }
     }
 
-    /// Word-wrap `text` to fit `max_width` (render pixels), balancing line widths
-    /// to approximate libass smart wrapping (WrapStyle 0). Returns one entry per
-    /// wrapped line; a single line that already fits is returned unchanged.
-    fn wrap_text(
+    /// Word-wrap a logical line (one or more tagged segments) to fit `max_width`
+    /// (render pixels), preserving per-segment tags and balancing line widths to
+    /// approximate libass smart wrapping (WrapStyle 0). Width is measured with the
+    /// line's leading font — exact for the common single-font / mid-line
+    /// colour-change case; mixed font SIZES within one line are approximated.
+    /// Returns one entry per wrapped line (a line that already fits is one entry).
+    #[allow(clippy::too_many_arguments)]
+    fn wrap_segments(
         &self,
-        text: &str,
-        font: &str,
-        size: f32,
-        bold: bool,
-        italic: bool,
+        line: &[TextSegment],
+        default_font_name: &str,
+        default_font_size: f32,
+        default_scale_y: f32,
+        default_bold: bool,
+        default_italic: bool,
+        scale_y: f32,
         max_width: f32,
-    ) -> Vec<String> {
-        let words: Vec<&str> = text.split(' ').filter(|w| !w.is_empty()).collect();
-        if words.len() <= 1 {
-            return vec![text.to_string()];
+    ) -> Vec<Vec<TextSegment>> {
+        let Some(lead) = line.first() else {
+            return vec![line.to_vec()];
+        };
+
+        // Flatten to characters with a per-character owning-segment index.
+        let mut chars: Vec<char> = Vec::new();
+        let mut owner: Vec<usize> = Vec::new();
+        for (idx, seg) in line.iter().enumerate() {
+            for ch in seg.text.chars() {
+                chars.push(ch);
+                owner.push(idx);
+            }
         }
+        let full: String = chars.iter().collect();
+        let words: Vec<&str> = full.split(' ').collect();
+        if words.len() <= 1 {
+            return vec![line.to_vec()];
+        }
+
+        // Measure with the leading segment's resolved render font.
+        let font = lead.tags.font.name.as_deref().unwrap_or(default_font_name);
+        let size = lead.tags.font.size.unwrap_or(default_font_size)
+            * scale_y
+            * (lead.tags.font.scale_y.unwrap_or(default_scale_y) / 100.0)
+            * self.dpi_scale;
+        let bold = lead.tags.formatting.bold.unwrap_or(default_bold);
+        let italic = lead.tags.formatting.italic.unwrap_or(default_italic);
         let measure = |s: &str| {
             shape_text_with_style(s, font, size, bold, italic, &self.font_database)
                 .map_or(0.0, |shaped| shaped.width)
@@ -509,49 +538,82 @@ impl SoftwarePipeline {
         let word_w: Vec<f32> = words.iter().map(|w| measure(w)).collect();
         let space_w = (measure("x x") - measure("xx")).max(0.0);
 
-        // Greedily pack word indices into lines under a width `limit`.
+        // Greedily pack words under `limit`, returning word indices that start a line.
         let fill = |limit: f32| -> Vec<usize> {
-            let mut break_after: Vec<usize> = Vec::new();
+            let mut starts: Vec<usize> = Vec::new();
             let mut cur_w = 0.0;
             for (i, &ww) in word_w.iter().enumerate() {
                 let add = if cur_w == 0.0 { ww } else { space_w + ww };
                 if cur_w > 0.0 && cur_w + add > limit {
-                    break_after.push(i - 1);
+                    starts.push(i);
                     cur_w = ww;
                 } else {
                     cur_w += add;
                 }
             }
-            break_after
+            starts
         };
-
-        let base_breaks = fill(max_width).len();
-        if base_breaks == 0 {
-            return vec![text.to_string()];
+        let base = fill(max_width);
+        if base.is_empty() {
+            return vec![line.to_vec()];
         }
+        let target = base.len();
 
-        // Balance: find the smallest width limit that still yields the same number
-        // of lines (minimises the widest line, biasing earlier lines wider).
+        // Balance: smallest width limit that still yields `target` breaks (biases
+        // earlier lines wider, like libass WrapStyle 0).
         let max_word = word_w.iter().copied().fold(0.0_f32, f32::max);
         let (mut lo, mut hi) = (max_word, max_width);
         for _ in 0..24 {
             let mid = (lo + hi) / 2.0;
-            if fill(mid).len() <= base_breaks {
+            if fill(mid).len() <= target {
                 hi = mid;
             } else {
                 lo = mid;
             }
         }
+        let line_starts: Vec<usize> = core::iter::once(0).chain(fill(hi)).collect();
 
-        let breaks = fill(hi);
-        let mut lines = Vec::with_capacity(breaks.len() + 1);
-        let mut start = 0;
-        for &b in &breaks {
-            lines.push(words[start..=b].join(" "));
-            start = b + 1;
+        // Character offset where each word begins (words are space-separated).
+        let mut word_char_start = Vec::with_capacity(words.len());
+        let mut pos = 0usize;
+        for (i, word) in words.iter().enumerate() {
+            word_char_start.push(pos);
+            pos += word.chars().count();
+            if i + 1 < words.len() {
+                pos += 1; // the separating space
+            }
         }
-        lines.push(words[start..].join(" "));
-        lines
+
+        // Slice the flattened line into per-wrap char ranges and rebuild segments.
+        let mut out: Vec<Vec<TextSegment>> = Vec::with_capacity(line_starts.len());
+        for (k, &start_word) in line_starts.iter().enumerate() {
+            let start_char = word_char_start[start_word];
+            let end_char = if k + 1 < line_starts.len() {
+                word_char_start[line_starts[k + 1]] - 1 // drop the break space
+            } else {
+                chars.len()
+            };
+            let mut segs: Vec<TextSegment> = Vec::new();
+            let mut i = start_char;
+            while i < end_char {
+                let seg_idx = owner[i];
+                let mut text = String::new();
+                while i < end_char && owner[i] == seg_idx {
+                    text.push(chars[i]);
+                    i += 1;
+                }
+                segs.push(TextSegment {
+                    text,
+                    start: line[seg_idx].start,
+                    end: line[seg_idx].end,
+                    tags: line[seg_idx].tags.clone(),
+                });
+            }
+            if !segs.is_empty() {
+                out.push(segs);
+            }
+        }
+        out
     }
 
     fn process_event(
@@ -836,9 +898,9 @@ impl SoftwarePipeline {
             logical_lines.push(current_line_segments);
         }
 
-        // Width-based auto-wrap (libass smart wrapping). Break single-segment
-        // logical lines that exceed the available width into balanced lines.
-        // Positioned events (\pos/\move) keep their explicit layout.
+        // Width-based auto-wrap (libass smart wrapping). Break logical lines that
+        // exceed the available width into balanced lines, preserving per-segment
+        // tags. Positioned events (\pos/\move) keep their explicit layout.
         if !Self::event_is_positioned(event) {
             let margin_l =
                 Self::margin_or_style(event.margin_l, style.map(|s| s.margin_l.as_str()));
@@ -847,29 +909,16 @@ impl SoftwarePipeline {
             let available = (context.width() as f32 - (margin_l + margin_r) * scale_x).max(1.0);
             let mut wrapped: Vec<Vec<TextSegment>> = Vec::with_capacity(logical_lines.len());
             for line in logical_lines {
-                if let [seg] = line.as_slice() {
-                    let font = seg.tags.font.name.as_deref().unwrap_or(default_font_name);
-                    let render_size = seg.tags.font.size.unwrap_or(default_font_size_base)
-                        * scale_y
-                        * (seg.tags.font.scale_y.unwrap_or(default_scale_y) / 100.0)
-                        * self.dpi_scale;
-                    let bold = seg.tags.formatting.bold.unwrap_or(default_bold);
-                    let italic = seg.tags.formatting.italic.unwrap_or(default_italic);
-                    let pieces =
-                        self.wrap_text(&seg.text, font, render_size, bold, italic, available);
-                    if pieces.len() > 1 {
-                        for piece in pieces {
-                            wrapped.push(vec![TextSegment {
-                                text: piece,
-                                start: seg.start,
-                                end: seg.end,
-                                tags: seg.tags.clone(),
-                            }]);
-                        }
-                        continue;
-                    }
-                }
-                wrapped.push(line);
+                wrapped.extend(self.wrap_segments(
+                    &line,
+                    default_font_name,
+                    default_font_size_base,
+                    default_scale_y,
+                    default_bold,
+                    default_italic,
+                    scale_y,
+                    available,
+                ));
             }
             logical_lines = wrapped;
         }
@@ -900,6 +949,24 @@ impl SoftwarePipeline {
         let mut line_y_offset = 0.0;
 
         for (line_index, line_segments) in logical_lines.into_iter().enumerate() {
+            // Total rendered width of the whole line (all segments), so a
+            // multi-segment line is aligned as one unit rather than each segment
+            // re-centering on its own width.
+            let line_total_width: f32 = line_segments
+                .iter()
+                .map(|seg| {
+                    let size = seg.tags.font.size.unwrap_or(default_font_size_base)
+                        * scale_y
+                        * (seg.tags.font.scale_y.unwrap_or(default_scale_y) / 100.0)
+                        * self.dpi_scale;
+                    let fsx = seg.tags.font.scale_x.unwrap_or(default_scale_x) / 100.0;
+                    let font = seg.tags.font.name.as_deref().unwrap_or(default_font_name);
+                    let bold = seg.tags.formatting.bold.unwrap_or(default_bold);
+                    let italic = seg.tags.formatting.italic.unwrap_or(default_italic);
+                    shape_text_with_style(&seg.text, font, size, bold, italic, &self.font_database)
+                        .map_or(0.0, |sh| sh.width * fsx)
+                })
+                .sum();
             let mut current_x = 0.0;
             let mut needs_initial_position = true;
             let mut karaoke_accumulated_time = 0u32; // Track cumulative karaoke time for this line
@@ -981,8 +1048,10 @@ impl SoftwarePipeline {
                     );
 
                     (x, y)
-                } else if needs_initial_position || tags.formatting.alignment.is_some() {
-                    // Need to calculate initial position or alignment changed
+                } else if needs_initial_position {
+                    // First segment of the line: position the whole line. Later
+                    // segments continue from current_x (below) so they lay out
+                    // left-to-right instead of each re-centering.
                     let alignment = tags.formatting.alignment.unwrap_or(default_alignment);
                     let (anchor_x, anchor_y) =
                         self.calculate_position_from_alignment(alignment, event, context);
@@ -1026,14 +1095,14 @@ impl SoftwarePipeline {
                     let (x, y) = self.apply_alignment_offset(
                         anchor_x,
                         adjusted_y,
-                        shaped.width,
+                        line_total_width,
                         height_for_positioning,
                         alignment,
                     );
 
-                    // Start the pen at this segment's left edge; the post-draw
-                    // advance below moves current_x past it (adding the width here
-                    // too would double-advance and leave a gap before the next run).
+                    // Start the pen at the line's left edge; the post-draw advance
+                    // below moves current_x past each segment (centering uses the
+                    // whole line's width so multi-segment lines align as a unit).
                     current_x = x;
                     needs_initial_position = false;
                     (x, y)
@@ -1406,16 +1475,13 @@ impl SoftwarePipeline {
                     karaoke_accumulated_time += karaoke.duration;
                 }
 
-                // Update x position for next segment (only if no explicit positioning was used)
-                if tags.position.is_none()
-                    && tags.movement.is_none()
-                    && tags.formatting.alignment.is_none()
-                {
-                    if let Some(advance) = shaped.total_advance() {
-                        current_x += advance * font_scale_x;
-                    }
-                } else {
-                    current_x += line_text.len() as f32 * font_size * 0.6 * font_scale_x;
+                // Advance the pen to the end of this segment so the next run on the
+                // line continues right after it. Always use the real shaped advance:
+                // the old character-count estimate (used whenever alignment was set,
+                // including inherited `\an`) over-advanced and left gaps between the
+                // runs of a multi-segment line.
+                if let Some(advance) = shaped.total_advance() {
+                    current_x += advance * font_scale_x;
                 }
 
                 all_layers.push(IntermediateLayer::Text(layer));
