@@ -163,11 +163,13 @@ pub fn shape_text_with_style(
         cursor_y += pos.y_advance as f32 * scale;
     }
 
-    // Calculate metrics using VSFilter-compatible values
-    let height = metrics.line_height(font_size);
+    // Calculate metrics using VSFilter-compatible values. `height` is the font's
+    // ascent+descent box (Windows metrics) used for vertical centering, matching
+    // libass; the line-to-line ADVANCE is computed separately in the pipeline.
     let baseline = metrics.baseline(font_size);
     let ascent = metrics.ascender * scale;
     let descent = metrics.descender * scale;
+    let height = ascent - descent;
 
     Ok(ShapedText {
         width: cursor_x,

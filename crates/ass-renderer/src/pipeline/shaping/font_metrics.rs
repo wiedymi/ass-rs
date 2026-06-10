@@ -25,33 +25,21 @@ impl FontMetrics {
     pub fn from_face(face: &Face) -> Self {
         let units_per_em = face.units_per_em() as f32;
 
-        // Try to get OS/2 table metrics first (for VSFilter compatibility)
+        // libass/VSFilter use the OS/2 table's Windows metrics
+        // (usWinAscent/usWinDescent), NOT the typographic ascender/descender.
+        // usWinDescent is a positive distance below the baseline, so negate it to
+        // a conventional (negative) descender. Fall back to hhea when absent.
         if let Some(os2) = face.tables().os2 {
-            // Use typographic metrics from OS/2 table if available
-            // Note: ttf-parser's typographic_ascender/descender return i16 directly
-            // We'll use these if they're non-zero, otherwise fall back to regular metrics
-            let typographic_ascender = os2.typographic_ascender();
-            let typographic_descender = os2.typographic_descender();
-
-            let ascender = if typographic_ascender != 0 {
-                typographic_ascender as f32
-            } else {
-                face.ascender() as f32
-            };
-
-            let descender = if typographic_descender != 0 {
-                typographic_descender as f32
-            } else {
-                face.descender() as f32
-            };
-
-            return FontMetrics {
-                ascender,
-                descender,
-                line_gap: 0.0, // OS/2 doesn't have line gap in Windows metrics
-                units_per_em,
-                uses_os2: true,
-            };
+            let win_ascender = os2.windows_ascender();
+            if win_ascender != 0 {
+                return FontMetrics {
+                    ascender: f32::from(win_ascender),
+                    descender: -f32::from(os2.windows_descender()),
+                    line_gap: 0.0, // OS/2 Windows metrics carry no line gap
+                    units_per_em,
+                    uses_os2: true,
+                };
+            }
         }
 
         // Fall back to hhea table metrics

@@ -473,3 +473,31 @@ fn multiline_lines_spaced_by_font_size() {
         "multi-line advance should be ~font size 64, got {spacing}px"
     );
 }
+
+#[test]
+fn multiline_block_vertically_centered() {
+    // Regression: a centered (an5) multi-line block must sit at the frame's vertical
+    // center, matching libass. The old typographic ascent (~0.73x font size) placed
+    // the block ~17px too high; libass uses the OS/2 Windows ascent (~0.9x). The
+    // block center (first lit row to last lit row) should be near the frame center.
+    let (width, height, data) = render("Top line\\NBottom line");
+    let mut top = None;
+    let mut bottom = 0usize;
+    for y in 0..height {
+        let lit = (0..width)
+            .filter(|x| data[(y * width + x) * 4 + 3] >= 128)
+            .count();
+        if lit >= 3 {
+            top.get_or_insert(y);
+            bottom = y;
+        }
+    }
+    let top = top.expect("text should render");
+    let block_center = (top + bottom) / 2;
+    let delta = block_center.abs_diff(height / 2);
+    assert!(
+        delta <= 16,
+        "multi-line block center {block_center} should be near frame center {} (delta {delta})",
+        height / 2
+    );
+}
