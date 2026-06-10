@@ -949,24 +949,37 @@ impl SoftwarePipeline {
         let mut line_y_offset = 0.0;
 
         for (line_index, line_segments) in logical_lines.into_iter().enumerate() {
-            // Total rendered width of the whole line (all segments), so a
-            // multi-segment line is aligned as one unit rather than each segment
-            // re-centering on its own width.
-            let line_total_width: f32 = line_segments
-                .iter()
-                .map(|seg| {
-                    let size = seg.tags.font.size.unwrap_or(default_font_size_base)
-                        * scale_y
-                        * (seg.tags.font.scale_y.unwrap_or(default_scale_y) / 100.0)
-                        * self.dpi_scale;
-                    let fsx = seg.tags.font.scale_x.unwrap_or(default_scale_x) / 100.0;
-                    let font = seg.tags.font.name.as_deref().unwrap_or(default_font_name);
-                    let bold = seg.tags.formatting.bold.unwrap_or(default_bold);
-                    let italic = seg.tags.formatting.italic.unwrap_or(default_italic);
-                    shape_text_with_style(&seg.text, font, size, bold, italic, &self.font_database)
+            // For a multi-segment line, total rendered width so it is aligned as
+            // one unit rather than each segment re-centering on its own width. A
+            // single-segment line uses its per-segment shaped width below (which
+            // already reflects \t animations), so skip the pre-pass there.
+            let is_multi_segment = line_segments.len() > 1;
+            let line_total_width: f32 = if is_multi_segment {
+                line_segments
+                    .iter()
+                    .map(|seg| {
+                        let size = seg.tags.font.size.unwrap_or(default_font_size_base)
+                            * scale_y
+                            * (seg.tags.font.scale_y.unwrap_or(default_scale_y) / 100.0)
+                            * self.dpi_scale;
+                        let fsx = seg.tags.font.scale_x.unwrap_or(default_scale_x) / 100.0;
+                        let font = seg.tags.font.name.as_deref().unwrap_or(default_font_name);
+                        let bold = seg.tags.formatting.bold.unwrap_or(default_bold);
+                        let italic = seg.tags.formatting.italic.unwrap_or(default_italic);
+                        shape_text_with_style(
+                            &seg.text,
+                            font,
+                            size,
+                            bold,
+                            italic,
+                            &self.font_database,
+                        )
                         .map_or(0.0, |sh| sh.width * fsx)
-                })
-                .sum();
+                    })
+                    .sum()
+            } else {
+                0.0
+            };
             let mut current_x = 0.0;
             let mut needs_initial_position = true;
             let mut karaoke_accumulated_time = 0u32; // Track cumulative karaoke time for this line
@@ -1092,10 +1105,17 @@ impl SoftwarePipeline {
                         shaped.height
                     };
 
+                    // Multi-segment lines centre on the whole-line width; single
+                    // segments use their own shaped width (reflects \t animations).
+                    let line_width = if is_multi_segment {
+                        line_total_width
+                    } else {
+                        shaped.width
+                    };
                     let (x, y) = self.apply_alignment_offset(
                         anchor_x,
                         adjusted_y,
-                        line_total_width,
+                        line_width,
                         height_for_positioning,
                         alignment,
                     );
