@@ -32,6 +32,10 @@ pub mod visual_comparison;
 /// Performance benchmarking tools
 pub mod benchmarking;
 
+/// libass FFI bridge for A/B comparison (dev-only, requires native libass).
+#[cfg(feature = "libass-compare")]
+pub mod libass;
+
 pub use analyzer::{AnalysisReport, FrameAnalyzer};
 pub use benchmarking::{
     quick_benchmark, BenchmarkConfig, BenchmarkResult, PerformanceBenchmark, PerformanceMetrics,

@@ -98,6 +98,11 @@ image = ["dep:image"]
 # No-std support (limited backends)
 nostd = ["ass-core/nostd"]
 
+# Dev-only: link native libass (vcpkg on Windows / pkg-config elsewhere) to A/B
+# compare the software backend against libass. Requires libass to be installed;
+# excluded from default/full so normal builds never need the native library.
+libass-compare = []
+
 # Unicode wrapping support
 unicode-wrap = ["ass-core/unicode-wrap"]
 
@@ -108,6 +113,13 @@ docs = ["full", "web-backend", "unicode-wrap", "plugins", "benches"] # Safe feat
 # Plugin system support
 plugins = []
 
+# libass discovery for the dev-only `libass-compare` feature (see build.rs).
+[target.'cfg(windows)'.build-dependencies]
+vcpkg = "0.2"
+
+[target.'cfg(not(windows))'.build-dependencies]
+pkg-config = "0.3"
+
 [[bench]]
 name = "render_benchmarks"
 harness = false
@@ -116,3 +128,7 @@ required-features = ["benches"]
 [[example]]
 name = "libass_compare"
 required-features = ["software-backend", "image", "analysis-integration"]
+
+[[example]]
+name = "libass_ffi_compare"
+required-features = ["software-backend", "image", "analysis-integration", "libass-compare"]

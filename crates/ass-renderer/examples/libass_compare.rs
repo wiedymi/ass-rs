@@ -68,7 +68,15 @@ fn parse_config() -> Result<Config, String> {
         i += 1;
     }
     let ass = ass.ok_or_else(|| "--ass is required".to_string())?;
-    Ok(Config { ass, width, height, time_cs, ffmpeg, out, tol })
+    Ok(Config {
+        ass,
+        width,
+        height,
+        time_cs,
+        ffmpeg,
+        out,
+        tol,
+    })
 }
 
 /// Alpha-composite an RGBA buffer over opaque black, yielding packed RGB.
@@ -90,13 +98,19 @@ fn render_ours(cfg: &Config, script: &Script) -> Result<Vec<u8>, String> {
     let frame = renderer
         .render_frame(script, cfg.time_cs)
         .map_err(|e| format!("render: {e}"))?;
-    Ok(composite_over_black(frame.data(), (cfg.width * cfg.height) as usize))
+    Ok(composite_over_black(
+        frame.data(),
+        (cfg.width * cfg.height) as usize,
+    ))
 }
 
 /// Invoke ffmpeg's libass `ass` filter to rasterize the script over black at the
 /// requested time, then load the resulting PNG as packed RGB.
 fn render_libass(cfg: &Config, ref_png: &Path) -> Result<Vec<u8>, String> {
-    let abs = cfg.ass.canonicalize().map_err(|e| format!("ass path: {e}"))?;
+    let abs = cfg
+        .ass
+        .canonicalize()
+        .map_err(|e| format!("ass path: {e}"))?;
     let mut path = abs.to_string_lossy().replace('\\', "/");
     if let Some(stripped) = path.strip_prefix("//?/") {
         path = stripped.to_string();
@@ -196,7 +210,16 @@ fn diff(ours: &[u8], libass: &[u8], width: u32, height: u32, tol: u8) -> (Report
     } else {
         (None, None)
     };
-    let report = Report { total, diff_px, mae, maxe, bbox, centroid, ours_cov, libass_cov };
+    let report = Report {
+        total,
+        diff_px,
+        mae,
+        maxe,
+        bbox,
+        centroid,
+        ours_cov,
+        libass_cov,
+    };
     (report, heat)
 }
 
