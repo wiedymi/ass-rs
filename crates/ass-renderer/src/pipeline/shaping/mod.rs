@@ -310,7 +310,7 @@ fn font_support_count(
         .face_source(font_id)
         .ok_or_else(|| RenderError::FontError("Failed to load font data".to_string()))?;
 
-    let data: std::sync::Arc<dyn AsRef<[u8]> + Send + Sync> = match source {
+    let data: Arc<dyn AsRef<[u8]> + Send + Sync> = match source {
         fontdb::Source::Binary(data) => data,
         fontdb::Source::File(path) => {
             #[cfg(not(feature = "nostd"))]

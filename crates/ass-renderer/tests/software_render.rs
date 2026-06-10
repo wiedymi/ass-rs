@@ -385,7 +385,10 @@ fn blur_softens_outline_and_fill_together() {
         let script = Script::parse(&s).expect("parse");
         let ctx = RenderContext::new(1280, 720);
         let mut r = Renderer::new(BackendType::Software, ctx).expect("renderer");
-        r.render_frame(&script, 200).expect("render").data().to_vec()
+        r.render_frame(&script, 200)
+            .expect("render")
+            .data()
+            .to_vec()
     };
     let solid = |d: &[u8]| d.chunks_exact(4).filter(|p| p[3] >= 250).count() as u64;
 
@@ -415,7 +418,10 @@ fn blur_softens_shadow_and_fill_together() {
         let script = Script::parse(&s).expect("parse");
         let ctx = RenderContext::new(1280, 720);
         let mut r = Renderer::new(BackendType::Software, ctx).expect("renderer");
-        r.render_frame(&script, 200).expect("render").data().to_vec()
+        r.render_frame(&script, 200)
+            .expect("render")
+            .data()
+            .to_vec()
     };
     let solid = |d: &[u8]| d.chunks_exact(4).filter(|p| p[3] >= 250).count() as u64;
 
