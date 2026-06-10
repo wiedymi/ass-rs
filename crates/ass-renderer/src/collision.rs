@@ -133,130 +133,51 @@ impl CollisionResolver {
         self.positioned_events.push(event);
     }
 
-    /// Find a non-colliding position for an event
+    /// Resolve collisions by stacking the event away from its alignment margin:
+    /// bottom-aligned events (1-3) move up, top/middle (4-9) move down, until the
+    /// event no longer overlaps any already-placed same-layer event. This matches
+    /// libass "Normal" collisions, where earlier events keep the margin position
+    /// and later events stack past them. The resolved box is recorded so that
+    /// subsequent events stack against it.
     pub fn find_position(&mut self, mut event: PositionedEvent) -> BoundingBox {
-        let original_bbox = event.bbox;
-        let expanded_bbox = original_bbox.expand(self.collision_margin);
+        let margin = self.collision_margin;
+        let push_down = !matches!(event.alignment, 1..=3);
+        let mut bbox = event.bbox;
 
-        // Check if current position has collisions
-        let mut has_collision = false;
-        for existing in &self.positioned_events {
-            if existing.layer == event.layer {
-                let existing_expanded = existing.bbox.expand(self.collision_margin);
-                if expanded_bbox.intersects(&existing_expanded) {
-                    has_collision = true;
-                    break;
-                }
+        // Each iteration clears at least one overlap, so the placed-event count
+        // bounds the number of repositions needed.
+        for _ in 0..=self.positioned_events.len() {
+            let overlapping: Vec<BoundingBox> = self
+                .positioned_events
+                .iter()
+                .filter(|e| {
+                    e.layer == event.layer && e.bbox.expand(margin).intersects(&bbox.expand(margin))
+                })
+                .map(|e| e.bbox)
+                .collect();
+            if overlapping.is_empty() {
+                break;
             }
+            bbox.y = if push_down {
+                overlapping
+                    .iter()
+                    .map(|b| b.y + b.height)
+                    .fold(f32::MIN, f32::max)
+                    + margin * 2.0
+            } else {
+                overlapping.iter().map(|b| b.y).fold(f32::MAX, f32::min)
+                    - bbox.height
+                    - margin * 2.0
+            };
         }
 
-        if !has_collision {
-            self.positioned_events.push(event);
-            return original_bbox;
-        }
+        // Keep the event on-screen if the stack would overflow the frame edge.
+        let max_y = (self.screen_height - bbox.height).max(0.0);
+        bbox.y = bbox.y.clamp(0.0, max_y);
 
-        // Try to find alternative position based on alignment
-        let new_bbox = match event.alignment {
-            1..=3 => self.find_bottom_position(event.clone(), original_bbox),
-            4..=6 => self.find_middle_position(event.clone(), original_bbox),
-            7..=9 => self.find_top_position(event.clone(), original_bbox),
-            _ => original_bbox,
-        };
-
-        event.bbox = new_bbox;
+        event.bbox = bbox;
         self.positioned_events.push(event);
-        new_bbox
-    }
-
-    /// Find position for bottom-aligned text
-    fn find_bottom_position(&self, event: PositionedEvent, original: BoundingBox) -> BoundingBox {
-        let mut candidates = Vec::new();
-        let margin_v = event.margin_v as f32;
-
-        // Try positions moving up from bottom
-        let mut y = self.screen_height - original.height - margin_v;
-        let step = original.height + self.collision_margin * 2.0;
-
-        while y > margin_v {
-            let test_bbox = BoundingBox::new(original.x, y, original.width, original.height);
-            if !self.has_collision(&test_bbox, event.layer) {
-                candidates.push((test_bbox, (y - original.y).abs()));
-            }
-            y -= step;
-        }
-
-        // Return closest to original position
-        candidates
-            .into_iter()
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-            .map(|(bbox, _)| bbox)
-            .unwrap_or(original)
-    }
-
-    /// Find position for middle-aligned text
-    fn find_middle_position(&self, event: PositionedEvent, original: BoundingBox) -> BoundingBox {
-        let mut candidates = Vec::new();
-        let step = original.height + self.collision_margin * 2.0;
-
-        // Try positions above and below
-        for direction in &[-1.0, 1.0] {
-            let mut offset = step * direction;
-            for _ in 0..5 {
-                let y = original.y + offset;
-                if y >= 0.0 && y + original.height <= self.screen_height {
-                    let test_bbox =
-                        BoundingBox::new(original.x, y, original.width, original.height);
-                    if !self.has_collision(&test_bbox, event.layer) {
-                        candidates.push((test_bbox, offset.abs()));
-                    }
-                }
-                offset += step * direction;
-            }
-        }
-
-        candidates
-            .into_iter()
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-            .map(|(bbox, _)| bbox)
-            .unwrap_or(original)
-    }
-
-    /// Find position for top-aligned text
-    fn find_top_position(&self, event: PositionedEvent, original: BoundingBox) -> BoundingBox {
-        let mut candidates = Vec::new();
-        let margin_v = event.margin_v as f32;
-
-        // Try positions moving down from top
-        let mut y = margin_v;
-        let step = original.height + self.collision_margin * 2.0;
-
-        while y + original.height < self.screen_height - margin_v {
-            let test_bbox = BoundingBox::new(original.x, y, original.width, original.height);
-            if !self.has_collision(&test_bbox, event.layer) {
-                candidates.push((test_bbox, (y - original.y).abs()));
-            }
-            y += step;
-        }
-
-        candidates
-            .into_iter()
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-            .map(|(bbox, _)| bbox)
-            .unwrap_or(original)
-    }
-
-    /// Check if a bounding box has collision with existing events
-    fn has_collision(&self, bbox: &BoundingBox, layer: i32) -> bool {
-        let expanded = bbox.expand(self.collision_margin);
-        for existing in &self.positioned_events {
-            if existing.layer == layer {
-                let existing_expanded = existing.bbox.expand(self.collision_margin);
-                if expanded.intersects(&existing_expanded) {
-                    return true;
-                }
-            }
-        }
-        false
+        bbox
     }
 
     /// Get all positioned events

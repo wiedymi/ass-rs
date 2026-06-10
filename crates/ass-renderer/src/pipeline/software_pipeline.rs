@@ -12,6 +12,7 @@ use std::{
     vec::Vec,
 };
 
+use crate::collision::{BoundingBox, PositionedEvent};
 use crate::pipeline::{
     animation::calculate_move_progress,
     drawing::process_drawing_commands,
@@ -386,6 +387,83 @@ impl SoftwarePipeline {
             }
         }
         255 // Default opaque
+    }
+
+    /// Whether an event pins its own position (`\pos`/`\move`) and is therefore
+    /// exempt from collision stacking.
+    fn event_is_positioned(event: &Event) -> bool {
+        event.text.contains("\\pos") || event.text.contains("\\move")
+    }
+
+    /// Effective vertical-alignment row for collision: an inline `\an` override
+    /// wins over the style alignment (default 2 = bottom-centre).
+    fn effective_alignment(&self, event: &Event) -> u8 {
+        if let Some(idx) = event.text.find("\\an") {
+            if let Some(d) = event.text[idx + 3..]
+                .chars()
+                .next()
+                .and_then(|c| c.to_digit(10))
+            {
+                if (1..=9).contains(&d) {
+                    return d as u8;
+                }
+            }
+        }
+        self.styles_map
+            .get(event.style)
+            .and_then(|s| s.alignment.parse::<u8>().ok())
+            .filter(|a| (1..=9).contains(a))
+            .unwrap_or(2)
+    }
+
+    /// Event vertical margin in render-pixel space (event margin overrides the
+    /// style margin; `0`/empty means "use the style").
+    fn event_margin_v(&self, event: &Event, scale_y: f32) -> f32 {
+        let style_mv = self
+            .styles_map
+            .get(event.style)
+            .and_then(|s| s.margin_v.parse::<f32>().ok())
+            .unwrap_or(0.0);
+        let mv = if event.margin_v.is_empty() || event.margin_v == "0" {
+            style_mv
+        } else {
+            event.margin_v.parse::<f32>().unwrap_or(style_mv)
+        };
+        mv * scale_y
+    }
+
+    /// Approximate the rendered bounding box of an event from its text layers.
+    /// Per-line height uses the nominal font size (`font_size / dpi_scale`) so it
+    /// matches libass's baseline-to-baseline line box used for stacking.
+    fn event_bounding_box(&self, layers: &[IntermediateLayer]) -> Option<BoundingBox> {
+        let (mut min_x, mut min_y, mut max_x, mut max_y) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+        let mut found = false;
+        for layer in layers {
+            if let IntermediateLayer::Text(text) = layer {
+                let line_height = text.font_size / self.dpi_scale.max(0.01);
+                let width = text.text.chars().count() as f32 * text.font_size * 0.5;
+                min_x = min_x.min(text.x);
+                min_y = min_y.min(text.y);
+                max_x = max_x.max(text.x + width);
+                max_y = max_y.max(text.y + line_height);
+                found = true;
+            }
+        }
+        found.then(|| BoundingBox::new(min_x, min_y, max_x - min_x, max_y - min_y))
+    }
+
+    /// Shift every layer of an event vertically by `dy` (used after collision
+    /// resolution moves the event to a free slot).
+    fn offset_layers_y(layers: &mut [IntermediateLayer], dy: f32) {
+        for layer in layers {
+            match layer {
+                IntermediateLayer::Text(text) => text.y += dy,
+                IntermediateLayer::Raster(raster) => {
+                    raster.y = (raster.y as f32 + dy).max(0.0) as u32;
+                }
+                IntermediateLayer::Vector(_) => {}
+            }
+        }
     }
 
     fn process_event(
@@ -1609,9 +1687,33 @@ impl Pipeline for SoftwarePipeline {
             layer_a.cmp(&layer_b).then(start_a.cmp(&start_b))
         });
 
-        // Process each event
+        let scale_y = context.height() as f32 / self.play_res_y;
+
+        // Process each event, applying collision resolution so simultaneous
+        // non-positioned events stack instead of overlapping (libass "Normal"
+        // collisions). Positioned events (\pos/\move) are exempt and do not
+        // participate in stacking.
         for event in sorted_events {
-            let event_layers = self.process_event(event, time_cs, context)?;
+            let mut event_layers = self.process_event(event, time_cs, context)?;
+
+            if !Self::event_is_positioned(event) {
+                if let Some(bbox) = self.event_bounding_box(&event_layers) {
+                    let positioned = PositionedEvent {
+                        bbox,
+                        layer: event.layer.parse::<i32>().unwrap_or(0),
+                        margin_v: self.event_margin_v(event, scale_y) as i32,
+                        margin_l: 0,
+                        margin_r: 0,
+                        alignment: self.effective_alignment(event),
+                        priority: 0,
+                    };
+                    let resolved = self.collision_resolver.find_position(positioned);
+                    let dy = resolved.y - bbox.y;
+                    if dy.abs() > 0.5 {
+                        Self::offset_layers_y(&mut event_layers, dy);
+                    }
+                }
+            }
 
             all_layers.extend(event_layers);
         }

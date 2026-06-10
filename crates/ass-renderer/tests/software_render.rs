@@ -540,3 +540,58 @@ fn frz_rotates_counterclockwise() {
         "\\frz30 should ascend to the right (CCW): left mean y {left:.0} must be below right {right:.0}"
     );
 }
+
+#[test]
+fn simultaneous_events_stack_without_overlap() {
+    // Two events visible at the same time must stack (libass "Normal" collisions)
+    // instead of overlapping. With collision the frame shows two distinct text
+    // bands; without it they coincide into one.
+    let script_text = format!(
+        "{HEAD}Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,Alpha line\n\
+         Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,Beta line\n"
+    );
+    let script = Script::parse(&script_text).expect("parse");
+    let ctx = RenderContext::new(1280, 720);
+    let mut renderer = Renderer::new(BackendType::Software, ctx).expect("renderer");
+    let frame = renderer.render_frame(&script, 200).expect("render");
+    let (w, h, data) = (
+        frame.width() as usize,
+        frame.height() as usize,
+        frame.data(),
+    );
+    let mut bands = 0;
+    let mut in_band = false;
+    for y in 0..h {
+        let lit = (0..w).filter(|x| data[(y * w + x) * 4 + 3] >= 128).count();
+        let on = lit >= 3;
+        if on && !in_band {
+            bands += 1;
+            in_band = true;
+        } else if !on && in_band {
+            in_band = false;
+        }
+    }
+    assert_eq!(
+        bands, 2,
+        "two simultaneous events should stack into two bands, got {bands}"
+    );
+}
+
+#[test]
+fn p_drawing_renders_filled_shape() {
+    // \p vector drawing: a filled rectangle must produce a large solid opaque
+    // region (not just thin glyph strokes).
+    let script_text = format!(
+        "{HEAD}Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,\
+         {{\\an7\\pos(100,100)\\p1}}m 0 0 l 200 0 l 200 120 l 0 120{{\\p0}}\n"
+    );
+    let script = Script::parse(&script_text).expect("parse");
+    let ctx = RenderContext::new(1280, 720);
+    let mut renderer = Renderer::new(BackendType::Software, ctx).expect("renderer");
+    let frame = renderer.render_frame(&script, 200).expect("render");
+    let opaque = count_opaque(frame.data(), |r, g, b| r > 200 && g > 200 && b > 200);
+    assert!(
+        opaque > 10000,
+        "filled \\p rectangle should produce a large opaque region, got {opaque}px"
+    );
+}
