@@ -158,6 +158,7 @@ impl SoftwarePipeline {
         event_start_cs: u32,
         current_time_cs: u32,
         default_colors: ([u8; 4], [u8; 4], [u8; 4], [u8; 4]), // primary, secondary, outline, shadow
+        default_font_size: f32,
     ) {
         // Process all transforms (can have multiple)
         for transform_data in &tags.transforms {
@@ -226,7 +227,13 @@ impl SoftwarePipeline {
                                 tags.font.size =
                                     Some(interpolate_f32(current, *target_size, progress));
                             } else {
-                                tags.font.size = Some(*target_size * progress);
+                                // No explicit \fs before \t: animate from the style's
+                                // base size (libass), not from zero.
+                                tags.font.size = Some(interpolate_f32(
+                                    default_font_size,
+                                    *target_size,
+                                    progress,
+                                ));
                             }
                         }
                         AnimatableTag::FontScaleX(target_scale) => {
@@ -924,7 +931,13 @@ impl SoftwarePipeline {
                     default_outline_color,
                     default_back_color,
                 );
-                self.apply_transform_animations(&mut tags, event_start_cs, time_cs, default_colors);
+                self.apply_transform_animations(
+                    &mut tags,
+                    event_start_cs,
+                    time_cs,
+                    default_colors,
+                    default_font_size_base,
+                );
 
                 // Shape the text first to get dimensions for proper alignment
                 // Get base font size and scale factors

@@ -625,3 +625,18 @@ fn long_line_auto_wraps() {
         "wrapped text must fit within the frame width ({bbox_w} vs {w})"
     );
 }
+
+#[test]
+fn t_animates_font_size_from_base() {
+    // Regression: `\t(\fs..)` with no preceding `\fs` must interpolate from the
+    // style's base size (libass), not from zero. At mid-animation the text is
+    // larger than the base, not smaller.
+    let (bw, _, base) = render("GROW");
+    let (mw, _, mid) = render_at(50, "{\\t(0,1000,\\fs120)}GROW");
+    let base_h = opaque_bbox_height(&base, bw);
+    let mid_h = opaque_bbox_height(&mid, mw);
+    assert!(
+        base_h > 0 && mid_h > base_h,
+        "\\t \\fs should grow text from the base size (mid {mid_h} vs base {base_h})"
+    );
+}
