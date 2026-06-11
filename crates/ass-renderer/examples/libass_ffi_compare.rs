@@ -218,6 +218,33 @@ fn run() -> Result<(), String> {
     let ours_bands = frame_line_bands(&ours, cfg.width, cfg.height);
     let libass_bands = frame_line_bands(&libass, cfg.width, cfg.height);
 
+    // Diff heatmap (red = magnitude of per-pixel disagreement) for visual triage:
+    // thin edge halos = irreducible rasteriser AA; solid one-sided fills = a real
+    // sub-pixel offset.
+    let pixels = (cfg.width * cfg.height) as usize;
+    let mut heat = vec![0u8; pixels * 3];
+    for i in 0..pixels {
+        let d = (0..3)
+            .map(|c| ours[i * 3 + c].abs_diff(libass[i * 3 + c]))
+            .max()
+            .unwrap_or(0);
+        heat[i * 3] = (u32::from(d) * 4).min(255) as u8;
+    }
+    RgbImage::from_raw(cfg.width, cfg.height, heat)
+        .ok_or_else(|| "build diff image".to_string())?
+        .save(cfg.out.join("diff.png"))
+        .map_err(|e| format!("save diff: {e}"))?;
+
+    // Total ink mass ratio: >1 means our glyphs render systematically bolder than
+    // libass (a coverage/gamma difference), <1 lighter; ~1 means edge-position AA.
+    let ours_mass: u64 = ours.iter().map(|&v| u64::from(v)).sum();
+    let libass_mass: u64 = libass.iter().map(|&v| u64::from(v)).sum();
+    let mass_ratio = if libass_mass > 0 {
+        ours_mass as f64 / libass_mass as f64
+    } else {
+        0.0
+    };
+
     RgbImage::from_raw(cfg.width, cfg.height, ours)
         .ok_or_else(|| "build ours image".to_string())?
         .save(cfg.out.join("ours.png"))
@@ -236,7 +263,7 @@ fn run() -> Result<(), String> {
         cfg.tol
     );
     println!(
-        "diff: {:.3}% px>tol  MAE={:.2}  MAXE={}",
+        "diff: {:.3}% px>tol  MAE={:.2}  MAXE={}  ink_mass ours/libass={mass_ratio:.4}",
         diff.pct, diff.mae, diff.maxe
     );
     match diff.bbox {
