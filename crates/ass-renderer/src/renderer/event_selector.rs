@@ -25,6 +25,23 @@ pub struct EventSelector {
 
     /// Whether to render comment events (for signs and complex effects)
     render_comments: bool,
+
+    /// Cached, parsed time index for the current script. Rebuilt only when the
+    /// events change. Avoids re-parsing every event's start/end time string on
+    /// every frame (the dominant per-frame cost for large scripts).
+    time_index: Option<TimeIndex>,
+}
+
+/// Parsed, start-sorted timing index for a script's events.
+///
+/// Keyed by the events `Vec`'s address, length, and the comment-rendering flag,
+/// so it is reused across frames and rebuilt only when the script (or that flag)
+/// changes. Each entry is `(start_cs, end_cs, original_index)`; the original
+/// index preserves file-order rendering when active events are emitted.
+#[derive(Debug, Clone)]
+struct TimeIndex {
+    key: (usize, usize, bool),
+    by_start: Vec<(u32, u32, usize)>,
 }
 
 /// A region that needs re-rendering
@@ -64,6 +81,7 @@ impl EventSelector {
             last_timestamp: None,
             dirty_regions: Vec::new(),
             render_comments: true, // Enable by default for compatibility with sign rendering
+            time_index: None,
         }
     }
 
@@ -84,7 +102,10 @@ impl EventSelector {
         #[cfg(feature = "nostd")]
         let mut current_active = BTreeSet::new();
 
-        // Find all active events
+        // Find the events section, then answer the query from the cached, parsed
+        // time index. Active events satisfy `start <= t <= end`; entries are
+        // start-sorted, so `partition_point` bounds the scan to events that have
+        // already started, and the original index restores file order.
         if let Some(events_section) = script.sections().iter().find_map(|section| {
             if let Section::Events(events) = section {
                 Some(events)
@@ -92,25 +113,23 @@ impl EventSelector {
                 None
             }
         }) {
-            for (idx, event) in events_section.iter().enumerate() {
-                // Include both Dialogue and optionally Comment events
-                let should_include = match event.event_type {
-                    EventType::Dialogue => true,
-                    EventType::Comment => self.render_comments,
-                    _ => false,
-                };
-
-                if should_include {
-                    let start = event.start_time_cs().unwrap_or(0);
-                    let end = event.end_time_cs().unwrap_or(0);
-
-                    // Events are active from start time (inclusive) to end time (inclusive)
-                    // This matches ASS/SSA specification and libass behavior
-                    if start <= time_cs && end >= time_cs {
-                        active_events.push(event);
-                        current_active.insert(idx);
-                    }
-                }
+            self.ensure_index(events_section);
+            let index = self
+                .time_index
+                .as_ref()
+                .expect("time index built by ensure_index");
+            let hi = index
+                .by_start
+                .partition_point(|&(start, _, _)| start <= time_cs);
+            let mut active_idx: Vec<usize> = index.by_start[..hi]
+                .iter()
+                .filter(|&&(_, end, _)| end >= time_cs)
+                .map(|&(_, _, idx)| idx)
+                .collect();
+            active_idx.sort_unstable();
+            for idx in active_idx {
+                active_events.push(&events_section[idx]);
+                current_active.insert(idx);
             }
         }
 
@@ -146,6 +165,40 @@ impl EventSelector {
             newly_inactive,
             is_dirty,
         })
+    }
+
+    /// Build (or reuse) the parsed time index for `events`.
+    ///
+    /// The index is keyed by the events slice's address, length, and the current
+    /// comment-rendering flag; when that key is unchanged the existing index is
+    /// kept, so each event's start/end time string is parsed only once per script
+    /// rather than on every frame.
+    fn ensure_index(&mut self, events: &[Event]) {
+        let key = (events.as_ptr() as usize, events.len(), self.render_comments);
+        if self
+            .time_index
+            .as_ref()
+            .is_some_and(|index| index.key == key)
+        {
+            return;
+        }
+
+        let mut by_start = Vec::new();
+        for (idx, event) in events.iter().enumerate() {
+            let should_include = match event.event_type {
+                EventType::Dialogue => true,
+                EventType::Comment => self.render_comments,
+                _ => false,
+            };
+            if should_include {
+                let start = event.start_time_cs().unwrap_or(0);
+                let end = event.end_time_cs().unwrap_or(0);
+                by_start.push((start, end, idx));
+            }
+        }
+        by_start.sort_unstable_by_key(|&(start, _, _)| start);
+
+        self.time_index = Some(TimeIndex { key, by_start });
     }
 
     /// Check if any events have active animations
