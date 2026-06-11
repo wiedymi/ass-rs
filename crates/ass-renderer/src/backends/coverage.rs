@@ -12,7 +12,9 @@
 #[cfg(feature = "nostd")]
 use alloc::{vec, vec::Vec};
 
-use tiny_skia::{FillRule, Mask, Path, Transform};
+use tiny_skia::{Path, PathSegment};
+
+use crate::backends::raster::Rasterizer;
 
 /// An 8-bit coverage tile: `width * height` alpha samples, row-major.
 #[derive(Clone)]
@@ -44,19 +46,58 @@ impl CoverageTile {
         let width = u32::try_from((max_x - min_x).max(1)).ok()?;
         let height = u32::try_from((max_y - min_y).max(1)).ok()?;
 
-        let mut mask = Mask::new(width, height)?;
-        mask.fill_path(
-            path,
-            FillRule::Winding,
-            true,
-            Transform::from_translate(-min_x as f32, -min_y as f32),
-        );
+        // Feed the path's contours to the in-house scanline rasterizer, in tile
+        // coordinates (origin at the padded bbox corner). Each contour is closed
+        // (back to its start) so non-zero-winding coverage is correct.
+        let ox = min_x as f32;
+        let oy = min_y as f32;
+        let mut raster = Rasterizer::new(width as usize, height as usize);
+        let mut start = (0.0_f32, 0.0_f32);
+        let mut cur = (0.0_f32, 0.0_f32);
+        let mut open = false;
+        for segment in path.segments() {
+            match segment {
+                PathSegment::MoveTo(p) => {
+                    if open {
+                        raster.line(cur.0, cur.1, start.0, start.1);
+                    }
+                    start = (p.x - ox, p.y - oy);
+                    cur = start;
+                    open = true;
+                }
+                PathSegment::LineTo(p) => {
+                    let next = (p.x - ox, p.y - oy);
+                    raster.line(cur.0, cur.1, next.0, next.1);
+                    cur = next;
+                }
+                PathSegment::QuadTo(c, p) => {
+                    let cc = (c.x - ox, c.y - oy);
+                    let next = (p.x - ox, p.y - oy);
+                    raster.quad(cur.0, cur.1, cc.0, cc.1, next.0, next.1);
+                    cur = next;
+                }
+                PathSegment::CubicTo(c1, c2, p) => {
+                    let a = (c1.x - ox, c1.y - oy);
+                    let b = (c2.x - ox, c2.y - oy);
+                    let next = (p.x - ox, p.y - oy);
+                    raster.cubic(cur.0, cur.1, a.0, a.1, b.0, b.1, next.0, next.1);
+                    cur = next;
+                }
+                PathSegment::Close => {
+                    raster.line(cur.0, cur.1, start.0, start.1);
+                    cur = start;
+                }
+            }
+        }
+        if open {
+            raster.line(cur.0, cur.1, start.0, start.1);
+        }
 
         Some((
             Self {
                 width,
                 height,
-                data: mask.data().to_vec(),
+                data: raster.finish(),
             },
             min_x,
             min_y,
