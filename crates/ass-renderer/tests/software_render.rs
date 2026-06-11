@@ -673,3 +673,44 @@ fn multiseg_long_line_wraps_and_colors() {
         "wrapped multi-segment line must fit within the frame width"
     );
 }
+
+#[test]
+fn static_frame_cache_consistency() {
+    // The static frame cache must serve correct pixels: a non-animated subtitle
+    // rendered at two times is byte-identical, while an animated one differs (the
+    // cache must not serve a stale frame for time-dependent content).
+    let make =
+        |body: &str| format!("{HEAD}Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{body}\n");
+
+    let static_src = make("Static subtitle line");
+    let static_script = Script::parse(&static_src).expect("parse");
+    let mut r =
+        Renderer::new(BackendType::Software, RenderContext::new(1280, 720)).expect("renderer");
+    let a = r
+        .render_frame(&static_script, 100)
+        .expect("render")
+        .data()
+        .to_vec();
+    let b = r
+        .render_frame(&static_script, 500)
+        .expect("render")
+        .data()
+        .to_vec();
+    assert_eq!(a, b, "static frames at different times must be identical");
+
+    let anim_src = make("{\\t(0,2000,\\frz90)}Spinning");
+    let anim_script = Script::parse(&anim_src).expect("parse");
+    let mut r2 =
+        Renderer::new(BackendType::Software, RenderContext::new(1280, 720)).expect("renderer");
+    let c = r2
+        .render_frame(&anim_script, 10)
+        .expect("render")
+        .data()
+        .to_vec();
+    let d = r2
+        .render_frame(&anim_script, 190)
+        .expect("render")
+        .data()
+        .to_vec();
+    assert_ne!(c, d, "animated frames at different times must differ");
+}

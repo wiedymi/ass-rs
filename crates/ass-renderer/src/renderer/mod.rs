@@ -8,7 +8,7 @@ use ass_core::analysis::ScriptAnalysis;
 use ass_core::parser::Script;
 
 #[cfg(feature = "nostd")]
-use alloc::{boxed::Box, sync::Arc};
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 #[cfg(not(feature = "nostd"))]
 use std::{boxed::Box, sync::Arc, time::Duration};
 
@@ -28,6 +28,11 @@ pub struct Renderer {
     backend: Arc<dyn RenderBackend>,
     pipeline: Box<dyn Pipeline>,
     event_selector: event_selector::EventSelector,
+    /// Cache of the last fully-static rendered frame, keyed by the active events'
+    /// text spans. Reused (data copied, timestamp updated) when no active event is
+    /// animated and the active set is unchanged — the common case of a subtitle
+    /// shown across many frames. Animated frames (`\t`/`\move`/`\k`/`\fad`) skip it.
+    frame_cache: Option<(Vec<(usize, usize)>, Frame)>,
 }
 
 impl Renderer {
@@ -45,6 +50,7 @@ impl Renderer {
             backend,
             pipeline,
             event_selector: event_selector::EventSelector::new(),
+            frame_cache: None,
         })
     }
 
@@ -60,6 +66,7 @@ impl Renderer {
             backend,
             pipeline,
             event_selector: event_selector::EventSelector::new(),
+            frame_cache: None,
         })
     }
 
@@ -102,6 +109,30 @@ impl Renderer {
             ));
         }
 
+        // Frame cache: when no active event is animated, the rendered output is
+        // identical for every time the same events are active, so reuse the last
+        // render (copying its pixels with the current timestamp) instead of
+        // re-shaping and re-rasterizing. Animated frames bypass and clear it.
+        let animated = events.iter().any(|e| Self::event_is_animated(e.text));
+        let cache_key: Option<Vec<(usize, usize)>> = (!animated).then(|| {
+            events
+                .iter()
+                .map(|e| (e.text.as_ptr() as usize, e.text.len()))
+                .collect()
+        });
+        if let (Some(key), Some((cached_key, cached))) =
+            (cache_key.as_ref(), self.frame_cache.as_ref())
+        {
+            if cached_key == key {
+                return Ok(Frame::new(
+                    cached.data().to_vec(),
+                    self.context.width(),
+                    self.context.height(),
+                    time_cs,
+                ));
+            }
+        }
+
         #[cfg(feature = "analysis-integration")]
         self.pipeline.prepare_script(script, analysis.as_ref())?;
         #[cfg(not(feature = "analysis-integration"))]
@@ -112,12 +143,25 @@ impl Renderer {
 
         let frame_data = self.backend.composite_layers(&layers, &self.context)?;
 
-        Ok(Frame::new(
+        let frame = Frame::new(
             frame_data,
             self.context.width(),
             self.context.height(),
             time_cs,
-        ))
+        );
+        self.frame_cache = cache_key.map(|key| (key, frame.clone()));
+        Ok(frame)
+    }
+
+    /// Whether an event's text carries a time-dependent override (`\t`, `\move`,
+    /// karaoke `\k`/`\K`, or `\fad`), meaning its output changes between frames
+    /// and must not be served from the static frame cache.
+    fn event_is_animated(text: &str) -> bool {
+        text.contains("\\t")
+            || text.contains("\\move")
+            || text.contains("\\fad")
+            || text.contains("\\k")
+            || text.contains("\\K")
     }
 
     /// Render frame incrementally (dirty regions only)
