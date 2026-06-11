@@ -134,34 +134,33 @@ pub fn composite(
     let pg = mul255(u32::from(color[1]), pa);
     let pb = mul255(u32::from(color[2]), pa);
 
-    let dst_w_i = dst_w as i32;
-    let dst_h_i = dst_h as i32;
-    for ty in 0..tile.height {
-        let py = y + ty as i32;
-        if py < 0 || py >= dst_h_i {
-            continue;
-        }
-        let tile_row = (ty * tile.width) as usize;
-        let dst_row = (py as u32 * dst_w) as usize * 4;
-        for tx in 0..tile.width {
-            let cov = u32::from(tile.data[tile_row + tx as usize]);
-            if cov == 0 {
-                continue;
+    // Clip the tile against the destination ONCE, so the inner loop carries no
+    // bounds checks and only a single coverage branch — tight enough for the
+    // compiler to vectorize.
+    let (tw, th) = (tile.width as i32, tile.height as i32);
+    let (dw, dh) = (dst_w as i32, dst_h as i32);
+    let ty0 = (-y).max(0);
+    let ty1 = th.min(dh - y);
+    let tx0 = (-x).max(0);
+    let tx1 = tw.min(dw - x);
+    if ty1 <= ty0 || tx1 <= tx0 {
+        return;
+    }
+    let run = (tx1 - tx0) as usize;
+    let data = &tile.data;
+    for ty in ty0..ty1 {
+        let tile_base = (ty * tw + tx0) as usize;
+        let mut idx = ((y + ty) * dw + x + tx0) as usize * 4;
+        for t in 0..run {
+            let cov = u32::from(data[tile_base + t]);
+            if cov != 0 {
+                let inv = 255 - mul255(pa, cov);
+                dst[idx] = (mul255(pr, cov) + mul255(u32::from(dst[idx]), inv)) as u8;
+                dst[idx + 1] = (mul255(pg, cov) + mul255(u32::from(dst[idx + 1]), inv)) as u8;
+                dst[idx + 2] = (mul255(pb, cov) + mul255(u32::from(dst[idx + 2]), inv)) as u8;
+                dst[idx + 3] = (mul255(pa, cov) + mul255(u32::from(dst[idx + 3]), inv)) as u8;
             }
-            let px = x + tx as i32;
-            if px < 0 || px >= dst_w_i {
-                continue;
-            }
-            let idx = dst_row + px as usize * 4;
-            let sr = mul255(pr, cov);
-            let sg = mul255(pg, cov);
-            let sb = mul255(pb, cov);
-            let sa = mul255(pa, cov);
-            let inv = 255 - sa;
-            dst[idx] = (sr + mul255(u32::from(dst[idx]), inv)) as u8;
-            dst[idx + 1] = (sg + mul255(u32::from(dst[idx + 1]), inv)) as u8;
-            dst[idx + 2] = (sb + mul255(u32::from(dst[idx + 2]), inv)) as u8;
-            dst[idx + 3] = (sa + mul255(u32::from(dst[idx + 3]), inv)) as u8;
+            idx += 4;
         }
     }
 }
