@@ -48,20 +48,27 @@ pub fn parse_ass_time(time_str: &str) -> Result<u32, CoreError> {
         .map_err(|_| CoreError::InvalidTime(format!("Invalid seconds: {}", seconds_parts[0])))?;
 
     let centiseconds = if seconds_parts.len() > 1 {
-        let frac_str = &seconds_parts[1];
-        let frac_val: u32 = frac_str
+        let frac_str = seconds_parts[1];
+        if frac_str.is_empty() || !frac_str.bytes().all(|b| b.is_ascii_digit()) {
+            return Err(CoreError::InvalidTime(format!(
+                "Invalid centiseconds: {frac_str}"
+            )));
+        }
+        // Fractional seconds -> centiseconds. ASS specifies two digits, but real
+        // files (and libass) tolerate millisecond (3-digit) precision, so scale by
+        // the digit count and truncate, considering at most the first three digits
+        // (`.c` = tenths, `.cc` = centiseconds, `.mmm` = milliseconds).
+        let frac = &frac_str[..frac_str.len().min(3)];
+        let frac_val: u32 = frac
             .parse()
             .map_err(|_| CoreError::InvalidTime(format!("Invalid centiseconds: {frac_str}")))?;
-
-        match frac_str.len() {
-            1 => frac_val * 10,
-            2 => frac_val,
-            _ => {
-                return Err(CoreError::InvalidTime(format!(
-                    "Too many decimal places: {frac_str}"
-                )))
-            }
-        }
+        // 10^len for len in 1..=3: tenths, centiseconds, milliseconds.
+        let scale = match frac.len() {
+            1 => 10,
+            2 => 100,
+            _ => 1000,
+        };
+        frac_val * 100 / scale
     } else {
         0
     };

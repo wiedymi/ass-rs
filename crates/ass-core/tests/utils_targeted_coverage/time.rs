@@ -74,7 +74,7 @@ fn test_parse_ass_time_malformed_format() {
         "1:-30:45.50", // Negative minutes
         "1:30:-45.50", // Negative seconds
         "1:30:45.-50", // Negative centiseconds
-        "1:30:45.123", // Too many decimal places
+        "1:30:45.1a",  // Non-numeric fractional digit
     ];
 
     for time_str in malformed_times {

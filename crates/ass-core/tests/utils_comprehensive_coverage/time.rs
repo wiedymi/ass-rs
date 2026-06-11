@@ -98,7 +98,7 @@ fn test_time_parsing_boundary_values() {
         ("0:00:00.00", true),   // Minimum time
         ("0:59:60.00", false),  // Invalid seconds
         ("0:60:00.00", false),  // Invalid minutes
-        ("0:00:00.100", false), // Invalid centiseconds (if parsed strictly)
+        ("0:00:00.100", true),  // 100ms = 10cs (millisecond precision, libass-compatible)
     ];
 
     for (time_str, should_succeed) in boundary_cases {

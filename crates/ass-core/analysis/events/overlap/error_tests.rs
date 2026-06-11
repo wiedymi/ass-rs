@@ -109,7 +109,7 @@ fn test_malformed_time_formats_various() {
         ("invalid", "0:00:05.00"),       // Non-time format
         ("0:60:00.00", "0:00:05.00"),    // Invalid minute (60)
         ("0:00:60.00", "0:00:05.00"),    // Invalid second (60)
-        ("0:00:00.100", "0:00:05.00"),   // Invalid centiseconds (100)
+        ("0:00:00.xx", "0:00:05.00"),    // Non-numeric fraction
         ("0:00:00.00", "invalid"),       // Invalid end time
         ("0:00:00.00", "0:60:00.00"),    // Invalid end minute
         ("abc:def:gh.ij", "0:00:05.00"), // Non-numeric components
