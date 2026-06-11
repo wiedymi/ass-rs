@@ -159,7 +159,8 @@ impl SoftwareBackend {
         base_transform: Transform,
         baseline_y: f32,
     ) -> bool {
-        let Some((key, outline, shadow, _local)) = coverage_key(data, base_transform, baseline_y)
+        let Some((key, outline, shadow, _local, fill_color)) =
+            coverage_key(data, base_transform, baseline_y)
         else {
             return false;
         };
@@ -179,7 +180,7 @@ impl SoftwareBackend {
                 pixmap_h,
                 cached,
                 (anchor_x, anchor_y),
-                (outline.map(|(c, _)| c), shadow.map(|(c, ..)| c), data.color),
+                (outline.map(|(c, _)| c), shadow.map(|(c, ..)| c), fill_color),
             );
             true
         })
@@ -196,7 +197,8 @@ impl SoftwareBackend {
         base_transform: Transform,
         baseline_y: f32,
     ) -> bool {
-        let Some((key, outline, shadow, local)) = coverage_key(data, base_transform, baseline_y)
+        let Some((key, outline, shadow, local, fill_color)) =
+            coverage_key(data, base_transform, baseline_y)
         else {
             return false;
         };
@@ -234,7 +236,7 @@ impl SoftwareBackend {
                     pixmap_h,
                     cached,
                     (anchor_x, anchor_y),
-                    (outline.map(|(c, _)| c), shadow.map(|(c, ..)| c), data.color),
+                    (outline.map(|(c, _)| c), shadow.map(|(c, ..)| c), fill_color),
                 );
             }
         });
@@ -1047,6 +1049,7 @@ fn coverage_key(
     Option<([u8; 4], f32)>,
     Option<([u8; 4], f32, f32)>,
     Transform,
+    [u8; 4],
 )> {
     use crate::pipeline::TextEffect;
 
@@ -1054,6 +1057,12 @@ fn coverage_key(
     let mut shadow: Option<([u8; 4], f32, f32)> = None;
     let mut bold = false;
     let mut italic = false;
+    // The fill colour is normally the primary colour, but a binary karaoke
+    // syllable (`\k`) flips the whole syllable between primary and secondary; the
+    // glyph GEOMETRY is unchanged, so it stays cacheable and only the colour
+    // applied at composite time differs. Swept karaoke (`\kf`/`\K`) needs a
+    // per-pixel colour split and stays on the vector path.
+    let mut fill_color = data.color;
     for effect in &data.effects {
         match effect {
             TextEffect::Outline { color, width } => outline = Some((*color, *width)),
@@ -1065,6 +1074,20 @@ fn coverage_key(
             TextEffect::Bold => bold = true,
             TextEffect::Italic => italic = true,
             TextEffect::Rotation { .. } | TextEffect::Scale { .. } | TextEffect::Shear { .. } => {}
+            TextEffect::Karaoke {
+                progress,
+                style,
+                secondary,
+            } => {
+                if *style != 0 {
+                    return None;
+                }
+                fill_color = if *progress > 0.0 {
+                    data.color
+                } else {
+                    *secondary
+                };
+            }
             _ => return None,
         }
     }
@@ -1090,7 +1113,7 @@ fn coverage_key(
             local.ty.to_bits(),
         ],
     };
-    Some((key, outline, shadow, local))
+    Some((key, outline, shadow, local, fill_color))
 }
 
 /// Composite cached coverage tiles (shadow, then outline, then fill) onto the
