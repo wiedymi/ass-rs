@@ -132,3 +132,7 @@ required-features = ["software-backend", "image", "analysis-integration"]
 [[example]]
 name = "libass_ffi_compare"
 required-features = ["software-backend", "image", "analysis-integration", "libass-compare"]
+
+[[example]]
+name = "libass_bench"
+required-features = ["software-backend", "analysis-integration", "libass-compare"]

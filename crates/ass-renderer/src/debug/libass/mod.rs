@@ -152,6 +152,57 @@ impl Libass {
         }
         Ok(frame)
     }
+
+    /// Parse an `.ass` document into a reusable track (for benchmarking, so the
+    /// parse cost is not paid per frame).
+    pub fn read_track(&self, ass_text: &str) -> Result<LibassTrack, RenderError> {
+        let mut buf = ass_text.as_bytes().to_vec();
+        // SAFETY: `buf` is a valid mutable region; ass_read_memory parses in place.
+        let track = unsafe {
+            sys::ass_read_memory(
+                self.library,
+                buf.as_mut_ptr().cast(),
+                buf.len(),
+                core::ptr::null_mut(),
+            )
+        };
+        if track.is_null() {
+            return Err(RenderError::BackendError("ass_read_memory failed".into()));
+        }
+        Ok(LibassTrack { track })
+    }
+
+    /// Render a pre-parsed track at `time_ms` and return the number of output
+    /// bitmaps. Times only libass's frame rendering (`ass_render_frame`); the
+    /// returned count keeps the call from being optimized away in benchmarks.
+    pub fn render_count(&self, track: &LibassTrack, time_ms: i64) -> usize {
+        // SAFETY: `track` is a valid track owned by `self.library`; the returned
+        // list is owned by the renderer and only walked here.
+        unsafe {
+            let mut detect: c_int = 0;
+            let mut img = sys::ass_render_frame(self.renderer, track.track, time_ms, &mut detect);
+            let mut count = 0;
+            while !img.is_null() {
+                count += 1;
+                img = (*img).next;
+            }
+            count
+        }
+    }
+}
+
+/// A parsed libass track, freed on drop.
+pub struct LibassTrack {
+    track: *mut c_void,
+}
+
+impl Drop for LibassTrack {
+    fn drop(&mut self) {
+        // SAFETY: `track` came from ass_read_memory and is freed only here.
+        unsafe {
+            sys::ass_free_track(self.track);
+        }
+    }
 }
 
 impl Drop for Libass {
