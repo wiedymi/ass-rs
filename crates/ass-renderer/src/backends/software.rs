@@ -356,6 +356,16 @@ impl SoftwareBackend {
             }
         });
 
+        // Merge the layer's positioned glyph outlines once (sharp/non-\blur path):
+        // the sharp shadow, outline and main fill each rasterize this single path
+        // in one pass instead of looping per glyph — the dominant per-frame cost on
+        // animated scenes. The \blur branch keeps its own per-glyph temp pixmap.
+        let merged_base = if blur_radius.is_none() {
+            merge_transformed(&paths, base_transform)
+        } else {
+            None
+        };
+
         // Apply effects in order: shadow, outline, then main text. The sharp
         // shadow is skipped when \blur is active (it is folded into the blur
         // temp below so it softens together with the outline and fill).
@@ -368,16 +378,14 @@ impl SoftwareBackend {
 
                 let shadow_transform = base_transform.pre_translate(x_offset, y_offset);
 
-                for path in &paths {
-                    if let Some(transformed) = path.clone().transform(shadow_transform) {
-                        self.pixmap.fill_path(
-                            &transformed,
-                            &shadow_paint,
-                            tiny_skia::FillRule::Winding,
-                            Transform::identity(),
-                            clip_mask.as_ref(),
-                        );
-                    }
+                if let Some(merged) = merge_transformed(&paths, shadow_transform) {
+                    self.pixmap.fill_path(
+                        &merged,
+                        &shadow_paint,
+                        tiny_skia::FillRule::Winding,
+                        Transform::identity(),
+                        clip_mask.as_ref(),
+                    );
                 }
             }
         }
@@ -511,26 +519,21 @@ impl SoftwareBackend {
                         }
                     }
                 } else if blur_radius.is_none() {
-                    // Draw outline using path expansion (like libass).
-                    // This creates a filled outline rather than a stroked one.
-                    // (When \blur is active this is skipped — the outline goes into
-                    // the blur temp below so it blurs together with the fill.)
-                    let mut stroker = tiny_skia::PathStroker::new();
-
-                    for path in &paths {
-                        if let Some(transformed) = path.clone().transform(base_transform) {
-                            // Expand the path to create an outline shape
-                            if let Some(outlined_path) = stroker.stroke(&transformed, &stroke, 1.0)
-                            {
-                                // Fill the expanded outline path
-                                self.pixmap.fill_path(
-                                    &outlined_path,
-                                    &outline_paint,
-                                    tiny_skia::FillRule::Winding,
-                                    Transform::identity(),
-                                    clip_mask.as_ref(),
-                                );
-                            }
+                    // Draw outline using path expansion (like libass): stroke the
+                    // merged glyph path once and fill the expansion, rather than
+                    // stroking each glyph separately. (When \blur is active this is
+                    // skipped — the outline goes into the blur temp below so it
+                    // blurs together with the fill.)
+                    if let Some(ref merged) = merged_base {
+                        let mut stroker = tiny_skia::PathStroker::new();
+                        if let Some(outlined_path) = stroker.stroke(merged, &stroke, 1.0) {
+                            self.pixmap.fill_path(
+                                &outlined_path,
+                                &outline_paint,
+                                tiny_skia::FillRule::Winding,
+                                Transform::identity(),
+                                clip_mask.as_ref(),
+                            );
                         }
                     }
                 }
@@ -771,17 +774,16 @@ impl SoftwareBackend {
                 }
             }
         } else {
-            // Draw without blur or karaoke
-            for path in &paths {
-                if let Some(transformed) = path.clone().transform(text_transform) {
-                    self.pixmap.fill_path(
-                        &transformed,
-                        &text_paint,
-                        tiny_skia::FillRule::Winding,
-                        Transform::identity(),
-                        clip_mask.as_ref(),
-                    );
-                }
+            // Draw without blur or karaoke: fill the merged glyph path in one pass.
+            // (text_transform == base_transform, so merged_base applies directly.)
+            if let Some(ref merged) = merged_base {
+                self.pixmap.fill_path(
+                    merged,
+                    &text_paint,
+                    tiny_skia::FillRule::Winding,
+                    Transform::identity(),
+                    clip_mask.as_ref(),
+                );
             }
         }
 
@@ -838,6 +840,24 @@ impl SoftwareBackend {
 
         Ok(())
     }
+}
+
+/// Merge positioned glyph outlines into a single path under one transform.
+///
+/// Lets a layer's glyphs be stroked and filled in one rasterizer pass instead of
+/// one per glyph — the per-call setup of `fill_path`/`PathStroker` and the path
+/// clones dominate per-frame cost on glyph-dense animated scenes. For
+/// non-overlapping glyphs (normal text) the merged Winding fill/stroke is
+/// pixel-identical to filling each glyph separately. Returns `None` if no glyph
+/// produced geometry.
+fn merge_transformed(paths: &[tiny_skia::Path], transform: Transform) -> Option<tiny_skia::Path> {
+    let mut builder = tiny_skia::PathBuilder::new();
+    for path in paths {
+        if let Some(transformed) = path.clone().transform(transform) {
+            builder.push_path(&transformed);
+        }
+    }
+    builder.finish()
 }
 
 /// Apply a simple box blur to a pixmap
