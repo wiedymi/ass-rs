@@ -3,8 +3,6 @@
 use crate::backends::RenderBackend;
 use crate::pipeline::Pipeline;
 use crate::utils::RenderError;
-#[cfg(feature = "analysis-integration")]
-use ass_core::analysis::ScriptAnalysis;
 use ass_core::parser::Script;
 
 #[cfg(feature = "nostd")]
@@ -80,11 +78,6 @@ impl Renderer {
 
     /// Render a frame for the given script at the specified time
     pub fn render_frame(&mut self, script: &Script, time_cs: u32) -> Result<Frame, RenderError> {
-        #[cfg(feature = "analysis-integration")]
-        let analysis = ScriptAnalysis::analyze(script).ok();
-        #[cfg(not(feature = "analysis-integration"))]
-        let analysis: Option<()> = None;
-
         // Extract script resolution and update context
         for section in script.sections() {
             if let ass_core::parser::Section::ScriptInfo(info) = section {
@@ -128,14 +121,13 @@ impl Renderer {
             }
         }
 
-        #[cfg(feature = "analysis-integration")]
-        self.pipeline.prepare_script(script, analysis.as_ref())?;
-        #[cfg(not(feature = "analysis-integration"))]
+        // The pipeline does not consume a ScriptAnalysis, so it is not computed
+        // here — analysing the whole script every frame was pathologically slow on
+        // large files (tens of seconds for a full episode).
         self.pipeline.prepare_script(script, None)?;
         let layers = self
             .pipeline
             .process_events(&events, time_cs, &self.context)?;
-
         let frame_data = self.backend.composite_layers(&layers, &self.context)?;
 
         let frame = Frame::new(
@@ -176,14 +168,6 @@ impl Renderer {
             return Ok(previous_frame.clone());
         }
 
-        #[cfg(feature = "analysis-integration")]
-        let analysis = ScriptAnalysis::analyze(script).ok();
-        #[cfg(not(feature = "analysis-integration"))]
-        let analysis: Option<()> = None;
-
-        #[cfg(feature = "analysis-integration")]
-        self.pipeline.prepare_script(script, analysis.as_ref())?;
-        #[cfg(not(feature = "analysis-integration"))]
         self.pipeline.prepare_script(script, None)?;
         let layers = self
             .pipeline
