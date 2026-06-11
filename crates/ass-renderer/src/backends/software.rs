@@ -146,71 +146,61 @@ impl SoftwareBackend {
     /// coverage depends only on the layer geometry — which is what makes the
     /// per-frame work for unchanged geometry a cheap composite rather than a
     /// re-rasterization.
+    /// Composite a text layer from cached coverage tiles WITHOUT shaping or
+    /// building glyph paths. Returns `true` on a cache hit; `false` if the layer
+    /// is ineligible or its geometry is not cached yet (the caller then builds
+    /// the paths and calls [`Self::rasterize_coverage_miss`]). This is the path
+    /// that makes geometry-static animated layers nearly free: the per-frame work
+    /// is just the composite.
     #[cfg(not(feature = "nostd"))]
-    fn try_coverage_text(
+    fn coverage_hit(
+        &mut self,
+        data: &crate::pipeline::TextData,
+        base_transform: Transform,
+        baseline_y: f32,
+    ) -> bool {
+        let Some((key, outline, shadow, _local)) = coverage_key(data, base_transform, baseline_y)
+        else {
+            return false;
+        };
+        let anchor_x = data.x.round() as i32;
+        let anchor_y = baseline_y.round() as i32;
+        let pixmap_w = self.pixmap.width();
+        let pixmap_h = self.pixmap.height();
+        let dst = self.pixmap.data_mut();
+        RUN_COVERAGE.with(|cache| {
+            let map = cache.borrow();
+            let Some(cached) = map.get(&key) else {
+                return false;
+            };
+            composite_cached(
+                dst,
+                pixmap_w,
+                pixmap_h,
+                cached,
+                (anchor_x, anchor_y),
+                (outline.map(|(c, _)| c), shadow.map(|(c, ..)| c), data.color),
+            );
+            true
+        })
+    }
+
+    /// Rasterize a text layer's coverage from already-built `paths`, cache it,
+    /// and composite it. Returns `true` if the coverage path handled the layer,
+    /// or `false` if it is ineligible and must take the full vector path.
+    #[cfg(not(feature = "nostd"))]
+    fn rasterize_coverage_miss(
         &mut self,
         data: &crate::pipeline::TextData,
         paths: &[tiny_skia::Path],
         base_transform: Transform,
         baseline_y: f32,
     ) -> bool {
-        use crate::backends::coverage::composite;
-        use crate::pipeline::TextEffect;
-        use std::cell::RefCell;
-        use std::collections::HashMap;
-
-        thread_local! {
-            static RUN_COVERAGE: RefCell<HashMap<RunCoverageKey, CachedCoverage>> =
-                RefCell::new(HashMap::new());
-        }
-
-        let mut outline: Option<([u8; 4], f32)> = None;
-        let mut shadow: Option<([u8; 4], f32, f32)> = None;
-        let mut bold = false;
-        let mut italic = false;
-        for effect in &data.effects {
-            match effect {
-                TextEffect::Outline { color, width } => outline = Some((*color, *width)),
-                TextEffect::Shadow {
-                    color,
-                    x_offset,
-                    y_offset,
-                } => shadow = Some((*color, *x_offset, *y_offset)),
-                TextEffect::Bold => bold = true,
-                TextEffect::Italic => italic = true,
-                // Baked into `base_transform`; nothing more to do here.
-                TextEffect::Rotation { .. }
-                | TextEffect::Scale { .. }
-                | TextEffect::Shear { .. } => {}
-                // Not representable as a plain coverage composite — fall back.
-                _ => return false,
-            }
-        }
-
-        // Strip the screen translation so the rasterized coverage depends only on
-        // geometry and can be reused at any screen position / colour.
-        let local = base_transform.post_translate(-data.x, -baseline_y);
-        let key = RunCoverageKey {
-            text: data.text.clone(),
-            font: data.font_family.clone(),
-            size: data.font_size.to_bits(),
-            spacing: data.spacing.to_bits(),
-            bold,
-            italic,
-            outline: outline.map(|(_, w)| w.to_bits()),
-            shadow: shadow.map(|(_, x, y)| (x.to_bits(), y.to_bits())),
-            transform: [
-                local.sx.to_bits(),
-                local.kx.to_bits(),
-                local.ky.to_bits(),
-                local.sy.to_bits(),
-                local.tx.to_bits(),
-                local.ty.to_bits(),
-            ],
+        let Some((key, outline, shadow, local)) = coverage_key(data, base_transform, baseline_y)
+        else {
+            return false;
         };
 
-        // Rasterize (and cache) the geometry once; a stable key means later frames
-        // skip straight to compositing.
         RUN_COVERAGE.with(|cache| {
             if !cache.borrow().contains_key(&key) {
                 let cached = rasterize_run_coverage(
@@ -220,10 +210,9 @@ impl SoftwareBackend {
                     shadow.map(|(_, x, y)| (x, y)),
                 );
                 let mut map = cache.borrow_mut();
-                // Bound memory: continuously geometry-animated layers (e.g. a `\t`
-                // rotation) produce a fresh key every frame, so drop the cache when
-                // it grows large rather than leak. Geometry-static layers simply
-                // re-cache once afterwards.
+                // Bound memory: continuously geometry-animated layers produce a
+                // fresh key every frame, so drop the cache when it grows large
+                // rather than leak; geometry-static layers re-cache once after.
                 if map.len() >= 256 {
                     map.clear();
                 }
@@ -236,49 +225,19 @@ impl SoftwareBackend {
         let pixmap_w = self.pixmap.width();
         let pixmap_h = self.pixmap.height();
         let dst = self.pixmap.data_mut();
-
-        // Composite shadow, then outline, then fill — by reference into the cache,
-        // applying the current colours and the (rounded) screen anchor.
         RUN_COVERAGE.with(|cache| {
             let map = cache.borrow();
-            let Some(cached) = map.get(&key) else {
-                return;
-            };
-            if let (Some((color, ..)), Some((tile, ox, oy))) = (shadow, &cached.shadow) {
-                composite(
+            if let Some(cached) = map.get(&key) {
+                composite_cached(
                     dst,
                     pixmap_w,
                     pixmap_h,
-                    tile,
-                    anchor_x + ox,
-                    anchor_y + oy,
-                    color,
-                );
-            }
-            if let (Some((color, _)), Some((tile, ox, oy))) = (outline, &cached.outline) {
-                composite(
-                    dst,
-                    pixmap_w,
-                    pixmap_h,
-                    tile,
-                    anchor_x + ox,
-                    anchor_y + oy,
-                    color,
-                );
-            }
-            if let Some((tile, ox, oy)) = &cached.fill {
-                composite(
-                    dst,
-                    pixmap_w,
-                    pixmap_h,
-                    tile,
-                    anchor_x + ox,
-                    anchor_y + oy,
-                    data.color,
+                    cached,
+                    (anchor_x, anchor_y),
+                    (outline.map(|(c, _)| c), shadow.map(|(c, ..)| c), data.color),
                 );
             }
         });
-
         true
     }
 
@@ -312,24 +271,6 @@ impl SoftwareBackend {
             bold,
             italic,
             &self.font_database,
-        )?;
-
-        // Resolve the same font used for shaping, with robust fallback to any
-        // loaded face when the requested family is unavailable.
-        let font_id = find_font_for_text(
-            &self.font_database,
-            &data.font_family,
-            bold,
-            italic,
-            &data.text,
-        )?;
-
-        // Render glyphs to paths using cached renderer with spacing
-        let paths = self.glyph_renderer.render_shaped_text(
-            &shaped,
-            font_id,
-            &self.font_database,
-            data.spacing,
         )?;
 
         // Build base transform with rotation and scaling
@@ -423,12 +364,36 @@ impl SoftwareBackend {
             }
         }
 
-        // Fast path: render the layer from A8 coverage tiles (shadow, outline,
-        // fill) composited with colour/position, instead of per-glyph vector
-        // fills. Handles the common case and falls through to the full vector
-        // path below for blur / karaoke / clip / opaque-box / under/strike.
+        // Fast path: composite the layer from cached coverage tiles. On a cache
+        // hit this skips font lookup, glyph-path building and rasterization
+        // entirely, so a geometry-static animated layer (\move/\fad/colour \t)
+        // costs only the composite — the lever for animation-heavy content.
         #[cfg(not(feature = "nostd"))]
-        if self.try_coverage_text(data, &paths, base_transform, baseline_y) {
+        if self.coverage_hit(data, base_transform, baseline_y) {
+            return Ok(());
+        }
+
+        // Cache miss (or an effect the coverage path does not handle): resolve the
+        // font and build the glyph paths now.
+        let font_id = find_font_for_text(
+            &self.font_database,
+            &data.font_family,
+            bold,
+            italic,
+            &data.text,
+        )?;
+        let paths = self.glyph_renderer.render_shaped_text(
+            &shaped,
+            font_id,
+            &self.font_database,
+            data.spacing,
+        )?;
+
+        // Rasterize, cache and composite the coverage. Returns false only for
+        // effects the coverage path does not handle, which fall through to the
+        // full vector path below.
+        #[cfg(not(feature = "nostd"))]
+        if self.rasterize_coverage_miss(data, &paths, base_transform, baseline_y) {
             return Ok(());
         }
 
@@ -1056,6 +1021,125 @@ fn rasterize_run_coverage(
         fill,
         outline,
         shadow,
+    }
+}
+
+// Per-thread cache of rasterized coverage tiles, shared by the hit and miss
+// paths and persistent across frames.
+#[cfg(not(feature = "nostd"))]
+std::thread_local! {
+    static RUN_COVERAGE: std::cell::RefCell<std::collections::HashMap<RunCoverageKey, CachedCoverage>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+/// Build the coverage cache key (and extract the outline/shadow paints and the
+/// position-independent transform) for a text layer, or `None` if the layer uses
+/// an effect the coverage path does not handle (blur, edge blur, karaoke, clip,
+/// opaque box, underline, strikethrough) and must take the full vector path.
+#[cfg(not(feature = "nostd"))]
+#[allow(clippy::type_complexity)]
+fn coverage_key(
+    data: &crate::pipeline::TextData,
+    base_transform: Transform,
+    baseline_y: f32,
+) -> Option<(
+    RunCoverageKey,
+    Option<([u8; 4], f32)>,
+    Option<([u8; 4], f32, f32)>,
+    Transform,
+)> {
+    use crate::pipeline::TextEffect;
+
+    let mut outline: Option<([u8; 4], f32)> = None;
+    let mut shadow: Option<([u8; 4], f32, f32)> = None;
+    let mut bold = false;
+    let mut italic = false;
+    for effect in &data.effects {
+        match effect {
+            TextEffect::Outline { color, width } => outline = Some((*color, *width)),
+            TextEffect::Shadow {
+                color,
+                x_offset,
+                y_offset,
+            } => shadow = Some((*color, *x_offset, *y_offset)),
+            TextEffect::Bold => bold = true,
+            TextEffect::Italic => italic = true,
+            TextEffect::Rotation { .. } | TextEffect::Scale { .. } | TextEffect::Shear { .. } => {}
+            _ => return None,
+        }
+    }
+
+    // Strip the screen translation so the coverage depends only on geometry and
+    // can be reused at any screen position / colour.
+    let local = base_transform.post_translate(-data.x, -baseline_y);
+    let key = RunCoverageKey {
+        text: data.text.clone(),
+        font: data.font_family.clone(),
+        size: data.font_size.to_bits(),
+        spacing: data.spacing.to_bits(),
+        bold,
+        italic,
+        outline: outline.map(|(_, w)| w.to_bits()),
+        shadow: shadow.map(|(_, x, y)| (x.to_bits(), y.to_bits())),
+        transform: [
+            local.sx.to_bits(),
+            local.kx.to_bits(),
+            local.ky.to_bits(),
+            local.sy.to_bits(),
+            local.tx.to_bits(),
+            local.ty.to_bits(),
+        ],
+    };
+    Some((key, outline, shadow, local))
+}
+
+/// Composite cached coverage tiles (shadow, then outline, then fill) onto the
+/// premultiplied buffer at the rounded screen anchor, applying the current
+/// colours.
+#[cfg(not(feature = "nostd"))]
+fn composite_cached(
+    dst: &mut [u8],
+    pixmap_w: u32,
+    pixmap_h: u32,
+    cached: &CachedCoverage,
+    anchor: (i32, i32),
+    colors: (Option<[u8; 4]>, Option<[u8; 4]>, [u8; 4]),
+) {
+    use crate::backends::coverage::composite;
+    let (anchor_x, anchor_y) = anchor;
+    let (outline_color, shadow_color, fill_color) = colors;
+    if let (Some(color), Some((tile, ox, oy))) = (shadow_color, &cached.shadow) {
+        composite(
+            dst,
+            pixmap_w,
+            pixmap_h,
+            tile,
+            anchor_x + ox,
+            anchor_y + oy,
+            color,
+        );
+    }
+    if let (Some(color), Some((tile, ox, oy))) = (outline_color, &cached.outline) {
+        composite(
+            dst,
+            pixmap_w,
+            pixmap_h,
+            tile,
+            anchor_x + ox,
+            anchor_y + oy,
+            color,
+        );
+    }
+    if let Some((tile, ox, oy)) = &cached.fill {
+        composite(
+            dst,
+            pixmap_w,
+            pixmap_h,
+            tile,
+            anchor_x + ox,
+            anchor_y + oy,
+            fill_color,
+        );
     }
 }
 
