@@ -1,9 +1,9 @@
 //! Software (CPU) rendering backend using tiny-skia
 
 #[cfg(feature = "nostd")]
-use alloc::{boxed::Box, format, vec, vec::Vec};
+use alloc::{boxed::Box, format, sync::Arc, vec, vec::Vec};
 #[cfg(not(feature = "nostd"))]
-use std::{boxed::Box, vec::Vec};
+use std::{boxed::Box, sync::Arc, vec::Vec};
 
 use crate::backends::{BackendFeature, BackendType, RenderBackend};
 use crate::cache::{RenderCache, TextCacheKey};
@@ -15,7 +15,7 @@ use tiny_skia::{Pixmap, Transform};
 /// Software rendering backend using tiny-skia
 pub struct SoftwareBackend {
     pixmap: Pixmap,
-    font_database: fontdb::Database,
+    font_database: Arc<fontdb::Database>,
     glyph_renderer: crate::pipeline::shaping::GlyphRenderer,
     cache: RenderCache,
     #[cfg(feature = "backend-metrics")]
@@ -28,32 +28,13 @@ impl SoftwareBackend {
         let pixmap =
             Pixmap::new(context.width(), context.height()).ok_or(RenderError::InvalidDimensions)?;
 
-        // Initialize font database once and load system fonts
-        let mut font_database = fontdb::Database::new();
-        font_database.load_system_fonts();
-
-        // Also load common fallback fonts and ensure Japanese font support
+        // Share the process-wide, lazily-loaded system font database. A fresh
+        // backend is built every frame, so re-scanning system fonts here (the old
+        // behaviour) dominated frame time; cloning the shared Arc is ~free.
         #[cfg(not(feature = "nostd"))]
-        {
-            // Try to load additional Unicode fonts for better coverage
-            if let Ok(home) = std::env::var("HOME") {
-                let font_dirs = [
-                    format!("{home}/.fonts"),
-                    "/usr/share/fonts".to_string(),
-                    "/usr/local/share/fonts".to_string(),
-                    "/System/Library/Fonts".to_string(), // macOS
-                    "/System/Library/Fonts/Supplemental".to_string(), // macOS CJK fonts
-                    "/Library/Fonts".to_string(),        // macOS user fonts
-                    "C:\\Windows\\Fonts".to_string(),    // Windows
-                ];
-
-                for dir in &font_dirs {
-                    if std::path::Path::new(dir).exists() {
-                        font_database.load_fonts_dir(dir);
-                    }
-                }
-            }
-        }
+        let font_database = crate::pipeline::font_loader::shared_system_fonts();
+        #[cfg(feature = "nostd")]
+        let font_database = Arc::new(fontdb::Database::new());
 
         Ok(Self {
             pixmap,

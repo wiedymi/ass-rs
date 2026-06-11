@@ -3,6 +3,45 @@
 use ass_core::parser::Script;
 use fontdb::Database as FontDatabase;
 
+/// Lazily-loaded, process-wide system font database, shared via `Arc`.
+///
+/// `load_system_fonts` scans every installed font and is expensive (tens of ms),
+/// so it is run once and the result shared. Read-only callers — notably the
+/// software backend, which builds a fresh instance every frame — clone the `Arc`
+/// instead of re-scanning, which was previously the dominant per-frame cost.
+#[cfg(not(feature = "nostd"))]
+pub fn shared_system_fonts() -> std::sync::Arc<FontDatabase> {
+    use std::sync::{Arc, OnceLock};
+    static CACHE: OnceLock<Arc<FontDatabase>> = OnceLock::new();
+    CACHE
+        .get_or_init(|| {
+            let mut db = FontDatabase::new();
+            db.load_system_fonts();
+            // Best-effort fallback dirs for broader (e.g. CJK) coverage on Unix;
+            // Windows fonts are already covered by load_system_fonts.
+            let dirs = [
+                "/usr/share/fonts",
+                "/usr/local/share/fonts",
+                "/System/Library/Fonts",
+                "/System/Library/Fonts/Supplemental",
+                "/Library/Fonts",
+            ];
+            for dir in dirs {
+                if std::path::Path::new(dir).exists() {
+                    db.load_fonts_dir(dir);
+                }
+            }
+            if let Ok(home) = std::env::var("HOME") {
+                let user_fonts = format!("{home}/.fonts");
+                if std::path::Path::new(&user_fonts).exists() {
+                    db.load_fonts_dir(&user_fonts);
+                }
+            }
+            Arc::new(db)
+        })
+        .clone()
+}
+
 /// Load embedded fonts from ASS script into font database
 pub fn load_embedded_fonts(script: &Script, font_database: &mut FontDatabase) {
     // Check if the script has a Fonts section
