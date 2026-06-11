@@ -6,7 +6,6 @@ use alloc::{boxed::Box, format, sync::Arc, vec, vec::Vec};
 use std::{boxed::Box, sync::Arc, vec::Vec};
 
 use crate::backends::{BackendFeature, BackendType, RenderBackend};
-use crate::cache::{RenderCache, TextCacheKey};
 use crate::pipeline::{IntermediateLayer, Pipeline, SoftwarePipeline};
 use crate::renderer::RenderContext;
 use crate::utils::{DirtyRegion, RenderError};
@@ -17,7 +16,6 @@ pub struct SoftwareBackend {
     pixmap: Pixmap,
     font_database: Arc<fontdb::Database>,
     glyph_renderer: crate::pipeline::shaping::GlyphRenderer,
-    cache: RenderCache,
     #[cfg(feature = "backend-metrics")]
     metrics: super::BackendMetrics,
 }
@@ -40,7 +38,6 @@ impl SoftwareBackend {
             pixmap,
             font_database,
             glyph_renderer: crate::pipeline::shaping::GlyphRenderer::new(),
-            cache: RenderCache::with_limits(2000, 1000), // Increased cache limits for better performance
             #[cfg(feature = "backend-metrics")]
             metrics: super::BackendMetrics::new(),
         })
@@ -141,7 +138,7 @@ impl SoftwareBackend {
     }
 
     fn draw_text_layer(&mut self, data: &crate::pipeline::TextData) -> Result<(), RenderError> {
-        use crate::pipeline::shaping::{find_font_for_text, shape_text_with_style};
+        use crate::pipeline::shaping::{find_font_for_text, shape_text_cached};
 
         // Extract bold/italic from effects
         let bold = data
@@ -161,30 +158,16 @@ impl SoftwareBackend {
             .iter()
             .any(|e| matches!(e, crate::pipeline::TextEffect::Strikethrough));
 
-        // Create cache key
-        let cache_key = TextCacheKey {
-            text: data.text.clone(),
-            font_family: data.font_family.clone(),
-            font_size: data.font_size as u32,
+        // Shape the text via the shared per-thread cache (persists across frames
+        // and reuses the run the pipeline already shaped for layout).
+        let shaped = shape_text_cached(
+            &data.text,
+            &data.font_family,
+            data.font_size,
             bold,
             italic,
-        };
-
-        // Try to get from cache or shape the text
-        let shaped = if let Some(cached) = self.cache.get_shaped_text(&cache_key) {
-            cached
-        } else {
-            // Shape the text
-            let shaped_text = shape_text_with_style(
-                &data.text,
-                &data.font_family,
-                data.font_size,
-                bold,
-                italic,
-                &self.font_database,
-            )?;
-            self.cache.store_shaped_text(cache_key, shaped_text)
-        };
+            &self.font_database,
+        )?;
 
         // Resolve the same font used for shaping, with robust fallback to any
         // loaded face when the requested family is unavailable.

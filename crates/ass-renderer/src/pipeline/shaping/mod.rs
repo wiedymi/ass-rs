@@ -80,6 +80,92 @@ pub fn shape_text(
     shape_text_with_style(text, font_family, font_size, false, false, font_database)
 }
 
+/// Shape text with style, caching the result per thread keyed by
+/// (text, font, size, bold, italic).
+///
+/// Avoids re-shaping the same run within a frame — the pipeline shapes for layout
+/// and the backend re-shapes for rasterization — and across frames for content
+/// whose glyphs do not change (e.g. transform-animated or karaoke text). The
+/// shaped result depends only on the font outlines, so it is valid across the
+/// pipeline's and backend's (equivalent) system-font databases.
+pub fn shape_text_cached(
+    text: &str,
+    font_family: &str,
+    font_size: f32,
+    bold: bool,
+    italic: bool,
+    font_database: &FontDatabase,
+) -> Result<ShapedText, RenderError> {
+    #[cfg(not(feature = "nostd"))]
+    {
+        use std::cell::RefCell;
+        use std::collections::HashMap;
+        // (text, font family, font size bits, bold, italic)
+        type ShapeCacheKey = (String, String, u32, bool, bool);
+        thread_local! {
+            static CACHE: RefCell<HashMap<ShapeCacheKey, ShapedText>> = RefCell::new(HashMap::new());
+        }
+        let key = (
+            text.to_string(),
+            font_family.to_string(),
+            font_size.to_bits(),
+            bold,
+            italic,
+        );
+        if let Some(shaped) = CACHE.with(|c| c.borrow().get(&key).cloned()) {
+            return Ok(shaped);
+        }
+        let shaped =
+            shape_text_with_style(text, font_family, font_size, bold, italic, font_database)?;
+        CACHE.with(|c| {
+            let mut map = c.borrow_mut();
+            // Bound memory: drop the whole cache if it grows large (re-shaping a
+            // cold entry is cheap next to the hot-path savings).
+            if map.len() >= 8192 {
+                map.clear();
+            }
+            map.insert(key, shaped.clone());
+        });
+        Ok(shaped)
+    }
+    #[cfg(feature = "nostd")]
+    {
+        shape_text_with_style(text, font_family, font_size, bold, italic, font_database)
+    }
+}
+
+/// Read a font file once and cache its bytes (per thread), so repeated shaping of
+/// the same font does not re-read it from disk on every call.
+#[cfg(not(feature = "nostd"))]
+fn cached_font_file(
+    path: &std::path::Path,
+) -> Result<std::sync::Arc<dyn AsRef<[u8]> + Send + Sync>, RenderError> {
+    use std::cell::RefCell;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
+    thread_local! {
+        static CACHE: RefCell<HashMap<PathBuf, Arc<Vec<u8>>>> = RefCell::new(HashMap::new());
+    }
+
+    CACHE.with(|cache| {
+        // Clone-and-drop the borrow before any borrow_mut below.
+        let cached = cache.borrow().get(path).cloned();
+        let data = if let Some(data) = cached {
+            data
+        } else {
+            let bytes = std::fs::read(path)
+                .map_err(|e| RenderError::FontError(format!("Failed to read font file: {e}")))?;
+            let data = Arc::new(bytes);
+            cache.borrow_mut().insert(path.to_path_buf(), data.clone());
+            data
+        };
+        let shared: Arc<dyn AsRef<[u8]> + Send + Sync> = data;
+        Ok(shared)
+    })
+}
+
 /// Shape text with style options
 pub fn shape_text_with_style(
     text: &str,
@@ -97,24 +183,24 @@ pub fn shape_text_with_style(
         .face_source(font_id)
         .ok_or_else(|| RenderError::FontError("Failed to load font data".to_string()))?;
 
-    // Extract data based on source type
+    // Extract data based on source type. File sources are read from disk once and
+    // cached (per thread) — re-reading the font file on every shape call was the
+    // dominant per-frame cost.
     let font_data = match source {
-        fontdb::Source::Binary(data) => data,
-        fontdb::Source::File(_path) => {
+        fontdb::Source::Binary(data) | fontdb::Source::SharedFile(_, data) => data,
+        fontdb::Source::File(path) => {
             #[cfg(not(feature = "nostd"))]
             {
-                std::sync::Arc::new(std::fs::read(&_path).map_err(|e| {
-                    RenderError::FontError(format!("Failed to read font file: {e}"))
-                })?)
+                cached_font_file(&path)?
             }
             #[cfg(feature = "nostd")]
             {
+                let _ = path;
                 return Err(RenderError::FontError(
                     "File reading not supported in no_std mode".into(),
                 ));
             }
         }
-        fontdb::Source::SharedFile(_, data) => data,
     };
 
     // Create rustybuzz face

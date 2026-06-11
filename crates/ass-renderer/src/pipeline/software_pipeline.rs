@@ -16,7 +16,7 @@ use crate::collision::{BoundingBox, PositionedEvent};
 use crate::pipeline::{
     animation::calculate_move_progress,
     drawing::process_drawing_commands,
-    shaping::{shape_text_with_style, GlyphRenderer},
+    shaping::{shape_text_cached, GlyphRenderer},
     tag_processor::{KaraokeStyle, ProcessedTags},
     text_segmenter::{segment_text_with_tags, TextSegment},
     transform::{interpolate_alpha, interpolate_color, interpolate_f32, AnimatableTag},
@@ -532,7 +532,7 @@ impl SoftwarePipeline {
         let bold = lead.tags.formatting.bold.unwrap_or(default_bold);
         let italic = lead.tags.formatting.italic.unwrap_or(default_italic);
         let measure = |s: &str| {
-            shape_text_with_style(s, font, size, bold, italic, &self.font_database)
+            shape_text_cached(s, font, size, bold, italic, &self.font_database)
                 .map_or(0.0, |shaped| shaped.width)
         };
         let word_w: Vec<f32> = words.iter().map(|w| measure(w)).collect();
@@ -966,15 +966,8 @@ impl SoftwarePipeline {
                         let font = seg.tags.font.name.as_deref().unwrap_or(default_font_name);
                         let bold = seg.tags.formatting.bold.unwrap_or(default_bold);
                         let italic = seg.tags.formatting.italic.unwrap_or(default_italic);
-                        shape_text_with_style(
-                            &seg.text,
-                            font,
-                            size,
-                            bold,
-                            italic,
-                            &self.font_database,
-                        )
-                        .map_or(0.0, |sh| sh.width * fsx)
+                        shape_text_cached(&seg.text, font, size, bold, italic, &self.font_database)
+                            .map_or(0.0, |sh| sh.width * fsx)
                     })
                     .sum()
             } else {
@@ -1029,7 +1022,7 @@ impl SoftwarePipeline {
 
                 let font_to_use = tags.font.name.as_deref().unwrap_or(default_font_name);
 
-                let shaped = shape_text_with_style(
+                let shaped = shape_text_cached(
                     line_text,
                     font_to_use,
                     actual_font_size,
