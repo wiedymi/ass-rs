@@ -5,9 +5,9 @@ use crate::renderer::RenderContext;
 use crate::utils::{DirtyRegion, RenderError};
 
 #[cfg(feature = "nostd")]
-use alloc::{boxed::Box, format, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, format, vec::Vec};
 #[cfg(not(feature = "nostd"))]
-use std::{boxed::Box, sync::Arc, vec::Vec};
+use std::{boxed::Box, vec::Vec};
 
 // ToString is only needed for backends that aren't compiled with minimal features
 #[cfg(all(
@@ -71,14 +71,14 @@ pub trait RenderBackend: Send + Sync {
 
     /// Composite layers into final frame
     fn composite_layers(
-        &self,
+        &mut self,
         layers: &[IntermediateLayer],
         context: &RenderContext,
     ) -> Result<Vec<u8>, RenderError>;
 
     /// Composite layers incrementally (dirty regions only)
     fn composite_layers_incremental(
-        &self,
+        &mut self,
         layers: &[IntermediateLayer],
         dirty_regions: &[DirtyRegion],
         previous_frame: &[u8],
@@ -161,7 +161,7 @@ pub fn create_backend(
     backend_type: BackendType,
     width: u32,
     height: u32,
-) -> Result<Arc<dyn RenderBackend>, RenderError> {
+) -> Result<Box<dyn RenderBackend>, RenderError> {
     match backend_type {
         BackendType::Auto => {
             // Try backends in order of preference
@@ -191,7 +191,7 @@ pub fn create_backend(
         BackendType::Software => {
             let context = crate::renderer::RenderContext::new(width, height);
             let backend = software::SoftwareBackend::new(&context)?;
-            Ok(Arc::new(backend))
+            Ok(Box::new(backend))
         }
 
         #[cfg(all(feature = "hardware-backend", feature = "vulkan"))]
@@ -204,7 +204,7 @@ pub fn create_backend(
         BackendType::Metal => {
             let context = crate::renderer::RenderContext::new(width, height);
             let backend = hardware::metal::MetalBackend::new(&context)?;
-            Ok(Arc::new(backend))
+            Ok(Box::new(backend))
         }
 
         #[cfg(feature = "web-backend")]

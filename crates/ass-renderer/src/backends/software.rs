@@ -935,43 +935,43 @@ impl RenderBackend for SoftwareBackend {
     }
 
     fn composite_layers(
-        &self,
+        &mut self,
         layers: &[IntermediateLayer],
         context: &RenderContext,
     ) -> Result<Vec<u8>, RenderError> {
-        // Create a new backend instance for this frame
-        // This is intentional - the backend must be stateless due to Arc<dyn RenderBackend>
-        let mut backend = Self::new(context)?;
-
-        // Clear pixmap
-        backend.pixmap.fill(tiny_skia::Color::TRANSPARENT);
-
-        // Composite each layer
-        for layer in layers {
-            backend.composite_layer(layer, context)?;
+        // The backend persists across frames, so the per-glyph outline cache and
+        // font-data cache in `glyph_renderer` (and the pixmap allocation) survive
+        // instead of being rebuilt each frame. Match the pixmap to the current
+        // context size, then clear and redraw.
+        if self.pixmap.width() != context.width() || self.pixmap.height() != context.height() {
+            self.resize(context.width(), context.height())?;
         }
 
-        // Return RGBA data
-        let data = backend.pixmap.data().to_vec();
+        self.pixmap.fill(tiny_skia::Color::TRANSPARENT);
 
-        Ok(data)
+        for layer in layers {
+            self.composite_layer(layer, context)?;
+        }
+
+        Ok(self.pixmap.data().to_vec())
     }
 
     fn composite_layers_incremental(
-        &self,
+        &mut self,
         layers: &[IntermediateLayer],
         dirty_regions: &[DirtyRegion],
         previous_frame: &[u8],
         context: &RenderContext,
     ) -> Result<Vec<u8>, RenderError> {
-        // Create a new backend instance for this frame
-        let mut backend = Self::new(context)?;
+        if self.pixmap.width() != context.width() || self.pixmap.height() != context.height() {
+            self.resize(context.width(), context.height())?;
+        }
 
-        // Copy previous frame
-        if previous_frame.len() == backend.pixmap.data().len() {
-            backend.pixmap.data_mut().copy_from_slice(previous_frame);
+        // Seed from the previous frame, then redraw only the dirty regions.
+        if previous_frame.len() == self.pixmap.data().len() {
+            self.pixmap.data_mut().copy_from_slice(previous_frame);
         } else {
-            backend.pixmap.fill(tiny_skia::Color::TRANSPARENT);
+            self.pixmap.fill(tiny_skia::Color::TRANSPARENT);
         }
 
         // Only redraw dirty regions
@@ -983,12 +983,12 @@ impl RenderBackend for SoftwareBackend {
             // Composite layers within this region
             for layer in layers {
                 if layer.intersects_region(region) {
-                    backend.composite_layer(layer, context)?;
+                    self.composite_layer(layer, context)?;
                 }
             }
         }
 
-        Ok(backend.pixmap.data().to_vec())
+        Ok(self.pixmap.data().to_vec())
     }
 
     fn supports_feature(&self, feature: BackendFeature) -> bool {

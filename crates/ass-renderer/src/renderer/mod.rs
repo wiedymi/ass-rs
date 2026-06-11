@@ -6,9 +6,9 @@ use crate::utils::RenderError;
 use ass_core::parser::Script;
 
 #[cfg(feature = "nostd")]
-use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 #[cfg(not(feature = "nostd"))]
-use std::{boxed::Box, sync::Arc, time::Duration};
+use std::{boxed::Box, time::Duration};
 
 mod context;
 mod event_selector;
@@ -23,7 +23,7 @@ pub use probing::BackendProber;
 /// Main renderer that coordinates rendering pipeline
 pub struct Renderer {
     context: RenderContext,
-    backend: Arc<dyn RenderBackend>,
+    backend: Box<dyn RenderBackend>,
     pipeline: Box<dyn Pipeline>,
     event_selector: event_selector::EventSelector,
     /// Cache of the last fully-static rendered frame, keyed by the active events'
@@ -55,7 +55,7 @@ impl Renderer {
     /// Create a new renderer with a specific backend instance
     pub fn with_backend(
         context: RenderContext,
-        backend: Arc<dyn RenderBackend>,
+        backend: Box<dyn RenderBackend>,
     ) -> Result<Self, RenderError> {
         let pipeline = backend.create_pipeline()?;
 

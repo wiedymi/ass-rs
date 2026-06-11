@@ -236,7 +236,7 @@ impl RenderBackend for MetalBackend {
     }
 
     fn composite_layers(
-        &self,
+        &mut self,
         layers: &[IntermediateLayer],
         context: &RenderContext,
     ) -> Result<Vec<u8>, RenderError> {
@@ -254,7 +254,7 @@ impl RenderBackend for MetalBackend {
     }
 
     fn composite_layers_incremental(
-        &self,
+        &mut self,
         layers: &[IntermediateLayer],
         _dirty_regions: &[DirtyRegion],
         _previous_frame: &[u8],

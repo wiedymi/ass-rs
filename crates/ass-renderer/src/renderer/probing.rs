@@ -5,9 +5,9 @@ use crate::renderer::RenderContext;
 use crate::utils::RenderError;
 
 #[cfg(feature = "nostd")]
-use alloc::{sync::Arc, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 #[cfg(not(feature = "nostd"))]
-use std::{sync::Arc, vec::Vec};
+use std::vec::Vec;
 
 /// Backend prober for automatic backend selection
 pub struct BackendProber {
@@ -48,7 +48,7 @@ impl BackendProber {
     pub fn probe_best_backend(
         &self,
         context: &RenderContext,
-    ) -> Result<Arc<dyn RenderBackend>, RenderError> {
+    ) -> Result<Box<dyn RenderBackend>, RenderError> {
         for backend_type in &self.preferred_order {
             match self.try_create_backend(*backend_type, context) {
                 Ok(backend) => {
@@ -66,30 +66,30 @@ impl BackendProber {
         &self,
         backend_type: BackendType,
         context: &RenderContext,
-    ) -> Result<Arc<dyn RenderBackend>, RenderError> {
+    ) -> Result<Box<dyn RenderBackend>, RenderError> {
         match backend_type {
             #[cfg(feature = "software-backend")]
             BackendType::Software => {
                 use crate::backends::software::SoftwareBackend;
-                Ok(Arc::new(SoftwareBackend::new(context)?))
+                Ok(Box::new(SoftwareBackend::new(context)?))
             }
 
             #[cfg(all(feature = "vulkan", not(feature = "nostd")))]
             BackendType::Vulkan => {
                 use crate::backends::hardware::VulkanBackend;
-                Ok(Arc::new(VulkanBackend::new()?))
+                Ok(Box::new(VulkanBackend::new()?))
             }
 
             #[cfg(feature = "metal")]
             BackendType::Metal => {
                 use crate::backends::hardware::metal::MetalBackend;
-                Ok(Arc::new(MetalBackend::new(context)?))
+                Ok(Box::new(MetalBackend::new(context)?))
             }
 
             #[cfg(feature = "web-backend")]
             BackendType::WebGPU => {
                 use crate::backends::web::WebGpuBackend;
-                Ok(Arc::new(WebGpuBackend::from_dimensions(
+                Ok(Box::new(WebGpuBackend::from_dimensions(
                     context.width(),
                     context.height(),
                 )))
