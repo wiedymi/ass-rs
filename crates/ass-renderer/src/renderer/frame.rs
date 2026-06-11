@@ -1,14 +1,19 @@
 //! Rendered frame representation
 
 #[cfg(feature = "nostd")]
-use alloc::{vec, vec::Vec};
+use alloc::{sync::Arc, vec, vec::Vec};
 #[cfg(not(feature = "nostd"))]
-use std::vec::Vec;
+use std::{sync::Arc, vec::Vec};
 
-/// Rendered frame containing pixel data
+/// Rendered frame containing pixel data.
+///
+/// The pixel buffer is reference-counted (`Arc`) so that cloning a frame — e.g.
+/// returning a cached static frame for a new timestamp — is O(1) and shares the
+/// pixels. Mutating accessors use copy-on-write, so an exclusively-owned frame is
+/// still mutated in place.
 #[derive(Clone)]
 pub struct Frame {
-    buffer: Vec<u8>,
+    buffer: Arc<Vec<u8>>,
     width: u32,
     height: u32,
     timestamp: u32,
@@ -30,7 +35,7 @@ impl Frame {
     /// Create a new frame with the given buffer
     pub fn new(buffer: Vec<u8>, width: u32, height: u32, timestamp: u32) -> Self {
         Self {
-            buffer,
+            buffer: Arc::new(buffer),
             width,
             height,
             timestamp,
@@ -40,13 +45,7 @@ impl Frame {
 
     /// Create a frame from RGBA data
     pub fn from_rgba(buffer: Vec<u8>, width: u32, height: u32) -> Self {
-        Self {
-            buffer,
-            width,
-            height,
-            timestamp: 0,
-            format: PixelFormat::Rgba8,
-        }
+        Self::new(buffer, width, height, 0)
     }
 
     /// Create a new frame with specific pixel format
@@ -58,7 +57,7 @@ impl Frame {
         format: PixelFormat,
     ) -> Self {
         Self {
-            buffer,
+            buffer: Arc::new(buffer),
             width,
             height,
             timestamp,
@@ -69,33 +68,37 @@ impl Frame {
     /// Create an empty frame (transparent)
     pub fn empty(width: u32, height: u32, timestamp: u32) -> Self {
         let size = (width * height * 4) as usize;
+        Self::new(vec![0; size], width, height, timestamp)
+    }
+
+    /// Clone this frame sharing its pixel buffer (O(1)) but with a new timestamp.
+    /// Used to serve a cached static frame for the current time without copying.
+    pub fn with_timestamp(&self, timestamp: u32) -> Self {
         Self {
-            buffer: vec![0; size],
-            width,
-            height,
+            buffer: Arc::clone(&self.buffer),
             timestamp,
-            format: PixelFormat::Rgba8,
+            ..*self
         }
     }
 
     /// Get frame buffer data
     pub fn data(&self) -> &[u8] {
-        &self.buffer
+        self.buffer.as_slice()
     }
 
     /// Get frame pixels (alias for data())
     pub fn pixels(&self) -> &[u8] {
-        &self.buffer
+        self.buffer.as_slice()
     }
 
-    /// Get mutable frame buffer data
+    /// Get mutable frame buffer data (copy-on-write if the buffer is shared)
     pub fn data_mut(&mut self) -> &mut [u8] {
-        &mut self.buffer
+        Arc::make_mut(&mut self.buffer).as_mut_slice()
     }
 
-    /// Take ownership of the buffer
+    /// Take ownership of the buffer (clones only if the buffer is still shared)
     pub fn into_buffer(self) -> Vec<u8> {
-        self.buffer
+        Arc::try_unwrap(self.buffer).unwrap_or_else(|arc| (*arc).clone())
     }
 
     /// Get frame width
@@ -136,7 +139,7 @@ impl Frame {
         match self.format {
             PixelFormat::Rgba8 => self,
             PixelFormat::Bgra8 => {
-                for chunk in self.buffer.chunks_exact_mut(4) {
+                for chunk in Arc::make_mut(&mut self.buffer).chunks_exact_mut(4) {
                     chunk.swap(0, 2);
                 }
                 self.format = PixelFormat::Rgba8;
@@ -147,7 +150,7 @@ impl Frame {
                 for chunk in self.buffer.chunks_exact(3) {
                     rgba.extend_from_slice(&[chunk[0], chunk[1], chunk[2], 255]);
                 }
-                self.buffer = rgba;
+                self.buffer = Arc::new(rgba);
                 self.format = PixelFormat::Rgba8;
                 self
             }

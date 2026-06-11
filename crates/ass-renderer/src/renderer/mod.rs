@@ -124,12 +124,7 @@ impl Renderer {
             (cache_key.as_ref(), self.frame_cache.as_ref())
         {
             if cached_key == key {
-                return Ok(Frame::new(
-                    cached.data().to_vec(),
-                    self.context.width(),
-                    self.context.height(),
-                    time_cs,
-                ));
+                return Ok(cached.with_timestamp(time_cs));
             }
         }
 
