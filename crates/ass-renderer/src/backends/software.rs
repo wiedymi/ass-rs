@@ -160,6 +160,12 @@ impl SoftwareBackend {
     }
 
     fn draw_vector_layer(&mut self, data: &crate::pipeline::VectorData) -> Result<(), RenderError> {
+        let Some(path) = &data.path else {
+            return Ok(());
+        };
+
+        let clip_mask = self.vector_clip_mask(data.clip);
+
         let mut paint = tiny_skia::Paint::default();
         // Ensure we're setting color with proper alpha handling
         // tiny-skia expects premultiplied alpha internally
@@ -167,15 +173,13 @@ impl SoftwareBackend {
         paint.anti_alias = true;
         paint.blend_mode = tiny_skia::BlendMode::SourceOver;
 
-        if let Some(path) = &data.path {
-            self.pixmap.fill_path(
-                path,
-                &paint,
-                tiny_skia::FillRule::Winding,
-                Transform::identity(),
-                None,
-            );
-        }
+        self.pixmap.fill_path(
+            path,
+            &paint,
+            tiny_skia::FillRule::Winding,
+            Transform::identity(),
+            clip_mask.as_ref(),
+        );
 
         if let Some(stroke) = &data.stroke {
             paint.set_color_rgba8(
@@ -190,13 +194,48 @@ impl SoftwareBackend {
                 ..Default::default()
             };
 
-            if let Some(path) = &data.path {
-                self.pixmap
-                    .stroke_path(path, &paint, &sk_stroke, Transform::identity(), None);
-            }
+            self.pixmap.stroke_path(
+                path,
+                &paint,
+                &sk_stroke,
+                Transform::identity(),
+                clip_mask.as_ref(),
+            );
         }
 
         Ok(())
+    }
+
+    /// Build a full-canvas clip mask for a drawing's rectangular `\clip` /
+    /// `\iclip` (coordinates already in render space). Mirrors the text clip in
+    /// [`Self::composite_layer`]; `None` leaves the drawing unclipped.
+    fn vector_clip_mask(
+        &self,
+        clip: Option<(f32, f32, f32, f32, bool)>,
+    ) -> Option<tiny_skia::Mask> {
+        let (x1, y1, x2, y2, inverse) = clip?;
+        let width = self.pixmap.width();
+        let height = self.pixmap.height();
+        let mut mask = tiny_skia::Mask::new(width, height)?;
+        let mut builder = tiny_skia::PathBuilder::new();
+        builder.move_to(x1, y1);
+        builder.line_to(x2, y1);
+        builder.line_to(x2, y2);
+        builder.line_to(x1, y2);
+        builder.close();
+        let fill_rule = if inverse {
+            builder.move_to(0.0, 0.0);
+            builder.line_to(width as f32, 0.0);
+            builder.line_to(width as f32, height as f32);
+            builder.line_to(0.0, height as f32);
+            builder.close();
+            tiny_skia::FillRule::EvenOdd
+        } else {
+            tiny_skia::FillRule::Winding
+        };
+        let clip_path = builder.finish()?;
+        mask.fill_path(&clip_path, fill_rule, true, Transform::identity());
+        Some(mask)
     }
 
     /// Render a text layer from A8 coverage tiles (shadow, outline, fill) and

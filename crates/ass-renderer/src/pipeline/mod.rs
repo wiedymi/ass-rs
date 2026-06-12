@@ -133,6 +133,9 @@ pub struct VectorData {
     pub stroke: Option<StrokeInfo>,
     /// Bounding box
     pub bounds: Option<(u32, u32, u32, u32)>,
+    /// Rectangular `\clip` / `\iclip` in render coordinates as
+    /// `(x1, y1, x2, y2, inverse)`; `None` when the drawing is unclipped.
+    pub clip: Option<(f32, f32, f32, f32, bool)>,
 }
 
 /// Stroke information for vector graphics

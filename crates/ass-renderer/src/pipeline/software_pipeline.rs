@@ -707,6 +707,17 @@ impl SoftwarePipeline {
             let scale_x = context.width() as f32 / self.play_res_x;
             let scale_y = context.height() as f32 / self.play_res_y;
 
+            // Drawing geometry is in script (PlayRes) units, exactly like `\pos`,
+            // so it must be scaled to the render resolution. Previously only the
+            // position was scaled and the shape was left at script size, rendering
+            // ~1.5x too large whenever the output differed from PlayRes (the ED
+            // sparkle particles, PlayRes 1920 rendered at 1280, were the visible
+            // case: oversized shapes ~3x the ink libass produced).
+            let path = path
+                .clone()
+                .transform(Transform::from_scale(scale_x, scale_y))
+                .unwrap_or(path);
+
             // Calculate position with proper scaling
             let (x, y) = if let Some((px, py)) = tags.position {
                 // Scale from script coordinates to render coordinates
@@ -778,11 +789,24 @@ impl SoftwarePipeline {
                 y + align_y_offset,
             ));
 
+            // `\clip` / `\iclip` coordinates are in script space (like `\pos`),
+            // so scale them into render space the same way the text path does.
+            let clip = tags.clip.as_ref().map(|c| {
+                (
+                    c.x1 * scale_x,
+                    c.y1 * scale_y,
+                    c.x2 * scale_x,
+                    c.y2 * scale_y,
+                    c.inverse,
+                )
+            });
+
             return Ok(vec![IntermediateLayer::Vector(VectorData {
                 path: transformed_path,
                 color,
                 stroke: None,
                 bounds: None,
+                clip,
             })]);
         }
 
