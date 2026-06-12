@@ -1545,65 +1545,73 @@ fn apply_box_blur(pixmap: &mut Pixmap, radius: f32) {
     // A single separable box blur. The oracle confirms this already tracks libass's
     // Gaussian to within the AA noise floor (<=0.54% even at radius 20); a 3-pass
     // Gaussian approximation gained ~0.02% for 3x the cost, so it is not used.
+    //
+    // Implemented as a sliding-window (running-sum) blur: each pass keeps a window
+    // sum and, per pixel, subtracts the leaving sample and adds the entering one
+    // instead of re-summing all `2r+1` taps. That makes it O(pixels) rather than
+    // O(pixels * radius) — the box blur was ~76% of blurred-text render time — and
+    // is bit-identical, since the window is the same clamp-to-edge `2r+1` integer
+    // sum divided by the same count, just accumulated incrementally.
     let radius = radius.round() as i32;
     let width = pixmap.width() as i32;
     let height = pixmap.height() as i32;
+    if width == 0 || height == 0 {
+        return;
+    }
     let data = pixmap.data_mut();
-
-    // Create temporary buffer for horizontal pass
+    let count = (2 * radius + 1) as u32;
     let mut temp = vec![0u8; data.len()];
 
-    // Horizontal blur pass
+    // Horizontal pass (data -> temp): one running window per row.
     for y in 0..height {
-        for x in 0..width {
-            let mut r = 0u32;
-            let mut g = 0u32;
-            let mut b = 0u32;
-            let mut a = 0u32;
-            let mut count = 0u32;
-
-            for dx in -radius..=radius {
-                let sx = (x + dx).clamp(0, width - 1);
-                let idx = ((y * width + sx) * 4) as usize;
-                r += data[idx] as u32;
-                g += data[idx + 1] as u32;
-                b += data[idx + 2] as u32;
-                a += data[idx + 3] as u32;
-                count += 1;
+        let row = (y * width) as usize * 4;
+        let mut s = [0u32; 4];
+        for dx in -radius..=radius {
+            let sx = dx.clamp(0, width - 1) as usize;
+            let i = row + sx * 4;
+            for (acc, &v) in s.iter_mut().zip(&data[i..i + 4]) {
+                *acc += u32::from(v);
             }
-
-            let out_idx = ((y * width + x) * 4) as usize;
-            temp[out_idx] = (r / count) as u8;
-            temp[out_idx + 1] = (g / count) as u8;
-            temp[out_idx + 2] = (b / count) as u8;
-            temp[out_idx + 3] = (a / count) as u8;
+        }
+        for x in 0..width {
+            let o = row + x as usize * 4;
+            for (dst, &acc) in temp[o..o + 4].iter_mut().zip(&s) {
+                *dst = (acc / count) as u8;
+            }
+            if x + 1 < width {
+                let rem = row + (x - radius).clamp(0, width - 1) as usize * 4;
+                let add = row + (x + 1 + radius).clamp(0, width - 1) as usize * 4;
+                for c in 0..4 {
+                    s[c] = s[c] - u32::from(data[rem + c]) + u32::from(data[add + c]);
+                }
+            }
         }
     }
 
-    // Vertical blur pass
-    for y in 0..height {
-        for x in 0..width {
-            let mut r = 0u32;
-            let mut g = 0u32;
-            let mut b = 0u32;
-            let mut a = 0u32;
-            let mut count = 0u32;
-
-            for dy in -radius..=radius {
-                let sy = (y + dy).clamp(0, height - 1);
-                let idx = ((sy * width + x) * 4) as usize;
-                r += temp[idx] as u32;
-                g += temp[idx + 1] as u32;
-                b += temp[idx + 2] as u32;
-                a += temp[idx + 3] as u32;
-                count += 1;
+    // Vertical pass (temp -> data): one running window per column.
+    let stride = width as usize * 4;
+    for x in 0..width {
+        let col = x as usize * 4;
+        let mut s = [0u32; 4];
+        for dy in -radius..=radius {
+            let sy = dy.clamp(0, height - 1) as usize;
+            let i = sy * stride + col;
+            for (acc, &v) in s.iter_mut().zip(&temp[i..i + 4]) {
+                *acc += u32::from(v);
             }
-
-            let out_idx = ((y * width + x) * 4) as usize;
-            data[out_idx] = (r / count) as u8;
-            data[out_idx + 1] = (g / count) as u8;
-            data[out_idx + 2] = (b / count) as u8;
-            data[out_idx + 3] = (a / count) as u8;
+        }
+        for y in 0..height {
+            let o = y as usize * stride + col;
+            for (dst, &acc) in data[o..o + 4].iter_mut().zip(&s) {
+                *dst = (acc / count) as u8;
+            }
+            if y + 1 < height {
+                let rem = (y - radius).clamp(0, height - 1) as usize * stride + col;
+                let add = (y + 1 + radius).clamp(0, height - 1) as usize * stride + col;
+                for c in 0..4 {
+                    s[c] = s[c] - u32::from(temp[rem + c]) + u32::from(temp[add + c]);
+                }
+            }
         }
     }
 }
