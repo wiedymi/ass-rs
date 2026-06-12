@@ -115,6 +115,23 @@ fn run() -> Result<(), String> {
     }
     let ours_ms = t.elapsed().as_secs_f64() * 1000.0;
 
+    // --- our bitmap-list output (libass-style: emit positioned bitmaps, no
+    // full-frame clear/composite/copy — the apples-to-apples shape of libass) ---
+    for _ in 0..warmup {
+        renderer
+            .render_frame_bitmaps(&script, 0)
+            .map_err(|e| format!("warmup bitmaps: {e}"))?;
+    }
+    let mut sink_b = 0u64;
+    let tb = Instant::now();
+    for &time_cs in &times {
+        let bitmaps = renderer
+            .render_frame_bitmaps(&script, time_cs)
+            .map_err(|e| format!("render bitmaps: {e}"))?;
+        sink_b = sink_b.wrapping_add(bitmaps.len() as u64);
+    }
+    let ours_bitmaps_ms = tb.elapsed().as_secs_f64() * 1000.0;
+
     // --- libass (ass_render_frame only; player would composite) ---
     let lib = Libass::new(cfg.width, cfg.height).map_err(|e| format!("libass init: {e}"))?;
     lib.set_fonts(None, &cfg.family, true)
@@ -141,11 +158,17 @@ fn run() -> Result<(), String> {
         cfg.duration_cs
     );
     report("ours", ours_ms, cfg.frames);
+    report("ours-bmp", ours_bitmaps_ms, cfg.frames);
     report("libass", libass_ms, cfg.frames);
     println!(
-        "ratio ours/libass: {:.2}x   (checksums {sink}/{sink2})",
+        "ratio ours/libass: {:.2}x   ours-bmp/libass: {:.2}x   (checksums {sink}/{sink_b}/{sink2})",
         if libass_ms > 0.0 {
             ours_ms / libass_ms
+        } else {
+            0.0
+        },
+        if libass_ms > 0.0 {
+            ours_bitmaps_ms / libass_ms
         } else {
             0.0
         }

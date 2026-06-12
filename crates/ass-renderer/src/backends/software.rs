@@ -16,6 +16,10 @@ pub struct SoftwareBackend {
     pixmap: Pixmap,
     font_database: Arc<fontdb::Database>,
     glyph_renderer: crate::pipeline::shaping::GlyphRenderer,
+    /// Reused scratch pixmap into which a vector-path layer is rendered when
+    /// collecting a bitmap list (`render_to_bitmaps`), then cropped to a tile.
+    #[cfg(not(feature = "nostd"))]
+    scratch: Pixmap,
     #[cfg(feature = "backend-metrics")]
     metrics: super::BackendMetrics,
 }
@@ -34,10 +38,16 @@ impl SoftwareBackend {
         #[cfg(feature = "nostd")]
         let font_database = Arc::new(fontdb::Database::new());
 
+        #[cfg(not(feature = "nostd"))]
+        let scratch =
+            Pixmap::new(context.width(), context.height()).ok_or(RenderError::InvalidDimensions)?;
+
         Ok(Self {
             pixmap,
             font_database,
             glyph_renderer: crate::pipeline::shaping::GlyphRenderer::new(),
+            #[cfg(not(feature = "nostd"))]
+            scratch,
             #[cfg(feature = "backend-metrics")]
             metrics: super::BackendMetrics::new(),
         })
@@ -46,7 +56,57 @@ impl SoftwareBackend {
     /// Resize the backend pixmap
     pub fn resize(&mut self, width: u32, height: u32) -> Result<(), RenderError> {
         self.pixmap = Pixmap::new(width, height).ok_or(RenderError::InvalidDimensions)?;
+        #[cfg(not(feature = "nostd"))]
+        {
+            self.scratch = Pixmap::new(width, height).ok_or(RenderError::InvalidDimensions)?;
+        }
         Ok(())
+    }
+
+    /// Render layers into a positioned bitmap list (libass `ASS_Image` style)
+    /// instead of compositing into a frame buffer.
+    ///
+    /// Coverage-path layers emit cheap A8 [`RenderBitmap::Coverage`] tiles (an
+    /// `Arc` clone of the cached coverage); vector-path layers (blur, swept
+    /// karaoke, clip, drawings) are rendered into a scratch pixmap and cropped to
+    /// an [`RenderBitmap::Rgba`] tile. This skips the full-frame clear and the
+    /// final copy entirely — the caller (or a GPU) composites the list.
+    #[cfg(not(feature = "nostd"))]
+    fn render_to_bitmaps(
+        &mut self,
+        layers: &[IntermediateLayer],
+        context: &RenderContext,
+    ) -> Result<Vec<crate::backends::coverage::RenderBitmap>, RenderError> {
+        if self.pixmap.width() != context.width() || self.pixmap.height() != context.height() {
+            self.resize(context.width(), context.height())?;
+        }
+
+        // The scratch starts (and stays) clear; only vector-path layers draw into
+        // it, after which it is cropped and cleared again. Coverage-path layers
+        // emit into the sink and never touch it — so we avoid a per-layer clear
+        // and full-frame scan, which would dwarf the bitmap emit.
+        self.scratch.fill(tiny_skia::Color::TRANSPARENT);
+        let mut out = Vec::new();
+        for layer in layers {
+            EMIT_SINK.with(|sink| *sink.borrow_mut() = Some(Vec::new()));
+            std::mem::swap(&mut self.pixmap, &mut self.scratch);
+            let result = self.composite_layer(layer, context);
+            std::mem::swap(&mut self.pixmap, &mut self.scratch);
+            result?;
+
+            let coverage = EMIT_SINK.with(|sink| sink.borrow_mut().take().unwrap_or_default());
+            if coverage.is_empty() {
+                // Vector / raster / drawing layer: it rendered into the scratch.
+                if let Some(bitmap) = crop_pixmap(&self.scratch) {
+                    out.push(bitmap);
+                }
+                self.scratch.fill(tiny_skia::Color::TRANSPARENT);
+            } else {
+                out.extend(coverage);
+            }
+        }
+        EMIT_SINK.with(|sink| *sink.borrow_mut() = None);
+        Ok(out)
     }
 
     fn composite_layer(
@@ -1031,6 +1091,12 @@ fn shadow_delta(local: Transform, sx: f32, sy: f32) -> (i32, i32) {
 std::thread_local! {
     static RUN_COVERAGE: std::cell::RefCell<std::collections::HashMap<RunCoverageKey, CachedCoverage>> =
         std::cell::RefCell::new(std::collections::HashMap::new());
+
+    /// When `Some`, coverage-path layers append their bitmaps here instead of
+    /// compositing — this is how `render_to_bitmaps` collects the libass-style
+    /// output while reusing the normal layer-rendering code unchanged.
+    static EMIT_SINK: std::cell::RefCell<Option<Vec<crate::backends::coverage::RenderBitmap>>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 /// Build the coverage cache key (and extract the outline/shadow paints and the
@@ -1136,7 +1202,7 @@ fn emit_cached(
     let mut out = Vec::new();
     let bitmap =
         |tile: &crate::backends::coverage::CoverageTile, x: i32, y: i32, color: [u8; 4]| {
-            RenderBitmap {
+            RenderBitmap::Coverage {
                 width: tile.width,
                 height: tile.height,
                 coverage: tile.data.clone(),
@@ -1172,9 +1238,60 @@ fn composite_cached(
     colors: LayerColors,
 ) {
     use crate::backends::coverage::composite_bitmap;
-    for bitmap in emit_cached(cached, anchor, colors) {
-        composite_bitmap(dst, pixmap_w, pixmap_h, &bitmap);
+    let bitmaps = emit_cached(cached, anchor, colors);
+    EMIT_SINK.with(|sink| {
+        let mut sink = sink.borrow_mut();
+        if let Some(sink) = sink.as_mut() {
+            // Collecting the bitmap list: hand the layer's bitmaps over instead of
+            // blending them into a frame buffer.
+            sink.extend(bitmaps);
+        } else {
+            for bitmap in &bitmaps {
+                composite_bitmap(dst, pixmap_w, pixmap_h, bitmap);
+            }
+        }
+    });
+}
+
+/// Crop a premultiplied-RGBA pixmap to the bounding box of its non-transparent
+/// pixels and return it as an `Rgba` [`RenderBitmap`], or `None` if fully empty.
+#[cfg(not(feature = "nostd"))]
+fn crop_pixmap(pixmap: &Pixmap) -> Option<crate::backends::coverage::RenderBitmap> {
+    use crate::backends::coverage::RenderBitmap;
+    let w = pixmap.width() as i32;
+    let h = pixmap.height() as i32;
+    let data = pixmap.data();
+    let (mut min_x, mut min_y, mut max_x, mut max_y) = (w, h, -1_i32, -1_i32);
+    for y in 0..h {
+        let row = (y * w) as usize * 4;
+        for x in 0..w {
+            if data[row + x as usize * 4 + 3] != 0 {
+                min_x = min_x.min(x);
+                max_x = max_x.max(x);
+                min_y = min_y.min(y);
+                max_y = max_y.max(y);
+            }
+        }
     }
+    if max_x < min_x {
+        return None;
+    }
+    let bw = (max_x - min_x + 1) as u32;
+    let bh = (max_y - min_y + 1) as u32;
+    let row_bytes = bw as usize * 4;
+    let mut pixels = vec![0u8; row_bytes * bh as usize];
+    for ty in 0..bh as i32 {
+        let src = (((min_y + ty) * w + min_x) as usize) * 4;
+        let dst = ty as usize * row_bytes;
+        pixels[dst..dst + row_bytes].copy_from_slice(&data[src..src + row_bytes]);
+    }
+    Some(RenderBitmap::Rgba {
+        width: bw,
+        height: bh,
+        pixels: Arc::new(pixels),
+        x: min_x,
+        y: min_y,
+    })
 }
 
 /// Merge positioned glyph outlines into a single path under one transform.
@@ -1309,6 +1426,14 @@ impl RenderBackend for SoftwareBackend {
         }
 
         Ok(self.pixmap.data().to_vec())
+    }
+
+    fn render_layers_to_bitmaps(
+        &mut self,
+        layers: &[IntermediateLayer],
+        context: &RenderContext,
+    ) -> Result<Vec<crate::backends::coverage::RenderBitmap>, RenderError> {
+        self.render_to_bitmaps(layers, context)
     }
 
     fn composite_layers_incremental(

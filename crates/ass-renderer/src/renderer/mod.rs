@@ -140,6 +140,45 @@ impl Renderer {
         Ok(frame)
     }
 
+    /// Render the active subtitles at `time_cs` to a positioned bitmap list
+    /// (libass `ASS_Image` style) rather than a composited frame.
+    ///
+    /// The caller (typically a video player or GPU) composites the returned
+    /// bitmaps. This skips the renderer's full-frame clear, the final composite
+    /// blend and the frame-buffer copy — the model real integrations use, and the
+    /// apples-to-apples shape of libass's own output. Requires a software backend.
+    #[cfg(feature = "software-backend")]
+    pub fn render_frame_bitmaps(
+        &mut self,
+        script: &Script,
+        time_cs: u32,
+    ) -> Result<Vec<crate::backends::coverage::RenderBitmap>, RenderError> {
+        for section in script.sections() {
+            if let ass_core::parser::Section::ScriptInfo(info) = section {
+                if let Some((play_x, play_y)) = info.play_resolution() {
+                    self.context.set_playback_resolution(play_x, play_y);
+                }
+                if let Some((layout_x, layout_y)) = info.layout_resolution() {
+                    self.context.set_storage_resolution(layout_x, layout_y);
+                }
+                break;
+            }
+        }
+
+        let active = self.event_selector.select_active(script, time_cs)?;
+        let events = active.events;
+        if events.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        self.pipeline.prepare_script(script, None)?;
+        let layers = self
+            .pipeline
+            .process_events(&events, time_cs, &self.context)?;
+        self.backend
+            .render_layers_to_bitmaps(&layers, &self.context)
+    }
+
     /// Whether an event's text carries a time-dependent override (`\t`, `\move`,
     /// karaoke `\k`/`\K`, or `\fad`), meaning its output changes between frames
     /// and must not be served from the static frame cache.

@@ -32,24 +32,43 @@ pub struct CoverageTile {
     pub data: Arc<Vec<u8>>,
 }
 
-/// A positioned 8-bit coverage bitmap plus its colour — the renderer's
-/// libass-`ASS_Image`-style output unit. A frame is a list of these; the caller
-/// (or [`composite_bitmap`]) blends them. Producing one from a cached tile is an
-/// `Arc` clone, so geometry-static animated layers cost almost nothing per frame.
+/// A positioned bitmap — the renderer's libass-`ASS_Image`-style output unit. A
+/// frame is a list of these; the caller (or [`composite_bitmap`]) blends them.
+///
+/// The common case is `Coverage` (A8 + one colour): producing it from a cached
+/// tile is an `Arc` clone, so geometry-static animated layers cost almost nothing
+/// per frame. Complex effects that mix colours within a layer (blur, swept
+/// karaoke, clip) are pre-composited into an `Rgba` tile.
 #[derive(Clone)]
-pub struct RenderBitmap {
-    /// Bitmap width in pixels.
-    pub width: u32,
-    /// Bitmap height in pixels.
-    pub height: u32,
-    /// `width * height` A8 coverage bytes.
-    pub coverage: Arc<Vec<u8>>,
-    /// Destination x of the bitmap's top-left, in frame pixels.
-    pub x: i32,
-    /// Destination y of the bitmap's top-left, in frame pixels.
-    pub y: i32,
-    /// Straight (non-premultiplied) RGBA colour applied through the coverage.
-    pub color: [u8; 4],
+pub enum RenderBitmap {
+    /// An 8-bit coverage mask plus a single straight RGBA colour.
+    Coverage {
+        /// Bitmap width in pixels.
+        width: u32,
+        /// Bitmap height in pixels.
+        height: u32,
+        /// `width * height` A8 coverage bytes.
+        coverage: Arc<Vec<u8>>,
+        /// Destination x of the top-left, in frame pixels.
+        x: i32,
+        /// Destination y of the top-left, in frame pixels.
+        y: i32,
+        /// Straight (non-premultiplied) RGBA colour applied through the coverage.
+        color: [u8; 4],
+    },
+    /// A pre-composited premultiplied-RGBA tile (`width * height * 4` bytes).
+    Rgba {
+        /// Bitmap width in pixels.
+        width: u32,
+        /// Bitmap height in pixels.
+        height: u32,
+        /// `width * height * 4` premultiplied RGBA bytes.
+        pixels: Arc<Vec<u8>>,
+        /// Destination x of the top-left, in frame pixels.
+        x: i32,
+        /// Destination y of the top-left, in frame pixels.
+        y: i32,
+    },
 }
 
 impl CoverageTile {
@@ -329,15 +348,67 @@ pub fn composite(
     );
 }
 
-/// Composite a [`RenderBitmap`] at its own position and colour.
+/// Composite a [`RenderBitmap`] at its own position onto a premultiplied-RGBA8
+/// frame buffer with source-over blending.
 pub fn composite_bitmap(dst: &mut [u8], dst_w: u32, dst_h: u32, bmp: &RenderBitmap) {
-    composite_coverage(
-        dst,
-        (dst_w, dst_h),
-        (&bmp.coverage, bmp.width, bmp.height),
-        (bmp.x, bmp.y),
-        bmp.color,
-    );
+    match bmp {
+        RenderBitmap::Coverage {
+            width,
+            height,
+            coverage,
+            x,
+            y,
+            color,
+        } => composite_coverage(
+            dst,
+            (dst_w, dst_h),
+            (coverage, *width, *height),
+            (*x, *y),
+            *color,
+        ),
+        RenderBitmap::Rgba {
+            width,
+            height,
+            pixels,
+            x,
+            y,
+        } => composite_rgba(dst, (dst_w, dst_h), (pixels, *width, *height), (*x, *y)),
+    }
+}
+
+/// Source-over a premultiplied-RGBA `src` tile onto a premultiplied-RGBA frame.
+fn composite_rgba(dst: &mut [u8], dst_dim: (u32, u32), src: (&[u8], u32, u32), pos: (i32, i32)) {
+    let (dst_w, dst_h) = dst_dim;
+    let (pixels, sw, sh) = src;
+    let (x, y) = pos;
+    let (tw, th) = (sw as i32, sh as i32);
+    let (dw, dh) = (dst_w as i32, dst_h as i32);
+    let ty0 = (-y).max(0);
+    let ty1 = th.min(dh - y);
+    let tx0 = (-x).max(0);
+    let tx1 = tw.min(dw - x);
+    if ty1 <= ty0 || tx1 <= tx0 {
+        return;
+    }
+    for ty in ty0..ty1 {
+        let mut si = ((ty * tw + tx0) as usize) * 4;
+        let mut di = ((y + ty) * dw + x + tx0) as usize * 4;
+        for _ in tx0..tx1 {
+            let sa = u16::from(pixels[si + 3]);
+            if sa != 0 {
+                let inv = 255 - sa;
+                dst[di] = (u16::from(pixels[si]) + mul255(u16::from(dst[di]), inv)) as u8;
+                dst[di + 1] =
+                    (u16::from(pixels[si + 1]) + mul255(u16::from(dst[di + 1]), inv)) as u8;
+                dst[di + 2] =
+                    (u16::from(pixels[si + 2]) + mul255(u16::from(dst[di + 2]), inv)) as u8;
+                dst[di + 3] =
+                    (u16::from(pixels[si + 3]) + mul255(u16::from(dst[di + 3]), inv)) as u8;
+            }
+            si += 4;
+            di += 4;
+        }
+    }
 }
 
 #[cfg(test)]

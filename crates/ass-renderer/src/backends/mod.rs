@@ -95,6 +95,21 @@ pub trait RenderBackend: Send + Sync {
         self.composite_layers(layers, context)
     }
 
+    /// Render layers to a positioned bitmap list (libass `ASS_Image` style)
+    /// instead of a composited frame buffer, skipping the full-frame clear/copy.
+    /// The default reports the backend does not support it.
+    #[cfg(feature = "software-backend")]
+    fn render_layers_to_bitmaps(
+        &mut self,
+        layers: &[IntermediateLayer],
+        context: &RenderContext,
+    ) -> Result<Vec<crate::backends::coverage::RenderBitmap>, RenderError> {
+        let _ = (layers, context);
+        Err(RenderError::BackendError(
+            "bitmap-list output not supported by this backend".into(),
+        ))
+    }
+
     /// Check if backend supports a specific feature
     fn supports_feature(&self, feature: BackendFeature) -> bool {
         match feature {
