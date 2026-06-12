@@ -159,11 +159,12 @@ impl SoftwareBackend {
         base_transform: Transform,
         baseline_y: f32,
     ) -> bool {
-        let Some((key, outline, shadow, _local, fill_color)) =
+        let Some((key, outline, shadow, local, fill_color)) =
             coverage_key(data, base_transform, baseline_y)
         else {
             return false;
         };
+        let shadow_paint = shadow.map(|(c, sx, sy)| (c, shadow_delta(local, sx, sy)));
         let anchor_x = data.x.round() as i32;
         let anchor_y = baseline_y.round() as i32;
         let pixmap_w = self.pixmap.width();
@@ -180,7 +181,7 @@ impl SoftwareBackend {
                 pixmap_h,
                 cached,
                 (anchor_x, anchor_y),
-                (outline.map(|(c, _)| c), shadow.map(|(c, ..)| c), fill_color),
+                (outline.map(|(c, _)| c), shadow_paint, fill_color),
             );
             true
         })
@@ -205,12 +206,7 @@ impl SoftwareBackend {
 
         RUN_COVERAGE.with(|cache| {
             if !cache.borrow().contains_key(&key) {
-                let cached = rasterize_run_coverage(
-                    paths,
-                    local,
-                    outline.map(|(_, w)| w),
-                    shadow.map(|(_, x, y)| (x, y)),
-                );
+                let cached = rasterize_run_coverage(paths, local, outline.map(|(_, w)| w));
                 let mut map = cache.borrow_mut();
                 // Bound memory: continuously geometry-animated layers produce a
                 // fresh key every frame, so drop the cache when it grows large
@@ -222,6 +218,7 @@ impl SoftwareBackend {
             }
         });
 
+        let shadow_paint = shadow.map(|(c, sx, sy)| (c, shadow_delta(local, sx, sy)));
         let anchor_x = data.x.round() as i32;
         let anchor_y = baseline_y.round() as i32;
         let pixmap_w = self.pixmap.width();
@@ -236,7 +233,7 @@ impl SoftwareBackend {
                     pixmap_h,
                     cached,
                     (anchor_x, anchor_y),
-                    (outline.map(|(c, _)| c), shadow.map(|(c, ..)| c), fill_color),
+                    (outline.map(|(c, _)| c), shadow_paint, fill_color),
                 );
             }
         });
@@ -985,21 +982,21 @@ struct RunCoverageKey {
 
 /// Rasterized coverage tiles for one text layer, in position-independent local
 /// space. Each entry is the A8 tile plus its `(x, y)` offset from the layer
-/// anchor, so compositing happens at `anchor + offset`.
+/// anchor, so compositing happens at `anchor + offset`. The shadow is not stored
+/// separately: it is the fill shape, so it reuses the fill tile composited at an
+/// offset (see [`composite_cached`]).
 #[cfg(not(feature = "nostd"))]
 struct CachedCoverage {
     fill: Option<(crate::backends::coverage::CoverageTile, i32, i32)>,
     outline: Option<(crate::backends::coverage::CoverageTile, i32, i32)>,
-    shadow: Option<(crate::backends::coverage::CoverageTile, i32, i32)>,
 }
 
-/// Rasterize a layer's fill, outline and shadow coverage in local space.
+/// Rasterize a layer's fill and outline coverage in local space.
 #[cfg(not(feature = "nostd"))]
 fn rasterize_run_coverage(
     paths: &[tiny_skia::Path],
     local: Transform,
     outline_width: Option<f32>,
-    shadow_offset: Option<(f32, f32)>,
 ) -> CachedCoverage {
     use crate::backends::coverage::CoverageTile;
 
@@ -1015,15 +1012,17 @@ fn rasterize_run_coverage(
         let outlined = tiny_skia::PathStroker::new().stroke(&merged, &stroke, 1.0)?;
         CoverageTile::rasterize(&outlined)
     });
-    let shadow = shadow_offset.and_then(|(sx, sy)| {
-        let p = merge_transformed(paths, local.pre_translate(sx, sy))?;
-        CoverageTile::rasterize(&p)
-    });
-    CachedCoverage {
-        fill,
-        outline,
-        shadow,
-    }
+    CachedCoverage { fill, outline }
+}
+
+/// Screen-space shadow displacement for a local-space `(sx, sy)` offset under the
+/// layer transform's linear part — so the fill tile can be reused as the shadow.
+#[cfg(not(feature = "nostd"))]
+fn shadow_delta(local: Transform, sx: f32, sy: f32) -> (i32, i32) {
+    (
+        (sx * local.sx + sy * local.kx).round() as i32,
+        (sx * local.ky + sy * local.sy).round() as i32,
+    )
 }
 
 // Per-thread cache of rasterized coverage tiles, shared by the hit and miss
@@ -1126,19 +1125,21 @@ fn composite_cached(
     pixmap_h: u32,
     cached: &CachedCoverage,
     anchor: (i32, i32),
-    colors: (Option<[u8; 4]>, Option<[u8; 4]>, [u8; 4]),
+    colors: (Option<[u8; 4]>, Option<([u8; 4], (i32, i32))>, [u8; 4]),
 ) {
     use crate::backends::coverage::composite;
     let (anchor_x, anchor_y) = anchor;
-    let (outline_color, shadow_color, fill_color) = colors;
-    if let (Some(color), Some((tile, ox, oy))) = (shadow_color, &cached.shadow) {
+    let (outline_color, shadow, fill_color) = colors;
+    // Shadow: the fill shape in the shadow colour, displaced. Reuses the fill
+    // tile rather than a separately rasterized one.
+    if let (Some((color, (dx, dy))), Some((tile, ox, oy))) = (shadow, &cached.fill) {
         composite(
             dst,
             pixmap_w,
             pixmap_h,
             tile,
-            anchor_x + ox,
-            anchor_y + oy,
+            anchor_x + ox + dx,
+            anchor_y + oy + dy,
             color,
         );
     }
