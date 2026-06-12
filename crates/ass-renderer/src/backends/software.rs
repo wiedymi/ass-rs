@@ -221,7 +221,7 @@ impl SoftwareBackend {
         base_transform: Transform,
         baseline_y: f32,
     ) -> bool {
-        let Some((key, outline, shadow, local, fill_color)) =
+        let Some((key, outline, shadow, local, fill_color, karaoke_sweep)) =
             coverage_key(data, base_transform, baseline_y)
         else {
             return false;
@@ -244,6 +244,7 @@ impl SoftwareBackend {
                 cached,
                 (anchor_x, anchor_y),
                 (outline.map(|(c, _)| c), shadow_paint, fill_color),
+                karaoke_sweep,
             );
             true
         })
@@ -260,7 +261,7 @@ impl SoftwareBackend {
         base_transform: Transform,
         baseline_y: f32,
     ) -> bool {
-        let Some((key, outline, shadow, local, fill_color)) =
+        let Some((key, outline, shadow, local, fill_color, karaoke_sweep)) =
             coverage_key(data, base_transform, baseline_y)
         else {
             return false;
@@ -296,6 +297,7 @@ impl SoftwareBackend {
                     cached,
                     (anchor_x, anchor_y),
                     (outline.map(|(c, _)| c), shadow_paint, fill_color),
+                    karaoke_sweep,
                 );
             }
         });
@@ -1181,6 +1183,7 @@ fn coverage_key(
     Option<([u8; 4], f32, f32)>,
     Transform,
     [u8; 4],
+    Option<(f32, [u8; 4])>,
 )> {
     use crate::pipeline::TextEffect;
 
@@ -1188,12 +1191,13 @@ fn coverage_key(
     let mut shadow: Option<([u8; 4], f32, f32)> = None;
     let mut bold = false;
     let mut italic = false;
-    // The fill colour is normally the primary colour, but a binary karaoke
-    // syllable (`\k`) flips the whole syllable between primary and secondary; the
-    // glyph GEOMETRY is unchanged, so it stays cacheable and only the colour
-    // applied at composite time differs. Swept karaoke (`\kf`/`\K`) needs a
-    // per-pixel colour split and stays on the vector path.
+    // The fill colour is normally the primary colour. Karaoke leaves the glyph
+    // GEOMETRY unchanged, so it stays cacheable: binary `\k` just flips the whole
+    // syllable's fill colour (primary once sung, else secondary), and swept
+    // `\K`/`\kf` is `karaoke_sweep = (progress, secondary)` — applied at composite
+    // as a secondary base plus a primary fill cropped to the sweep boundary.
     let mut fill_color = data.color;
+    let mut karaoke_sweep: Option<(f32, [u8; 4])> = None;
     for effect in &data.effects {
         match effect {
             TextEffect::Outline { color, width } => outline = Some((*color, *width)),
@@ -1210,14 +1214,15 @@ fn coverage_key(
                 style,
                 secondary,
             } => {
-                if *style != 0 {
-                    return None;
-                }
-                fill_color = if *progress > 0.0 {
-                    data.color
+                if *style == 0 {
+                    fill_color = if *progress > 0.0 {
+                        data.color
+                    } else {
+                        *secondary
+                    };
                 } else {
-                    *secondary
-                };
+                    karaoke_sweep = Some((*progress, *secondary));
+                }
             }
             _ => return None,
         }
@@ -1244,7 +1249,7 @@ fn coverage_key(
             local.ty.to_bits(),
         ],
     };
-    Some((key, outline, shadow, local, fill_color))
+    Some((key, outline, shadow, local, fill_color, karaoke_sweep))
 }
 
 /// Per-layer composite colours: `(outline, shadow (colour + screen displacement),
@@ -1261,6 +1266,7 @@ fn emit_cached(
     cached: &CachedCoverage,
     anchor: (i32, i32),
     colors: LayerColors,
+    karaoke_sweep: Option<(f32, [u8; 4])>,
 ) -> Vec<crate::backends::coverage::RenderBitmap> {
     use crate::backends::coverage::RenderBitmap;
     let (anchor_x, anchor_y) = anchor;
@@ -1286,9 +1292,56 @@ fn emit_cached(
         out.push(bitmap(tile, anchor_x + ox, anchor_y + oy, color));
     }
     if let Some((tile, ox, oy)) = &cached.fill {
-        out.push(bitmap(tile, anchor_x + ox, anchor_y + oy, fill_color));
+        let (x, y) = (anchor_x + ox, anchor_y + oy);
+        match karaoke_sweep {
+            // Swept `\K`/`\kf`: not-yet-sung syllables are wholly secondary,
+            // fully-sung wholly primary (both reuse the shared tile, no copy);
+            // only the one syllable mid-sweep needs a secondary base plus a
+            // primary fill cropped to the advancing boundary.
+            Some((progress, secondary)) if progress <= 0.0 => {
+                out.push(bitmap(tile, x, y, secondary));
+            }
+            Some((progress, _)) if progress >= 1.0 => {
+                out.push(bitmap(tile, x, y, fill_color));
+            }
+            Some((progress, secondary)) => {
+                out.push(bitmap(tile, x, y, secondary));
+                let cols = (1.0 + progress * (tile.width as f32 - 2.0))
+                    .round()
+                    .clamp(0.0, tile.width as f32) as u32;
+                if cols > 0 {
+                    out.push(RenderBitmap::Coverage {
+                        width: cols,
+                        height: tile.height,
+                        coverage: crop_coverage_columns(tile, cols),
+                        x,
+                        y,
+                        color: fill_color,
+                    });
+                }
+            }
+            None => out.push(bitmap(tile, x, y, fill_color)),
+        }
     }
     out
+}
+
+/// Copy the leftmost `cols` columns of a coverage tile into a new buffer — the
+/// "sung" portion of a swept karaoke syllable.
+#[cfg(not(feature = "nostd"))]
+fn crop_coverage_columns(
+    tile: &crate::backends::coverage::CoverageTile,
+    cols: u32,
+) -> std::sync::Arc<Vec<u8>> {
+    let cols = cols.min(tile.width) as usize;
+    let width = tile.width as usize;
+    let mut data = vec![0u8; cols * tile.height as usize];
+    for y in 0..tile.height as usize {
+        let src = y * width;
+        let dst = y * cols;
+        data[dst..dst + cols].copy_from_slice(&tile.data[src..src + cols]);
+    }
+    std::sync::Arc::new(data)
 }
 
 /// Composite cached coverage tiles (shadow, then outline, then fill) onto the
@@ -1302,9 +1355,10 @@ fn composite_cached(
     cached: &CachedCoverage,
     anchor: (i32, i32),
     colors: LayerColors,
+    karaoke_sweep: Option<(f32, [u8; 4])>,
 ) {
     use crate::backends::coverage::composite_bitmap;
-    let bitmaps = emit_cached(cached, anchor, colors);
+    let bitmaps = emit_cached(cached, anchor, colors, karaoke_sweep);
     EMIT_SINK.with(|sink| {
         let mut sink = sink.borrow_mut();
         if let Some(sink) = sink.as_mut() {
