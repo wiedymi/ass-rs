@@ -1110,18 +1110,22 @@ fn rasterize_run_coverage(
 ) -> CachedCoverage {
     use crate::backends::coverage::CoverageTile;
 
-    let fill = merge_transformed(paths, local).and_then(|p| CoverageTile::rasterize(&p));
-    let outline = outline_width.and_then(|width| {
-        let merged = merge_transformed(paths, local)?;
-        let stroke = tiny_skia::Stroke {
-            width: width * 0.6,
-            line_cap: tiny_skia::LineCap::Square,
-            line_join: tiny_skia::LineJoin::Miter,
-            ..Default::default()
-        };
-        let outlined = tiny_skia::PathStroker::new().stroke(&merged, &stroke, 1.0)?;
-        CoverageTile::rasterize(&outlined)
-    });
+    // Merge the per-glyph paths once; both the fill and the outline derive from
+    // the same merged outline (previously merged twice, redundantly).
+    let merged = merge_transformed(paths, local);
+    let fill = merged.as_ref().and_then(CoverageTile::rasterize);
+    let outline = outline_width
+        .zip(merged.as_ref())
+        .and_then(|(width, merged)| {
+            let stroke = tiny_skia::Stroke {
+                width: width * 0.6,
+                line_cap: tiny_skia::LineCap::Square,
+                line_join: tiny_skia::LineJoin::Miter,
+                ..Default::default()
+            };
+            let outlined = tiny_skia::PathStroker::new().stroke(merged, &stroke, 1.0)?;
+            CoverageTile::rasterize(&outlined)
+        });
     CachedCoverage { fill, outline }
 }
 

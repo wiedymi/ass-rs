@@ -24,6 +24,12 @@ pub struct Rasterizer {
     /// at the right edge land in guard cells instead of the next row.
     stride: usize,
     acc: Vec<f32>,
+    /// Per-row touched-column span `[row_min, row_max]`. `finish` resolves only
+    /// this span and leaves the (zero-initialised) rest untouched, so the prefix
+    /// sum runs over the live columns instead of the whole — usually mostly
+    /// empty — tile. `row_min[y] > row_max[y]` marks an untouched row.
+    row_min: Vec<u32>,
+    row_max: Vec<u32>,
 }
 
 impl Rasterizer {
@@ -31,11 +37,14 @@ impl Rasterizer {
     #[must_use]
     pub fn new(width: usize, height: usize) -> Self {
         let stride = width + 2;
+        let rows = height.max(1);
         Self {
             width,
             height,
             stride,
-            acc: vec![0.0; stride * height.max(1)],
+            acc: vec![0.0; stride * rows],
+            row_min: vec![width as u32; rows],
+            row_max: vec![0; rows],
         }
     }
 
@@ -89,6 +98,14 @@ impl Rasterizer {
             let x0i = xa_floor as usize;
             let x1ceil = xb.ceil();
             let x1i = x1ceil as usize;
+
+            // Record the touched column span for this row. The single-column
+            // branch always writes `x0i` and `x0i + 1`; the multi-column branch
+            // writes through `x1i`. `finish` resolves only `[row_min, row_max]`.
+            let rmin = &mut self.row_min[y];
+            *rmin = (*rmin).min(x0i as u32);
+            let rmax = &mut self.row_max[y];
+            *rmax = (*rmax).max(x1i.max(x0i + 1) as u32);
 
             if x1i <= x0i + 1 {
                 // The edge stays within a single pixel column.
@@ -183,17 +200,64 @@ impl Rasterizer {
     #[must_use]
     pub fn finish(&self) -> Vec<u8> {
         let mut out = vec![0u8; self.width * self.height];
+        if self.width == 0 {
+            return out;
+        }
+        // Scratch for one row's prefix sums, reused across rows.
+        let mut psum = vec![0.0_f32; self.width];
         for y in 0..self.height {
+            let lo = self.row_min[y] as usize;
+            // The right guard column (`width`) is never emitted, mirroring the
+            // original `0..width` scan, so clamp the span to the last real pixel.
+            let hi = (self.row_max[y] as usize).min(self.width - 1);
+            if lo > hi {
+                continue; // untouched row: stays transparent
+            }
             let row = y * self.stride;
             let out_row = y * self.width;
+            let psum_row = &mut psum[lo..=hi];
             let mut sum = 0.0_f32;
-            for x in 0..self.width {
-                sum += self.acc[row + x];
-                let cov = sum.abs().min(1.0);
-                out[out_row + x] = (cov * 255.0 + 0.5) as u8;
+            for (p, &a) in psum_row.iter_mut().zip(&self.acc[row + lo..=row + hi]) {
+                sum += a;
+                *p = sum;
             }
+            convert_span(psum_row, &mut out[out_row + lo..=out_row + hi]);
         }
         out
+    }
+}
+
+/// Convert a row of accumulated prefix sums to 8-bit non-zero-winding coverage:
+/// `coverage = min(|sum|, 1) * 255`.
+#[cfg(feature = "simd")]
+fn convert_span(psum: &[f32], out: &mut [u8]) {
+    use wide::f32x8;
+    let ones = f32x8::splat(1.0);
+    let scale = f32x8::splat(255.0);
+    let half = f32x8::splat(0.5);
+
+    let mut pc = psum.chunks_exact(8);
+    let mut oc = out.chunks_exact_mut(8);
+    for (p, o) in pc.by_ref().zip(oc.by_ref()) {
+        let mut lane = [0.0_f32; 8];
+        lane.copy_from_slice(p);
+        let v = f32x8::new(lane);
+        let cov = v.abs().min(ones) * scale + half;
+        let bytes = cov.to_array();
+        for (dst, b) in o.iter_mut().zip(bytes) {
+            *dst = b as u8;
+        }
+    }
+    for (dst, &s) in oc.into_remainder().iter_mut().zip(pc.remainder()) {
+        *dst = (s.abs().min(1.0) * 255.0 + 0.5) as u8;
+    }
+}
+
+/// Scalar fallback for [`convert_span`] when the `simd` feature is off.
+#[cfg(not(feature = "simd"))]
+fn convert_span(psum: &[f32], out: &mut [u8]) {
+    for (dst, &s) in out.iter_mut().zip(psum) {
+        *dst = (s.abs().min(1.0) * 255.0 + 0.5) as u8;
     }
 }
 
