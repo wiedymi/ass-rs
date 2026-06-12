@@ -10,13 +10,18 @@
 //! re-rasterizing every frame.
 
 #[cfg(feature = "nostd")]
-use alloc::{vec, vec::Vec};
+use alloc::{sync::Arc, vec, vec::Vec};
+#[cfg(not(feature = "nostd"))]
+use std::sync::Arc;
 
 use tiny_skia::{Path, PathSegment};
 
 use crate::backends::raster::Rasterizer;
 
 /// An 8-bit coverage tile: `width * height` alpha samples, row-major.
+///
+/// The coverage is `Arc`-shared so a cached tile can be emitted as a
+/// [`RenderBitmap`] (or composited) without copying the buffer.
 #[derive(Clone)]
 pub struct CoverageTile {
     /// Tile width in pixels.
@@ -24,7 +29,27 @@ pub struct CoverageTile {
     /// Tile height in pixels.
     pub height: u32,
     /// `width * height` coverage bytes (0 = empty, 255 = fully covered).
-    pub data: Vec<u8>,
+    pub data: Arc<Vec<u8>>,
+}
+
+/// A positioned 8-bit coverage bitmap plus its colour — the renderer's
+/// libass-`ASS_Image`-style output unit. A frame is a list of these; the caller
+/// (or [`composite_bitmap`]) blends them. Producing one from a cached tile is an
+/// `Arc` clone, so geometry-static animated layers cost almost nothing per frame.
+#[derive(Clone)]
+pub struct RenderBitmap {
+    /// Bitmap width in pixels.
+    pub width: u32,
+    /// Bitmap height in pixels.
+    pub height: u32,
+    /// `width * height` A8 coverage bytes.
+    pub coverage: Arc<Vec<u8>>,
+    /// Destination x of the bitmap's top-left, in frame pixels.
+    pub x: i32,
+    /// Destination y of the bitmap's top-left, in frame pixels.
+    pub y: i32,
+    /// Straight (non-premultiplied) RGBA colour applied through the coverage.
+    pub color: [u8; 4],
 }
 
 impl CoverageTile {
@@ -97,7 +122,7 @@ impl CoverageTile {
             Self {
                 width,
                 height,
-                data: raster.finish(),
+                data: Arc::new(raster.finish()),
             },
             min_x,
             min_y,
@@ -240,19 +265,17 @@ fn blend_pixel(dst: &mut [u8], di: usize, cov: u16, pr: u16, pg: u16, pb: u16, p
     dst[di + 3] = (mul255(pa, cov) + mul255(u16::from(dst[di + 3]), inv)) as u8;
 }
 
-/// Composite an A8 coverage tile onto a premultiplied-RGBA8 buffer at `(x, y)`
-/// using a straight (non-premultiplied) `color`, with source-over blending.
+/// Source-over an A8 `cov` (`cov_w * cov_h`) onto a premultiplied-RGBA8 buffer at
+/// `(x, y)` using a straight (non-premultiplied) `color`.
 ///
 /// `dst` is `dst_w * dst_h * 4` bytes in tiny-skia's premultiplied RGBA layout.
 /// The paint is premultiplied once, then scaled by each pixel's coverage — the
 /// same result as filling the path directly with a solid-colour paint.
-pub fn composite(
+fn composite_coverage(
     dst: &mut [u8],
-    dst_w: u32,
-    dst_h: u32,
-    tile: &CoverageTile,
-    x: i32,
-    y: i32,
+    dst_dim: (u32, u32),
+    src: (&[u8], u32, u32),
+    pos: (i32, i32),
     color: [u8; 4],
 ) {
     let pa = u16::from(color[3]);
@@ -263,8 +286,12 @@ pub fn composite(
     let pg = mul255(u16::from(color[1]), pa);
     let pb = mul255(u16::from(color[2]), pa);
 
+    let (dst_w, dst_h) = dst_dim;
+    let (cov, cov_w, cov_h) = src;
+    let (x, y) = pos;
+
     // Clip the tile against the destination once so the row blend is bounds-free.
-    let (tw, th) = (tile.width as i32, tile.height as i32);
+    let (tw, th) = (cov_w as i32, cov_h as i32);
     let (dw, dh) = (dst_w as i32, dst_h as i32);
     let ty0 = (-y).max(0);
     let ty1 = th.min(dh - y);
@@ -276,15 +303,46 @@ pub fn composite(
     let run = (tx1 - tx0) as usize;
     for ty in ty0..ty1 {
         let tile_base = (ty * tw + tx0) as usize;
-        let cov_row = &tile.data[tile_base..tile_base + run];
+        let cov_row = &cov[tile_base..tile_base + run];
         let dst_start = ((y + ty) * dw + x + tx0) as usize * 4;
         blend_row(dst, dst_start, cov_row, pr, pg, pb, pa);
     }
 }
 
+/// Composite an A8 coverage tile at `(x, y)` in `color` (see
+/// [`composite_coverage`]).
+pub fn composite(
+    dst: &mut [u8],
+    dst_w: u32,
+    dst_h: u32,
+    tile: &CoverageTile,
+    x: i32,
+    y: i32,
+    color: [u8; 4],
+) {
+    composite_coverage(
+        dst,
+        (dst_w, dst_h),
+        (&tile.data, tile.width, tile.height),
+        (x, y),
+        color,
+    );
+}
+
+/// Composite a [`RenderBitmap`] at its own position and colour.
+pub fn composite_bitmap(dst: &mut [u8], dst_w: u32, dst_h: u32, bmp: &RenderBitmap) {
+    composite_coverage(
+        dst,
+        (dst_w, dst_h),
+        (&bmp.coverage, bmp.width, bmp.height),
+        (bmp.x, bmp.y),
+        bmp.color,
+    );
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{composite, CoverageTile};
+    use super::{composite, Arc, CoverageTile};
 
     #[test]
     fn composite_blends_known_pixel() {
@@ -292,7 +350,7 @@ mod tests {
         let tile = CoverageTile {
             width: 1,
             height: 1,
-            data: vec![128],
+            data: Arc::new(vec![128]),
         };
         let mut dst = vec![0u8, 0, 0, 255]; // premultiplied black, opaque
         composite(&mut dst, 1, 1, &tile, 0, 0, [255, 0, 0, 255]);
@@ -309,7 +367,7 @@ mod tests {
         let tile = CoverageTile {
             width: 4,
             height: 4,
-            data: vec![255; 16],
+            data: Arc::new(vec![255; 16]),
         };
         let mut dst = vec![0u8; 2 * 2 * 4];
         // Place mostly off the top-left; only the bottom-right tile pixel lands.
