@@ -1120,9 +1120,48 @@ fn coverage_key(
 #[cfg(not(feature = "nostd"))]
 type LayerColors = (Option<[u8; 4]>, Option<([u8; 4], (i32, i32))>, [u8; 4]);
 
+/// Emit a layer's cached coverage as positioned [`RenderBitmap`]s (shadow, then
+/// outline, then fill), applying the current colours at the rounded screen
+/// anchor. Producing each is an `Arc` clone of the cached tile, so a
+/// geometry-static layer costs almost nothing — this is the libass-style output.
+#[cfg(not(feature = "nostd"))]
+fn emit_cached(
+    cached: &CachedCoverage,
+    anchor: (i32, i32),
+    colors: LayerColors,
+) -> Vec<crate::backends::coverage::RenderBitmap> {
+    use crate::backends::coverage::RenderBitmap;
+    let (anchor_x, anchor_y) = anchor;
+    let (outline_color, shadow, fill_color) = colors;
+    let mut out = Vec::new();
+    let bitmap =
+        |tile: &crate::backends::coverage::CoverageTile, x: i32, y: i32, color: [u8; 4]| {
+            RenderBitmap {
+                width: tile.width,
+                height: tile.height,
+                coverage: tile.data.clone(),
+                x,
+                y,
+                color,
+            }
+        };
+    // Shadow: the fill shape in the shadow colour, displaced. Reuses the fill
+    // tile rather than a separately rasterized one.
+    if let (Some((color, (dx, dy))), Some((tile, ox, oy))) = (shadow, &cached.fill) {
+        out.push(bitmap(tile, anchor_x + ox + dx, anchor_y + oy + dy, color));
+    }
+    if let (Some(color), Some((tile, ox, oy))) = (outline_color, &cached.outline) {
+        out.push(bitmap(tile, anchor_x + ox, anchor_y + oy, color));
+    }
+    if let Some((tile, ox, oy)) = &cached.fill {
+        out.push(bitmap(tile, anchor_x + ox, anchor_y + oy, fill_color));
+    }
+    out
+}
+
 /// Composite cached coverage tiles (shadow, then outline, then fill) onto the
-/// premultiplied buffer at the rounded screen anchor, applying the current
-/// colours.
+/// premultiplied buffer at the rounded screen anchor — emits the layer's bitmaps
+/// and blends them in order.
 #[cfg(not(feature = "nostd"))]
 fn composite_cached(
     dst: &mut [u8],
@@ -1132,43 +1171,9 @@ fn composite_cached(
     anchor: (i32, i32),
     colors: LayerColors,
 ) {
-    use crate::backends::coverage::composite;
-    let (anchor_x, anchor_y) = anchor;
-    let (outline_color, shadow, fill_color) = colors;
-    // Shadow: the fill shape in the shadow colour, displaced. Reuses the fill
-    // tile rather than a separately rasterized one.
-    if let (Some((color, (dx, dy))), Some((tile, ox, oy))) = (shadow, &cached.fill) {
-        composite(
-            dst,
-            pixmap_w,
-            pixmap_h,
-            tile,
-            anchor_x + ox + dx,
-            anchor_y + oy + dy,
-            color,
-        );
-    }
-    if let (Some(color), Some((tile, ox, oy))) = (outline_color, &cached.outline) {
-        composite(
-            dst,
-            pixmap_w,
-            pixmap_h,
-            tile,
-            anchor_x + ox,
-            anchor_y + oy,
-            color,
-        );
-    }
-    if let Some((tile, ox, oy)) = &cached.fill {
-        composite(
-            dst,
-            pixmap_w,
-            pixmap_h,
-            tile,
-            anchor_x + ox,
-            anchor_y + oy,
-            fill_color,
-        );
+    use crate::backends::coverage::composite_bitmap;
+    for bitmap in emit_cached(cached, anchor, colors) {
+        composite_bitmap(dst, pixmap_w, pixmap_h, &bitmap);
     }
 }
 
