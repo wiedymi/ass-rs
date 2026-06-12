@@ -105,10 +105,139 @@ impl CoverageTile {
     }
 }
 
-/// Rounded fixed-point multiply-divide by 255 (`a * b / 255`).
+/// Rounded fixed-point `a * b / 255` for `a, b` in `0..=255`.
+///
+/// The `((t + (t >> 8)) >> 8)` form is bit-identical to `(a*b + 127) / 255` over
+/// that range but maps directly onto SIMD lanes (no per-lane division), so the
+/// scalar and SIMD composite paths produce identical pixels.
 #[inline]
-fn mul255(a: u32, b: u32) -> u32 {
-    (a * b + 127) / 255
+fn mul255(a: u16, b: u16) -> u16 {
+    let t = a * b + 128;
+    (t + (t >> 8)) >> 8
+}
+
+#[cfg(feature = "simd")]
+#[inline]
+fn mul255x16(a: wide::u16x16, b: wide::u16x16) -> wide::u16x16 {
+    let t = a * b + 128_u16;
+    (t + (t >> 8)) >> 8
+}
+
+/// Source-over blend of one tile row (premultiplied straight `color`, premult
+/// channels `pr/pg/pb/pa`) onto `dst` starting at byte `dst_start`. Four pixels
+/// at a time with `wide` when the `simd` feature is on; empty four-pixel groups
+/// are skipped (text coverage is mostly empty).
+#[cfg(feature = "simd")]
+#[inline]
+fn blend_row(dst: &mut [u8], dst_start: usize, cov_row: &[u8], pr: u16, pg: u16, pb: u16, pa: u16) {
+    use wide::u16x16;
+    let pcolor = u16x16::new([
+        pr, pg, pb, pa, pr, pg, pb, pa, pr, pg, pb, pa, pr, pg, pb, pa,
+    ]);
+    let run = cov_row.len();
+    let mut t = 0;
+    while t + 4 <= run {
+        let (c0, c1, c2, c3) = (cov_row[t], cov_row[t + 1], cov_row[t + 2], cov_row[t + 3]);
+        if (c0 | c1 | c2 | c3) != 0 {
+            let cov = u16x16::new([
+                u16::from(c0),
+                u16::from(c0),
+                u16::from(c0),
+                u16::from(c0),
+                u16::from(c1),
+                u16::from(c1),
+                u16::from(c1),
+                u16::from(c1),
+                u16::from(c2),
+                u16::from(c2),
+                u16::from(c2),
+                u16::from(c2),
+                u16::from(c3),
+                u16::from(c3),
+                u16::from(c3),
+                u16::from(c3),
+            ]);
+            let src = mul255x16(pcolor, cov);
+            let s = src.to_array();
+            let inv = u16x16::new([
+                255 - s[3],
+                255 - s[3],
+                255 - s[3],
+                255 - s[3],
+                255 - s[7],
+                255 - s[7],
+                255 - s[7],
+                255 - s[7],
+                255 - s[11],
+                255 - s[11],
+                255 - s[11],
+                255 - s[11],
+                255 - s[15],
+                255 - s[15],
+                255 - s[15],
+                255 - s[15],
+            ]);
+            let di = dst_start + t * 4;
+            let d = &dst[di..di + 16];
+            let dpix = u16x16::new([
+                u16::from(d[0]),
+                u16::from(d[1]),
+                u16::from(d[2]),
+                u16::from(d[3]),
+                u16::from(d[4]),
+                u16::from(d[5]),
+                u16::from(d[6]),
+                u16::from(d[7]),
+                u16::from(d[8]),
+                u16::from(d[9]),
+                u16::from(d[10]),
+                u16::from(d[11]),
+                u16::from(d[12]),
+                u16::from(d[13]),
+                u16::from(d[14]),
+                u16::from(d[15]),
+            ]);
+            let out = (src + mul255x16(dpix, inv)).to_array();
+            for (slot, &v) in dst[di..di + 16].iter_mut().zip(out.iter()) {
+                *slot = v as u8;
+            }
+        }
+        t += 4;
+    }
+    while t < run {
+        blend_pixel(
+            dst,
+            dst_start + t * 4,
+            u16::from(cov_row[t]),
+            pr,
+            pg,
+            pb,
+            pa,
+        );
+        t += 1;
+    }
+}
+
+/// Scalar fallback when the `simd` feature is off.
+#[cfg(not(feature = "simd"))]
+#[inline]
+fn blend_row(dst: &mut [u8], dst_start: usize, cov_row: &[u8], pr: u16, pg: u16, pb: u16, pa: u16) {
+    for (t, &c) in cov_row.iter().enumerate() {
+        blend_pixel(dst, dst_start + t * 4, u16::from(c), pr, pg, pb, pa);
+    }
+}
+
+/// Source-over one premultiplied RGBA pixel by coverage `cov`.
+#[inline]
+fn blend_pixel(dst: &mut [u8], di: usize, cov: u16, pr: u16, pg: u16, pb: u16, pa: u16) {
+    if cov == 0 {
+        return;
+    }
+    let inv = 255 - mul255(pa, cov);
+    dst[di] = (mul255(pr, cov) + mul255(u16::from(dst[di]), inv)) as u8;
+    dst[di + 1] = (mul255(pg, cov) + mul255(u16::from(dst[di + 1]), inv)) as u8;
+    dst[di + 2] = (mul255(pb, cov) + mul255(u16::from(dst[di + 2]), inv)) as u8;
+    dst[di + 3] = (mul255(pa, cov) + mul255(u16::from(dst[di + 3]), inv)) as u8;
 }
 
 /// Composite an A8 coverage tile onto a premultiplied-RGBA8 buffer at `(x, y)`
@@ -126,17 +255,15 @@ pub fn composite(
     y: i32,
     color: [u8; 4],
 ) {
-    let pa = u32::from(color[3]);
+    let pa = u16::from(color[3]);
     if pa == 0 {
         return;
     }
-    let pr = mul255(u32::from(color[0]), pa);
-    let pg = mul255(u32::from(color[1]), pa);
-    let pb = mul255(u32::from(color[2]), pa);
+    let pr = mul255(u16::from(color[0]), pa);
+    let pg = mul255(u16::from(color[1]), pa);
+    let pb = mul255(u16::from(color[2]), pa);
 
-    // Clip the tile against the destination ONCE, so the inner loop carries no
-    // bounds checks and only a single coverage branch — tight enough for the
-    // compiler to vectorize.
+    // Clip the tile against the destination once so the row blend is bounds-free.
     let (tw, th) = (tile.width as i32, tile.height as i32);
     let (dw, dh) = (dst_w as i32, dst_h as i32);
     let ty0 = (-y).max(0);
@@ -147,20 +274,47 @@ pub fn composite(
         return;
     }
     let run = (tx1 - tx0) as usize;
-    let data = &tile.data;
     for ty in ty0..ty1 {
         let tile_base = (ty * tw + tx0) as usize;
-        let mut idx = ((y + ty) * dw + x + tx0) as usize * 4;
-        for t in 0..run {
-            let cov = u32::from(data[tile_base + t]);
-            if cov != 0 {
-                let inv = 255 - mul255(pa, cov);
-                dst[idx] = (mul255(pr, cov) + mul255(u32::from(dst[idx]), inv)) as u8;
-                dst[idx + 1] = (mul255(pg, cov) + mul255(u32::from(dst[idx + 1]), inv)) as u8;
-                dst[idx + 2] = (mul255(pb, cov) + mul255(u32::from(dst[idx + 2]), inv)) as u8;
-                dst[idx + 3] = (mul255(pa, cov) + mul255(u32::from(dst[idx + 3]), inv)) as u8;
-            }
-            idx += 4;
-        }
+        let cov_row = &tile.data[tile_base..tile_base + run];
+        let dst_start = ((y + ty) * dw + x + tx0) as usize * 4;
+        blend_row(dst, dst_start, cov_row, pr, pg, pb, pa);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{composite, CoverageTile};
+
+    #[test]
+    fn composite_blends_known_pixel() {
+        // 1x1 tile, half coverage, opaque red over opaque black.
+        let tile = CoverageTile {
+            width: 1,
+            height: 1,
+            data: vec![128],
+        };
+        let mut dst = vec![0u8, 0, 0, 255]; // premultiplied black, opaque
+        composite(&mut dst, 1, 1, &tile, 0, 0, [255, 0, 0, 255]);
+        // src alpha = 255*128/255 = 128; inv = 127.
+        // r = 128 + 0; a = 128 + 255*127/255 = 128 + 127 = 255.
+        assert_eq!(dst[0], 128, "red");
+        assert_eq!(dst[1], 0, "green");
+        assert_eq!(dst[2], 0, "blue");
+        assert_eq!(dst[3], 255, "alpha");
+    }
+
+    #[test]
+    fn composite_clips_offscreen() {
+        let tile = CoverageTile {
+            width: 4,
+            height: 4,
+            data: vec![255; 16],
+        };
+        let mut dst = vec![0u8; 2 * 2 * 4];
+        // Place mostly off the top-left; only the bottom-right tile pixel lands.
+        composite(&mut dst, 2, 2, &tile, -3, -3, [10, 20, 30, 255]);
+        assert_eq!(&dst[0..3], &[10, 20, 30], "the one in-bounds pixel blended");
+        assert_eq!(&dst[4..8], &[0, 0, 0, 0], "neighbours untouched");
     }
 }
