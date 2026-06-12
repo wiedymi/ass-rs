@@ -89,6 +89,7 @@ impl SoftwareBackend {
         let mut out = Vec::new();
         for layer in layers {
             EMIT_SINK.with(|sink| *sink.borrow_mut() = Some(Vec::new()));
+            DIRTY_BBOX.with(|b| *b.borrow_mut() = None);
             std::mem::swap(&mut self.pixmap, &mut self.scratch);
             let result = self.composite_layer(layer, context);
             std::mem::swap(&mut self.pixmap, &mut self.scratch);
@@ -97,7 +98,8 @@ impl SoftwareBackend {
             let coverage = EMIT_SINK.with(|sink| sink.borrow_mut().take().unwrap_or_default());
             if coverage.is_empty() {
                 // Vector / raster / drawing layer: it rendered into the scratch.
-                if let Some(bitmap) = crop_pixmap(&self.scratch) {
+                let hint = DIRTY_BBOX.with(|b| *b.borrow());
+                if let Some(bitmap) = crop_pixmap(&self.scratch, hint) {
                     out.push(bitmap);
                 }
                 self.scratch.fill(tiny_skia::Color::TRANSPARENT);
@@ -454,6 +456,13 @@ impl SoftwareBackend {
         #[cfg(not(feature = "nostd"))]
         if self.rasterize_coverage_miss(data, &paths, base_transform, baseline_y) {
             return Ok(());
+        }
+
+        // Vector path (blur / swept karaoke / clip / opaque box / under-strike).
+        // Record a generous dirty bbox so a bitmap-list crop scans only this region.
+        #[cfg(not(feature = "nostd"))]
+        if let Some(bbox) = text_vector_dirty_bbox(data, &paths, base_transform) {
+            note_dirty_bbox(bbox);
         }
 
         // Create clip mask if needed
@@ -1097,6 +1106,63 @@ std::thread_local! {
     /// output while reusing the normal layer-rendering code unchanged.
     static EMIT_SINK: std::cell::RefCell<Option<Vec<crate::backends::coverage::RenderBitmap>>> =
         const { std::cell::RefCell::new(None) };
+
+    /// A generous screen-space `(min_x, min_y, max_x, max_y)` of a vector layer's
+    /// drawn pixels, set during `render_to_bitmaps` so the scratch crop scans only
+    /// that region instead of the whole (4K) frame.
+    static DIRTY_BBOX: std::cell::RefCell<Option<(i32, i32, i32, i32)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// A generous screen-space bbox covering a text layer's vector-path output
+/// (glyphs plus an outline/shadow/blur margin), or `None` if it has no geometry.
+#[cfg(not(feature = "nostd"))]
+fn text_vector_dirty_bbox(
+    data: &crate::pipeline::TextData,
+    paths: &[tiny_skia::Path],
+    base_transform: Transform,
+) -> Option<(i32, i32, i32, i32)> {
+    use crate::pipeline::TextEffect;
+    let bounds = merge_transformed(paths, base_transform)?.bounds();
+    let (mut outline, mut shadow, mut blur) = (0.0_f32, 0.0_f32, 0.0_f32);
+    for effect in &data.effects {
+        match effect {
+            TextEffect::Outline { width, .. } => outline = outline.max(*width),
+            TextEffect::Shadow {
+                x_offset, y_offset, ..
+            } => shadow = shadow.max(x_offset.abs()).max(y_offset.abs()),
+            TextEffect::Blur { radius } | TextEffect::EdgeBlur { radius } => {
+                blur = blur.max(*radius)
+            }
+            _ => {}
+        }
+    }
+    // Generous: box blur of radius r spreads ~r each side; ×4 leaves head-room.
+    let margin = 4.0 + outline * 2.0 + shadow + blur * 4.0;
+    Some((
+        (bounds.left() - margin).floor() as i32,
+        (bounds.top() - margin).floor() as i32,
+        (bounds.right() + margin).ceil() as i32,
+        (bounds.bottom() + margin).ceil() as i32,
+    ))
+}
+
+/// Record a generous dirty bbox for the current vector layer (used to bound the
+/// scratch crop). No-op outside `render_to_bitmaps`.
+#[cfg(not(feature = "nostd"))]
+fn note_dirty_bbox(bbox: (i32, i32, i32, i32)) {
+    DIRTY_BBOX.with(|b| {
+        let mut slot = b.borrow_mut();
+        *slot = Some(match *slot {
+            None => bbox,
+            Some((x0, y0, x1, y1)) => (
+                x0.min(bbox.0),
+                y0.min(bbox.1),
+                x1.max(bbox.2),
+                y1.max(bbox.3),
+            ),
+        });
+    });
 }
 
 /// Build the coverage cache key (and extract the outline/shadow paints and the
@@ -1256,15 +1322,27 @@ fn composite_cached(
 /// Crop a premultiplied-RGBA pixmap to the bounding box of its non-transparent
 /// pixels and return it as an `Rgba` [`RenderBitmap`], or `None` if fully empty.
 #[cfg(not(feature = "nostd"))]
-fn crop_pixmap(pixmap: &Pixmap) -> Option<crate::backends::coverage::RenderBitmap> {
+fn crop_pixmap(
+    pixmap: &Pixmap,
+    hint: Option<(i32, i32, i32, i32)>,
+) -> Option<crate::backends::coverage::RenderBitmap> {
     use crate::backends::coverage::RenderBitmap;
     let w = pixmap.width() as i32;
     let h = pixmap.height() as i32;
     let data = pixmap.data();
-    let (mut min_x, mut min_y, mut max_x, mut max_y) = (w, h, -1_i32, -1_i32);
-    for y in 0..h {
+    // Only scan the layer's (generous) dirty region — scanning the whole 4K frame
+    // per vector layer is memory-bound and dominates otherwise.
+    let (scan_x0, scan_y0, scan_x1, scan_y1) = match hint {
+        Some((x0, y0, x1, y1)) => (x0.max(0), y0.max(0), (x1 + 1).min(w), (y1 + 1).min(h)),
+        None => (0, 0, w, h),
+    };
+    if scan_x1 <= scan_x0 || scan_y1 <= scan_y0 {
+        return None;
+    }
+    let (mut min_x, mut min_y, mut max_x, mut max_y) = (scan_x1, scan_y1, -1_i32, -1_i32);
+    for y in scan_y0..scan_y1 {
         let row = (y * w) as usize * 4;
-        for x in 0..w {
+        for x in scan_x0..scan_x1 {
             if data[row + x as usize * 4 + 3] != 0 {
                 min_x = min_x.min(x);
                 max_x = max_x.max(x);
