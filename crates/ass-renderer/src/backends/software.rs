@@ -823,7 +823,30 @@ impl SoftwareBackend {
             let text_width = (shaped.width + blur_size as f32 * 2.0).ceil() as u32;
             let text_height = (shaped.height + blur_size as f32 * 2.0).ceil() as u32;
 
-            if let Some(mut temp_pixmap) = Pixmap::new(text_width, text_height) {
+            // The blurred bitmap is a pure function of the glyph outlines, blur
+            // radius and baked colours (screen position is applied at composite),
+            // so identical blurred glyphs reuse one bitmap. A positional `\clip`
+            // makes the result position-dependent, so it is not cached.
+            let cache_key = clip_mask.is_none().then(|| BlurTileKey {
+                text: data.text.clone(),
+                font: data.font_family.clone(),
+                size: data.font_size.to_bits(),
+                spacing: data.spacing.to_bits(),
+                bold,
+                italic,
+                blur: radius.to_bits(),
+                fill: data.color,
+                outline: outline_info.map(|(c, w)| (w.to_bits(), c)),
+                shadow: shadow_info.map(|(c, x, y)| (c, x.to_bits(), y.to_bits())),
+            });
+
+            let cached = cache_key
+                .as_ref()
+                .and_then(|k| BLUR_TILES.with(|c| c.borrow().get(k).cloned()));
+
+            let tile = if cached.is_some() {
+                cached
+            } else if let Some(mut temp_pixmap) = Pixmap::new(text_width, text_height) {
                 temp_pixmap.fill(tiny_skia::Color::TRANSPARENT);
 
                 // Draw shadow (if any) then outline then text into the temp
@@ -893,20 +916,45 @@ impl SoftwareBackend {
                 // Apply simple box blur
                 apply_box_blur(&mut temp_pixmap, radius);
 
-                // Draw blurred result to main pixmap. Use baseline_y (the same
-                // vertical origin as the sharp path) so the blurred glyphs land on
-                // the text rather than floating above it as a halo.
-                let blend_transform = Transform::from_translate(
-                    data.x - blur_size as f32,
-                    baseline_y - blur_size as f32,
-                );
-                let paint = tiny_skia::PixmapPaint {
-                    blend_mode: tiny_skia::BlendMode::SourceOver,
-                    ..Default::default()
-                };
+                let tile = std::sync::Arc::new(BlurTile {
+                    data: temp_pixmap.data().to_vec(),
+                    width: text_width,
+                    height: text_height,
+                });
+                if let Some(key) = cache_key {
+                    BLUR_TILES.with(|c| {
+                        let mut map = c.borrow_mut();
+                        // Bound memory: drop the cache wholesale if it grows large
+                        // (a varied blurred scene) rather than leak.
+                        if map.len() >= 512 {
+                            map.clear();
+                        }
+                        map.insert(key, tile.clone());
+                    });
+                }
+                Some(tile)
+            } else {
+                None
+            };
 
-                self.pixmap
-                    .draw_pixmap(0, 0, temp_pixmap.as_ref(), &paint, blend_transform, None);
+            // Draw the (cached or freshly rendered) blurred bitmap. Use baseline_y
+            // (the same vertical origin as the sharp path) so the blurred glyphs
+            // land on the text rather than floating above it as a halo.
+            if let Some(tile) = tile {
+                if let Some(pixref) =
+                    tiny_skia::PixmapRef::from_bytes(&tile.data, tile.width, tile.height)
+                {
+                    let blend_transform = Transform::from_translate(
+                        data.x - blur_size as f32,
+                        baseline_y - blur_size as f32,
+                    );
+                    let paint = tiny_skia::PixmapPaint {
+                        blend_mode: tiny_skia::BlendMode::SourceOver,
+                        ..Default::default()
+                    };
+                    self.pixmap
+                        .draw_pixmap(0, 0, pixref, &paint, blend_transform, None);
+                }
             }
         } else if let Some((progress, karaoke_style, karaoke_secondary)) = karaoke_info {
             // ASS karaoke colours: a syllable is the secondary colour until it is
@@ -1115,6 +1163,35 @@ struct RunCoverageKey {
     transform: [u32; 6],
 }
 
+/// Cache key for a blurred text layer's pre-composited bitmap. The `\blur` branch
+/// rasterizes shadow + outline + fill into a temp pixmap and box-blurs it; that
+/// result depends only on the glyph outlines, the blur radius and the baked
+/// colours — NOT screen position (applied at composite). So the recurring letters
+/// of blurred credit text reuse one rasterized+blurred bitmap, as libass does.
+/// Colours are part of the key because they are baked into the bitmap.
+#[cfg(not(feature = "nostd"))]
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct BlurTileKey {
+    text: String,
+    font: String,
+    size: u32,
+    spacing: u32,
+    bold: bool,
+    italic: bool,
+    blur: u32,
+    fill: [u8; 4],
+    outline: Option<(u32, [u8; 4])>,
+    shadow: Option<([u8; 4], u32, u32)>,
+}
+
+/// A cached blurred-text bitmap: premultiplied RGBA, shared via `Arc`.
+#[cfg(not(feature = "nostd"))]
+struct BlurTile {
+    data: Vec<u8>,
+    width: u32,
+    height: u32,
+}
+
 /// Rasterized coverage tiles for one text layer, in position-independent local
 /// space. Each entry is the A8 tile plus its `(x, y)` offset from the layer
 /// anchor, so compositing happens at `anchor + offset`. The shadow is not stored
@@ -1169,6 +1246,11 @@ fn shadow_delta(local: Transform, sx: f32, sy: f32) -> (i32, i32) {
 #[cfg(not(feature = "nostd"))]
 std::thread_local! {
     static RUN_COVERAGE: std::cell::RefCell<std::collections::HashMap<RunCoverageKey, CachedCoverage>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+
+    /// Per-thread cache of blurred text bitmaps (see [`BlurTileKey`]), persistent
+    /// across frames so recurring blurred glyphs are rasterized+blurred once.
+    static BLUR_TILES: std::cell::RefCell<std::collections::HashMap<BlurTileKey, std::sync::Arc<BlurTile>>> =
         std::cell::RefCell::new(std::collections::HashMap::new());
 
     /// When `Some`, coverage-path layers append their bitmaps here instead of
