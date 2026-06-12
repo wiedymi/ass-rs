@@ -25,6 +25,7 @@ struct Config {
     width: u32,
     height: u32,
     frames: u32,
+    start_cs: u32,
     duration_cs: u32,
     family: String,
 }
@@ -40,6 +41,7 @@ fn parse_config() -> Result<Config, String> {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     let mut ass: Option<PathBuf> = None;
     let (mut width, mut height, mut frames, mut duration_cs) = (1280u32, 720u32, 300u32, 1000u32);
+    let mut start_cs = 0u32;
     let mut family = String::from("Arial");
     let mut i = 0;
     while i < argv.len() {
@@ -61,6 +63,11 @@ fn parse_config() -> Result<Config, String> {
                     .parse()
                     .map_err(|_| "bad --duration")?;
             }
+            "--start" => {
+                start_cs = next_val(&argv, &mut i)?
+                    .parse()
+                    .map_err(|_| "bad --start")?;
+            }
             "--family" => family = next_val(&argv, &mut i)?,
             other => return Err(format!("unknown arg {other}")),
         }
@@ -72,6 +79,7 @@ fn parse_config() -> Result<Config, String> {
         width,
         height,
         frames: frames.max(1),
+        start_cs,
         duration_cs,
         family,
     })
@@ -90,9 +98,9 @@ fn run() -> Result<(), String> {
     let text = std::fs::read_to_string(&cfg.ass).map_err(|e| format!("read ass: {e}"))?;
     let warmup = 5u32;
 
-    // Frame times (centiseconds) swept evenly across the duration.
+    // Frame times (centiseconds) swept evenly across [start, start+duration).
     let times: Vec<u32> = (0..cfg.frames)
-        .map(|i| i * cfg.duration_cs / cfg.frames)
+        .map(|i| cfg.start_cs + i * cfg.duration_cs / cfg.frames)
         .collect();
 
     // --- our software backend (full pipeline incl. final composite) ---
@@ -150,11 +158,12 @@ fn run() -> Result<(), String> {
     let libass_ms = t2.elapsed().as_secs_f64() * 1000.0;
 
     println!(
-        "ass: {}  {}x{}  frames={}  duration={}cs",
+        "ass: {}  {}x{}  frames={}  start={}cs  duration={}cs",
         cfg.ass.display(),
         cfg.width,
         cfg.height,
         cfg.frames,
+        cfg.start_cs,
         cfg.duration_cs
     );
     report("ours", ours_ms, cfg.frames);
