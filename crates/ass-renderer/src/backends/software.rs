@@ -368,6 +368,101 @@ impl SoftwareBackend {
         true
     }
 
+    /// Composite a blurred text layer directly from the cached blurred bitmap
+    /// (see [`BlurTileKey`]), skipping the font lookup and glyph-path build.
+    /// Returns `true` on a hit. Eligible only when the cached bitmap is the
+    /// layer's *entire* output: `\blur` is present and every effect is one the
+    /// bitmap captures (outline/shadow) or that the blur branch ignores
+    /// (bold/italic/rotation/scale/shear). A clip, opaque box, underline,
+    /// strikethrough, edge blur or karaoke draws beyond the tile, so those layers
+    /// fall through to the full path.
+    #[cfg(not(feature = "nostd"))]
+    fn blur_tile_hit(
+        &mut self,
+        data: &crate::pipeline::TextData,
+        bold: bool,
+        italic: bool,
+        baseline_y: f32,
+    ) -> bool {
+        use crate::pipeline::TextEffect;
+
+        let eligible = data.effects.iter().all(|e| {
+            matches!(
+                e,
+                TextEffect::Blur { .. }
+                    | TextEffect::Outline { .. }
+                    | TextEffect::Shadow { .. }
+                    | TextEffect::Bold
+                    | TextEffect::Italic
+                    | TextEffect::Rotation { .. }
+                    | TextEffect::Scale { .. }
+                    | TextEffect::Shear { .. }
+            )
+        });
+        if !eligible {
+            return false;
+        }
+
+        // Extract blur/outline/shadow with the same first-match semantics the blur
+        // branch uses, so the key is identical to the one it stored.
+        let Some(radius) = data.effects.iter().find_map(|e| match e {
+            TextEffect::Blur { radius } => Some(*radius),
+            _ => None,
+        }) else {
+            return false;
+        };
+        let outline_info = data.effects.iter().find_map(|e| match e {
+            TextEffect::Outline { color, width } => Some((*color, *width)),
+            _ => None,
+        });
+        let shadow_info = data.effects.iter().find_map(|e| match e {
+            TextEffect::Shadow {
+                color,
+                x_offset,
+                y_offset,
+            } => Some((*color, *x_offset, *y_offset)),
+            _ => None,
+        });
+
+        let key = BlurTileKey {
+            text: data.text.clone(),
+            font: data.font_family.clone(),
+            size: data.font_size.to_bits(),
+            spacing: data.spacing.to_bits(),
+            bold,
+            italic,
+            blur: radius.to_bits(),
+            fill: data.color,
+            outline: outline_info.map(|(c, w)| (w.to_bits(), c)),
+            shadow: shadow_info.map(|(c, x, y)| (c, x.to_bits(), y.to_bits())),
+        };
+        let Some(tile) = BLUR_TILES.with(|c| c.borrow().get(&key).cloned()) else {
+            return false;
+        };
+
+        // Composite exactly as the blur branch does on a hit: same fractional
+        // origin (data.x/baseline_y - blur_size) and SourceOver draw.
+        let blur_size = (radius * 2.0).ceil();
+        let x = data.x - blur_size;
+        let y = baseline_y - blur_size;
+        note_dirty_bbox((
+            x.floor() as i32,
+            y.floor() as i32,
+            (x + tile.width as f32).ceil() as i32,
+            (y + tile.height as f32).ceil() as i32,
+        ));
+        if let Some(pixref) = tiny_skia::PixmapRef::from_bytes(&tile.data, tile.width, tile.height)
+        {
+            let paint = tiny_skia::PixmapPaint {
+                blend_mode: tiny_skia::BlendMode::SourceOver,
+                ..Default::default()
+            };
+            self.pixmap
+                .draw_pixmap(0, 0, pixref, &paint, Transform::from_translate(x, y), None);
+        }
+        true
+    }
+
     fn draw_text_layer(&mut self, data: &crate::pipeline::TextData) -> Result<(), RenderError> {
         use crate::pipeline::shaping::{find_font_for_text, shape_text_cached};
 
@@ -497,6 +592,16 @@ impl SoftwareBackend {
         // costs only the composite — the lever for animation-heavy content.
         #[cfg(not(feature = "nostd"))]
         if self.coverage_hit(data, base_transform, baseline_y) {
+            return Ok(());
+        }
+
+        // Fast path for blurred text whose bitmap is already cached: composite it
+        // and skip the font lookup + glyph-path build entirely. On a blur-cache hit
+        // those paths are unused (the blur branch just composites the cached tile),
+        // so this is bit-identical — it just avoids the per-call font parse and
+        // outline build, the dominant cost of the recurring blurred credit glyphs.
+        #[cfg(not(feature = "nostd"))]
+        if self.blur_tile_hit(data, bold, italic, baseline_y) {
             return Ok(());
         }
 
