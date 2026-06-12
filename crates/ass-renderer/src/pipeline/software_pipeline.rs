@@ -687,7 +687,7 @@ impl SoftwarePipeline {
         if let Some(path) = path_opt {
             // Get color from tags or style. `\c` overrides only RGB, so inherit the
             // alpha from the style (parse_bgr_color leaves alpha at 0 for 6-digit tags).
-            let color = if let Some(mut c) = tags.colors.primary {
+            let mut color = if let Some(mut c) = tags.colors.primary {
                 c[3] = style.map_or(255, |s| Self::parse_ass_color(&s.primary_colour)[3]);
                 c
             } else if let Some(s) = style {
@@ -695,6 +695,13 @@ impl SoftwarePipeline {
             } else {
                 [255, 255, 255, 255]
             };
+            // Apply the `\alpha` / `\1a` override (drawings are filled with the
+            // primary colour). parse_alpha already inverted ASS alpha to RGBA
+            // (255 = opaque). Without this, layered glow drawings (each with a
+            // decreasing `\alpha`) all draw opaque and accumulate far too much ink.
+            if let Some(alpha) = tags.colors.alpha1.or(tags.colors.alpha) {
+                color[3] = alpha;
+            }
 
             // Calculate scaling factors
             let scale_x = context.width() as f32 / self.play_res_x;
