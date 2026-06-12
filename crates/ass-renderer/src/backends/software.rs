@@ -440,18 +440,38 @@ impl SoftwareBackend {
             return false;
         };
 
-        // Composite exactly as the blur branch does on a hit: same fractional
-        // origin (data.x/baseline_y - blur_size) and SourceOver draw.
         let blur_size = (radius * 2.0).ceil();
         let x = data.x - blur_size;
         let y = baseline_y - blur_size;
-        note_dirty_bbox((
-            x.floor() as i32,
-            y.floor() as i32,
-            (x + tile.width as f32).ceil() as i32,
-            (y + tile.height as f32).ceil() as i32,
-        ));
-        if let Some(pixref) = tiny_skia::PixmapRef::from_bytes(&tile.data, tile.width, tile.height)
+
+        // Bitmap-list mode: the cached tile IS this layer's entire output (the
+        // eligibility check guarantees nothing else is drawn), so emit it directly
+        // as a positioned bitmap — skipping the full-frame scratch render + crop +
+        // clear the generic vector path would do. `composite_rgba` places it at
+        // integer (x, y); the sharp `\blur` path's nearest-filter `draw_pixmap`
+        // lands at the same rounded position, so this stays frame-equivalent.
+        let emitted = EMIT_SINK.with(|sink| {
+            if let Some(list) = sink.borrow_mut().as_mut() {
+                list.push(crate::backends::coverage::RenderBitmap::Rgba {
+                    width: tile.width,
+                    height: tile.height,
+                    pixels: tile.data.clone(),
+                    x: x.round() as i32,
+                    y: y.round() as i32,
+                });
+                true
+            } else {
+                false
+            }
+        });
+        if emitted {
+            return true;
+        }
+
+        // Composite mode: draw the tile into the frame at the same fractional
+        // origin and SourceOver blend the blur branch uses on a hit.
+        if let Some(pixref) =
+            tiny_skia::PixmapRef::from_bytes(tile.data.as_slice(), tile.width, tile.height)
         {
             let paint = tiny_skia::PixmapPaint {
                 blend_mode: tiny_skia::BlendMode::SourceOver,
@@ -1022,7 +1042,7 @@ impl SoftwareBackend {
                 apply_box_blur(&mut temp_pixmap, radius);
 
                 let tile = std::sync::Arc::new(BlurTile {
-                    data: temp_pixmap.data().to_vec(),
+                    data: std::sync::Arc::new(temp_pixmap.data().to_vec()),
                     width: text_width,
                     height: text_height,
                 });
@@ -1047,7 +1067,7 @@ impl SoftwareBackend {
             // land on the text rather than floating above it as a halo.
             if let Some(tile) = tile {
                 if let Some(pixref) =
-                    tiny_skia::PixmapRef::from_bytes(&tile.data, tile.width, tile.height)
+                    tiny_skia::PixmapRef::from_bytes(tile.data.as_slice(), tile.width, tile.height)
                 {
                     let blend_transform = Transform::from_translate(
                         data.x - blur_size as f32,
@@ -1289,10 +1309,11 @@ struct BlurTileKey {
     shadow: Option<([u8; 4], u32, u32)>,
 }
 
-/// A cached blurred-text bitmap: premultiplied RGBA, shared via `Arc`.
+/// A cached blurred-text bitmap: premultiplied RGBA. The pixels live in an `Arc`
+/// so a cache hit can emit them as a [`RenderBitmap::Rgba`] with a cheap clone.
 #[cfg(not(feature = "nostd"))]
 struct BlurTile {
-    data: Vec<u8>,
+    data: Arc<Vec<u8>>,
     width: u32,
     height: u32,
 }
