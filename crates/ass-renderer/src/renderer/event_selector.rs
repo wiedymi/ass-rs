@@ -80,7 +80,11 @@ impl EventSelector {
             previous_active: BTreeSet::new(),
             last_timestamp: None,
             dirty_regions: Vec::new(),
-            render_comments: true, // Enable by default for compatibility with sign rendering
+            // libass never renders `Comment` events, so default to matching it.
+            // `Comment` lines in real scripts hold source text, karaoke templates
+            // and disabled alternates — rendering them duplicates/overlaps the
+            // real `Dialogue` lines. Opt in via `set_render_comments(true)`.
+            render_comments: false,
             time_index: None,
         }
     }

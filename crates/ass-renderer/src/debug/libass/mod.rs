@@ -189,6 +189,37 @@ impl Libass {
             count
         }
     }
+
+    /// Render a pre-parsed track at `time_ms` into a full frame (image + rects),
+    /// without re-parsing the document each call — the sweep counterpart of
+    /// [`Self::render`] for scanning many frames of one large script.
+    pub fn render_track(&self, track: &LibassTrack, time_ms: i64) -> LibassFrame {
+        let mut frame = LibassFrame {
+            width: self.width,
+            height: self.height,
+            rgba: vec![0u8; (self.width * self.height * 4) as usize],
+            rects: Vec::new(),
+        };
+        // SAFETY: `track` is a valid track owned by `self.library`; the returned
+        // list is owned by the renderer and only read here before the next call.
+        unsafe {
+            let mut detect: c_int = 0;
+            let mut img = sys::ass_render_frame(self.renderer, track.track, time_ms, &mut detect);
+            while !img.is_null() {
+                let image = &*img;
+                composite_image(&mut frame, image);
+                frame.rects.push(LibassRect {
+                    x: image.dst_x,
+                    y: image.dst_y,
+                    w: image.w,
+                    h: image.h,
+                    color: image.color,
+                });
+                img = image.next;
+            }
+        }
+        frame
+    }
 }
 
 /// A parsed libass track, freed on drop.

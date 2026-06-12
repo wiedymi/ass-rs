@@ -76,7 +76,8 @@ fn selected<'a>(
 #[test]
 fn index_matches_brute_force_across_sweep() {
     let script = Script::parse(ADVERSARIAL).expect("parse");
-    let mut selector = EventSelector::new(); // render_comments = true by default
+    let mut selector = EventSelector::new();
+    selector.set_render_comments(true); // this case exercises comment rendering
 
     // Dense sweep past the last end time, hitting every inclusive boundary.
     for t in 0..=520u32 {

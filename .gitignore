@@ -9,3 +9,14 @@ tarpaulin-report.html
 test_output/
 examples_output/
 .libass/
+
+# Dev render/preview artifacts (parity_sweep / render_video / ffmpeg output)
+*.mp4
+*.mkv
+/frame_*.png
+/v_*.png
+/test_frame.png
+render_full.log
+ffmpeg_full.log
+rv.log
+ff.log
