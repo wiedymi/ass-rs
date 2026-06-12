@@ -1115,6 +1115,11 @@ fn coverage_key(
     Some((key, outline, shadow, local, fill_color))
 }
 
+/// Per-layer composite colours: `(outline, shadow (colour + screen displacement),
+/// fill)`. Outline and shadow are `None` when absent.
+#[cfg(not(feature = "nostd"))]
+type LayerColors = (Option<[u8; 4]>, Option<([u8; 4], (i32, i32))>, [u8; 4]);
+
 /// Composite cached coverage tiles (shadow, then outline, then fill) onto the
 /// premultiplied buffer at the rounded screen anchor, applying the current
 /// colours.
@@ -1125,7 +1130,7 @@ fn composite_cached(
     pixmap_h: u32,
     cached: &CachedCoverage,
     anchor: (i32, i32),
-    colors: (Option<[u8; 4]>, Option<([u8; 4], (i32, i32))>, [u8; 4]),
+    colors: LayerColors,
 ) {
     use crate::backends::coverage::composite;
     let (anchor_x, anchor_y) = anchor;
