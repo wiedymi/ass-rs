@@ -100,9 +100,21 @@ impl SoftwareBackend {
                 // Vector / raster / drawing layer: it rendered into the scratch.
                 let hint = DIRTY_BBOX.with(|b| *b.borrow());
                 if let Some(bitmap) = crop_pixmap(&self.scratch, hint) {
+                    // Clear only the cropped extent (all non-zero pixels lie within
+                    // it) to restore a transparent scratch for the next layer,
+                    // rather than memset-ing the whole frame per drawing.
+                    if let crate::backends::coverage::RenderBitmap::Rgba {
+                        x,
+                        y,
+                        width,
+                        height,
+                        ..
+                    } = &bitmap
+                    {
+                        clear_region(&mut self.scratch, (*x, *y, *width, *height));
+                    }
                     out.push(bitmap);
                 }
-                self.scratch.fill(tiny_skia::Color::TRANSPARENT);
             } else {
                 out.extend(coverage);
             }
@@ -163,6 +175,19 @@ impl SoftwareBackend {
         let Some(path) = &data.path else {
             return Ok(());
         };
+
+        // Record the drawn region so `render_to_bitmaps` crops and clears only
+        // this shape's bounds instead of scanning/clearing the whole frame per
+        // drawing — the dominant cost on sparkle-heavy frames (dozens-to-hundreds
+        // of `\p` drawings, each previously a full-frame scan + clear).
+        let b = path.bounds();
+        let margin = 2.0 + data.stroke.as_ref().map_or(0.0, |s| s.width);
+        note_dirty_bbox((
+            (b.left() - margin).floor() as i32,
+            (b.top() - margin).floor() as i32,
+            (b.right() + margin).ceil() as i32,
+            (b.bottom() + margin).ceil() as i32,
+        ));
 
         let clip_mask = self.vector_clip_mask(data.clip);
 
@@ -1418,6 +1443,30 @@ fn composite_cached(
 
 /// Crop a premultiplied-RGBA pixmap to the bounding box of its non-transparent
 /// pixels and return it as an `Rgba` [`RenderBitmap`], or `None` if fully empty.
+#[cfg(not(feature = "nostd"))]
+/// Zero a rectangular region `(x, y, width, height)` of `pixmap` (clamped to its
+/// bounds). Used to restore the scratch pixmap to transparent after a vector
+/// layer is cropped, clearing only the touched rectangle rather than the frame.
+#[cfg(not(feature = "nostd"))]
+fn clear_region(pixmap: &mut Pixmap, region: (i32, i32, u32, u32)) {
+    let (rx, ry, rw, rh) = region;
+    let w = pixmap.width() as i32;
+    let h = pixmap.height() as i32;
+    let x0 = rx.max(0);
+    let y0 = ry.max(0);
+    let x1 = (rx + rw as i32).min(w);
+    let y1 = (ry + rh as i32).min(h);
+    if x1 <= x0 || y1 <= y0 {
+        return;
+    }
+    let row_bytes = (x1 - x0) as usize * 4;
+    let data = pixmap.data_mut();
+    for y in y0..y1 {
+        let start = (y * w + x0) as usize * 4;
+        data[start..start + row_bytes].fill(0);
+    }
+}
+
 #[cfg(not(feature = "nostd"))]
 fn crop_pixmap(
     pixmap: &Pixmap,
