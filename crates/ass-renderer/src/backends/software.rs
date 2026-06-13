@@ -830,9 +830,10 @@ impl SoftwareBackend {
                 outline_paint.anti_alias = true;
                 outline_paint.blend_mode = tiny_skia::BlendMode::SourceOver;
 
-                // Create stroke configuration for path expansion
+                // Create stroke configuration for path expansion. 2x: a centred
+                // stroke's outward extent is width/2; match libass's outward grow.
                 let stroke = tiny_skia::Stroke {
-                    width: *width * 0.6, // Further reduce width to match libass
+                    width: *width * 2.0,
                     line_cap: tiny_skia::LineCap::Square,
                     line_join: tiny_skia::LineJoin::Miter,
                     ..Default::default()
@@ -1016,7 +1017,9 @@ impl SoftwareBackend {
                     };
                     outline_paint.set_color_rgba8(ocolor[0], ocolor[1], ocolor[2], ocolor[3]);
                     let stroke = tiny_skia::Stroke {
-                        width: owidth * 0.6,
+                        // 2x: a centred stroke's outward extent is width/2; match
+                        // libass's outward border grow (see rasterize_run_coverage).
+                        width: owidth * 2.0,
                         line_cap: tiny_skia::LineCap::Square,
                         line_join: tiny_skia::LineJoin::Miter,
                         ..Default::default()
@@ -1359,7 +1362,12 @@ fn rasterize_run_coverage(
         .zip(merged.as_ref())
         .and_then(|(width, merged)| {
             let stroke = tiny_skia::Stroke {
-                width: width * 0.6,
+                // libass grows the glyph outward by the border width; a tiny-skia
+                // stroke is centred on the path (half of it hidden under the
+                // fill), so the visible outward extent is width/2. Use 2x the
+                // border so the outward extent matches libass (verified: a 4.2px
+                // `\bord` then renders at libass's height instead of ~0.3x of it).
+                width: width * 2.0,
                 line_cap: tiny_skia::LineCap::Square,
                 line_join: tiny_skia::LineJoin::Miter,
                 ..Default::default()

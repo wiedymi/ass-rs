@@ -34,7 +34,11 @@ fn build_background(mode: &str, width: u32, height: u32) -> Result<Vec<u8>, Stri
             let sq = 24u32;
             for y in 0..height {
                 for x in 0..width {
-                    let c = if (x / sq + y / sq).is_multiple_of(2) { 56 } else { 96 };
+                    let c = if (x / sq + y / sq).is_multiple_of(2) {
+                        56
+                    } else {
+                        96
+                    };
                     let i = (y * width + x) as usize * 3;
                     bg[i] = c;
                     bg[i + 1] = c;
