@@ -997,6 +997,35 @@ impl SoftwareBackend {
                     };
                     shadow_paint.set_color_rgba8(scolor[0], scolor[1], scolor[2], scolor[3]);
                     let shadow_transform = temp_transform.pre_translate(sx, sy);
+                    // The shadow is the silhouette of the FINAL glyph (fill +
+                    // border), so when there is a border, stroke it into the
+                    // shadow too. Without this a heavy `\bord` is absent from the
+                    // shadow — e.g. the "Declassified" body box is a row of `b`s
+                    // (BSOD block font) drawn shadow-only with `\bord12`; the 12px
+                    // border is what merges them into a solid box, so a fill-only
+                    // shadow collapsed it to bare glyph blobs.
+                    if let Some((_, owidth)) = outline_info {
+                        let stroke = tiny_skia::Stroke {
+                            width: owidth * 2.0,
+                            line_cap: tiny_skia::LineCap::Square,
+                            line_join: tiny_skia::LineJoin::Miter,
+                            ..Default::default()
+                        };
+                        let mut stroker = tiny_skia::PathStroker::new();
+                        for path in &paths {
+                            if let Some(t) = path.clone().transform(shadow_transform) {
+                                if let Some(outlined) = stroker.stroke(&t, &stroke, 1.0) {
+                                    temp_pixmap.fill_path(
+                                        &outlined,
+                                        &shadow_paint,
+                                        tiny_skia::FillRule::Winding,
+                                        Transform::identity(),
+                                        None,
+                                    );
+                                }
+                            }
+                        }
+                    }
                     for path in &paths {
                         if let Some(transformed) = path.clone().transform(shadow_transform) {
                             temp_pixmap.fill_path(
