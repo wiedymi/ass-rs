@@ -383,6 +383,7 @@ impl SoftwareBackend {
         bold: bool,
         italic: bool,
         baseline_y: f32,
+        ascent: f32,
     ) -> bool {
         use crate::pipeline::TextEffect;
 
@@ -442,7 +443,9 @@ impl SoftwareBackend {
 
         let blur_size = (radius * 2.0).ceil();
         let x = data.x - blur_size;
-        let y = baseline_y - blur_size;
+        // The tile's baseline sits at `blur_size + ascent` from its top (see the
+        // blur branch's temp_transform), so the tile origin lands here.
+        let y = baseline_y - blur_size - ascent;
 
         // Bitmap-list mode: the cached tile IS this layer's entire output (the
         // eligibility check guarantees nothing else is drawn), so emit it directly
@@ -621,7 +624,7 @@ impl SoftwareBackend {
         // so this is bit-identical — it just avoids the per-call font parse and
         // outline build, the dominant cost of the recurring blurred credit glyphs.
         #[cfg(not(feature = "nostd"))]
-        if self.blur_tile_hit(data, bold, italic, baseline_y) {
+        if self.blur_tile_hit(data, bold, italic, baseline_y, shaped.ascent) {
             return Ok(());
         }
 
@@ -977,7 +980,14 @@ impl SoftwareBackend {
                 // Draw shadow (if any) then outline then text into the temp
                 // pixmap, so the box blur below softens shadow, outline and fill
                 // together. The shadow goes down first as it sits behind the rest.
-                let temp_transform = Transform::from_translate(blur_size as f32, blur_size as f32);
+                //
+                // The glyph paths have their origin on the baseline and rise by
+                // `ascent` above it, so the baseline must sit `ascent` below the
+                // temp's top (plus the blur margin) — otherwise tall glyphs are
+                // clipped at the temp's top edge (only the lower part survives,
+                // the bug on large blurred text like the OP/ED song).
+                let temp_transform =
+                    Transform::from_translate(blur_size as f32, blur_size as f32 + shaped.ascent);
                 if let Some((scolor, sx, sy)) = shadow_info {
                     let mut shadow_paint = tiny_skia::Paint {
                         anti_alias: true,
@@ -1069,9 +1079,12 @@ impl SoftwareBackend {
                 if let Some(pixref) =
                     tiny_skia::PixmapRef::from_bytes(tile.data.as_slice(), tile.width, tile.height)
                 {
+                    // The baseline sits at `blur_size + ascent` inside the tile
+                    // (see temp_transform), so offset the composite to land that
+                    // baseline back on `baseline_y`.
                     let blend_transform = Transform::from_translate(
                         data.x - blur_size as f32,
-                        baseline_y - blur_size as f32,
+                        baseline_y - blur_size as f32 - shaped.ascent,
                     );
                     let paint = tiny_skia::PixmapPaint {
                         blend_mode: tiny_skia::BlendMode::SourceOver,
