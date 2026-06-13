@@ -48,8 +48,8 @@ fn brute_force<'a>(script: &'a Script<'a>, t: u32, render_comments: bool) -> Vec
                 _ => false,
             };
             if include {
-                let start = event.start_time_cs().unwrap_or(0);
-                let end = event.end_time_cs().unwrap_or(0);
+                let start = event.start_time_ms().unwrap_or(0);
+                let end = event.end_time_ms().unwrap_or(0);
                 if start <= t && end >= t {
                     out.push(core::ptr::from_ref(event));
                 }
@@ -79,13 +79,14 @@ fn index_matches_brute_force_across_sweep() {
     let mut selector = EventSelector::new();
     selector.set_render_comments(true); // this case exercises comment rendering
 
-    // Dense sweep past the last end time, hitting every inclusive boundary.
-    for t in 0..=520u32 {
+    // Dense sweep (milliseconds) past the last end time, hitting every
+    // inclusive boundary.
+    for t in 0..=5200u32 {
         let expected = brute_force(&script, t, true);
         let got = selected(&mut selector, &script, t);
         assert_eq!(
             got, expected,
-            "active set mismatch at t={t}cs (comments on)"
+            "active set mismatch at t={t}ms (comments on)"
         );
     }
 }
@@ -98,12 +99,12 @@ fn index_respects_render_comments_toggle() {
 
     // Toggling the flag must rebuild the index (it is part of the cache key), so
     // the comment event C must now be excluded at every timestamp.
-    for t in 0..=520u32 {
+    for t in 0..=5200u32 {
         let expected = brute_force(&script, t, false);
         let got = selected(&mut selector, &script, t);
         assert_eq!(
             got, expected,
-            "active set mismatch at t={t}cs (comments off)"
+            "active set mismatch at t={t}ms (comments off)"
         );
     }
 }
@@ -113,8 +114,8 @@ fn boundaries_are_inclusive_on_both_ends() {
     let script = Script::parse(ADVERSARIAL).expect("parse");
     let mut selector = EventSelector::new();
 
-    // Event A is 100..=300cs. It must be active at both endpoints and inactive
-    // one unit outside each.
+    // Event A is 1000..=3000ms. It must be active at both endpoints and inactive
+    // one millisecond outside each.
     let text_at = |sel: &mut EventSelector, t: u32| -> Vec<String> {
         sel.select_active(&script, t)
             .unwrap()
@@ -124,21 +125,21 @@ fn boundaries_are_inclusive_on_both_ends() {
             .collect()
     };
 
-    assert!(text_at(&mut selector, 99)
+    assert!(text_at(&mut selector, 999)
         .iter()
         .all(|s| !s.starts_with("A ")));
-    assert!(text_at(&mut selector, 100)
+    assert!(text_at(&mut selector, 1000)
         .iter()
         .any(|s| s.starts_with("A ")));
-    assert!(text_at(&mut selector, 300)
+    assert!(text_at(&mut selector, 3000)
         .iter()
         .any(|s| s.starts_with("A ")));
-    assert!(text_at(&mut selector, 301)
+    assert!(text_at(&mut selector, 3001)
         .iter()
         .all(|s| !s.starts_with("A ")));
 
-    // Zero-duration event D (300..=300) and only-at-zero event F (0..=0).
-    assert!(text_at(&mut selector, 300)
+    // Zero-duration event D (3000..=3000) and only-at-zero event F (0..=0).
+    assert!(text_at(&mut selector, 3000)
         .iter()
         .any(|s| s.starts_with("D ")));
     assert!(text_at(&mut selector, 0)

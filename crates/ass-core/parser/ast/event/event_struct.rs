@@ -114,6 +114,27 @@ impl Event<'_> {
         crate::utils::parse_ass_time(self.end)
     }
 
+    /// Parse start time to milliseconds (full fractional precision).
+    ///
+    /// Unlike [`Self::start_time_cs`] this keeps millisecond resolution, so
+    /// frame-stepped events only milliseconds apart are timed correctly.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the time format is invalid or cannot be parsed.
+    pub fn start_time_ms(&self) -> Result<u32, crate::utils::CoreError> {
+        crate::utils::parse_ass_time_ms(self.start)
+    }
+
+    /// Parse end time to milliseconds (full fractional precision).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the time format is invalid or cannot be parsed.
+    pub fn end_time_ms(&self) -> Result<u32, crate::utils::CoreError> {
+        crate::utils::parse_ass_time_ms(self.end)
+    }
+
     /// Get duration in centiseconds
     ///
     /// Calculates the event duration by subtracting start time from end time.

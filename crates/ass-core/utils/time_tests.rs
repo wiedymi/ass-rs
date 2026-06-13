@@ -31,6 +31,35 @@ fn parse_ass_time_millisecond_precision() {
 }
 
 #[test]
+fn parse_ass_time_ms_keeps_full_precision() {
+    // Unlike parse_ass_time (centiseconds, truncating), this keeps milliseconds.
+    assert_eq!(parse_ass_time_ms("0:00:00.00").unwrap(), 0);
+    assert_eq!(parse_ass_time_ms("0:00:01.00").unwrap(), 1000);
+    assert_eq!(parse_ass_time_ms("0:01:00.00").unwrap(), 60_000);
+    assert_eq!(parse_ass_time_ms("1:00:00.00").unwrap(), 3_600_000);
+
+    // Fractional scaling by digit count: tenths, centiseconds, milliseconds.
+    assert_eq!(parse_ass_time_ms("0:00:00.5").unwrap(), 500); // tenths
+    assert_eq!(parse_ass_time_ms("0:00:00.05").unwrap(), 50); // centiseconds
+    assert_eq!(parse_ass_time_ms("0:00:00.098").unwrap(), 98); // milliseconds, no truncation
+    assert_eq!(parse_ass_time_ms("0:00:27.021").unwrap(), 27_021);
+
+    // The sub-centisecond remainder parse_ass_time would drop is preserved here:
+    // 0.098s is 98ms, not 90ms (9cs).
+    assert_eq!(parse_ass_time("0:00:00.098").unwrap() * 10, 90);
+    assert_eq!(parse_ass_time_ms("0:00:00.098").unwrap(), 98);
+}
+
+#[test]
+fn parse_ass_time_ms_invalid() {
+    assert!(parse_ass_time_ms("invalid").is_err());
+    assert!(parse_ass_time_ms("0:60:00.00").is_err()); // Invalid minutes
+    assert!(parse_ass_time_ms("0:00:60.00").is_err()); // Invalid seconds
+    assert!(parse_ass_time_ms("0:00:00.xx").is_err()); // Non-numeric fraction
+    assert!(parse_ass_time_ms("0:00").is_err()); // Missing component
+}
+
+#[test]
 fn format_ass_times() {
     assert_eq!(format_ass_time(0), "0:00:00.00");
     assert_eq!(format_ass_time(100), "0:00:01.00");
