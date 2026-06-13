@@ -283,6 +283,14 @@ fn tokenize_drawing_commands(text: &str) -> Vec<String> {
     let mut current = String::new();
 
     for ch in text.chars() {
+        if ch == '\\' {
+            // A backslash starts an override tag, which is never part of a `\p`
+            // drawing. Real scripts append the closing tag to the drawing text
+            // (e.g. `...105.31\p0}`); stop here so that trailing tag does not
+            // poison the final coordinate and discard the whole shape. libass
+            // likewise ends the drawing at the tag.
+            break;
+        }
         if ch.is_whitespace() {
             if !current.is_empty() {
                 tokens.push(current.clone());
@@ -376,4 +384,40 @@ fn spline_to_bezier(points: &[(f32, f32)], extended: bool) -> Vec<BezierCurve> {
     }
 
     beziers
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plain_drawing_parses() {
+        let path = process_drawing_commands("m 0 0 l 100 0 l 100 100 l 0 100")
+            .expect("ok")
+            .expect("some path");
+        let b = path.bounds();
+        assert!(b.width() > 50.0 && b.height() > 50.0);
+    }
+
+    #[test]
+    fn trailing_tag_does_not_discard_the_shape() {
+        // Real scripts append the drawing's closing tag to the `\p` text, e.g.
+        // `...l 0 100\p0}`. The backslash must end the drawing, not poison the
+        // last coordinate and throw the whole shape away (which rendered nothing
+        // for every elaborate sign — the gradient boxes, brushstrokes, etc.).
+        let path = process_drawing_commands("m 0 0 l 100 0 l 100 100 l 0 100\\p0}")
+            .expect("ok")
+            .expect("some path");
+        let b = path.bounds();
+        assert!(
+            b.width() > 50.0 && b.height() > 50.0,
+            "shape with a trailing \\p0 tag was discarded: bounds {b:?}"
+        );
+
+        // The same shape with and without the trailing tag must be identical.
+        let clean = process_drawing_commands("m 0 0 l 100 0 l 100 100 l 0 100")
+            .expect("ok")
+            .expect("some");
+        assert_eq!(path.len(), clean.len());
+    }
 }
