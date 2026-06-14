@@ -10,10 +10,14 @@ use std::{format, string::String, vec::Vec};
 
 use super::CoreError;
 
-/// Parse ASS time format (H:MM:SS.CC) to centiseconds
+/// Parse ASS time format (H:MM:SS.CC) to centiseconds, the libass way.
 ///
-/// ASS uses centiseconds (1/100th second) for timing.
-/// Supports various formats including fractional seconds.
+/// ASS uses centiseconds (1/100th second) for timing. The fractional field is
+/// read exactly as libass reads it: as an integer count of centiseconds via
+/// `sscanf("%d:%d:%d.%d")` (then `ms = field * 10` internally). The digit count
+/// is ignored and the value is not normalised, so `.5` is 5cs, `.054` is 54cs,
+/// and `.100` is 100cs (one second). This matches the reference player rather than
+/// interpreting a 3-digit field as true milliseconds.
 ///
 /// # Example
 ///
@@ -54,21 +58,16 @@ pub fn parse_ass_time(time_str: &str) -> Result<u32, CoreError> {
                 "Invalid centiseconds: {frac_str}"
             )));
         }
-        // Fractional seconds -> centiseconds. ASS specifies two digits, but real
-        // files (and libass) tolerate millisecond (3-digit) precision, so scale by
-        // the digit count and truncate, considering at most the first three digits
-        // (`.c` = tenths, `.cc` = centiseconds, `.mmm` = milliseconds).
-        let frac = &frac_str[..frac_str.len().min(3)];
-        let frac_val: u32 = frac
-            .parse()
-            .map_err(|_| CoreError::InvalidTime(format!("Invalid centiseconds: {frac_str}")))?;
-        // 10^len for len in 1..=3: tenths, centiseconds, milliseconds.
-        let scale = match frac.len() {
-            1 => 10,
-            2 => 100,
-            _ => 1000,
-        };
-        frac_val * 100 / scale
+        // libass reads the fractional field with `sscanf("%d:%d:%d.%d")` and forms
+        // `ms = field * 10` — i.e. it parses the whole fractional as an integer
+        // count of CENTISECONDS, regardless of digit count, and never normalises it.
+        // Replicate that exactly so event timing matches libass: `.5` -> 5cs,
+        // `.50` -> 50cs, `.054` -> 54cs, `.100` -> 100cs (rolls into the next
+        // second, as libass does). A 3-digit "millisecond" field is therefore read
+        // the same quirky way libass reads it, not as true milliseconds.
+        frac_str
+            .parse::<u32>()
+            .map_err(|_| CoreError::InvalidTime(format!("Invalid centiseconds: {frac_str}")))?
     } else {
         0
     };
@@ -81,83 +80,10 @@ pub fn parse_ass_time(time_str: &str) -> Result<u32, CoreError> {
     if seconds >= 60 {
         return Err(CoreError::InvalidTime(format!(
             "Seconds must be < 60: {seconds}"
-        )));
-    }
-    if centiseconds >= 100 {
-        return Err(CoreError::InvalidTime(format!(
-            "Centiseconds must be < 100: {centiseconds}"
         )));
     }
 
     Ok(hours * 360_000 + minutes * 6_000 + seconds * 100 + centiseconds)
-}
-
-/// Parse ASS time format (`H:MM:SS.CC`) to milliseconds.
-///
-/// Preserves the full fractional precision real scripts use (`.c` tenths, `.cc`
-/// centiseconds, `.mmm` milliseconds). Unlike [`parse_ass_time`], which truncates
-/// to centiseconds, this keeps millisecond resolution — needed so frame-stepped
-/// karaoke/typesetting (syllable events only milliseconds apart) is sampled at the
-/// right instant rather than collapsing onto centisecond boundaries.
-///
-/// # Errors
-///
-/// Returns an error if the time format is invalid or cannot be parsed.
-pub fn parse_ass_time_ms(time_str: &str) -> Result<u32, CoreError> {
-    let parts: Vec<&str> = time_str.split(':').collect();
-    if parts.len() != 3 {
-        return Err(CoreError::InvalidTime(format!(
-            "Invalid time format: {time_str}"
-        )));
-    }
-
-    let hours: u32 = parts[0]
-        .parse()
-        .map_err(|_| CoreError::InvalidTime(format!("Invalid hours: {}", parts[0])))?;
-    let minutes: u32 = parts[1]
-        .parse()
-        .map_err(|_| CoreError::InvalidTime(format!("Invalid minutes: {}", parts[1])))?;
-
-    let seconds_parts: Vec<&str> = parts[2].split('.').collect();
-    let seconds: u32 = seconds_parts[0]
-        .parse()
-        .map_err(|_| CoreError::InvalidTime(format!("Invalid seconds: {}", seconds_parts[0])))?;
-
-    let milliseconds = if seconds_parts.len() > 1 {
-        let frac_str = seconds_parts[1];
-        if frac_str.is_empty() || !frac_str.bytes().all(|b| b.is_ascii_digit()) {
-            return Err(CoreError::InvalidTime(format!(
-                "Invalid fractional seconds: {frac_str}"
-            )));
-        }
-        // Consider at most the first three digits: `.c` tenths, `.cc` centiseconds,
-        // `.mmm` milliseconds. Scale each to milliseconds.
-        let frac = &frac_str[..frac_str.len().min(3)];
-        let frac_val: u32 = frac.parse().map_err(|_| {
-            CoreError::InvalidTime(format!("Invalid fractional seconds: {frac_str}"))
-        })?;
-        let scale = match frac.len() {
-            1 => 100, // tenths -> ms
-            2 => 10,  // centiseconds -> ms
-            _ => 1,   // milliseconds
-        };
-        frac_val * scale
-    } else {
-        0
-    };
-
-    if minutes >= 60 {
-        return Err(CoreError::InvalidTime(format!(
-            "Minutes must be < 60: {minutes}"
-        )));
-    }
-    if seconds >= 60 {
-        return Err(CoreError::InvalidTime(format!(
-            "Seconds must be < 60: {seconds}"
-        )));
-    }
-
-    Ok(hours * 3_600_000 + minutes * 60_000 + seconds * 1_000 + milliseconds)
 }
 
 /// Format centiseconds back to ASS time format

@@ -96,16 +96,16 @@ impl EventSelector {
 
     /// Select active events and track changes for incremental rendering.
     ///
-    /// `time_ms` is in milliseconds. Event boundaries are parsed at full
-    /// millisecond precision (not truncated to centiseconds), so an event
-    /// whose start has a sub-centisecond remainder becomes active on the first
-    /// sample at or after its true start rather than one centisecond early —
-    /// this is what stops sequential karaoke/typeset events from briefly
-    /// overlapping ("ghosting") at their shared boundary.
+    /// `time_cs` is in centiseconds. An event is active when
+    /// `start <= time_cs < end` — the start is inclusive and the end is
+    /// exclusive, matching libass (`Start <= now < Start + Duration`). The
+    /// exclusive end is what stops two events that share a boundary timestamp
+    /// (one ending exactly as the next begins) from both rendering for a frame
+    /// and stacking on top of each other.
     pub fn select_active<'a>(
         &mut self,
         script: &'a Script<'a>,
-        time_ms: u32,
+        time_cs: u32,
     ) -> Result<ActiveEvents<'a>, RenderError> {
         let mut active_events = Vec::new();
         #[cfg(not(feature = "nostd"))]
@@ -114,7 +114,7 @@ impl EventSelector {
         let mut current_active = BTreeSet::new();
 
         // Find the events section, then answer the query from the cached, parsed
-        // time index. Active events satisfy `start <= t <= end`; entries are
+        // time index. Active events satisfy `start <= t < end`; entries are
         // start-sorted, so `partition_point` bounds the scan to events that have
         // already started, and the original index restores file order.
         if let Some(events_section) = script.sections().iter().find_map(|section| {
@@ -131,10 +131,10 @@ impl EventSelector {
                 .expect("time index built by ensure_index");
             let hi = index
                 .by_start
-                .partition_point(|&(start, _, _)| start <= time_ms);
+                .partition_point(|&(start, _, _)| start <= time_cs);
             let mut active_idx: Vec<usize> = index.by_start[..hi]
                 .iter()
-                .filter(|&&(_, end, _)| end >= time_ms)
+                .filter(|&&(_, end, _)| end > time_cs)
                 .map(|&(_, _, idx)| idx)
                 .collect();
             active_idx.sort_unstable();
@@ -161,14 +161,14 @@ impl EventSelector {
         // Check if re-render is needed
         let is_dirty = !newly_active.is_empty()
             || !newly_inactive.is_empty()
-            || self.has_animated_events(&active_events, time_ms)
+            || self.has_animated_events(&active_events, time_cs)
             || self
                 .last_timestamp
-                .is_none_or(|last| (time_ms as i32 - last as i32).abs() > 1000);
+                .is_none_or(|last| (time_cs as i32 - last as i32).abs() > 100);
 
         // Update state
         self.previous_active = current_active;
-        self.last_timestamp = Some(time_ms);
+        self.last_timestamp = Some(time_cs);
 
         Ok(ActiveEvents {
             events: active_events,
@@ -202,8 +202,8 @@ impl EventSelector {
                 _ => false,
             };
             if should_include {
-                let start = event.start_time_ms().unwrap_or(0);
-                let end = event.end_time_ms().unwrap_or(0);
+                let start = event.start_time_cs().unwrap_or(0);
+                let end = event.end_time_cs().unwrap_or(0);
                 by_start.push((start, end, idx));
             }
         }
@@ -213,7 +213,7 @@ impl EventSelector {
     }
 
     /// Check if any events have active animations
-    fn has_animated_events(&self, events: &[&Event], time_ms: u32) -> bool {
+    fn has_animated_events(&self, events: &[&Event], time_cs: u32) -> bool {
         for event in events {
             let text = event.text;
             // Check for animation tags
@@ -226,8 +226,8 @@ impl EventSelector {
             }
             // Check for karaoke
             if text.contains(r"\k") || text.contains(r"\K") {
-                if let Ok(start) = event.start_time_ms() {
-                    if time_ms > start {
+                if let Ok(start) = event.start_time_cs() {
+                    if time_cs > start {
                         return true;
                     }
                 }
@@ -294,12 +294,12 @@ impl Default for EventSelector {
     }
 }
 
-/// Legacy function for backward compatibility (`time_ms` in milliseconds).
+/// Legacy function for backward compatibility (`time_cs` in centiseconds).
 #[allow(dead_code)] // Kept for backward compatibility
-pub fn select_active_events<'a>(script: &'a Script<'a>, time_ms: u32) -> Vec<&'a Event<'a>> {
+pub fn select_active_events<'a>(script: &'a Script<'a>, time_cs: u32) -> Vec<&'a Event<'a>> {
     let mut selector = EventSelector::new();
     selector
-        .select_active(script, time_ms)
+        .select_active(script, time_cs)
         .map(|active| active.events)
         .unwrap_or_default()
 }

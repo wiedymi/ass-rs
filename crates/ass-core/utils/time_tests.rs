@@ -20,43 +20,20 @@ fn parse_ass_times_invalid() {
 }
 
 #[test]
-fn parse_ass_time_millisecond_precision() {
-    // libass and many real files use 3-digit (millisecond) fractional seconds;
-    // they parse as truncated centiseconds rather than erroring.
-    assert_eq!(parse_ass_time("0:00:00.100").unwrap(), 10); // 100ms = 10cs
-    assert_eq!(parse_ass_time("0:00:27.021").unwrap(), 2702); // 27.021s
-    assert_eq!(parse_ass_time("0:00:00.098").unwrap(), 9); // 98ms -> 9cs (truncated)
-    assert_eq!(parse_ass_time("0:00:00.5").unwrap(), 50); // tenths
-    assert_eq!(parse_ass_time("0:00:00.05").unwrap(), 5); // centiseconds
-}
+fn parse_ass_time_fractional_is_libass_faithful() {
+    // libass reads the fractional field as an integer count of centiseconds
+    // (`sscanf %d`, then `ms = field * 10`), ignoring the digit count and never
+    // normalising. We replicate that exactly so event timing matches the player.
+    assert_eq!(parse_ass_time("0:00:00.5").unwrap(), 5); // ".5" -> 5cs (NOT 50)
+    assert_eq!(parse_ass_time("0:00:00.05").unwrap(), 5); // ".05" -> 5cs
+    assert_eq!(parse_ass_time("0:00:00.50").unwrap(), 50); // ".50" -> 50cs
+    assert_eq!(parse_ass_time("0:00:00.098").unwrap(), 98); // ".098" -> 98cs (NOT 9)
+    assert_eq!(parse_ass_time("0:00:27.021").unwrap(), 2721); // 2700 + 21
 
-#[test]
-fn parse_ass_time_ms_keeps_full_precision() {
-    // Unlike parse_ass_time (centiseconds, truncating), this keeps milliseconds.
-    assert_eq!(parse_ass_time_ms("0:00:00.00").unwrap(), 0);
-    assert_eq!(parse_ass_time_ms("0:00:01.00").unwrap(), 1000);
-    assert_eq!(parse_ass_time_ms("0:01:00.00").unwrap(), 60_000);
-    assert_eq!(parse_ass_time_ms("1:00:00.00").unwrap(), 3_600_000);
-
-    // Fractional scaling by digit count: tenths, centiseconds, milliseconds.
-    assert_eq!(parse_ass_time_ms("0:00:00.5").unwrap(), 500); // tenths
-    assert_eq!(parse_ass_time_ms("0:00:00.05").unwrap(), 50); // centiseconds
-    assert_eq!(parse_ass_time_ms("0:00:00.098").unwrap(), 98); // milliseconds, no truncation
-    assert_eq!(parse_ass_time_ms("0:00:27.021").unwrap(), 27_021);
-
-    // The sub-centisecond remainder parse_ass_time would drop is preserved here:
-    // 0.098s is 98ms, not 90ms (9cs).
-    assert_eq!(parse_ass_time("0:00:00.098").unwrap() * 10, 90);
-    assert_eq!(parse_ass_time_ms("0:00:00.098").unwrap(), 98);
-}
-
-#[test]
-fn parse_ass_time_ms_invalid() {
-    assert!(parse_ass_time_ms("invalid").is_err());
-    assert!(parse_ass_time_ms("0:60:00.00").is_err()); // Invalid minutes
-    assert!(parse_ass_time_ms("0:00:60.00").is_err()); // Invalid seconds
-    assert!(parse_ass_time_ms("0:00:00.xx").is_err()); // Non-numeric fraction
-    assert!(parse_ass_time_ms("0:00").is_err()); // Missing component
+    // A 3-digit field >= 100 is taken literally and rolls past the second,
+    // exactly as libass's `field * 10` does (".100" -> 100cs = one second).
+    assert_eq!(parse_ass_time("0:00:00.100").unwrap(), 100);
+    assert_eq!(parse_ass_time("0:00:30.150").unwrap(), 3150);
 }
 
 #[test]
@@ -103,7 +80,7 @@ fn parse_ass_time_edge_cases() {
     // Test boundary values that should fail
     assert!(parse_ass_time("0:60:00.00").is_err()); // 60 minutes
     assert!(parse_ass_time("0:00:60.00").is_err()); // 60 seconds
-    assert_eq!(parse_ass_time("0:00:00.100").unwrap(), 10); // 100ms = 10cs, not invalid
+    assert_eq!(parse_ass_time("0:00:00.100").unwrap(), 100); // libass: ".100" -> 100cs
 }
 
 #[test]

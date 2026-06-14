@@ -2,11 +2,12 @@
 //!
 //! The index replaced an O(n) per-frame scan that re-parsed every event's
 //! start/end time string. These tests pin the index to the exact semantics of
-//! that brute-force scan (`start <= t <= end`, file-order output, Dialogue
-//! always / Comment gated by `render_comments`) across a dense sweep of
-//! timestamps and an adversarial event layout: out-of-order starts, overlaps,
-//! inclusive boundaries, zero-duration events, millisecond and centisecond
-//! precision, and interleaved comments.
+//! that brute-force scan — libass timing: an event is active for
+//! `start <= t < end` (inclusive start, EXCLUSIVE end), file-order output,
+//! Dialogue always / Comment gated by `render_comments` — across a dense sweep
+//! of timestamps and an adversarial event layout: out-of-order starts, overlaps,
+//! shared boundaries, zero-duration events, 3-digit fractional times, and
+//! interleaved comments.
 
 use ass_core::parser::ast::EventType;
 use ass_core::parser::{Event, Script, Section};
@@ -28,12 +29,13 @@ Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,A overlaps
 Dialogue: 0,0:00:00.50,0:00:02.00,Default,,0,0,0,,B starts first listed second
 Comment: 0,0:00:01.50,0:00:04.00,Default,,0,0,0,,C comment sign
 Dialogue: 0,0:00:03.00,0:00:03.00,Default,,0,0,0,,D zero duration at boundary
-Dialogue: 0,0:00:02.000,0:00:05.000,Default,,0,0,0,,E millisecond precision
-Dialogue: 0,0:00:00.00,0:00:00.00,Default,,0,0,0,,F only at zero
+Dialogue: 0,0:00:02.000,0:00:05.000,Default,,0,0,0,,E three-digit fractional
+Dialogue: 0,0:00:00.00,0:00:00.00,Default,,0,0,0,,F zero duration at zero
 Dialogue: 0,0:00:04.00,0:00:04.50,Default,,0,0,0,,G late
 ";
 
-/// Brute-force reference: the exact logic the index replaced.
+/// Brute-force reference: the exact logic the index replaced. Inclusive start,
+/// exclusive end (`start <= t < end`), matching libass.
 fn brute_force<'a>(script: &'a Script<'a>, t: u32, render_comments: bool) -> Vec<*const Event<'a>> {
     let mut out = Vec::new();
     if let Some(Section::Events(events)) = script
@@ -48,9 +50,9 @@ fn brute_force<'a>(script: &'a Script<'a>, t: u32, render_comments: bool) -> Vec
                 _ => false,
             };
             if include {
-                let start = event.start_time_ms().unwrap_or(0);
-                let end = event.end_time_ms().unwrap_or(0);
-                if start <= t && end >= t {
+                let start = event.start_time_cs().unwrap_or(0);
+                let end = event.end_time_cs().unwrap_or(0);
+                if start <= t && end > t {
                     out.push(core::ptr::from_ref(event));
                 }
             }
@@ -79,14 +81,13 @@ fn index_matches_brute_force_across_sweep() {
     let mut selector = EventSelector::new();
     selector.set_render_comments(true); // this case exercises comment rendering
 
-    // Dense sweep (milliseconds) past the last end time, hitting every
-    // inclusive boundary.
-    for t in 0..=5200u32 {
+    // Dense sweep (centiseconds) past the last end time, hitting every boundary.
+    for t in 0..=520u32 {
         let expected = brute_force(&script, t, true);
         let got = selected(&mut selector, &script, t);
         assert_eq!(
             got, expected,
-            "active set mismatch at t={t}ms (comments on)"
+            "active set mismatch at t={t}cs (comments on)"
         );
     }
 }
@@ -99,23 +100,23 @@ fn index_respects_render_comments_toggle() {
 
     // Toggling the flag must rebuild the index (it is part of the cache key), so
     // the comment event C must now be excluded at every timestamp.
-    for t in 0..=5200u32 {
+    for t in 0..=520u32 {
         let expected = brute_force(&script, t, false);
         let got = selected(&mut selector, &script, t);
         assert_eq!(
             got, expected,
-            "active set mismatch at t={t}ms (comments off)"
+            "active set mismatch at t={t}cs (comments off)"
         );
     }
 }
 
 #[test]
-fn boundaries_are_inclusive_on_both_ends() {
+fn boundaries_match_libass_inclusive_start_exclusive_end() {
     let script = Script::parse(ADVERSARIAL).expect("parse");
     let mut selector = EventSelector::new();
 
-    // Event A is 1000..=3000ms. It must be active at both endpoints and inactive
-    // one millisecond outside each.
+    // Event A is [100, 300)cs: active at the inclusive start and up to one cs
+    // before the exclusive end, inactive at the end itself and outside.
     let text_at = |sel: &mut EventSelector, t: u32| -> Vec<String> {
         sel.select_active(&script, t)
             .unwrap()
@@ -125,27 +126,29 @@ fn boundaries_are_inclusive_on_both_ends() {
             .collect()
     };
 
-    assert!(text_at(&mut selector, 999)
+    assert!(text_at(&mut selector, 99)
         .iter()
         .all(|s| !s.starts_with("A ")));
-    assert!(text_at(&mut selector, 1000)
+    assert!(text_at(&mut selector, 100)
         .iter()
         .any(|s| s.starts_with("A ")));
-    assert!(text_at(&mut selector, 3000)
+    assert!(text_at(&mut selector, 299)
         .iter()
         .any(|s| s.starts_with("A ")));
-    assert!(text_at(&mut selector, 3001)
+    // Exclusive end: A is NOT active at its end timestamp.
+    assert!(text_at(&mut selector, 300)
+        .iter()
+        .all(|s| !s.starts_with("A ")));
+    assert!(text_at(&mut selector, 301)
         .iter()
         .all(|s| !s.starts_with("A ")));
 
-    // Zero-duration event D (3000..=3000) and only-at-zero event F (0..=0).
-    assert!(text_at(&mut selector, 3000)
+    // Zero-duration events never render with an exclusive end: D [300,300) and
+    // F [0,0) must be inactive even at their own timestamp (as in libass).
+    assert!(text_at(&mut selector, 300)
         .iter()
-        .any(|s| s.starts_with("D ")));
+        .all(|s| !s.starts_with("D ")));
     assert!(text_at(&mut selector, 0)
-        .iter()
-        .any(|s| s.starts_with("F ")));
-    assert!(text_at(&mut selector, 1)
         .iter()
         .all(|s| !s.starts_with("F ")));
 }

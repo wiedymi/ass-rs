@@ -91,9 +91,7 @@ impl Renderer {
             }
         }
 
-        let active = self
-            .event_selector
-            .select_active(script, time_cs.saturating_mul(10))?;
+        let active = self.event_selector.select_active(script, time_cs)?;
         let events = active.events;
 
         if events.is_empty() {
@@ -167,9 +165,7 @@ impl Renderer {
             }
         }
 
-        let active = self
-            .event_selector
-            .select_active(script, time_cs.saturating_mul(10))?;
+        let active = self.event_selector.select_active(script, time_cs)?;
         let events = active.events;
         if events.is_empty() {
             return Ok(Vec::new());
@@ -201,9 +197,7 @@ impl Renderer {
         time_cs: u32,
         previous_frame: &Frame,
     ) -> Result<Frame, RenderError> {
-        let active = self
-            .event_selector
-            .select_active(script, time_cs.saturating_mul(10))?;
+        let active = self.event_selector.select_active(script, time_cs)?;
         let events = active.events;
         let dirty_regions =
             self.pipeline

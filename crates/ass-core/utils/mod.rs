@@ -57,5 +57,5 @@ pub use color::parse_bgr_color;
 pub use fields::{normalize_field_value, parse_numeric, validate_ass_name};
 pub use math::eval_cubic_bezier;
 pub use spans::Spans;
-pub use time::{format_ass_time, parse_ass_time, parse_ass_time_ms};
+pub use time::{format_ass_time, parse_ass_time};
 pub use uu::decode_uu_data;
