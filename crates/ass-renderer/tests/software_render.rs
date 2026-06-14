@@ -627,6 +627,55 @@ fn long_line_auto_wraps() {
 }
 
 #[test]
+fn letter_spacing_forces_wrap() {
+    // Letter spacing (style Spacing / \fsp) widens a line. A line that fits on one
+    // line at Spacing=0 must wrap once enough spacing is added: the wrap measurement
+    // has to include spacing between glyphs, matching libass and our own render.
+    // Regression: spacing was omitted from the wrap width, so spaced lines overran
+    // the margin box as a single line instead of wrapping.
+    let bands_for = |spacing: i32| -> usize {
+        let head = format!(
+            "[Script Info]\nPlayResX: 1280\nPlayResY: 720\n\n[V4+ Styles]\n\
+             Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n\
+             Style: Sp,Arial,64,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,{spacing},0,1,0,0,5,30,30,30,1\n\n\
+             [Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        );
+        let src =
+            format!("{head}Dialogue: 0,0:00:00.00,0:00:10.00,Sp,,0,0,0,,alpha beta gamma delta\n");
+        let script = Script::parse(&src).expect("parse");
+        let ctx = RenderContext::new(1280, 720);
+        let mut r = Renderer::new(BackendType::Software, ctx).expect("renderer");
+        let frame = r.render_frame(&script, 200).expect("render");
+        let (w, h) = (frame.width() as usize, frame.height() as usize);
+        let data = frame.data();
+        let mut bands = 0;
+        let mut in_band = false;
+        for y in 0..h {
+            let lit = (0..w).filter(|x| data[(y * w + x) * 4 + 3] >= 128).count();
+            let on = lit >= 3;
+            if on && !in_band {
+                bands += 1;
+                in_band = true;
+            } else if !on && in_band {
+                in_band = false;
+            }
+        }
+        bands
+    };
+
+    let unspaced = bands_for(0);
+    let spaced = bands_for(60);
+    assert_eq!(
+        unspaced, 1,
+        "short line should fit on one line without spacing, got {unspaced} bands"
+    );
+    assert!(
+        spaced >= 2,
+        "large letter spacing must force a wrap, got {spaced} bands"
+    );
+}
+
+#[test]
 fn t_animates_font_size_from_base() {
     // Regression: `\t(\fs..)` with no preceding `\fs` must interpolate from the
     // style's base size (libass), not from zero. At mid-animation the text is

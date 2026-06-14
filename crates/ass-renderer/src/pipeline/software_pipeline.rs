@@ -501,6 +501,8 @@ impl SoftwarePipeline {
         default_scale_y: f32,
         default_bold: bool,
         default_italic: bool,
+        default_spacing: f32,
+        default_scale_x: f32,
         scale_y: f32,
         max_width: f32,
     ) -> Vec<Vec<TextSegment>> {
@@ -523,7 +525,13 @@ impl SoftwarePipeline {
             return vec![line.to_vec()];
         }
 
-        // Measure with the leading segment's resolved render font.
+        // Measure with the leading segment's resolved render font, reproducing the
+        // render's geometry exactly so a line wraps iff it would actually overflow:
+        // glyph advances at the rendered size, plus letter spacing applied BETWEEN
+        // glyphs (libass counts N-1 gaps; the trailing glyph has no spacing), with
+        // the whole run scaled by `\fscx` to mirror the render's post-transform.
+        // Without the spacing term a line measures narrower than it draws and fails
+        // to wrap when libass does.
         let font = lead.tags.font.name.as_deref().unwrap_or(default_font_name);
         let size = lead.tags.font.size.unwrap_or(default_font_size)
             * scale_y
@@ -531,24 +539,43 @@ impl SoftwarePipeline {
             * self.dpi_scale;
         let bold = lead.tags.formatting.bold.unwrap_or(default_bold);
         let italic = lead.tags.formatting.italic.unwrap_or(default_italic);
-        let measure = |s: &str| {
+        let spacing = lead.tags.font.spacing.unwrap_or(default_spacing);
+        let sx = lead.tags.font.scale_x.unwrap_or(default_scale_x) / 100.0;
+        let advance = |s: &str| {
             shape_text_cached(s, font, size, bold, italic, &self.font_database)
                 .map_or(0.0, |shaped| shaped.width)
         };
-        let word_w: Vec<f32> = words.iter().map(|w| measure(w)).collect();
-        let space_w = (measure("x x") - measure("xx")).max(0.0);
+        let word_adv: Vec<f32> = words.iter().map(|w| advance(w)).collect();
+        let word_glyphs: Vec<usize> = words.iter().map(|w| w.chars().count()).collect();
+        // Advance of one space glyph, isolated from neighbouring side bearings.
+        let space_adv = (advance("x x") - advance("xx")).max(0.0);
+
+        // Rendered width of a contiguous run: advances + spacing between glyphs,
+        // scaled by `\fscx`, matching software.rs glyph placement.
+        let run_width = |adv: f32, glyphs: usize| -> f32 {
+            sx * (adv + spacing * glyphs.saturating_sub(1) as f32)
+        };
 
         // Greedily pack words under `limit`, returning word indices that start a line.
         let fill = |limit: f32| -> Vec<usize> {
             let mut starts: Vec<usize> = Vec::new();
-            let mut cur_w = 0.0;
-            for (i, &ww) in word_w.iter().enumerate() {
-                let add = if cur_w == 0.0 { ww } else { space_w + ww };
-                if cur_w > 0.0 && cur_w + add > limit {
-                    starts.push(i);
-                    cur_w = ww;
+            let mut cur_adv = 0.0;
+            let mut cur_glyphs = 0usize;
+            let mut started = false;
+            for i in 0..words.len() {
+                let (add_adv, add_glyphs) = if started {
+                    (space_adv + word_adv[i], 1 + word_glyphs[i])
                 } else {
-                    cur_w += add;
+                    (word_adv[i], word_glyphs[i])
+                };
+                if started && run_width(cur_adv + add_adv, cur_glyphs + add_glyphs) > limit {
+                    starts.push(i);
+                    cur_adv = word_adv[i];
+                    cur_glyphs = word_glyphs[i];
+                } else {
+                    cur_adv += add_adv;
+                    cur_glyphs += add_glyphs;
+                    started = true;
                 }
             }
             starts
@@ -561,7 +588,9 @@ impl SoftwarePipeline {
 
         // Balance: smallest width limit that still yields `target` breaks (biases
         // earlier lines wider, like libass WrapStyle 0).
-        let max_word = word_w.iter().copied().fold(0.0_f32, f32::max);
+        let max_word = (0..words.len())
+            .map(|i| run_width(word_adv[i], word_glyphs[i]))
+            .fold(0.0_f32, f32::max);
         let (mut lo, mut hi) = (max_word, max_width);
         for _ in 0..24 {
             let mid = (lo + hi) / 2.0;
@@ -947,6 +976,8 @@ impl SoftwarePipeline {
                     default_scale_y,
                     default_bold,
                     default_italic,
+                    default_spacing,
+                    default_scale_x,
                     scale_y,
                     available,
                 ));
