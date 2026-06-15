@@ -676,6 +676,43 @@ fn letter_spacing_forces_wrap() {
 }
 
 #[test]
+fn wrap_style_2_disables_wrapping() {
+    // WrapStyle 2 / `\q2`: no width-based wrapping. A line that the smart default
+    // wraps must stay a single (overflowing) line under `\q2`, breaking only on
+    // explicit `\N`.
+    let count_bands = |data: &[u8], w: usize, h: usize| -> usize {
+        let mut bands = 0;
+        let mut in_band = false;
+        for y in 0..h {
+            let lit = (0..w).filter(|x| data[(y * w + x) * 4 + 3] >= 128).count();
+            let on = lit >= 3;
+            if on && !in_band {
+                bands += 1;
+                in_band = true;
+            } else if !on && in_band {
+                in_band = false;
+            }
+        }
+        bands
+    };
+    let long =
+        "This is a very long subtitle line that certainly exceeds the available width and must wrap";
+
+    let (w, h, smart) = render(long);
+    assert!(
+        count_bands(&smart, w, h) >= 2,
+        "smart default must wrap the long line"
+    );
+
+    let (w2, h2, no_wrap) = render(&format!("{{\\q2}}{long}"));
+    assert_eq!(
+        count_bands(&no_wrap, w2, h2),
+        1,
+        "\\q2 must not wrap: the long line stays a single band"
+    );
+}
+
+#[test]
 fn t_animates_font_size_from_base() {
     // Regression: `\t(\fs..)` with no preceding `\fs` must interpolate from the
     // style's base size (libass), not from zero. At mid-animation the text is

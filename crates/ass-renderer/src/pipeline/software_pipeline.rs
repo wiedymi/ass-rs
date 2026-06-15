@@ -121,6 +121,9 @@ pub struct SoftwarePipeline {
     /// libass uses 72 DPI, some systems use 96 DPI
     /// Empirically adjusted to 0.9 for better libass visual match
     dpi_scale: f32,
+    /// Script `WrapStyle` header (0 smart, 1 greedy, 2 none, 3 smart); the `\q`
+    /// override takes precedence per event. Defaults to 0.
+    wrap_style: u8,
 }
 
 impl Default for SoftwarePipeline {
@@ -148,6 +151,7 @@ impl SoftwarePipeline {
             layout_res_y: None,
             scaled_border_and_shadow: true, // Default to true per ASS spec
             dpi_scale: 0.9,                 // Adjusted for better libass compatibility (was 0.75)
+            wrap_style: 0,
         }
     }
 
@@ -330,6 +334,7 @@ impl SoftwarePipeline {
             layout_res_y: None,
             scaled_border_and_shadow: true, // Default to true per ASS spec
             dpi_scale: 0.9,                 // Adjusted for better libass compatibility (was 0.75)
+            wrap_style: 0,
         }
     }
 
@@ -505,6 +510,7 @@ impl SoftwarePipeline {
         default_scale_x: f32,
         scale_y: f32,
         max_width: f32,
+        balance: bool,
     ) -> Vec<Vec<TextSegment>> {
         let Some(lead) = line.first() else {
             return vec![line.to_vec()];
@@ -584,23 +590,28 @@ impl SoftwarePipeline {
         if base.is_empty() {
             return vec![line.to_vec()];
         }
-        let target = base.len();
 
-        // Balance: smallest width limit that still yields `target` breaks (biases
-        // earlier lines wider, like libass WrapStyle 0).
-        let max_word = (0..words.len())
-            .map(|i| run_width(word_adv[i], word_glyphs[i]))
-            .fold(0.0_f32, f32::max);
-        let (mut lo, mut hi) = (max_word, max_width);
-        for _ in 0..24 {
-            let mid = (lo + hi) / 2.0;
-            if fill(mid).len() <= target {
-                hi = mid;
-            } else {
-                lo = mid;
+        // WrapStyle 0/3 (`balance`): find the smallest width limit that still yields
+        // the greedy break count, biasing earlier lines wider like libass smart
+        // wrapping. WrapStyle 1 keeps the raw greedy (end-of-line) breaks.
+        let line_starts: Vec<usize> = if balance {
+            let target = base.len();
+            let max_word = (0..words.len())
+                .map(|i| run_width(word_adv[i], word_glyphs[i]))
+                .fold(0.0_f32, f32::max);
+            let (mut lo, mut hi) = (max_word, max_width);
+            for _ in 0..24 {
+                let mid = (lo + hi) / 2.0;
+                if fill(mid).len() <= target {
+                    hi = mid;
+                } else {
+                    lo = mid;
+                }
             }
-        }
-        let line_starts: Vec<usize> = core::iter::once(0).chain(fill(hi)).collect();
+            core::iter::once(0).chain(fill(hi)).collect()
+        } else {
+            core::iter::once(0).chain(base).collect()
+        };
 
         // Character offset where each word begins (words are space-separated).
         let mut word_char_start = Vec::with_capacity(words.len());
@@ -920,6 +931,15 @@ impl SoftwarePipeline {
         // Get base position from first segment - we'll adjust per-segment as needed
         let _base_tags = &segments[0].tags;
 
+        // Effective wrap style: a `\q` override (clamped to 0..=3, like libass which
+        // falls back to the track style on an invalid value) takes precedence over
+        // the script's WrapStyle header.
+        let event_wrap_style = segments
+            .iter()
+            .find_map(|s| s.tags.formatting.wrap_style)
+            .filter(|&q| q <= 3)
+            .unwrap_or(self.wrap_style);
+
         // Restructure segments into logical lines
         let mut logical_lines: Vec<Vec<TextSegment>> = Vec::new();
         let mut current_line_segments: Vec<TextSegment> = Vec::new();
@@ -958,15 +978,17 @@ impl SoftwarePipeline {
             logical_lines.push(current_line_segments);
         }
 
-        // Width-based auto-wrap (libass smart wrapping). Break logical lines that
-        // exceed the available width into balanced lines, preserving per-segment
-        // tags. Positioned events (\pos/\move) keep their explicit layout.
-        if !Self::event_is_positioned(event) {
+        // Width-based auto-wrap. WrapStyle 2 disables width wrapping entirely (only
+        // explicit \N breaks, already split into logical_lines); positioned events
+        // (\pos/\move) keep their explicit layout. WrapStyle 1 wraps greedily with
+        // no balancing; 0/3 balance the lines (libass smart wrapping).
+        if !Self::event_is_positioned(event) && event_wrap_style != 2 {
             let margin_l =
                 Self::margin_or_style(event.margin_l, style.map(|s| s.margin_l.as_str()));
             let margin_r =
                 Self::margin_or_style(event.margin_r, style.map(|s| s.margin_r.as_str()));
             let available = (context.width() as f32 - (margin_l + margin_r) * scale_x).max(1.0);
+            let balance = event_wrap_style != 1;
             let mut wrapped: Vec<Vec<TextSegment>> = Vec::with_capacity(logical_lines.len());
             for line in logical_lines {
                 wrapped.extend(self.wrap_segments(
@@ -980,6 +1002,7 @@ impl SoftwarePipeline {
                     default_scale_x,
                     scale_y,
                     available,
+                    balance,
                 ));
             }
             logical_lines = wrapped;
@@ -1827,6 +1850,9 @@ impl Pipeline for SoftwarePipeline {
                         self.play_res_x = res_x as f32;
                         self.play_res_y = res_y as f32;
                     }
+
+                    // Extract WrapStyle (0 smart / 1 greedy / 2 none / 3 smart)
+                    self.wrap_style = info.wrap_style();
 
                     // Extract LayoutResX and LayoutResY if present
                     if let Some((layout_x, layout_y)) = info.layout_resolution() {
