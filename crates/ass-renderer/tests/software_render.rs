@@ -728,6 +728,67 @@ fn t_animates_font_size_from_base() {
 }
 
 #[test]
+fn move_tag_interpolates_position() {
+    // \move with explicit times must interpolate: at the middle of its time window
+    // the text sits near the midpoint, not snapped to the end. Regression: the move
+    // times were converted ms->cs twice, so the move completed 10x early and the
+    // text sat at its end position on almost every frame.
+    let center_x = |data: &[u8], w: usize| -> usize {
+        let (mut lo, mut hi) = (usize::MAX, 0usize);
+        for (i, px) in data.chunks_exact(4).enumerate() {
+            if px[3] >= 128 {
+                let x = i % w;
+                lo = lo.min(x);
+                hi = hi.max(x);
+            }
+        }
+        if lo == usize::MAX {
+            0
+        } else {
+            (lo + hi) / 2
+        }
+    };
+    // Move 200->1080 (midpoint 640) over [1000ms,5000ms] of a 6s event; sample at 3s.
+    let body = "{\\an5\\move(200,360,1080,360,1000,5000)}X";
+    let src = format!("{HEAD}Dialogue: 0,0:00:00.00,0:00:06.00,Default,,0,0,0,,{body}\n");
+    let script = Script::parse(&src).expect("parse");
+    let mut r =
+        Renderer::new(BackendType::Software, RenderContext::new(1280, 720)).expect("renderer");
+    let frame = r.render_frame(&script, 300).expect("render");
+    let cx = center_x(frame.data(), frame.width() as usize);
+    assert!(
+        (540..=740).contains(&cx),
+        "move should interpolate to ~640 at the window midpoint, got x-center {cx}"
+    );
+}
+
+#[test]
+fn t_tag_interpolates_over_event_duration() {
+    // \t with no explicit times animates across the whole event duration; at
+    // mid-event the value is partway to the target, not snapped to it. Regression:
+    // a zero end-time made progress always 1.0 (instant jump to the final state).
+    let height_of = |t: u32, body: &str| -> usize {
+        let src = format!("{HEAD}Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{body}\n");
+        let script = Script::parse(&src).expect("parse");
+        let mut r =
+            Renderer::new(BackendType::Software, RenderContext::new(1280, 720)).expect("renderer");
+        let frame = r.render_frame(&script, t).expect("render");
+        opaque_bbox_height(frame.data(), frame.width() as usize)
+    };
+    let base = height_of(0, "{\\an5\\pos(640,360)}GROW"); // static, style size
+    let mid = height_of(500, "{\\an5\\pos(640,360)\\t(\\fs120)}GROW"); // 5s of 10s -> partway
+    let near_end = height_of(999, "{\\an5\\pos(640,360)\\t(\\fs120)}GROW"); // ~full
+    assert!(
+        mid > base,
+        "mid \\t(\\fs) height should have grown past base (base={base} mid={mid})"
+    );
+    assert!(
+        mid < near_end,
+        "mid \\t height must be less than the final (not snapped): mid={mid} near_end={near_end}"
+    );
+}
+
+#[test]
 fn multiseg_long_line_wraps_and_colors() {
     // A long line with a mid-line colour change must wrap (preserving the coloured
     // segment) and lay out its segments left-to-right without overlapping.

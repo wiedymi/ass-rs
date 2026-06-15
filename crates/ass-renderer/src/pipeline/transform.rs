@@ -69,26 +69,11 @@ impl TransformAnimation {
 
         let inner = &args[1..args.len() - 1];
 
-        // Find where tags start (after numeric parameters)
-        let mut tag_start = 0;
-        let mut _depth = 0;
-        let in_tag = false;
-
-        for (i, ch) in inner.chars().enumerate() {
-            if ch == '\\' && !in_tag {
-                tag_start = i;
-                break;
-            }
-            if ch == '(' {
-                _depth += 1;
-            } else if ch == ')' {
-                _depth -= 1;
-            }
-        }
-
-        if tag_start == 0 {
-            return None;
-        }
+        // Find where the override tags start (the first backslash). Everything
+        // before it is the numeric parameter list, which is empty for the
+        // `\t(<tags>)` form (tags begin at index 0). No backslash means there are
+        // no tags to animate, so this is not a transform.
+        let tag_start = inner.find('\\')?;
 
         let params = &inner[..tag_start];
         let tags = &inner[tag_start..];
@@ -146,27 +131,27 @@ impl TransformAnimation {
         })
     }
 
-    /// Calculate interpolation progress for current time
-    pub fn calculate_progress(&self, current_ms: u32) -> f32 {
+    /// Calculate interpolation progress for the current time (all in milliseconds
+    /// relative to the event start).
+    ///
+    /// `full_duration_ms` is the event's duration: a `\t` with no explicit end time
+    /// (`\t(tags)` or `\t(accel,tags)`) animates across the whole event, matching
+    /// libass, rather than snapping straight to the target.
+    pub fn calculate_progress(&self, current_ms: u32, full_duration_ms: u32) -> f32 {
+        let end_ms = if self.end_ms > 0 {
+            self.end_ms
+        } else {
+            full_duration_ms
+        };
+
         if current_ms <= self.start_ms {
             return 0.0;
         }
-        if self.end_ms > 0 && current_ms >= self.end_ms {
+        if end_ms <= self.start_ms || current_ms >= end_ms {
             return 1.0;
         }
 
-        let duration = if self.end_ms > 0 {
-            self.end_ms - self.start_ms
-        } else {
-            // Use full line duration if end time not specified
-            current_ms - self.start_ms
-        };
-
-        if duration == 0 {
-            return 1.0;
-        }
-
-        let linear_progress = (current_ms - self.start_ms) as f32 / duration as f32;
+        let linear_progress = (current_ms - self.start_ms) as f32 / (end_ms - self.start_ms) as f32;
 
         // Apply acceleration curve
         apply_acceleration_curve(linear_progress, self.accel)

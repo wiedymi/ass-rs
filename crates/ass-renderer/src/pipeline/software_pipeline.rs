@@ -160,10 +160,16 @@ impl SoftwarePipeline {
         &self,
         tags: &mut ProcessedTags,
         event_start_cs: u32,
+        event_end_cs: u32,
         current_time_cs: u32,
         default_colors: ([u8; 4], [u8; 4], [u8; 4], [u8; 4]), // primary, secondary, outline, shadow
         default_font_size: f32,
     ) {
+        // Event duration in milliseconds: a \t with no explicit end animates over it.
+        let full_duration_ms = event_end_cs
+            .saturating_sub(event_start_cs)
+            .saturating_mul(10);
+
         // Process all transforms (can have multiple)
         for transform_data in &tags.transforms {
             let animation = &transform_data.animation;
@@ -176,7 +182,7 @@ impl SoftwarePipeline {
             };
 
             // Calculate animation progress (expects milliseconds)
-            let progress = animation.calculate_progress(relative_time_ms);
+            let progress = animation.calculate_progress(relative_time_ms, full_duration_ms);
 
             // If animation hasn't started or has finished, we might not need to interpolate
             if progress <= 0.0 || progress >= 1.0 {
@@ -1092,6 +1098,7 @@ impl SoftwarePipeline {
                 self.apply_transform_animations(
                     &mut tags,
                     event_start_cs,
+                    event.end_time_cs().unwrap_or(u32::MAX),
                     time_cs,
                     default_colors,
                     default_font_size_base,
@@ -1633,15 +1640,13 @@ impl SoftwarePipeline {
             let event_start_cs = event.start_time_cs().unwrap_or(0);
             let event_end_cs = event.end_time_cs().unwrap_or(u32::MAX);
 
-            // t1 and t2 are in milliseconds, need to convert to centiseconds
-            let t1_cs = t1 / 10;
-            let t2_cs = t2 / 10;
-
-            // If t1 and t2 are both 0, movement spans the entire event duration
+            // t1/t2 already arrive in centiseconds: the \move parser converted the
+            // tag's milliseconds once. With both zero the movement spans the whole
+            // event duration (libass default).
             let (move_start_cs, move_end_cs) = if t1 == 0 && t2 == 0 {
                 (event_start_cs, event_end_cs)
             } else {
-                (event_start_cs + t1_cs, event_start_cs + t2_cs)
+                (event_start_cs + t1, event_start_cs + t2)
             };
 
             let progress = calculate_move_progress(time_cs, move_start_cs, move_end_cs);
