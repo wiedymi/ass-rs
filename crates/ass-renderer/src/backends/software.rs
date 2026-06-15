@@ -573,25 +573,20 @@ impl SoftwareBackend {
                     }
                 }
                 crate::pipeline::TextEffect::Scale { x, y } => {
-                    // Font Y-scale is already applied to the font size during shaping
-                    // But X-scale needs to be applied as a transform since fonts don't support
-                    // asymmetric scaling through size alone
-                    // Apply X-scale transform if it's different from Y-scale
-                    let x_scale = *x / 100.0;
-                    let y_scale = *y / 100.0;
-
-                    // Apply scale transform
-                    // Note: Y-scale is already partially applied to font size during shaping,
-                    // but we still need to apply the transform for proper scaling
-                    if (x_scale - 1.0).abs() > 0.01 || (y_scale - 1.0).abs() > 0.01 {
-                        // Get the center of the text for scaling
+                    // `\fscy` is baked into the font SIZE during shaping, so the glyph
+                    // arrives scaled by the y-factor on BOTH axes. libass scales the
+                    // axes independently, so here we only correct the HORIZONTAL one:
+                    // dividing `\fscx` by `\fscy` makes the net horizontal scale equal
+                    // `\fscx` while the vertical stays `\fscy`. (For `\fscx` alone, y is
+                    // 100 so this reduces to the plain x-scale; for uniform scaling the
+                    // ratio is 1 and this is a no-op.)
+                    let x_scale = if *y != 0.0 { *x / *y } else { *x / 100.0 };
+                    if (x_scale - 1.0).abs() > 0.01 {
                         let text_center_x = shaped.width / 2.0;
-                        let text_center_y = shaped.height / 2.0 - shaped.baseline;
-
                         base_transform = base_transform
-                            .pre_translate(text_center_x, text_center_y)
-                            .pre_scale(x_scale, 1.0) // X-scale, Y is in font size already
-                            .pre_translate(-text_center_x, -text_center_y);
+                            .pre_translate(text_center_x, 0.0)
+                            .pre_scale(x_scale, 1.0)
+                            .pre_translate(-text_center_x, 0.0);
                     }
                 }
                 crate::pipeline::TextEffect::Shear { x, y } => {

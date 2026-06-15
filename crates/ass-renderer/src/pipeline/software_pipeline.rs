@@ -552,7 +552,15 @@ impl SoftwarePipeline {
         let bold = lead.tags.formatting.bold.unwrap_or(default_bold);
         let italic = lead.tags.formatting.italic.unwrap_or(default_italic);
         let spacing = lead.tags.font.spacing.unwrap_or(default_spacing);
-        let sx = lead.tags.font.scale_x.unwrap_or(default_scale_x) / 100.0;
+        // The shaped advance already carries \fscy (folded into `size`), and the
+        // render's net horizontal scale is \fscx, so the wrap multiplier is the
+        // x/y ratio (reduces to \fscx/100 in the common \fscy=100 case).
+        let scale_y_pct = lead.tags.font.scale_y.unwrap_or(default_scale_y);
+        let sx = if scale_y_pct.abs() > 0.01 {
+            lead.tags.font.scale_x.unwrap_or(default_scale_x) / scale_y_pct
+        } else {
+            lead.tags.font.scale_x.unwrap_or(default_scale_x) / 100.0
+        };
         let advance = |s: &str| {
             shape_text_cached(s, font, size, bold, italic, &self.font_database)
                 .map_or(0.0, |shaped| shaped.width)
@@ -1513,13 +1521,15 @@ impl SoftwarePipeline {
                     }
                 }
 
-                // Add scale effect if X-scale is not 100%
-                // Y-scale is already applied to font size during shaping,
-                // but X-scale needs to be applied as a transform
+                // Add a scale effect when either axis is non-100%. \fscy is folded
+                // into the shaped font size (uniform), so the backend uses the
+                // x/y ratio to correct the horizontal axis; \fscy alone (x=100,
+                // y!=100) still needs the effect so that correction runs.
                 let font_scale_x_val = tags.font.scale_x.unwrap_or(default_scale_x);
                 let font_scale_y_val = tags.font.scale_y.unwrap_or(default_scale_y);
-                if (font_scale_x_val - 100.0).abs() > 0.01 {
-                    // Add scale effect to handle X-scaling
+                if (font_scale_x_val - 100.0).abs() > 0.01
+                    || (font_scale_y_val - 100.0).abs() > 0.01
+                {
                     layer.effects.push(TextEffect::Scale {
                         x: font_scale_x_val,
                         y: font_scale_y_val,

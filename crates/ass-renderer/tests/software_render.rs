@@ -789,6 +789,40 @@ fn t_tag_interpolates_over_event_duration() {
 }
 
 #[test]
+fn fscx_fscy_scale_independently() {
+    // \fscx stretches horizontally only; \fscy vertically only, matching libass's
+    // per-axis scaling. Regression: \fscy was folded into the font size and scaled
+    // uniformly, so the text got both taller AND wider (and thicker-stroked).
+    let dims = |body: &str| -> (usize, usize) {
+        let src = format!("{HEAD}Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{body}\n");
+        let script = Script::parse(&src).expect("parse");
+        let mut r =
+            Renderer::new(BackendType::Software, RenderContext::new(1280, 720)).expect("renderer");
+        let frame = r.render_frame(&script, 100).expect("render");
+        let w = frame.width() as usize;
+        (
+            opaque_bbox_width(frame.data(), w),
+            opaque_bbox_height(frame.data(), w),
+        )
+    };
+    let (bw, bh) = dims("{\\an5\\pos(640,360)}ABC");
+    let (xw, xh) = dims("{\\an5\\pos(640,360)\\fscx200}ABC");
+    let (yw, yh) = dims("{\\an5\\pos(640,360)\\fscy200}ABC");
+
+    // \fscx200: width ~doubles, height stays close to base.
+    assert!(
+        xw > bw + bw / 2 && (xh as i32 - bh as i32).abs() <= bh as i32 / 5,
+        "fscx200 should widen only: base={bw}x{bh} fscx200={xw}x{xh}"
+    );
+    // \fscy200: height ~doubles, width stays close to base (the regression made it
+    // widen too).
+    assert!(
+        yh > bh + bh / 2 && (yw as i32 - bw as i32).abs() <= bw as i32 / 5,
+        "fscy200 should heighten only: base={bw}x{bh} fscy200={yw}x{yh}"
+    );
+}
+
+#[test]
 fn multiseg_long_line_wraps_and_colors() {
     // A long line with a mid-line colour change must wrap (preserving the coloured
     // segment) and lay out its segments left-to-right without overlapping.
