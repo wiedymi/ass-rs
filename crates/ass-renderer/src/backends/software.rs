@@ -441,7 +441,7 @@ impl SoftwareBackend {
             return false;
         };
 
-        let blur_size = (radius * 2.0).ceil();
+        let blur_size = (radius * 3.0).ceil();
         let x = data.x - blur_size;
         // The tile's baseline sits at `blur_size + ascent` from its top (see the
         // blur branch's temp_transform), so the tile origin lands here.
@@ -883,7 +883,7 @@ impl SoftwareBackend {
                 // If edge blur is needed, render outline to temporary pixmap first
                 if let Some(blur_radius) = edge_blur_radius {
                     if blur_radius > 0.0 {
-                        let blur_size = (blur_radius * 2.0).ceil() as u32;
+                        let blur_size = (blur_radius * 3.0).ceil() as u32;
                         let outline_width =
                             (shaped.width + blur_size as f32 * 2.0 + *width * 2.0).ceil() as u32;
                         let outline_height =
@@ -918,7 +918,7 @@ impl SoftwareBackend {
                             }
 
                             // Apply blur to the outline
-                            apply_box_blur(&mut temp_pixmap, blur_radius);
+                            apply_gaussian_blur(&mut temp_pixmap, blur_radius);
 
                             // Draw blurred outline to main pixmap
                             let blend_transform = base_transform.pre_translate(
@@ -988,8 +988,10 @@ impl SoftwareBackend {
 
         // Apply blur if needed
         if let Some(radius) = blur_radius {
-            // Create a temporary pixmap for blurred text
-            let blur_size = (radius * 2.0).ceil() as u32;
+            // Create a temporary pixmap for blurred text. The padding must contain
+            // the full Gaussian kernel (~3*sigma) or the soft tail is clipped and
+            // the blurred glyph loses mass at larger radii.
+            let blur_size = (radius * 3.0).ceil() as u32;
             let text_width = (shaped.width + blur_size as f32 * 2.0).ceil() as u32;
             let text_height = (shaped.height + blur_size as f32 * 2.0).ceil() as u32;
 
@@ -1122,7 +1124,7 @@ impl SoftwareBackend {
                 }
 
                 // Apply simple box blur
-                apply_box_blur(&mut temp_pixmap, radius);
+                apply_gaussian_blur(&mut temp_pixmap, radius);
 
                 let tile = std::sync::Arc::new(BlurTile {
                     data: std::sync::Arc::new(temp_pixmap.data().to_vec()),
@@ -1891,96 +1893,85 @@ fn project_path_3d(
 }
 
 /// Apply a simple box blur to a pixmap
-fn apply_box_blur(pixmap: &mut Pixmap, radius: f32) {
-    if radius <= 0.0 {
+fn apply_gaussian_blur(pixmap: &mut Pixmap, blur: f32) {
+    if blur <= 0.0 {
         return;
     }
 
-    // A single separable box blur. The oracle confirms this already tracks libass's
-    // Gaussian to within the AA noise floor (<=0.54% even at radius 20); a 3-pass
-    // Gaussian approximation gained ~0.02% for 3x the cost, so it is not used.
-    //
-    // Implemented as a sliding-window (running-sum) blur: each pass keeps a window
-    // sum and, per pixel, subtracts the leaving sample and adds the entering one
-    // instead of re-summing all `2r+1` taps. That makes it O(pixels) rather than
-    // O(pixels * radius) — the box blur was ~76% of blurred-text render time — and
-    // is bit-identical, since the window is the same clamp-to-edge `2r+1` integer
-    // sum divided by the same count, just accumulated incrementally.
-    let radius = radius.round() as i32;
+    // A true separable Gaussian, matching libass. libass maps the `\blur` value to a
+    // Gaussian std-dev via blur_radius_scale = 2/sqrt(ln 256) times the
+    // storage->display blur_scale (ass_render.c:2539). Calibrated against the FFI
+    // oracle, the effective factor at a 1:1 render is 1/sqrt(ln 256) ~= 0.425 (the
+    // blur_scale contributes the remaining ~0.5), so `\blur8` is sigma ~= 3.4px. A
+    // flat box blur lowers the peak and washes the glyph centre out at larger radii;
+    // the Gaussian keeps a bright centre with a soft falloff. Applied to glyph-sized
+    // temp pixmaps, so the per-tap cost stays small.
+    let sigma = blur * (1.0 / 256.0_f32.ln().sqrt());
+    if sigma <= 0.0 {
+        return;
+    }
+    let radius = (sigma * 3.0).ceil() as i32;
     let width = pixmap.width() as i32;
     let height = pixmap.height() as i32;
-    if width == 0 || height == 0 {
+    if radius < 1 || width == 0 || height == 0 {
         return;
     }
+
+    // Normalised 1D Gaussian kernel.
+    let inv_two_sigma_sq = 1.0 / (2.0 * sigma * sigma);
+    let mut kernel = vec![0f32; (2 * radius + 1) as usize];
+    let mut sum = 0f32;
+    for (i, k) in kernel.iter_mut().enumerate() {
+        let x = i as i32 - radius;
+        let v = (-((x * x) as f32) * inv_two_sigma_sq).exp();
+        *k = v;
+        sum += v;
+    }
+    for k in &mut kernel {
+        *k /= sum;
+    }
+
+    let stride = width as usize * 4;
     let data = pixmap.data_mut();
-    let count = (2 * radius + 1) as u32;
     let mut temp = vec![0u8; data.len()];
 
-    // Horizontal pass (data -> temp): one running window per row.
+    // Horizontal pass (data -> temp).
     for y in 0..height {
-        let row = (y * width) as usize * 4;
-        let mut s = [0u32; 4];
-        for dx in -radius..=radius {
-            let sx = dx.clamp(0, width - 1) as usize;
-            let i = row + sx * 4;
-            for (acc, &v) in s.iter_mut().zip(&data[i..i + 4]) {
-                *acc += u32::from(v);
-            }
-        }
+        let row = y as usize * stride;
         for x in 0..width {
-            let o = row + x as usize * 4;
-            for (dst, &acc) in temp[o..o + 4].iter_mut().zip(&s) {
-                *dst = (acc / count) as u8;
-            }
-            if x + 1 < width {
-                let rem = row + (x - radius).clamp(0, width - 1) as usize * 4;
-                let add = row + (x + 1 + radius).clamp(0, width - 1) as usize * 4;
-                for c in 0..4 {
-                    s[c] = s[c] - u32::from(data[rem + c]) + u32::from(data[add + c]);
+            let mut acc = [0f32; 4];
+            for (ki, &kw) in kernel.iter().enumerate() {
+                let sx = (x + ki as i32 - radius).clamp(0, width - 1) as usize;
+                let i = row + sx * 4;
+                for (a, &v) in acc.iter_mut().zip(&data[i..i + 4]) {
+                    *a += kw * f32::from(v);
                 }
+            }
+            let o = row + x as usize * 4;
+            for (dst, &a) in temp[o..o + 4].iter_mut().zip(&acc) {
+                *dst = a.round().clamp(0.0, 255.0) as u8;
             }
         }
     }
 
-    // Vertical pass (temp -> data): one running window per column.
-    let stride = width as usize * 4;
+    // Vertical pass (temp -> data).
     for x in 0..width {
         let col = x as usize * 4;
-        let mut s = [0u32; 4];
-        for dy in -radius..=radius {
-            let sy = dy.clamp(0, height - 1) as usize;
-            let i = sy * stride + col;
-            for (acc, &v) in s.iter_mut().zip(&temp[i..i + 4]) {
-                *acc += u32::from(v);
-            }
-        }
         for y in 0..height {
-            let o = y as usize * stride + col;
-            for (dst, &acc) in data[o..o + 4].iter_mut().zip(&s) {
-                *dst = (acc / count) as u8;
-            }
-            if y + 1 < height {
-                let rem = (y - radius).clamp(0, height - 1) as usize * stride + col;
-                let add = (y + 1 + radius).clamp(0, height - 1) as usize * stride + col;
-                for c in 0..4 {
-                    s[c] = s[c] - u32::from(temp[rem + c]) + u32::from(temp[add + c]);
+            let mut acc = [0f32; 4];
+            for (ki, &kw) in kernel.iter().enumerate() {
+                let sy = (y + ki as i32 - radius).clamp(0, height - 1) as usize;
+                let i = sy * stride + col;
+                for (a, &v) in acc.iter_mut().zip(&temp[i..i + 4]) {
+                    *a += kw * f32::from(v);
                 }
             }
+            let o = y as usize * stride + col;
+            for (dst, &a) in data[o..o + 4].iter_mut().zip(&acc) {
+                *dst = a.round().clamp(0.0, 255.0) as u8;
+            }
         }
     }
-}
-
-/// Apply optimized box blur using SIMD when available
-#[cfg(feature = "simd")]
-#[allow(dead_code)] // Placeholder for future SIMD optimization
-fn apply_box_blur_simd(pixmap: &mut Pixmap, radius: f32) {
-    if radius <= 0.0 {
-        return;
-    }
-
-    // Use SIMD instructions for faster blur
-    // This is a placeholder - real SIMD implementation would use intrinsics
-    apply_box_blur(pixmap, radius);
 }
 
 impl RenderBackend for SoftwareBackend {
