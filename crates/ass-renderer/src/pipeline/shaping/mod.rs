@@ -52,6 +52,12 @@ pub struct ShapedText {
     pub ascent: f32,
     /// Font descent (for underline/strikeout positioning)
     pub descent: f32,
+    /// Left edge of the inked glyph outlines (the first glyph's left side bearing).
+    /// libass measures line widths from ink extents, not advances, so wrapping uses
+    /// `width - ink_min - (width - ink_max)` to match its break points.
+    pub ink_min: f32,
+    /// Right edge of the inked glyph outlines.
+    pub ink_max: f32,
 }
 
 impl ShapedText {
@@ -257,6 +263,24 @@ pub fn shape_text_with_style(
     let descent = metrics.descender * scale;
     let height = ascent - descent;
 
+    // Ink extents: the union of each glyph's outline bbox placed at its pen
+    // position. libass wraps on ink width (x_max - x_min), which is narrower than
+    // the advance sum by the leading/trailing side bearings — enough to flip a
+    // borderline line's break count.
+    let (mut ink_min, mut ink_max) = (f32::INFINITY, f32::NEG_INFINITY);
+    for glyph in &glyphs {
+        if let Some(bbox) = ttf_face.glyph_bounding_box(ttf_parser::GlyphId(glyph.glyph_id as u16))
+        {
+            ink_min = ink_min.min(glyph.x_position + f32::from(bbox.x_min) * scale);
+            ink_max = ink_max.max(glyph.x_position + f32::from(bbox.x_max) * scale);
+        }
+    }
+    if ink_min > ink_max {
+        // No inked glyphs (e.g. all spaces): fall back to the advance box.
+        ink_min = 0.0;
+        ink_max = cursor_x;
+    }
+
     Ok(ShapedText {
         width: cursor_x,
         height,
@@ -265,6 +289,8 @@ pub fn shape_text_with_style(
         glyphs,
         ascent,
         descent,
+        ink_min,
+        ink_max,
     })
 }
 

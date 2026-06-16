@@ -532,7 +532,14 @@ impl SoftwarePipeline {
             }
         }
         let full: String = chars.iter().collect();
-        let words: Vec<&str> = full.split(' ').collect();
+        let mut words: Vec<&str> = full.split(' ').collect();
+        // Drop empty tokens from a trailing space (e.g. "...land, \N"): libass trims
+        // trailing whitespace before measuring, so it must not count toward the wrap
+        // width or it can force a spurious extra break. The space stays in the
+        // rendered (invisible) line tail via the char-range rebuild below.
+        while words.len() > 1 && words.last().is_some_and(|w| w.is_empty()) {
+            words.pop();
+        }
         if words.len() <= 1 {
             return vec![line.to_vec()];
         }
@@ -561,24 +568,34 @@ impl SoftwarePipeline {
         } else {
             lead.tags.font.scale_x.unwrap_or(default_scale_x) / 100.0
         };
-        let advance = |s: &str| {
+        let measure = |s: &str| -> (f32, f32, f32) {
+            // (advance, ink_min, ink_max)
             shape_text_cached(s, font, size, bold, italic, &self.font_database)
-                .map_or(0.0, |shaped| shaped.width)
+                .map_or((0.0, 0.0, 0.0), |sh| (sh.width, sh.ink_min, sh.ink_max))
         };
-        let word_adv: Vec<f32> = words.iter().map(|w| advance(w)).collect();
+        let word_m: Vec<(f32, f32, f32)> = words.iter().map(|w| measure(w)).collect();
+        let word_adv: Vec<f32> = word_m.iter().map(|m| m.0).collect();
+        // Per-word side bearings: lead = ink left edge, trail = advance - ink right.
+        // libass measures a line on ink width (x_max - x_min), which is the advance
+        // box minus the first word's lead and the last word's trail.
+        let word_lead: Vec<f32> = word_m.iter().map(|m| m.1).collect();
+        let word_trail: Vec<f32> = word_m.iter().map(|m| (m.0 - m.2).max(0.0)).collect();
         let word_glyphs: Vec<usize> = words.iter().map(|w| w.chars().count()).collect();
         // Advance of one space glyph, isolated from neighbouring side bearings.
-        let space_adv = (advance("x x") - advance("xx")).max(0.0);
+        let space_adv = (measure("x x").0 - measure("xx").0).max(0.0);
 
-        // Rendered width of a contiguous run: advances + spacing between glyphs,
-        // scaled by `\fscx`, matching software.rs glyph placement.
-        let run_width = |adv: f32, glyphs: usize| -> f32 {
-            sx * (adv + spacing * glyphs.saturating_sub(1) as f32)
+        // Ink width of a contiguous run of words [start..=end]: advances plus the
+        // inter-glyph spacing, scaled by `\fscx`, minus the run's leading/trailing
+        // side bearings (so it matches libass's ink-extent wrap threshold).
+        let line_ink = |adv: f32, glyphs: usize, start: usize, end: usize| -> f32 {
+            let advance_box = adv + spacing * glyphs.saturating_sub(1) as f32;
+            sx * (advance_box - word_lead[start] - word_trail[end])
         };
 
         // Greedily pack words under `limit`, returning word indices that start a line.
         let fill = |limit: f32| -> Vec<usize> {
             let mut starts: Vec<usize> = Vec::new();
+            let mut line_start = 0usize;
             let mut cur_adv = 0.0;
             let mut cur_glyphs = 0usize;
             let mut started = false;
@@ -588,8 +605,11 @@ impl SoftwarePipeline {
                 } else {
                     (word_adv[i], word_glyphs[i])
                 };
-                if started && run_width(cur_adv + add_adv, cur_glyphs + add_glyphs) > limit {
+                if started
+                    && line_ink(cur_adv + add_adv, cur_glyphs + add_glyphs, line_start, i) > limit
+                {
                     starts.push(i);
+                    line_start = i;
                     cur_adv = word_adv[i];
                     cur_glyphs = word_glyphs[i];
                 } else {
@@ -611,7 +631,7 @@ impl SoftwarePipeline {
         let line_starts: Vec<usize> = if balance {
             let target = base.len();
             let max_word = (0..words.len())
-                .map(|i| run_width(word_adv[i], word_glyphs[i]))
+                .map(|i| line_ink(word_adv[i], word_glyphs[i], i, i))
                 .fold(0.0_f32, f32::max);
             let (mut lo, mut hi) = (max_word, max_width);
             for _ in 0..24 {
