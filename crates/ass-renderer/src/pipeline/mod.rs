@@ -177,8 +177,13 @@ pub enum TextEffect {
     Underline,
     /// Strikethrough
     Strikethrough,
-    /// Outline with color and width
-    Outline { color: [u8; 4], width: f32 },
+    /// Outline with color and per-axis width (`\bord`/`\xbord`/`\ybord`). For the
+    /// common symmetric case `width_x == width_y`.
+    Outline {
+        color: [u8; 4],
+        width_x: f32,
+        width_y: f32,
+    },
     /// Shadow with color and offset
     Shadow {
         color: [u8; 4],
@@ -217,6 +222,10 @@ pub enum TextEffect {
         inverse: bool,
     },
     /// Opaque box behind the text (`BorderStyle: 3`), drawn in the outline
-    /// colour with `padding` pixels around the glyph bounds.
-    OpaqueBox { color: [u8; 4], padding: f32 },
+    /// colour with per-axis padding around the glyph bounds.
+    OpaqueBox {
+        color: [u8; 4],
+        padding_x: f32,
+        padding_y: f32,
+    },
 }

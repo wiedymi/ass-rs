@@ -839,6 +839,34 @@ fn shadow_uses_full_offset_and_border() {
 }
 
 #[test]
+fn per_axis_border_grows_each_axis_independently() {
+    // \xbord/\ybord grow the border per axis. Regression: both collapsed to max(),
+    // making an asymmetric border square.
+    let dims = |body: &str| -> (usize, usize) {
+        let src = format!("{HEAD}Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{body}\n");
+        let script = Script::parse(&src).expect("parse");
+        let mut r =
+            Renderer::new(BackendType::Software, RenderContext::new(1280, 720)).expect("renderer");
+        let frame = r.render_frame(&script, 100).expect("render");
+        let w = frame.width() as usize;
+        (
+            opaque_bbox_width(frame.data(), w),
+            opaque_bbox_height(frame.data(), w),
+        )
+    };
+    let (wx, hx) = dims("{\\an5\\pos(640,360)\\xbord16\\ybord1}HH");
+    let (wy, hy) = dims("{\\an5\\pos(640,360)\\xbord1\\ybord16}HH");
+    assert!(
+        wx > wy,
+        "\\xbord16 should be wider than \\ybord16 (wx={wx} wy={wy})"
+    );
+    assert!(
+        hy > hx,
+        "\\ybord16 should be taller than \\xbord16 (hx={hx} hy={hy})"
+    );
+}
+
+#[test]
 fn frx_applies_vertical_perspective() {
     // \frx rotates about the X axis: a true perspective projection foreshortens the
     // text vertically (and the far edge converges). Regression guard against the old

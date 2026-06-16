@@ -1471,17 +1471,19 @@ impl SoftwarePipeline {
                 let border_style = style
                     .and_then(|s| s.border_style.trim().parse::<u8>().ok())
                     .unwrap_or(1);
-                let border_width = outline_width_x.max(outline_width_y);
                 if border_style == 3 {
-                    // BorderStyle 3: opaque box behind the text in the outline colour.
+                    // BorderStyle 3: opaque box behind the text in the outline colour,
+                    // padded per-axis (\xbord/\ybord).
                     layer.effects.push(TextEffect::OpaqueBox {
                         color: outline_color,
-                        padding: border_width,
+                        padding_x: outline_width_x,
+                        padding_y: outline_width_y,
                     });
                 } else if outline_width_x > 0.0 || outline_width_y > 0.0 {
                     layer.effects.push(TextEffect::Outline {
                         color: outline_color,
-                        width: border_width, // Use max for now
+                        width_x: outline_width_x,
+                        width_y: outline_width_y,
                     });
                 }
 

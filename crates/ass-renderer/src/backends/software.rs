@@ -307,7 +307,7 @@ impl SoftwareBackend {
                 pixmap_h,
                 cached,
                 (anchor_x, anchor_y),
-                (outline.map(|(c, _)| c), shadow_paint, fill_color),
+                (outline.map(|(c, _, _)| c), shadow_paint, fill_color),
                 karaoke_sweep,
             );
             true
@@ -333,7 +333,8 @@ impl SoftwareBackend {
 
         RUN_COVERAGE.with(|cache| {
             if !cache.borrow().contains_key(&key) {
-                let cached = rasterize_run_coverage(paths, local, outline.map(|(_, w)| w));
+                let cached =
+                    rasterize_run_coverage(paths, local, outline.map(|(_, wx, wy)| (wx, wy)));
                 let mut map = cache.borrow_mut();
                 // Bound memory: continuously geometry-animated layers produce a
                 // fresh key every frame, so drop the cache when it grows large
@@ -360,7 +361,7 @@ impl SoftwareBackend {
                     pixmap_h,
                     cached,
                     (anchor_x, anchor_y),
-                    (outline.map(|(c, _)| c), shadow_paint, fill_color),
+                    (outline.map(|(c, _, _)| c), shadow_paint, fill_color),
                     karaoke_sweep,
                 );
             }
@@ -413,7 +414,11 @@ impl SoftwareBackend {
             return false;
         };
         let outline_info = data.effects.iter().find_map(|e| match e {
-            TextEffect::Outline { color, width } => Some((*color, *width)),
+            TextEffect::Outline {
+                color,
+                width_x,
+                width_y,
+            } => Some((*color, *width_x, *width_y)),
             _ => None,
         });
         let shadow_info = data.effects.iter().find_map(|e| match e {
@@ -434,7 +439,7 @@ impl SoftwareBackend {
             italic,
             blur: radius.to_bits(),
             fill: data.color,
-            outline: outline_info.map(|(c, w)| (w.to_bits(), c)),
+            outline: outline_info.map(|(c, wx, wy)| (wx.to_bits(), wy.to_bits(), c)),
             shadow: shadow_info.map(|(c, x, y)| (c, x.to_bits(), y.to_bits())),
         };
         let Some(tile) = BLUR_TILES.with(|c| c.borrow().get(&key).cloned()) else {
@@ -736,8 +741,13 @@ impl SoftwareBackend {
             }
         });
         let outline_info = data.effects.iter().find_map(|e| {
-            if let crate::pipeline::TextEffect::Outline { color, width } = e {
-                Some((*color, *width))
+            if let crate::pipeline::TextEffect::Outline {
+                color,
+                width_x,
+                width_y,
+            } = e
+            {
+                Some((*color, *width_x, *width_y))
             } else {
                 None
             }
@@ -783,15 +793,8 @@ impl SoftwareBackend {
                     // too. Without this the shadow is thinner than libass's by the
                     // border width (and inconsistent with the \blur branch, which
                     // already includes it).
-                    if let Some((_, owidth)) = outline_info {
-                        let stroke = tiny_skia::Stroke {
-                            width: owidth * 2.0,
-                            line_cap: tiny_skia::LineCap::Square,
-                            line_join: tiny_skia::LineJoin::Miter,
-                            ..Default::default()
-                        };
-                        let mut stroker = tiny_skia::PathStroker::new();
-                        if let Some(stroked) = stroker.stroke(&merged, &stroke, 1.0) {
+                    if let Some((_, owx, owy)) = outline_info {
+                        if let Some(stroked) = stroke_outline(&merged, owx, owy) {
                             self.pixmap.fill_path(
                                 &stroked,
                                 &shadow_paint,
@@ -815,7 +818,12 @@ impl SoftwareBackend {
         // Draw opaque box (BorderStyle 3) behind the text, covering the glyph
         // bounds expanded by the padding, in the outline colour.
         for effect in &data.effects {
-            if let crate::pipeline::TextEffect::OpaqueBox { color, padding } = effect {
+            if let crate::pipeline::TextEffect::OpaqueBox {
+                color,
+                padding_x,
+                padding_y,
+            } = effect
+            {
                 let mut bounds: Option<tiny_skia::Rect> = None;
                 for path in &paths {
                     if let Some(t) = path.clone().transform(base_transform) {
@@ -834,10 +842,10 @@ impl SoftwareBackend {
                 }
                 if let Some(b) = bounds {
                     if let Some(rect) = tiny_skia::Rect::from_ltrb(
-                        b.left() - *padding,
-                        b.top() - *padding,
-                        b.right() + *padding,
-                        b.bottom() + *padding,
+                        b.left() - *padding_x,
+                        b.top() - *padding_y,
+                        b.right() + *padding_x,
+                        b.bottom() + *padding_y,
                     ) {
                         let mut box_paint = tiny_skia::Paint::default();
                         box_paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
@@ -865,47 +873,44 @@ impl SoftwareBackend {
 
         // Draw outline if present
         for effect in &data.effects {
-            if let crate::pipeline::TextEffect::Outline { color, width } = effect {
+            if let crate::pipeline::TextEffect::Outline {
+                color,
+                width_x,
+                width_y,
+            } = effect
+            {
                 let mut outline_paint = tiny_skia::Paint::default();
                 outline_paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
                 outline_paint.anti_alias = true;
                 outline_paint.blend_mode = tiny_skia::BlendMode::SourceOver;
 
-                // Create stroke configuration for path expansion. 2x: a centred
-                // stroke's outward extent is width/2; match libass's outward grow.
-                let stroke = tiny_skia::Stroke {
-                    width: *width * 2.0,
-                    line_cap: tiny_skia::LineCap::Square,
-                    line_join: tiny_skia::LineJoin::Miter,
-                    ..Default::default()
-                };
+                // `width` (the larger axis) sizes the temp pixmap and offsets; the
+                // stroke itself grows per-axis via stroke_outline.
+                let width = width_x.max(*width_y);
 
                 // If edge blur is needed, render outline to temporary pixmap first
                 if let Some(blur_radius) = edge_blur_radius {
                     if blur_radius > 0.0 {
                         let blur_size = (blur_radius * 3.0).ceil() as u32;
                         let outline_width =
-                            (shaped.width + blur_size as f32 * 2.0 + *width * 2.0).ceil() as u32;
+                            (shaped.width + blur_size as f32 * 2.0 + width * 2.0).ceil() as u32;
                         let outline_height =
-                            (shaped.height + blur_size as f32 * 2.0 + *width * 2.0).ceil() as u32;
+                            (shaped.height + blur_size as f32 * 2.0 + width * 2.0).ceil() as u32;
 
                         if let Some(mut temp_pixmap) = Pixmap::new(outline_width, outline_height) {
                             temp_pixmap.fill(tiny_skia::Color::TRANSPARENT);
 
                             // Draw outline to temporary pixmap
                             let temp_transform = Transform::from_translate(
-                                blur_size as f32 + *width,
-                                blur_size as f32 + *width,
+                                blur_size as f32 + width,
+                                blur_size as f32 + width,
                             );
 
-                            let mut stroker = tiny_skia::PathStroker::new();
                             for path in &paths {
                                 if let Some(transformed) = path.clone().transform(temp_transform) {
-                                    // Expand the path to create an outline shape
                                     if let Some(outlined_path) =
-                                        stroker.stroke(&transformed, &stroke, 1.0)
+                                        stroke_outline(&transformed, *width_x, *width_y)
                                     {
-                                        // Fill the expanded outline path
                                         temp_pixmap.fill_path(
                                             &outlined_path,
                                             &outline_paint,
@@ -922,8 +927,8 @@ impl SoftwareBackend {
 
                             // Draw blurred outline to main pixmap
                             let blend_transform = base_transform.pre_translate(
-                                -(blur_size as f32) - *width,
-                                -(blur_size as f32) - *width,
+                                -(blur_size as f32) - width,
+                                -(blur_size as f32) - width,
                             );
 
                             let paint = tiny_skia::PixmapPaint {
@@ -948,8 +953,7 @@ impl SoftwareBackend {
                     // skipped — the outline goes into the blur temp below so it
                     // blurs together with the fill.)
                     if let Some(ref merged) = merged_base {
-                        let mut stroker = tiny_skia::PathStroker::new();
-                        if let Some(outlined_path) = stroker.stroke(merged, &stroke, 1.0) {
+                        if let Some(outlined_path) = stroke_outline(merged, *width_x, *width_y) {
                             self.pixmap.fill_path(
                                 &outlined_path,
                                 &outline_paint,
@@ -1008,7 +1012,7 @@ impl SoftwareBackend {
                 italic,
                 blur: radius.to_bits(),
                 fill: data.color,
-                outline: outline_info.map(|(c, w)| (w.to_bits(), c)),
+                outline: outline_info.map(|(c, wx, wy)| (wx.to_bits(), wy.to_bits(), c)),
                 shadow: shadow_info.map(|(c, x, y)| (c, x.to_bits(), y.to_bits())),
             });
 
@@ -1047,17 +1051,10 @@ impl SoftwareBackend {
                     // (BSOD block font) drawn shadow-only with `\bord12`; the 12px
                     // border is what merges them into a solid box, so a fill-only
                     // shadow collapsed it to bare glyph blobs.
-                    if let Some((_, owidth)) = outline_info {
-                        let stroke = tiny_skia::Stroke {
-                            width: owidth * 2.0,
-                            line_cap: tiny_skia::LineCap::Square,
-                            line_join: tiny_skia::LineJoin::Miter,
-                            ..Default::default()
-                        };
-                        let mut stroker = tiny_skia::PathStroker::new();
+                    if let Some((_, owx, owy)) = outline_info {
                         for path in &paths {
                             if let Some(t) = path.clone().transform(shadow_transform) {
-                                if let Some(outlined) = stroker.stroke(&t, &stroke, 1.0) {
+                                if let Some(outlined) = stroke_outline(&t, owx, owy) {
                                     temp_pixmap.fill_path(
                                         &outlined,
                                         &shadow_paint,
@@ -1081,25 +1078,16 @@ impl SoftwareBackend {
                         }
                     }
                 }
-                if let Some((ocolor, owidth)) = outline_info {
+                if let Some((ocolor, owx, owy)) = outline_info {
                     let mut outline_paint = tiny_skia::Paint {
                         anti_alias: true,
                         blend_mode: tiny_skia::BlendMode::SourceOver,
                         ..Default::default()
                     };
                     outline_paint.set_color_rgba8(ocolor[0], ocolor[1], ocolor[2], ocolor[3]);
-                    let stroke = tiny_skia::Stroke {
-                        // 2x: a centred stroke's outward extent is width/2; match
-                        // libass's outward border grow (see rasterize_run_coverage).
-                        width: owidth * 2.0,
-                        line_cap: tiny_skia::LineCap::Square,
-                        line_join: tiny_skia::LineJoin::Miter,
-                        ..Default::default()
-                    };
-                    let mut stroker = tiny_skia::PathStroker::new();
                     for path in &paths {
                         if let Some(transformed) = path.clone().transform(temp_transform) {
-                            if let Some(outlined) = stroker.stroke(&transformed, &stroke, 1.0) {
+                            if let Some(outlined) = stroke_outline(&transformed, owx, owy) {
                                 temp_pixmap.fill_path(
                                     &outlined,
                                     &outline_paint,
@@ -1371,7 +1359,7 @@ struct RunCoverageKey {
     spacing: u32,
     bold: bool,
     italic: bool,
-    outline: Option<u32>,
+    outline: Option<(u32, u32)>,
     shadow: Option<(u32, u32)>,
     transform: [u32; 6],
 }
@@ -1393,7 +1381,7 @@ struct BlurTileKey {
     italic: bool,
     blur: u32,
     fill: [u8; 4],
-    outline: Option<(u32, [u8; 4])>,
+    outline: Option<(u32, u32, [u8; 4])>,
     shadow: Option<([u8; 4], u32, u32)>,
 }
 
@@ -1422,7 +1410,7 @@ struct CachedCoverage {
 fn rasterize_run_coverage(
     paths: &[tiny_skia::Path],
     local: Transform,
-    outline_width: Option<f32>,
+    outline_width: Option<(f32, f32)>,
 ) -> CachedCoverage {
     use crate::backends::coverage::CoverageTile;
 
@@ -1432,19 +1420,10 @@ fn rasterize_run_coverage(
     let fill = merged.as_ref().and_then(CoverageTile::rasterize);
     let outline = outline_width
         .zip(merged.as_ref())
-        .and_then(|(width, merged)| {
-            let stroke = tiny_skia::Stroke {
-                // libass grows the glyph outward by the border width; a tiny-skia
-                // stroke is centred on the path (half of it hidden under the
-                // fill), so the visible outward extent is width/2. Use 2x the
-                // border so the outward extent matches libass (verified: a 4.2px
-                // `\bord` then renders at libass's height instead of ~0.3x of it).
-                width: width * 2.0,
-                line_cap: tiny_skia::LineCap::Square,
-                line_join: tiny_skia::LineJoin::Miter,
-                ..Default::default()
-            };
-            let outlined = tiny_skia::PathStroker::new().stroke(merged, &stroke, 1.0)?;
+        .and_then(|((wx, wy), merged)| {
+            // libass grows the glyph outward by the per-axis border (\xbord/\ybord);
+            // stroke_outline produces that (uniform for the symmetric case).
+            let outlined = stroke_outline(merged, wx, wy)?;
             CoverageTile::rasterize(&outlined)
         });
     CachedCoverage { fill, outline }
@@ -1498,7 +1477,9 @@ fn text_vector_dirty_bbox(
     let (mut outline, mut shadow, mut blur) = (0.0_f32, 0.0_f32, 0.0_f32);
     for effect in &data.effects {
         match effect {
-            TextEffect::Outline { width, .. } => outline = outline.max(*width),
+            TextEffect::Outline {
+                width_x, width_y, ..
+            } => outline = outline.max(width_x.max(*width_y)),
             TextEffect::Shadow {
                 x_offset, y_offset, ..
             } => shadow = shadow.max(x_offset.abs()).max(y_offset.abs()),
@@ -1548,7 +1529,7 @@ fn coverage_key(
     baseline_y: f32,
 ) -> Option<(
     RunCoverageKey,
-    Option<([u8; 4], f32)>,
+    Option<([u8; 4], f32, f32)>,
     Option<([u8; 4], f32, f32)>,
     Transform,
     [u8; 4],
@@ -1556,7 +1537,7 @@ fn coverage_key(
 )> {
     use crate::pipeline::TextEffect;
 
-    let mut outline: Option<([u8; 4], f32)> = None;
+    let mut outline: Option<([u8; 4], f32, f32)> = None;
     let mut shadow: Option<([u8; 4], f32, f32)> = None;
     let mut bold = false;
     let mut italic = false;
@@ -1569,7 +1550,11 @@ fn coverage_key(
     let mut karaoke_sweep: Option<(f32, [u8; 4])> = None;
     for effect in &data.effects {
         match effect {
-            TextEffect::Outline { color, width } => outline = Some((*color, *width)),
+            TextEffect::Outline {
+                color,
+                width_x,
+                width_y,
+            } => outline = Some((*color, *width_x, *width_y)),
             TextEffect::Shadow {
                 color,
                 x_offset,
@@ -1607,7 +1592,7 @@ fn coverage_key(
         spacing: data.spacing.to_bits(),
         bold,
         italic,
-        outline: outline.map(|(_, w)| w.to_bits()),
+        outline: outline.map(|(_, wx, wy)| (wx.to_bits(), wy.to_bits())),
         shadow: shadow.map(|(_, x, y)| (x.to_bits(), y.to_bits())),
         transform: [
             local.sx.to_bits(),
@@ -1835,6 +1820,31 @@ fn merge_transformed(paths: &[tiny_skia::Path], transform: Transform) -> Option<
         }
     }
     builder.finish()
+}
+
+/// Stroke a glyph path to its outline, growing it outward by `wx` horizontally
+/// and `wy` vertically (`\xbord`/`\ybord`). tiny-skia strokes uniformly, so an
+/// asymmetric border is produced by stroking in a vertically-scaled space and
+/// scaling back. The symmetric case (`wx == wy`, almost all content) is a plain
+/// uniform stroke. The stroke width is doubled to match libass's outward grow.
+#[cfg(not(feature = "nostd"))]
+fn stroke_outline(path: &tiny_skia::Path, wx: f32, wy: f32) -> Option<tiny_skia::Path> {
+    let mk = |w: f32| tiny_skia::Stroke {
+        width: w * 2.0,
+        line_cap: tiny_skia::LineCap::Square,
+        line_join: tiny_skia::LineJoin::Miter,
+        ..Default::default()
+    };
+    let mut stroker = tiny_skia::PathStroker::new();
+    if (wx - wy).abs() < 0.05 || wx <= 0.0 || wy <= 0.0 {
+        return stroker.stroke(path, &mk(wx.max(wy)), 1.0);
+    }
+    // Stroke uniformly with radius wx in a space scaled by (1, wx/wy), then undo
+    // the scale: the vertical extent becomes wy while the horizontal stays wx.
+    let sy = wx / wy;
+    let scaled = path.clone().transform(Transform::from_scale(1.0, sy))?;
+    let stroked = stroker.stroke(&scaled, &mk(wx), 1.0)?;
+    stroked.transform(Transform::from_scale(1.0, 1.0 / sy))
 }
 
 /// Project a screen-space path through a 3D rotation (`\frx`/`\fry`) and a pinhole
