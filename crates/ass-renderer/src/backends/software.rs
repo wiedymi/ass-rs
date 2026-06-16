@@ -778,6 +778,29 @@ impl SoftwareBackend {
                 let shadow_transform = base_transform.pre_translate(x_offset, y_offset);
 
                 if let Some(merged) = merge_transformed(&paths, shadow_transform) {
+                    // libass's shadow is the silhouette of the FINAL glyph (fill +
+                    // border), so when there is an outline, stroke it into the shadow
+                    // too. Without this the shadow is thinner than libass's by the
+                    // border width (and inconsistent with the \blur branch, which
+                    // already includes it).
+                    if let Some((_, owidth)) = outline_info {
+                        let stroke = tiny_skia::Stroke {
+                            width: owidth * 2.0,
+                            line_cap: tiny_skia::LineCap::Square,
+                            line_join: tiny_skia::LineJoin::Miter,
+                            ..Default::default()
+                        };
+                        let mut stroker = tiny_skia::PathStroker::new();
+                        if let Some(stroked) = stroker.stroke(&merged, &stroke, 1.0) {
+                            self.pixmap.fill_path(
+                                &stroked,
+                                &shadow_paint,
+                                tiny_skia::FillRule::Winding,
+                                Transform::identity(),
+                                clip_mask.as_ref(),
+                            );
+                        }
+                    }
                     self.pixmap.fill_path(
                         &merged,
                         &shadow_paint,

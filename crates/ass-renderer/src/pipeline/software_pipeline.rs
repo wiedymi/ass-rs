@@ -1452,7 +1452,7 @@ impl SoftwarePipeline {
                     tags.formatting
                         .shadow_x
                         .map(|s| s * scale_x)
-                        .or(tags.formatting.shadow.map(|s| s * scale_y))
+                        .or(tags.formatting.shadow.map(|s| s * scale_x))
                         .unwrap_or(default_shadow)
                 } else {
                     tags.formatting
@@ -1473,10 +1473,11 @@ impl SoftwarePipeline {
                         .unwrap_or(default_shadow)
                 };
                 if shadow_x != 0.0 || shadow_y != 0.0 {
+                    // libass offsets the shadow by the full (scaled) \shad distance.
                     layer.effects.push(TextEffect::Shadow {
                         color: shadow_color,
-                        x_offset: shadow_x * 0.5, // Further reduce shadow to match libass
-                        y_offset: shadow_y * 0.5,
+                        x_offset: shadow_x,
+                        y_offset: shadow_y,
                     });
                 }
 

@@ -790,6 +790,33 @@ fn t_tag_interpolates_over_event_duration() {
 }
 
 #[test]
+fn shadow_uses_full_offset_and_border() {
+    // The drop shadow is offset by the FULL \shad distance (not half) and is the
+    // silhouette of fill+border, so a large \shad with an outline pushes the
+    // rendered bbox right edge out by ~the full offset beyond the no-shadow case.
+    let right_extent = |body: &str| -> usize {
+        let src = format!("{HEAD}Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{body}\n");
+        let script = Script::parse(&src).expect("parse");
+        let mut r =
+            Renderer::new(BackendType::Software, RenderContext::new(1280, 720)).expect("renderer");
+        let frame = r.render_frame(&script, 100).expect("render");
+        let (w, data) = (frame.width() as usize, frame.data());
+        data.chunks_exact(4)
+            .enumerate()
+            .filter(|(_, px)| px[3] >= 128)
+            .map(|(i, _)| i % w)
+            .max()
+            .unwrap_or(0)
+    };
+    let base = right_extent("{\\an7\\pos(100,300)\\bord4\\shad0}HH");
+    let shad = right_extent("{\\an7\\pos(100,300)\\bord4\\shad30}HH");
+    assert!(
+        shad >= base + 20,
+        "\\shad30 should extend the bbox ~30px right at full offset (base={base} shad={shad})"
+    );
+}
+
+#[test]
 fn frx_applies_vertical_perspective() {
     // \frx rotates about the X axis: a true perspective projection foreshortens the
     // text vertically (and the far edge converges). Regression guard against the old
