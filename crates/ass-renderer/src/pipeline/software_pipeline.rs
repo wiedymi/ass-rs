@@ -1133,7 +1133,12 @@ impl SoftwarePipeline {
 
                 // Calculate position for this segment
                 let (segment_x, segment_y) = if tags.position.is_some() || tags.movement.is_some() {
-                    // Explicit position override - use it directly
+                    // Explicit \pos/\move override (inherited by every segment of the
+                    // line). The first segment anchors the whole line — centred on the
+                    // full line width for multi-segment lines — and seeds current_x;
+                    // later segments continue left-to-right from current_x instead of
+                    // each re-centering on the same point (which stacked karaoke and
+                    // colour-split segments on top of one another).
                     let (anchor_x, anchor_y) = self.calculate_position_from_tags(
                         &tags,
                         event,
@@ -1141,19 +1146,33 @@ impl SoftwarePipeline {
                         time_cs,
                         default_alignment,
                     );
-
-                    // Apply alignment-based offset to get top-left corner
                     let alignment = tags.formatting.alignment.unwrap_or(default_alignment);
-                    needs_initial_position = false;
-                    let (x, y) = self.apply_alignment_offset(
-                        anchor_x,
-                        anchor_y,
-                        shaped.width,
-                        shaped.height,
-                        alignment,
-                    );
-
-                    (x, y)
+                    if needs_initial_position {
+                        let line_width = if is_multi_segment {
+                            line_total_width
+                        } else {
+                            shaped.width
+                        };
+                        let (x, y) = self.apply_alignment_offset(
+                            anchor_x,
+                            anchor_y,
+                            line_width,
+                            shaped.height,
+                            alignment,
+                        );
+                        current_x = x;
+                        needs_initial_position = false;
+                        (x, y)
+                    } else {
+                        let (_, y) = self.apply_alignment_offset(
+                            anchor_x,
+                            anchor_y,
+                            shaped.width,
+                            shaped.height,
+                            alignment,
+                        );
+                        (current_x, y)
+                    }
                 } else if needs_initial_position {
                     // First segment of the line: position the whole line. Later
                     // segments continue from current_x (below) so they lay out

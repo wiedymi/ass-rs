@@ -790,6 +790,28 @@ fn t_tag_interpolates_over_event_duration() {
 }
 
 #[test]
+fn positioned_multisegment_lays_out_left_to_right() {
+    // A \pos'd line split into multiple segments (karaoke, mid-line \c) must lay out
+    // left-to-right, not stack each segment on the same anchor. Regression: every
+    // segment re-centered on \pos, so only the last syllable was visible.
+    let width = |body: &str| -> usize {
+        let src = format!("{HEAD}Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{body}\n");
+        let script = Script::parse(&src).expect("parse");
+        let mut r =
+            Renderer::new(BackendType::Software, RenderContext::new(1280, 720)).expect("renderer");
+        let frame = r.render_frame(&script, 200).expect("render");
+        opaque_bbox_width(frame.data(), frame.width() as usize)
+    };
+    let single = width("{\\an5\\pos(640,360)}AAAABBBB");
+    let multi = width("{\\an5\\pos(640,360)\\k50}AAAA{\\k50}BBBB");
+    assert!(
+        multi >= single * 3 / 4,
+        "positioned multi-segment line must lay out full width, not collapse to one \
+         segment (single={single} multi={multi})"
+    );
+}
+
+#[test]
 fn shadow_uses_full_offset_and_border() {
     // The drop shadow is offset by the FULL \shad distance (not half) and is the
     // silhouette of fill+border, so a large \shad with an outline pushes the
