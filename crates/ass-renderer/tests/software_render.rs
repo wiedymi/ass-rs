@@ -230,9 +230,10 @@ fn clip_and_iclip_partition_the_text() {
 
 #[test]
 fn frx_fry_rotation_does_not_vanish() {
-    // Regression: \frx/\fry sheared around the screen origin, flinging text
-    // off-frame (it vanished entirely for angles >= ~30deg). They now shear around
-    // the text centre, so the glyphs stay on screen.
+    // Regression: \frx/\fry must stay on screen (they once sheared around the screen
+    // origin and flew off-frame for angles >= ~30deg). They are now a true perspective
+    // projection about the text centre, so \frx foreshortens the height (libass)
+    // rather than the old skew that increased it.
     let (pw, _, plain) = render("FLIPME");
     let (_, _, frx) = render("{\\frx55}FLIPME");
     let (_, _, fry) = render("{\\fry55}FLIPME");
@@ -242,8 +243,8 @@ fn frx_fry_rotation_does_not_vanish() {
     assert!(count_covered(&fry) > 0, "\\fry55 text vanished off-screen");
     let frx_h = opaque_bbox_height(&frx, pw);
     assert!(
-        frx_h > plain_h,
-        "\\frx should add vertical skew ({frx_h}px vs unrotated {plain_h}px)"
+        frx_h > 0 && frx_h < plain_h,
+        "\\frx should foreshorten vertically via perspective ({frx_h}px vs unrotated {plain_h}px)"
     );
 }
 
@@ -785,6 +786,35 @@ fn t_tag_interpolates_over_event_duration() {
     assert!(
         mid < near_end,
         "mid \\t height must be less than the final (not snapped): mid={mid} near_end={near_end}"
+    );
+}
+
+#[test]
+fn frx_applies_vertical_perspective() {
+    // \frx rotates about the X axis: a true perspective projection foreshortens the
+    // text vertically (and the far edge converges). Regression guard against the old
+    // affine skew approximation, which barely changed the height.
+    let metrics = |body: &str| -> (usize, usize) {
+        let src = format!("{HEAD}Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{body}\n");
+        let script = Script::parse(&src).expect("parse");
+        let mut r =
+            Renderer::new(BackendType::Software, RenderContext::new(1280, 720)).expect("renderer");
+        let frame = r.render_frame(&script, 100).expect("render");
+        let w = frame.width() as usize;
+        (
+            opaque_bbox_height(frame.data(), w),
+            opaque_bbox_width(frame.data(), w),
+        )
+    };
+    let (bh, _) = metrics("{\\an5\\pos(640,360)}HEIGHT");
+    let (th, tw) = metrics("{\\an5\\pos(640,360)\\frx60}HEIGHT");
+    assert!(
+        th > 0 && tw > 0,
+        "frx-rotated text must still render (h={th} w={tw})"
+    );
+    assert!(
+        th < bh * 3 / 4,
+        "frx60 should foreshorten the height (base={bh} frx60={th})"
     );
 }
 

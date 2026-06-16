@@ -525,6 +525,10 @@ impl SoftwareBackend {
 
         let mut base_transform = Transform::from_translate(data.x, baseline_y);
 
+        // \frx/\fry need a true projective transform; record (frx_rad, fry_rad,
+        // local rotation centre) here and project the glyph paths per-point below.
+        let mut rot3d: Option<(f32, f32, f32, f32)> = None;
+
         // Check for rotation, scaling, and shear effects
         for effect in &data.effects {
             match effect {
@@ -554,22 +558,18 @@ impl SoftwareBackend {
                             .pre_translate(-text_center_x, -text_center_y);
                     }
 
-                    // X rotation -> vertical skew (perspective approximation).
-                    if *x != 0.0 {
-                        let skew_y = (x * core::f32::consts::PI / 180.0).sin() * 0.5;
-                        base_transform = base_transform
-                            .pre_translate(text_center_x, text_center_y)
-                            .pre_concat(Transform::from_skew(0.0, skew_y))
-                            .pre_translate(-text_center_x, -text_center_y);
-                    }
-
-                    // Y rotation -> horizontal skew (perspective approximation).
-                    if *y != 0.0 {
-                        let skew_x = (y * core::f32::consts::PI / 180.0).sin() * 0.5;
-                        base_transform = base_transform
-                            .pre_translate(text_center_x, text_center_y)
-                            .pre_concat(Transform::from_skew(skew_x, 0.0))
-                            .pre_translate(-text_center_x, -text_center_y);
+                    // \frx/\fry are a true perspective projection (libass divides by
+                    // a camera distance), which tiny-skia's affine Transform cannot
+                    // express. Record the angles + the local rotation centre; the
+                    // glyph paths are projected per-point below. \frz stays affine and
+                    // is applied first, matching libass's RZ->RX->RY order.
+                    if *x != 0.0 || *y != 0.0 {
+                        rot3d = Some((
+                            x * core::f32::consts::PI / 180.0,
+                            y * core::f32::consts::PI / 180.0,
+                            text_center_x,
+                            text_center_y,
+                        ));
                     }
                 }
                 crate::pipeline::TextEffect::Scale { x, y } => {
@@ -609,7 +609,7 @@ impl SoftwareBackend {
         // entirely, so a geometry-static animated layer (\move/\fad/colour \t)
         // costs only the composite — the lever for animation-heavy content.
         #[cfg(not(feature = "nostd"))]
-        if self.coverage_hit(data, base_transform, baseline_y) {
+        if rot3d.is_none() && self.coverage_hit(data, base_transform, baseline_y) {
             return Ok(());
         }
 
@@ -619,7 +619,7 @@ impl SoftwareBackend {
         // so this is bit-identical — it just avoids the per-call font parse and
         // outline build, the dominant cost of the recurring blurred credit glyphs.
         #[cfg(not(feature = "nostd"))]
-        if self.blur_tile_hit(data, bold, italic, baseline_y, shaped.ascent) {
+        if rot3d.is_none() && self.blur_tile_hit(data, bold, italic, baseline_y, shaped.ascent) {
             return Ok(());
         }
 
@@ -639,11 +639,34 @@ impl SoftwareBackend {
             data.spacing,
         )?;
 
+        // For \frx/\fry, project the positioned glyph paths through the perspective
+        // transform once and switch to an identity base transform, so the vector
+        // fills below operate on the already-projected screen-space outlines. The
+        // perspective camera distance is libass's 20000 in 1/64-px units.
+        #[cfg(not(feature = "nostd"))]
+        let (paths, base_transform) = if let Some((frx, fry, lcx, lcy)) = rot3d {
+            let mut center = [tiny_skia::Point::from_xy(lcx, lcy)];
+            base_transform.map_points(&mut center);
+            let dist = 20000.0 / 64.0;
+            let projected: Vec<tiny_skia::Path> = paths
+                .iter()
+                .filter_map(|p| {
+                    let screen = p.clone().transform(base_transform)?;
+                    project_path_3d(&screen, frx, fry, center[0].x, center[0].y, dist)
+                })
+                .collect();
+            (projected, Transform::identity())
+        } else {
+            (paths, base_transform)
+        };
+
         // Rasterize, cache and composite the coverage. Returns false only for
         // effects the coverage path does not handle, which fall through to the
-        // full vector path below.
+        // full vector path below. Skipped for 3D (the projected paths are not
+        // representable by the affine coverage cache).
         #[cfg(not(feature = "nostd"))]
-        if self.rasterize_coverage_miss(data, &paths, base_transform, baseline_y) {
+        if rot3d.is_none() && self.rasterize_coverage_miss(data, &paths, base_transform, baseline_y)
+        {
             return Ok(());
         }
 
@@ -1787,6 +1810,61 @@ fn merge_transformed(paths: &[tiny_skia::Path], transform: Transform) -> Option<
         }
     }
     builder.finish()
+}
+
+/// Project a screen-space path through a 3D rotation (`\frx`/`\fry`) and a pinhole
+/// perspective division about `(cx, cy)`, mirroring libass's transform matrix
+/// (RX then RY about a camera at distance `dist`). `\frz` is applied beforehand as
+/// a 2D rotation, matching libass's RZ->RX->RY order. Returns `None` if the
+/// projected outline is empty.
+#[cfg(not(feature = "nostd"))]
+fn project_path_3d(
+    path: &tiny_skia::Path,
+    frx_rad: f32,
+    fry_rad: f32,
+    cx: f32,
+    cy: f32,
+    dist: f32,
+) -> Option<tiny_skia::Path> {
+    use tiny_skia::{PathSegment, Point};
+    // libass: sx = -sin(frx), cx = cos(frx); sy = sin(fry), cy = cos(fry).
+    let (sfx, cfx) = (-frx_rad.sin(), frx_rad.cos());
+    let (sfy, cfy) = (fry_rad.sin(), fry_rad.cos());
+    let project = |p: Point| -> Point {
+        let dx = p.x - cx;
+        let dy = p.y - cy;
+        // The glyph starts in the z=0 plane; rotate about X then Y.
+        let z3 = dy * sfx; // depth after \frx
+        let y3 = dy * cfx; // y after \frx
+        let x4 = dx * cfy - z3 * sfy;
+        let z4 = dx * sfy + z3 * cfy;
+        // Perspective divide by the camera distance (libass adds dist to z).
+        let zf = (z4 + dist).max(0.1);
+        Point::from_xy(cx + x4 * dist / zf, cy + y3 * dist / zf)
+    };
+    let mut pb = tiny_skia::PathBuilder::new();
+    for seg in path.segments() {
+        match seg {
+            PathSegment::MoveTo(p) => {
+                let q = project(p);
+                pb.move_to(q.x, q.y);
+            }
+            PathSegment::LineTo(p) => {
+                let q = project(p);
+                pb.line_to(q.x, q.y);
+            }
+            PathSegment::QuadTo(a, b) => {
+                let (qa, qb) = (project(a), project(b));
+                pb.quad_to(qa.x, qa.y, qb.x, qb.y);
+            }
+            PathSegment::CubicTo(a, b, c) => {
+                let (qa, qb, qc) = (project(a), project(b), project(c));
+                pb.cubic_to(qa.x, qa.y, qb.x, qb.y, qc.x, qc.y);
+            }
+            PathSegment::Close => pb.close(),
+        }
+    }
+    pb.finish()
 }
 
 /// Apply a simple box blur to a pixmap
