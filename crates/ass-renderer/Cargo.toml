@@ -147,3 +147,7 @@ required-features = ["software-backend", "image", "analysis-integration", "libas
 [[example]]
 name = "render_video"
 required-features = ["software-backend", "analysis-integration"]
+
+[[example]]
+name = "render_video_libass"
+required-features = ["analysis-integration", "libass-compare"]
