@@ -1526,8 +1526,13 @@ impl SoftwarePipeline {
                 let blur_radius = tags.formatting.blur.unwrap_or(0.0);
                 let edge_blur = tags.formatting.blur_edges.unwrap_or(0.0);
                 if blur_radius > 0.0 {
+                    // libass converts \blur to screen pixels via blur_scale =
+                    // frame/PlayRes (a resolution conversion applied
+                    // unconditionally, independent of ScaledBorderAndShadow);
+                    // apply_gaussian_blur then maps that screen radius to a
+                    // Gaussian std-dev with blur_radius_scale = 2/sqrt(ln 256).
                     layer.effects.push(TextEffect::Blur {
-                        radius: blur_radius,
+                        radius: blur_radius * scale_y,
                     });
                 }
                 if edge_blur > 0.0 {

@@ -199,6 +199,59 @@ fn blur_tag_spreads_coverage() {
 }
 
 #[test]
+fn blur_scales_with_render_resolution() {
+    // libass scales `\blur` to screen pixels via blur_scale = frame/PlayRes, so
+    // the same `\blur` produces a wider halo when the script's PlayRes matches
+    // the frame (scale 1.0) than at half scale (PlayRes = 2x the frame).
+    // Measuring the halo as (blurred coverage height - sharp coverage height)
+    // cancels the glyph-size difference between the two render scales.
+    fn covered_h(data: &[u8], width: usize) -> usize {
+        let (mut lo, mut hi) = (usize::MAX, 0usize);
+        for (i, px) in data.chunks_exact(4).enumerate() {
+            if px[3] > 0 {
+                let y = i / width;
+                lo = lo.min(y);
+                hi = hi.max(y);
+            }
+        }
+        if lo == usize::MAX {
+            0
+        } else {
+            hi - lo + 1
+        }
+    }
+    fn render_playres(play_x: u32, play_y: u32, text: &str) -> (usize, Vec<u8>) {
+        let head = format!(
+            "[Script Info]\nPlayResX: {play_x}\nPlayResY: {play_y}\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,64,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,30,30,30,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        );
+        let script_text =
+            format!("{head}Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{text}\n");
+        let script = Script::parse(&script_text).expect("parse");
+        let ctx = RenderContext::new(1280, 720);
+        let mut renderer = Renderer::new(BackendType::Software, ctx).expect("renderer");
+        let frame = renderer.render_frame(&script, 200).expect("render");
+        (frame.width() as usize, frame.data().to_vec())
+    }
+
+    let (w, sharp_full) = render_playres(1280, 720, "WAVE");
+    let (_, blur_full) = render_playres(1280, 720, "{\\blur8}WAVE");
+    let (_, sharp_half) = render_playres(2560, 1440, "WAVE");
+    let (_, blur_half) = render_playres(2560, 1440, "{\\blur8}WAVE");
+
+    let halo_full = covered_h(&blur_full, w).saturating_sub(covered_h(&sharp_full, w));
+    let halo_half = covered_h(&blur_half, w).saturating_sub(covered_h(&sharp_half, w));
+
+    assert!(
+        halo_full > 0 && halo_half > 0,
+        "both scales must show a halo"
+    );
+    assert!(
+        halo_full > halo_half,
+        "blur halo must scale with render resolution (scale 1.0 halo {halo_full}px vs scale 0.5 halo {halo_half}px)"
+    );
+}
+
+#[test]
 fn clip_and_iclip_partition_the_text() {
     // Regression: `\clip`/`\iclip` were dropped by the segmenter (no-op), and the
     // inverse flag only toggled mask anti-aliasing. `\clip` keeps pixels inside the

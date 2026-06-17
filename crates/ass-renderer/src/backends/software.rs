@@ -922,8 +922,12 @@ impl SoftwareBackend {
                                 }
                             }
 
-                            // Apply blur to the outline
-                            apply_gaussian_blur(&mut temp_pixmap, blur_radius);
+                            // Edge softening (\be): a gentler 1/sqrt(ln 256)
+                            // std-dev keeps it a thin outline blur, not a halo.
+                            apply_gaussian_blur(
+                                &mut temp_pixmap,
+                                blur_radius * (1.0 / 256.0_f32.ln().sqrt()),
+                            );
 
                             // Draw blurred outline to main pixmap
                             let blend_transform = base_transform.pre_translate(
@@ -1111,8 +1115,10 @@ impl SoftwareBackend {
                     }
                 }
 
-                // Apply simple box blur
-                apply_gaussian_blur(&mut temp_pixmap, radius);
+                // `radius` is the screen-pixel \blur (scaled by blur_scale in
+                // the pipeline); map it to a Gaussian std-dev via libass's
+                // blur_radius_scale = 2/sqrt(ln 256).
+                apply_gaussian_blur(&mut temp_pixmap, radius * (2.0 / 256.0_f32.ln().sqrt()));
 
                 let tile = std::sync::Arc::new(BlurTile {
                     data: std::sync::Arc::new(temp_pixmap.data().to_vec()),
@@ -1902,21 +1908,18 @@ fn project_path_3d(
     pb.finish()
 }
 
-/// Apply a simple box blur to a pixmap
-fn apply_gaussian_blur(pixmap: &mut Pixmap, blur: f32) {
-    if blur <= 0.0 {
-        return;
-    }
-
-    // A true separable Gaussian, matching libass. libass maps the `\blur` value to a
-    // Gaussian std-dev via blur_radius_scale = 2/sqrt(ln 256) times the
-    // storage->display blur_scale (ass_render.c:2539). Calibrated against the FFI
-    // oracle, the effective factor at a 1:1 render is 1/sqrt(ln 256) ~= 0.425 (the
-    // blur_scale contributes the remaining ~0.5), so `\blur8` is sigma ~= 3.4px. A
-    // flat box blur lowers the peak and washes the glyph centre out at larger radii;
-    // the Gaussian keeps a bright centre with a soft falloff. Applied to glyph-sized
-    // temp pixmaps, so the per-tap cost stays small.
-    let sigma = blur * (1.0 / 256.0_f32.ln().sqrt());
+/// Apply a separable Gaussian blur of standard deviation `sigma` (screen pixels)
+/// to a pixmap.
+///
+/// Callers map their source blur amount to `sigma`: a `\blur` of `b` at a
+/// frame/PlayRes ratio `s` becomes `sigma = b * s * 2/sqrt(ln 256)` (libass
+/// `blur_radius_scale`, ass_render.c:2539, where `restore_blur` returns the
+/// variance), so `\blur4` at a 1:1 render is sigma ~= 3.4px; `\be` edge
+/// softening uses a gentler factor. A flat box blur would lower the peak and
+/// wash the glyph centre out at larger radii; the Gaussian keeps a bright
+/// centre with a soft falloff. Applied to glyph-sized temp pixmaps, so the
+/// per-tap cost stays small.
+fn apply_gaussian_blur(pixmap: &mut Pixmap, sigma: f32) {
     if sigma <= 0.0 {
         return;
     }
