@@ -564,15 +564,32 @@ pub fn parse_move_args(args: &str) -> Option<(f32, f32, f32, f32, u32, u32)> {
     None
 }
 
+/// Strip any stray prefix before the `&H` colour/alpha introducer.
+///
+/// Real-world scripts often emit a malformed `\1cH&H2A4F5D&` (a stray letter
+/// between the tag and the `&H` value); libass parses these, so the value
+/// parsers slice from the `&H`/`&h` introducer rather than assuming it leads.
+/// Returns the original string unchanged when no `&H` is present (e.g. legacy
+/// decimal colours), so well-formed input is unaffected.
+fn strip_to_ampersand_hex(args: &str) -> &str {
+    let bytes = args.as_bytes();
+    for i in 0..bytes.len().saturating_sub(1) {
+        if bytes[i] == b'&' && (bytes[i + 1] | 0x20) == b'h' {
+            return &args[i..];
+        }
+    }
+    args
+}
+
 /// Parse color arguments from ASS color tags
 pub fn parse_color(args: &str) -> Option<[u8; 4]> {
     // Use ass-core's color parsing
-    ass_core::utils::parse_bgr_color(args).ok()
+    ass_core::utils::parse_bgr_color(strip_to_ampersand_hex(args)).ok()
 }
 
 /// Parse alpha arguments from ASS alpha tags
 pub fn parse_alpha(args: &str) -> Option<u8> {
-    let hex = args
+    let hex = strip_to_ampersand_hex(args)
         .trim_start_matches("&H")
         .trim_start_matches("&h")
         .trim_end_matches('&');

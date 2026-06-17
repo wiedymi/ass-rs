@@ -119,6 +119,23 @@ fn inline_color_tag_renders_opaque_and_colored() {
 }
 
 #[test]
+fn malformed_color_tag_with_stray_h_is_parsed() {
+    // Real scripts widely emit `\1cH&Hbbggrr&` / `\3cH&H..&` (a stray letter
+    // between the tag and the `&H` value) — 6500+ times in the benchmark. libass
+    // applies the colour; we must too, not drop the tag and fall back to the
+    // white style default. `&H0000FF&` is red (BGR).
+    let (_, _, red) = render("{\\1cH&H0000FF&}REDH");
+    let red_px = count_opaque(&red, |r, g, b| r > 150 && g < 110 && b < 110);
+    assert!(
+        red_px > 100,
+        "malformed \\1cH color tag should render red, got {red_px} red pixels"
+    );
+    // A dropped tag would render the white style default — assert that's absent.
+    let white_px = count_opaque(&red, |r, g, b| r > 200 && g > 200 && b > 200);
+    assert_eq!(white_px, 0, "color tag was dropped (rendered white)");
+}
+
+#[test]
 fn style_primary_color_renders_opaque() {
     // A plain white-style line must produce opaque near-white pixels.
     let (_, _, w) = render("White Text");

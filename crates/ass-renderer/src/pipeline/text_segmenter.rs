@@ -170,12 +170,14 @@ fn process_tag_block(
             // Special case for \fn tag - everything after "fn" is the font name
             ("fn", &part[2..])
         } else if part.starts_with(|c: char| c.is_ascii_digit()) {
-            // Handle tags like 1c, 2c, 3a, 4a
-            if let Some(idx) = part[1..]
-                .find(|c: char| !c.is_ascii_alphabetic())
-                .map(|i| i + 1)
-            {
-                (&part[..idx], &part[idx..])
+            // Colour/alpha tags (\1c \2c \3c \4c \1a \2a \3a \4a) are a digit plus
+            // exactly one letter, with the value following immediately. Take just
+            // those two chars so a malformed value like `\1cH&H2A4F5D&` (a stray
+            // letter before the `&H`, very common in real scripts — 6500+ times in
+            // the benchmark) still resolves to `1c` rather than an unknown `1cH`;
+            // parse_color / parse_alpha tolerate the leftover prefix.
+            if part.len() >= 2 {
+                (&part[..2], &part[2..])
             } else {
                 (part.as_str(), "")
             }
