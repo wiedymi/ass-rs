@@ -181,7 +181,7 @@ impl SoftwareBackend {
         // drawing — the dominant cost on sparkle-heavy frames (dozens-to-hundreds
         // of `\p` drawings, each previously a full-frame scan + clear).
         let b = path.bounds();
-        let margin = 2.0 + data.stroke.as_ref().map_or(0.0, |s| s.width);
+        let margin = 2.0 + data.stroke.as_ref().map_or(0.0, |s| s.width) + data.blur * 3.0;
         note_dirty_bbox((
             (b.left() - margin).floor() as i32,
             (b.top() - margin).floor() as i32,
@@ -198,35 +198,78 @@ impl SoftwareBackend {
         paint.anti_alias = true;
         paint.blend_mode = tiny_skia::BlendMode::SourceOver;
 
-        self.pixmap.fill_path(
-            path,
-            &paint,
-            tiny_skia::FillRule::Winding,
-            Transform::identity(),
-            clip_mask.as_ref(),
-        );
+        // Sharp drawing (no `\blur`): fill, then stroke, straight onto the frame.
+        if data.blur <= 0.0 {
+            self.pixmap.fill_path(
+                path,
+                &paint,
+                tiny_skia::FillRule::Winding,
+                Transform::identity(),
+                clip_mask.as_ref(),
+            );
+            if let Some(stroke) = &data.stroke {
+                paint.set_color_rgba8(
+                    stroke.color[0],
+                    stroke.color[1],
+                    stroke.color[2],
+                    stroke.color[3],
+                );
+                let sk_stroke = tiny_skia::Stroke {
+                    width: stroke.width,
+                    ..Default::default()
+                };
+                self.pixmap.stroke_path(
+                    path,
+                    &paint,
+                    &sk_stroke,
+                    Transform::identity(),
+                    clip_mask.as_ref(),
+                );
+            }
+            return Ok(());
+        }
 
+        // Blurred drawing: render fill+stroke into a padded temp pixmap, blur the
+        // whole silhouette, then composite (and clip). libass blurs the drawing
+        // bitmap and applies `\clip` afterwards, so clipped gradient strips tile
+        // seamlessly and dust/sparkle shapes spread into soft, dim glows instead
+        // of hard bright dots.
+        let pad = (data.blur * 3.0).ceil().max(1.0);
+        let tw = ((b.width() + pad * 2.0).ceil() as u32).max(1);
+        let th = ((b.height() + pad * 2.0).ceil() as u32).max(1);
+        let Some(mut temp) = Pixmap::new(tw, th) else {
+            return Ok(());
+        };
+        let off = Transform::from_translate(pad - b.left(), pad - b.top());
+        temp.fill_path(path, &paint, tiny_skia::FillRule::Winding, off, None);
         if let Some(stroke) = &data.stroke {
-            paint.set_color_rgba8(
+            let mut sp = tiny_skia::Paint::default();
+            sp.set_color_rgba8(
                 stroke.color[0],
                 stroke.color[1],
                 stroke.color[2],
                 stroke.color[3],
             );
-
+            sp.anti_alias = true;
             let sk_stroke = tiny_skia::Stroke {
                 width: stroke.width,
                 ..Default::default()
             };
-
-            self.pixmap.stroke_path(
-                path,
-                &paint,
-                &sk_stroke,
-                Transform::identity(),
-                clip_mask.as_ref(),
-            );
+            temp.stroke_path(path, &sp, &sk_stroke, off, None);
         }
+        apply_gaussian_blur(&mut temp, data.blur * (2.0 / 256.0_f32.ln().sqrt()));
+        let blend = Transform::from_translate(b.left() - pad, b.top() - pad);
+        self.pixmap.draw_pixmap(
+            0,
+            0,
+            temp.as_ref(),
+            &tiny_skia::PixmapPaint {
+                blend_mode: tiny_skia::BlendMode::SourceOver,
+                ..Default::default()
+            },
+            blend,
+            clip_mask.as_ref(),
+        );
 
         Ok(())
     }

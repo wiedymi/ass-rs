@@ -199,6 +199,29 @@ fn blur_tag_spreads_coverage() {
 }
 
 #[test]
+fn drawing_blur_spreads_and_dims() {
+    // Regression: `\blur` was dropped on `\p` vector drawings, so dust/sparkle
+    // and glow shapes rendered hard and bright. A blurred small drawing must
+    // spread its coverage well beyond the sharp shape and lower its opaque core.
+    let shape = "m 0 0 l 12 0 12 12 0 12";
+    let (_, _, sharp) = render(&format!("{{\\an7\\pos(200,200)\\p1}}{shape}"));
+    let (_, _, blurred) = render(&format!("{{\\an7\\pos(200,200)\\blur12\\p1}}{shape}"));
+    let sharp_cov = count_covered(&sharp);
+    let blur_cov = count_covered(&blurred);
+    let sharp_solid = count_opaque(&sharp, |_, _, _| true);
+    let blur_solid = count_opaque(&blurred, |_, _, _| true);
+    assert!(sharp_cov > 0, "sharp drawing should render");
+    assert!(
+        blur_cov >= sharp_cov * 2,
+        "\\blur should spread the drawing (blurred {blur_cov}px vs sharp {sharp_cov}px)"
+    );
+    assert!(
+        blur_solid < sharp_solid,
+        "\\blur should lower the opaque core (blurred {blur_solid}px vs sharp {sharp_solid}px)"
+    );
+}
+
+#[test]
 fn blur_scales_with_render_resolution() {
     // libass scales `\blur` to screen pixels via blur_scale = frame/PlayRes, so
     // the same `\blur` produces a wider halo when the script's PlayRes matches

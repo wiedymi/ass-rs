@@ -20,7 +20,7 @@ use crate::pipeline::{
     tag_processor::{KaraokeStyle, ProcessedTags},
     text_segmenter::{segment_text_with_tags, TextSegment},
     transform::{interpolate_alpha, interpolate_color, interpolate_f32, AnimatableTag},
-    IntermediateLayer, Pipeline, TextData, TextEffect, VectorData,
+    IntermediateLayer, Pipeline, StrokeInfo, TextData, TextEffect, VectorData,
 };
 use crate::renderer::RenderContext;
 use crate::utils::{DirtyRegion, RenderError};
@@ -875,12 +875,50 @@ impl SoftwarePipeline {
                 )
             });
 
+            // `\blur` on a drawing softens the filled shape exactly like text:
+            // scale the script value to screen pixels by blur_scale = frame/PlayRes
+            // (apply_gaussian_blur maps it to a std-dev). Sparkle/dust particles and
+            // gradient glows rely on this; without it they render as hard, bright
+            // shapes instead of soft, dim ones.
+            let blur = tags.formatting.blur.unwrap_or(0.0) * scale_y;
+
+            // `\bord` on a drawing strokes its outline in the `\3c` colour. Scale the
+            // width only when ScaledBorderAndShadow is set, mirroring text borders.
+            let border_w = tags
+                .formatting
+                .border_x
+                .or(tags.formatting.border)
+                .map(|w| {
+                    if self.scaled_border_and_shadow {
+                        w * scale_y
+                    } else {
+                        w
+                    }
+                })
+                .unwrap_or(0.0);
+            let stroke = (border_w > 0.0).then(|| {
+                let mut oc = tags.colors.outline.unwrap_or_else(|| {
+                    style
+                        .map(|s| Self::parse_ass_color(&s.outline_colour))
+                        .unwrap_or([0, 0, 0, 255])
+                });
+                oc[3] = style.map_or(255, |s| Self::parse_ass_color(&s.outline_colour)[3]);
+                if let Some(a) = tags.colors.alpha3.or(tags.colors.alpha) {
+                    oc[3] = a;
+                }
+                StrokeInfo {
+                    color: oc,
+                    width: border_w,
+                }
+            });
+
             return Ok(vec![IntermediateLayer::Vector(VectorData {
                 path: transformed_path,
                 color,
-                stroke: None,
+                stroke,
                 bounds: None,
                 clip,
+                blur,
             })]);
         }
 

@@ -136,6 +136,11 @@ pub struct VectorData {
     /// Rectangular `\clip` / `\iclip` in render coordinates as
     /// `(x1, y1, x2, y2, inverse)`; `None` when the drawing is unclipped.
     pub clip: Option<(f32, f32, f32, f32, bool)>,
+    /// Gaussian blur radius in screen pixels (the `\blur` value already scaled by
+    /// `blur_scale` = frame/PlayRes). `0.0` leaves the drawing sharp. Blur is
+    /// applied to the filled-and-stroked shape, then clipped — matching libass,
+    /// so soft `\p` glows (dust, sparkles, gradient banners) read correctly.
+    pub blur: f32,
 }
 
 /// Stroke information for vector graphics
