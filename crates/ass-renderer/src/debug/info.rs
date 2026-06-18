@@ -1,6 +1,6 @@
 //! Debug information data structures for rendered frames.
 //!
-//! Holds the per-frame debug metadata produced by [`super::DebugRenderer`]
+//! Holds the per-frame debug metadata produced by [`DebugRenderer`](crate::debug::DebugRenderer)
 //! together with the result of comparing two captured frames, plus their
 //! optional `serde` serialization implementations.
 

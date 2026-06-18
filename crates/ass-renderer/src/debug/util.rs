@@ -1,6 +1,6 @@
 //! Frame helper utilities for the debug renderer.
 //!
-//! Low-level helpers used by [`super::DebugRenderer`] to checksum frame
+//! Low-level helpers used by [`DebugRenderer`](crate::debug::DebugRenderer) to checksum frame
 //! buffers, persist frames as PNG files, and draw debugging overlays.
 
 use crate::{Frame, RenderError};

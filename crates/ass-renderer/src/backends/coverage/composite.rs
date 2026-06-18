@@ -51,8 +51,8 @@ fn composite_coverage(
     }
 }
 
-/// Composite an A8 coverage tile at `(x, y)` in `color` (see
-/// [`composite_coverage`]).
+/// Composite an A8 coverage tile at `(x, y)` in `color` (see the private
+/// `composite_coverage` helper).
 pub fn composite(
     dst: &mut [u8],
     dst_w: u32,
