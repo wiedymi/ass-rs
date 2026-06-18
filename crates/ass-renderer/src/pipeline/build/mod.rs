@@ -27,72 +27,13 @@ use crate::utils::{DirtyRegion, RenderError};
 use ahash::AHashMap;
 #[cfg(feature = "analysis-integration")]
 use ass_core::analysis::ScriptAnalysis;
-use ass_core::parser::{Event, Script, Style};
+use ass_core::parser::{Event, Script};
 use fontdb::Database as FontDatabase;
 use smallvec::SmallVec;
 use tiny_skia::Transform;
 
-/// Owned style for storing in pipeline
-#[derive(Clone)]
-struct OwnedStyle {
-    #[allow(dead_code)] // Style identifier - stored for completeness
-    name: String,
-    fontname: String,
-    fontsize: String,
-    primary_colour: String,
-    secondary_colour: String,
-    outline_colour: String,
-    back_colour: String,
-    bold: String,
-    italic: String,
-    underline: String,
-    strikeout: String,
-    scale_x: String,
-    scale_y: String,
-    spacing: String,
-    #[allow(dead_code)] // Text rotation angle - stored for completeness
-    angle: String,
-    #[allow(dead_code)] // Border rendering style - stored for completeness
-    border_style: String,
-    outline: String,
-    shadow: String,
-    alignment: String,
-    margin_l: String,
-    margin_r: String,
-    margin_v: String,
-    #[allow(dead_code)] // Text encoding specification - stored for completeness
-    encoding: String,
-}
-
-impl OwnedStyle {
-    fn from_style(style: &Style) -> Self {
-        Self {
-            name: style.name.to_string(),
-            fontname: style.fontname.to_string(),
-            fontsize: style.fontsize.to_string(),
-            primary_colour: style.primary_colour.to_string(),
-            secondary_colour: style.secondary_colour.to_string(),
-            outline_colour: style.outline_colour.to_string(),
-            back_colour: style.back_colour.to_string(),
-            bold: style.bold.to_string(),
-            italic: style.italic.to_string(),
-            underline: style.underline.to_string(),
-            strikeout: style.strikeout.to_string(),
-            scale_x: style.scale_x.to_string(),
-            scale_y: style.scale_y.to_string(),
-            spacing: style.spacing.to_string(),
-            angle: style.angle.to_string(),
-            border_style: style.border_style.to_string(),
-            outline: style.outline.to_string(),
-            shadow: style.shadow.to_string(),
-            alignment: style.alignment.to_string(),
-            margin_l: style.margin_l.to_string(),
-            margin_r: style.margin_r.to_string(),
-            margin_v: style.margin_v.to_string(),
-            encoding: style.encoding.to_string(),
-        }
-    }
-}
+mod style;
+use style::OwnedStyle;
 
 /// Software rendering pipeline with proper style inheritance
 pub struct SoftwarePipeline {
@@ -353,58 +294,6 @@ impl SoftwarePipeline {
     /// Get current DPI scale factor
     pub fn dpi_scale(&self) -> f32 {
         self.dpi_scale
-    }
-
-    /// Get style by name from the stored styles
-    #[allow(dead_code)] // Utility method for style lookup
-    fn get_style(&self, style_name: &str) -> Option<&OwnedStyle> {
-        self.styles_map
-            .get(style_name)
-            .or(self.default_style.as_ref())
-    }
-
-    /// Parse color from ASS format
-    fn parse_ass_color(color: &str) -> [u8; 4] {
-        // ASS colors are in &HAABBGGRR format where:
-        // AA = Alpha (00 = opaque, FF = transparent)
-        // BB = Blue, GG = Green, RR = Red
-        let color_trimmed = color.trim_end_matches('&');
-        if let Some(hex) = color_trimmed.strip_prefix("&H") {
-            if let Ok(value) = u32::from_str_radix(hex, 16) {
-                // Check if this is AABBGGRR (8 hex digits) or BBGGRR (6 hex digits)
-                let (alpha, bgr_value) = if hex.len() >= 8 {
-                    // Full AABBGGRR format
-                    let alpha = ((value >> 24) & 0xFF) as u8;
-                    // Convert ASS alpha (00=opaque, FF=transparent) to RGBA (00=transparent, FF=opaque)
-                    let rgba_alpha = 255 - alpha;
-                    (rgba_alpha, value & 0xFFFFFF)
-                } else {
-                    // Legacy BBGGRR format without alpha, assume opaque
-                    (255u8, value)
-                };
-
-                // Extract colors in BGR order
-                let r = (bgr_value & 0xFF) as u8; // Last 2 hex digits = Red
-                let g = ((bgr_value >> 8) & 0xFF) as u8; // Middle 2 hex digits = Green
-                let b = ((bgr_value >> 16) & 0xFF) as u8; // First 2 hex digits = Blue
-
-                // Return in RGBA order for rendering
-                return [r, g, b, alpha];
-            }
-        }
-        [255, 255, 255, 255] // Default white, opaque
-    }
-
-    /// Parse alpha from ASS format
-    #[allow(dead_code)] // Utility for parsing ASS alpha values
-    fn parse_ass_alpha(alpha: &str) -> u8 {
-        if let Some(hex) = alpha.strip_prefix("&H") {
-            if let Ok(value) = u8::from_str_radix(hex, 16) {
-                // ASS alpha is inverted (00 = opaque, FF = transparent)
-                return 255 - value;
-            }
-        }
-        255 // Default opaque
     }
 
     /// Whether an event pins its own position (`\pos`/`\move`) and is therefore
