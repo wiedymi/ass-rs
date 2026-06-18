@@ -15,6 +15,7 @@ mod event_selector;
 mod frame;
 mod metrics;
 mod probing;
+mod time_index;
 
 pub use context::RenderContext;
 pub use event_selector::{ActiveEvents, DirtyRegion, EventSelector};

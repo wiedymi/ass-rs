@@ -1,7 +1,9 @@
 //! Event selection and dirty region tracking for incremental rendering
 
 use crate::utils::RenderError;
-use ass_core::parser::{ast::EventType, Event, Script, Section};
+use ass_core::parser::{Event, Script, Section};
+
+use super::time_index::TimeIndex;
 
 #[cfg(feature = "nostd")]
 use alloc::{collections::BTreeSet, vec::Vec};
@@ -30,18 +32,6 @@ pub struct EventSelector {
     /// events change. Avoids re-parsing every event's start/end time string on
     /// every frame (the dominant per-frame cost for large scripts).
     time_index: Option<TimeIndex>,
-}
-
-/// Parsed, start-sorted timing index for a script's events.
-///
-/// Keyed by the events `Vec`'s address, length, and the comment-rendering flag,
-/// so it is reused across frames and rebuilt only when the script (or that flag)
-/// changes. Each entry is `(start_cs, end_cs, original_index)`; the original
-/// index preserves file-order rendering when active events are emitted.
-#[derive(Debug, Clone)]
-struct TimeIndex {
-    key: (usize, usize, bool),
-    by_start: Vec<(u32, u32, usize)>,
 }
 
 /// A region that needs re-rendering
@@ -194,22 +184,7 @@ impl EventSelector {
             return;
         }
 
-        let mut by_start = Vec::new();
-        for (idx, event) in events.iter().enumerate() {
-            let should_include = match event.event_type {
-                EventType::Dialogue => true,
-                EventType::Comment => self.render_comments,
-                _ => false,
-            };
-            if should_include {
-                let start = event.start_time_cs().unwrap_or(0);
-                let end = event.end_time_cs().unwrap_or(0);
-                by_start.push((start, end, idx));
-            }
-        }
-        by_start.sort_unstable_by_key(|&(start, _, _)| start);
-
-        self.time_index = Some(TimeIndex { key, by_start });
+        self.time_index = Some(TimeIndex::build(events, self.render_comments));
     }
 
     /// Check if any events have active animations
