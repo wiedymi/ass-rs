@@ -22,6 +22,9 @@ use alloc::string::ToString;
 use std::string::ToString;
 
 #[cfg(feature = "software-backend")]
+pub mod blur;
+
+#[cfg(feature = "software-backend")]
 pub mod coverage;
 
 #[cfg(feature = "software-backend")]
