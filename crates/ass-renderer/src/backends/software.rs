@@ -302,7 +302,14 @@ impl SoftwareBackend {
             tiny_skia::FillRule::Winding
         };
         let clip_path = builder.finish()?;
-        mask.fill_path(&clip_path, fill_rule, true, Transform::identity());
+        // Rasterize the clip rect WITHOUT anti-aliasing. Gradient/banner effects
+        // tile many abutting 2px-wide `\clip` strips of the same shape; an
+        // anti-aliased clip gives each strip partial coverage at the shared
+        // boundary, and SourceOver compositing under-fills there (0.33 over 0.67 =
+        // 0.78, not 1.0) — leaving a dark seam at every strip edge. A binary mask
+        // assigns each pixel to exactly one strip (pixel-center test), so abutting
+        // strips tile into a solid fill like libass.
+        mask.fill_path(&clip_path, fill_rule, false, Transform::identity());
         Some(mask)
     }
 
