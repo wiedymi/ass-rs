@@ -793,6 +793,49 @@ fn letter_spacing_forces_wrap() {
 }
 
 #[test]
+fn letter_spacing_scales_with_resolution() {
+    // Regression: letter spacing was added to glyph advances in raw script units,
+    // unscaled by the render resolution — so at PlayRes != frame it failed to shrink
+    // with the glyphs, widening spaced text (~2%) and forcing premature wraps (an
+    // extra line vs libass). The natural width of a spaced line must scale with
+    // resolution like the glyphs do.
+    fn width_at(play_x: u32, spacing: i32) -> usize {
+        let head = format!(
+            "[Script Info]\nPlayResX: {play_x}\nPlayResY: {}\n\n[V4+ Styles]\n\
+             Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n\
+             Style: Sp,Arial,64,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,{spacing},0,1,0,0,5,0,0,0,1\n\n\
+             [Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n",
+            play_x * 9 / 16
+        );
+        let src = format!(
+            "{head}Dialogue: 0,0:00:00.00,0:00:10.00,Sp,,0,0,0,,{{\\q2\\an5\\pos({},{})}}A A A A A A A A\n",
+            play_x / 2,
+            play_x * 9 / 32
+        );
+        let script = Script::parse(&src).expect("parse");
+        let ctx = RenderContext::new(1280, 720);
+        let mut r = Renderer::new(BackendType::Software, ctx).expect("renderer");
+        let frame = r.render_frame(&script, 200).expect("render");
+        let data = frame.data().to_vec();
+        opaque_bbox_width(&data, frame.width() as usize)
+    }
+    // Isolate the spacing contribution (width with spacing minus without) so glyph
+    // advance non-linearity at small sizes cancels out. At scale 1.0 the gaps are
+    // full; at scale 0.5 scaled spacing halves them, unscaled spacing keeps them.
+    let delta_full = width_at(1280, 40) as f64 - width_at(1280, 0) as f64; // scale 1.0
+    let delta_half = width_at(2560, 40) as f64 - width_at(2560, 0) as f64; // scale 0.5
+    assert!(
+        delta_full > 50.0,
+        "spacing should widen the line (delta {delta_full})"
+    );
+    assert!(
+        delta_half < delta_full * 0.7,
+        "spacing contribution must scale with resolution (full {delta_full}, half {delta_half}; \
+         unscaled spacing would keep half ~= full)"
+    );
+}
+
+#[test]
 fn wrap_style_2_disables_wrapping() {
     // WrapStyle 2 / `\q2`: no width-based wrapping. A line that the smart default
     // wraps must stay a single (overflowing) line under `\q2`, breaking only on

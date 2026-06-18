@@ -558,7 +558,11 @@ impl SoftwarePipeline {
             * self.dpi_scale;
         let bold = lead.tags.formatting.bold.unwrap_or(default_bold);
         let italic = lead.tags.formatting.italic.unwrap_or(default_italic);
-        let spacing = lead.tags.font.spacing.unwrap_or(default_spacing);
+        // `\fsp`/style spacing is a script-space gap; the advances here are at the
+        // screen `size`, so scale spacing to screen too (libass uses fsp * scale).
+        // Adding it unscaled over-measures the line and forces an early wrap (an
+        // extra line vs libass on borderline-width subtitles).
+        let spacing = lead.tags.font.spacing.unwrap_or(default_spacing) * scale_y;
         // The shaped advance already carries \fscy (folded into `size`), and the
         // render's net horizontal scale is \fscx, so the wrap multiplier is the
         // x/y ratio (reduces to \fscx/100 in the common \fscy=100 case).
@@ -1451,8 +1455,11 @@ impl SoftwarePipeline {
                     shadow_color[3] = (shadow_color[3] as f32 * fade_factor) as u8;
                 }
 
-                // Get spacing value (from tags or default style)
-                let spacing = tags.font.spacing.unwrap_or(default_spacing);
+                // Get spacing value (from tags or default style). `\fsp`/style
+                // spacing is in script units; scale it to screen like positions so
+                // the rendered run width (and thus wrapping) matches libass, which
+                // applies fsp * scale. Unscaled, spaced text drew ~2% too wide.
+                let spacing = tags.font.spacing.unwrap_or(default_spacing) * scale_x;
 
                 // Create text layer
                 let mut layer = TextData {
