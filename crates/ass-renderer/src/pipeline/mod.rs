@@ -23,8 +23,8 @@ pub mod text_segmenter;
 pub mod transform;
 pub mod validation;
 
-mod software_pipeline;
-pub use software_pipeline::SoftwarePipeline;
+mod build;
+pub use build::SoftwarePipeline;
 
 /// Pipeline trait for processing events
 pub trait Pipeline: Send + Sync {
