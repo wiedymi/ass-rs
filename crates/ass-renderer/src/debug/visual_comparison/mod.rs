@@ -7,51 +7,13 @@ use tiny_skia::{Color, Paint, Pixmap, Stroke, Transform};
 #[cfg(all(not(feature = "nostd"), feature = "serde"))]
 use std::{fs, path::Path};
 
-/// Visual debug info for rendering comparison
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct RenderDebugInfo {
-    /// Font size as calculated
-    pub calculated_font_size: f32,
-    /// Font size after PlayRes scaling
-    pub scaled_font_size: f32,
-    /// PlayResX value
-    pub play_res_x: u32,
-    /// PlayResY value
-    pub play_res_y: u32,
-    /// Render resolution
-    pub render_width: u32,
-    pub render_height: u32,
-    /// Color in BBGGRR format (as hex string)
-    pub color_bbggrr: String,
-    /// Converted RGBA values
-    pub color_rgba: [u8; 4],
-    /// Font metrics
-    pub font_metrics: FontMetricsDebug,
-    /// Text bounding box
-    pub text_bbox: BoundingBoxDebug,
-    /// Animation progress
-    pub animation_progress: Option<f32>,
-}
+mod types;
+mod util;
 
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct FontMetricsDebug {
-    pub ascender: f32,
-    pub descender: f32,
-    pub line_gap: f32,
-    pub units_per_em: f32,
-    pub scale_factor: f32,
-}
-
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct BoundingBoxDebug {
-    pub x: f32,
-    pub y: f32,
-    pub width: f32,
-    pub height: f32,
-}
+pub use types::{
+    BoundingBoxDebug, ComparisonResult, FontMetricsDebug, PixelDifference, RenderDebugInfo,
+};
+pub use util::create_comparison_image;
 
 /// Visual comparison renderer
 pub struct VisualComparison {
@@ -312,68 +274,4 @@ impl VisualComparison {
             pixel_differences: differences,
         }
     }
-}
-
-#[derive(Debug)]
-pub struct ComparisonResult {
-    pub average_difference: f32,
-    pub max_difference: f32,
-    pub different_pixels: usize,
-    pub total_pixels: usize,
-    pub pixel_differences: Vec<PixelDifference>,
-}
-
-#[derive(Debug)]
-pub struct PixelDifference {
-    pub x: u32,
-    pub y: u32,
-    pub our_color: [u8; 4],
-    pub libass_color: [u8; 4],
-    pub difference: f32,
-}
-
-/// Create side-by-side comparison image
-pub fn create_comparison_image(
-    our_output: &Pixmap,
-    libass_output: &Pixmap,
-    diff_map: Option<&Pixmap>,
-) -> Result<Pixmap, RenderError> {
-    let width = our_output.width() + libass_output.width() + diff_map.map_or(0, |d| d.width());
-    let height = our_output.height().max(libass_output.height());
-
-    let mut comparison = Pixmap::new(width, height).ok_or(RenderError::InvalidPixmap)?;
-
-    // Copy our output to left side
-    comparison.draw_pixmap(
-        0,
-        0,
-        our_output.as_ref(),
-        &tiny_skia::PixmapPaint::default(),
-        Transform::identity(),
-        None,
-    );
-
-    // Copy libass output to middle
-    comparison.draw_pixmap(
-        our_output.width() as i32,
-        0,
-        libass_output.as_ref(),
-        &tiny_skia::PixmapPaint::default(),
-        Transform::identity(),
-        None,
-    );
-
-    // Copy diff map to right side if provided
-    if let Some(diff) = diff_map {
-        comparison.draw_pixmap(
-            (our_output.width() + libass_output.width()) as i32,
-            0,
-            diff.as_ref(),
-            &tiny_skia::PixmapPaint::default(),
-            Transform::identity(),
-            None,
-        );
-    }
-
-    Ok(comparison)
 }
