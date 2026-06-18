@@ -2,7 +2,7 @@
 //! event for the software pipeline.
 
 use super::super::OwnedStyle;
-use super::TextDefaults;
+use super::types::TextDefaults;
 
 impl super::super::SoftwarePipeline {
     /// Resolve the style-derived defaults (font, size, colours, and formatting)

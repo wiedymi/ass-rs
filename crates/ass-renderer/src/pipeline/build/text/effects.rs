@@ -2,7 +2,7 @@
 //! blur/opaque-box, rotation, shear, scale, clip, and baseline offset.
 
 use super::super::OwnedStyle;
-use super::{EffectColors, RunCtx, TextDefaults};
+use super::types::{EffectColors, RunCtx, TextDefaults};
 use crate::pipeline::{tag_processor::ProcessedTags, TextData, TextEffect};
 
 impl super::super::SoftwarePipeline {

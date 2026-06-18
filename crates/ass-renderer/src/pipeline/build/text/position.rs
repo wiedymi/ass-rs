@@ -1,7 +1,7 @@
 //! Per-segment positioning for the software pipeline: anchoring lines, applying
 //! alignment offsets, and advancing the line pen.
 
-use super::{LineLayout, Pen, RunCtx};
+use super::types::{LineLayout, Pen, RunCtx};
 use crate::pipeline::shaping::ShapedText;
 use crate::pipeline::tag_processor::ProcessedTags;
 
