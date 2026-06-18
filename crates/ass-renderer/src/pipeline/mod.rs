@@ -15,7 +15,6 @@ use std::{string::String, vec::Vec};
 pub mod animation;
 pub mod compositing;
 pub mod drawing;
-pub mod effects;
 pub mod font_loader;
 pub mod shaping;
 pub mod tag_processor;
