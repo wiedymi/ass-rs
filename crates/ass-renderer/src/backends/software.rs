@@ -1989,6 +1989,19 @@ fn apply_gaussian_blur(pixmap: &mut Pixmap, sigma: f32) {
 
     let stride = width as usize * 4;
     let data = pixmap.data_mut();
+
+    // Blur in premultiplied space. Blurring straight-alpha RGBA mixes each colour
+    // channel independently of coverage, so a white-on-transparent edge averages
+    // toward black as alpha falls — narrowing and dimming the glow (a `\blur20`
+    // box kept only ~65% of libass's mass). libass blurs coverage, so premultiply
+    // (colour *= alpha) before the passes and un-premultiply after.
+    for px in data.chunks_exact_mut(4) {
+        let a = u32::from(px[3]);
+        px[0] = ((u32::from(px[0]) * a + 127) / 255) as u8;
+        px[1] = ((u32::from(px[1]) * a + 127) / 255) as u8;
+        px[2] = ((u32::from(px[2]) * a + 127) / 255) as u8;
+    }
+
     let mut temp = vec![0u8; data.len()];
 
     // Horizontal pass (data -> temp).
@@ -2026,6 +2039,15 @@ fn apply_gaussian_blur(pixmap: &mut Pixmap, sigma: f32) {
             for (dst, &a) in data[o..o + 4].iter_mut().zip(&acc) {
                 *dst = a.round().clamp(0.0, 255.0) as u8;
             }
+        }
+    }
+
+    // Un-premultiply (colour /= alpha) back to straight-alpha RGBA; a fully
+    // transparent pixel (alpha 0) has no colour to restore.
+    for px in data.chunks_exact_mut(4) {
+        let a = u32::from(px[3]);
+        for c in &mut px[0..3] {
+            *c = (u32::from(*c) * 255).checked_div(a).unwrap_or(0).min(255) as u8;
         }
     }
 }

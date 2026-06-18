@@ -239,6 +239,29 @@ fn drawing_blur_spreads_and_dims() {
 }
 
 #[test]
+fn blur_conserves_mass_premultiplied() {
+    // Blurring must preserve total coverage-weighted brightness, like libass.
+    // Blurring straight-alpha RGBA drags glow edges toward black and loses ~35%
+    // of the mass; a premultiplied blur conserves it. Compare composited-over-
+    // black luminance of a sharp vs a heavily blurred white box drawing.
+    fn premult_mass(data: &[u8]) -> u64 {
+        data.chunks_exact(4)
+            .map(|px| u64::from(u32::from(px[0]) * u32::from(px[3]) / 255))
+            .sum()
+    }
+    let shape = "m 0 0 l 80 0 80 80 0 80";
+    let (_, _, sharp) = render(&format!("{{\\an7\\pos(300,200)\\p1}}{shape}"));
+    let (_, _, blurred) = render(&format!("{{\\an7\\pos(300,200)\\blur20\\p1}}{shape}"));
+    let m_sharp = premult_mass(&sharp);
+    let m_blur = premult_mass(&blurred);
+    assert!(m_sharp > 0, "sharp box should render");
+    assert!(
+        m_blur as f64 >= m_sharp as f64 * 0.85,
+        "blur lost mass: blurred {m_blur} vs sharp {m_sharp} (straight-alpha blur bug)"
+    );
+}
+
+#[test]
 fn blur_scales_with_render_resolution() {
     // libass scales `\blur` to screen pixels via blur_scale = frame/PlayRes, so
     // the same `\blur` produces a wider halo when the script's PlayRes matches
