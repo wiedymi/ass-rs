@@ -25,6 +25,9 @@ use std::string::ToString;
 pub mod coverage;
 
 #[cfg(feature = "software-backend")]
+pub mod geometry;
+
+#[cfg(feature = "software-backend")]
 pub mod raster;
 
 #[cfg(feature = "software-backend")]
