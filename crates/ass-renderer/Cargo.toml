@@ -30,6 +30,9 @@ wgpu = { version = "0.19", optional = true }
 pollster = { version = "0.3", optional = true }
 bytemuck = { version = "1.14", features = ["derive"], optional = true }
 
+# Windowing for the real-time GPU present demo (gated behind `window`).
+winit = { version = "0.29", optional = true }
+
 # Utilities
 smallvec = "1.14"
 thiserror = "1.0"
@@ -62,6 +65,9 @@ software-backend = ["rayon"]
 # Native hybrid GPU compositor: reuses the software backend's cached coverage/RGBA
 # tiles and composites them on the GPU via wgpu (offscreen render + readback).
 gpu = ["wgpu", "pollster", "bytemuck", "software-backend"]
+# Real-time windowed demo: presents the resident GPU subtitle layer to a winit
+# window surface. Pulls in `winit` on top of the hybrid GPU backend.
+window = ["gpu", "dep:winit"]
 backend-probing = []
 backend-metrics = []
 
@@ -140,3 +146,7 @@ required-features = ["gpu", "analysis-integration", "software-backend"]
 [[example]]
 name = "gpu_playback"
 required-features = ["gpu", "analysis-integration", "software-backend"]
+
+[[example]]
+name = "gpu_window"
+required-features = ["window", "analysis-integration", "software-backend"]
