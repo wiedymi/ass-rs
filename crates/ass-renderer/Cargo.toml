@@ -136,3 +136,7 @@ required-features = ["gpu"]
 [[example]]
 name = "gpu_compare"
 required-features = ["gpu", "analysis-integration", "software-backend"]
+
+[[example]]
+name = "gpu_playback"
+required-features = ["gpu", "analysis-integration", "software-backend"]
