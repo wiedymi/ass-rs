@@ -175,7 +175,6 @@ name = "ass-renderer"
 version = "0.1.0"
 dependencies = [
  "ahash",
- "ash",
  "ass-core",
  "bumpalo",
  "bytemuck",
@@ -183,7 +182,6 @@ dependencies = [
  "env_logger",
  "fontdb",
  "image",
- "metal",
  "pkg-config",
  "pollster",
  "pretty_assertions",
@@ -197,9 +195,6 @@ dependencies = [
  "tiny-skia",
  "ttf-parser",
  "vcpkg",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
  "wgpu",
  "wide",
 ]

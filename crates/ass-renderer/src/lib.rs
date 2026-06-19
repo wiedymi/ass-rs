@@ -1,8 +1,8 @@
 //! ASS subtitle renderer with modular backend support
 //!
-//! `ass-renderer` provides high-performance subtitle rendering with support for
-//! multiple backends including software (CPU), hardware (Vulkan/Metal), and web
-//! (WebGPU/WebGL).
+//! `ass-renderer` provides high-performance subtitle rendering with a CPU
+//! software backend and an optional `wgpu`-based hybrid GPU compositor that
+//! reuses the software backend's rasterized tiles.
 
 #![cfg_attr(feature = "nostd", no_std)]
 #![deny(unsafe_code)] // Changed from forbid to allow overrides in FFI modules

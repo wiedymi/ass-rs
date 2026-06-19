@@ -6,12 +6,10 @@ High-performance ASS (Advanced SubStation Alpha) subtitle renderer with modular 
 
 ## Features
 
-- **Multiple Rendering Backends**
+- **Rendering Backends**
   - Software (CPU) rendering with tiny-skia (RECOMMENDED - fully implemented)
-  - WebGPU for web and native GPU acceleration (experimental)
-  - Vulkan for high-performance GPU rendering (experimental)
-  - Metal for macOS/iOS (experimental)
-  - WebGL is NOT supported - use Software backend instead
+  - GPU hybrid compositor via `wgpu` (uploads the software backend's coverage/RGBA
+    tiles and composites them on the GPU; one path covers Vulkan/Metal/DX12/GL natively)
   - Automatic backend selection (defaults to Software)
 
 - **Complete ASS/SSA Support**
@@ -64,15 +62,22 @@ use ass_renderer::{Renderer, RenderContext, BackendType};
 let mut renderer = Renderer::new(BackendType::Software, context)?;
 ```
 
-### Hardware Backends (Experimental)
-GPU acceleration backends are experimental and may have incomplete feature support:
+### GPU Backend (`gpu` feature)
+A `wgpu`-based hybrid compositor. It does **not** re-rasterize glyphs/shapes on the
+GPU; instead it reuses the software backend's cached coverage/RGBA tiles, uploads them
+as textures, and composites them with a textured-quad shader — so it inherits the
+software backend's parity. A single `wgpu` path covers Vulkan/Metal/DX12/GL natively.
 
-- **WebGPU**: Cross-platform GPU acceleration (basic implementation)
-- **Vulkan**: High-performance native GPU (basic implementation)  
-- **Metal**: macOS/iOS GPU acceleration (basic implementation)
-- **WebGL**: NOT SUPPORTED - use Software backend for web
+```rust
+use ass_renderer::{Renderer, RenderContext, BackendType};
 
-For production use, we strongly recommend the Software backend which has full feature support and has been thoroughly tested.
+// Requires building with --features gpu
+let mut renderer = Renderer::new(BackendType::Gpu, context)?;
+```
+
+Note: for this lightweight compositing workload the GPU path pays an upload + readback
+cost and is currently slower than the already-fast CPU backend; its value is GPU offload
+and a future browser (WebGPU) target. For production we recommend the Software backend.
 
 ## Collision Detection
 
@@ -126,8 +131,7 @@ Optimized for high performance:
 
 - `default`: Enables software backend and analysis integration
 - `software-backend`: CPU rendering support
-- `hardware-backend`: Vulkan and Metal support
-- `web-backend`: WebGPU support
+- `gpu`: wgpu hybrid GPU compositor (native; requires `software-backend`)
 - `simd`: SIMD acceleration
 - `arena`: Arena allocator for reduced allocations
 - `analysis-integration`: Integration with ass-core analysis
