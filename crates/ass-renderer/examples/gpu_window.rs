@@ -26,14 +26,20 @@
 //! default it presents with vsync (`Fifo`, capping FPS at the display refresh);
 //! pass `--no-vsync` to present with `Immediate` (uncapped) to expose the raw
 //! per-frame throughput when the GPU compositing — not the display — is the limit.
+//!
+//! Playback is interactive: a controllable clock drives `position_cs` from the
+//! real per-frame delta, and the keyboard seeks, pauses, and scales speed. The
+//! key bindings are printed once at startup (Left/Right seek, Space pause,
+//! Up/Down speed, R/Home restart, Esc quit).
 
 use std::sync::Arc;
 use std::time::Instant;
 
 use ass_core::parser::{Event, Script, Section};
 use winit::dpi::PhysicalSize;
-use winit::event::{Event as WinitEvent, WindowEvent};
+use winit::event::{ElementState, Event as WinitEvent, KeyEvent, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
+use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowBuilder};
 
 use ass_renderer::backends::gpu::{Background, Compositor, PresentTarget};
@@ -174,6 +180,22 @@ fn background_color(secs: f64) -> wgpu::Color {
     }
 }
 
+/// Wrap `value` into `[0, span)`, mapping negative inputs forward, so a seek past
+/// either clip boundary loops cleanly. `span` is assumed positive.
+fn wrap(value: f64, span: f64) -> f64 {
+    value.rem_euclid(span)
+}
+
+/// Format a centisecond playback position as `mm:ss.cs` for the window title.
+fn format_timecode(position_cs: f64) -> String {
+    let cs = position_cs.max(0.0) as u64;
+    let total_secs = cs / 100;
+    let minutes = total_secs / 60;
+    let seconds = total_secs % 60;
+    let centis = cs % 100;
+    format!("{minutes:02}:{seconds:02}.{centis:02}")
+}
+
 /// All persistent state the windowed render loop drives each frame.
 struct Demo {
     window: Arc<Window>,
@@ -192,7 +214,20 @@ struct Demo {
     clip_start: u32,
     clip_end: u32,
     last_key: Option<Vec<(usize, usize)>>,
-    start: Instant,
+    /// Current playback position in centiseconds, advanced by the real per-frame
+    /// delta (scaled by `speed`) and wrapped into `[clip_start, clip_end)`.
+    position_cs: f64,
+    /// Whether the clock is paused (real time still elapses, position does not).
+    paused: bool,
+    /// Playback rate multiplier, clamped to `[0.25, 4.0]`.
+    speed: f64,
+    /// Wall-clock instant of the previous tick, for computing the frame delta.
+    last_tick: Instant,
+    /// Free-running seconds accumulator driving the background animation, so the
+    /// clear colour keeps moving even while playback is paused or seeking.
+    anim_secs: f64,
+    /// Wall-clock instant the run began, for the final average-FPS report.
+    run_start: Instant,
     title_timer: Instant,
     title_frames: u32,
     frames: u64,
@@ -295,7 +330,12 @@ impl Demo {
             clip_start,
             clip_end,
             last_key: None,
-            start: now,
+            position_cs: f64::from(clip_start),
+            paused: false,
+            speed: 1.0,
+            last_tick: now,
+            anim_secs: 0.0,
+            run_start: now,
             title_timer: now,
             title_frames: 0,
             frames: 0,
@@ -322,11 +362,38 @@ impl Demo {
         Ok(())
     }
 
-    /// Compute the looping playback time (centiseconds) for the current instant.
-    fn playback_time(&self, secs: f64) -> u32 {
-        let elapsed_cs = (secs * 100.0) as u64;
-        let span = u64::from((self.clip_end - self.clip_start).max(1));
-        self.clip_start + (elapsed_cs % span) as u32
+    /// The loop span in centiseconds, never less than one to avoid a zero divisor.
+    fn span_cs(&self) -> f64 {
+        f64::from((self.clip_end - self.clip_start).max(1))
+    }
+
+    /// Seek `delta_cs` centiseconds (negative rewinds), wrapping within the clip so
+    /// seeking past either boundary loops around.
+    fn seek(&mut self, delta_cs: f64) {
+        let start = f64::from(self.clip_start);
+        self.position_cs = start + wrap(self.position_cs - start + delta_cs, self.span_cs());
+    }
+
+    /// Apply a pressed key to the playback clock. `Escape` is handled by the caller
+    /// (it needs the event loop to print the report and quit), so it is a no-op
+    /// here.
+    fn on_key(&mut self, code: KeyCode) {
+        match code {
+            KeyCode::ArrowLeft => self.seek(-500.0),
+            KeyCode::ArrowRight => self.seek(500.0),
+            KeyCode::Space => {
+                self.paused = !self.paused;
+                self.last_tick = Instant::now();
+            }
+            KeyCode::ArrowUp => self.speed = (self.speed * 2.0).min(4.0),
+            KeyCode::ArrowDown => self.speed = (self.speed / 2.0).max(0.25),
+            KeyCode::KeyR | KeyCode::Home => {
+                self.position_cs = f64::from(self.clip_start);
+                self.paused = false;
+                self.last_tick = Instant::now();
+            }
+            _ => {}
+        }
     }
 
     /// Render one frame: rebuild the resident layer only on a cache miss, then
@@ -336,8 +403,16 @@ impl Demo {
         if w == 0 || h == 0 {
             return Ok(());
         }
-        let secs = self.start.elapsed().as_secs_f64();
-        let t = self.playback_time(secs);
+        let now = Instant::now();
+        let dt = (now - self.last_tick).as_secs_f64();
+        self.last_tick = now;
+        self.anim_secs += dt;
+        if !self.paused {
+            self.position_cs += dt * 100.0 * self.speed;
+        }
+        let start = f64::from(self.clip_start);
+        self.position_cs = start + wrap(self.position_cs - start, self.span_cs());
+        let t = self.position_cs as u32;
 
         let key = cache_key(&self.gate.select_active(&self.script, t)?.events);
         let hit = key.is_some() && self.last_key == key;
@@ -370,7 +445,7 @@ impl Demo {
                 view: &view,
                 format: self.format,
             },
-            Background::Clear(background_color(secs)),
+            Background::Clear(background_color(self.anim_secs)),
             w,
             h,
         )?;
@@ -391,9 +466,13 @@ impl Demo {
         }
         let fps = f64::from(self.title_frames) / dt;
         let ms = dt * 1000.0 / f64::from(self.title_frames.max(1));
+        let tc = format_timecode(self.position_cs);
+        let state = if self.paused { "paused" } else { "▶" };
+        let speed = self.speed;
+        let (w, h) = (self.width, self.height);
         self.window.set_title(&format!(
-            "ass GPU window — {}x{} — {fps:.1} fps ({ms:.2} ms/frame)",
-            self.width, self.height
+            "ass GPU window — {tc} {state} x{speed:.2} — {w}x{h} — \
+             {fps:.1} fps ({ms:.2} ms/frame)"
         ));
         self.title_timer = Instant::now();
         self.title_frames = 0;
@@ -407,7 +486,7 @@ impl Demo {
 
     /// Print the overall average FPS, ms/frame and layer-rebuild count.
     fn report(&self) {
-        let secs = self.start.elapsed().as_secs_f64();
+        let secs = self.run_start.elapsed().as_secs_f64();
         let fps = if secs > 0.0 {
             self.frames as f64 / secs
         } else {
@@ -449,6 +528,10 @@ fn run() -> Result<(), String> {
         "GPU window playback of {} at {}x{} (surface format {:?}, {:?})",
         cfg.ass, demo.width, demo.height, demo.format, demo.present_mode
     );
+    println!(
+        "controls: Left/Right seek 5s, Space pause/resume, Up/Down speed (0.25x-4x), \
+         R or Home restart, Esc quit"
+    );
 
     event_loop
         .run(move |event, elwt| {
@@ -462,6 +545,21 @@ fn run() -> Result<(), String> {
                     WindowEvent::Resized(size) => {
                         if let Err(e) = demo.resize(size.width, size.height) {
                             eprintln!("resize error: {e}");
+                            elwt.exit();
+                        }
+                    }
+                    WindowEvent::KeyboardInput {
+                        event:
+                            KeyEvent {
+                                physical_key: PhysicalKey::Code(code),
+                                state: ElementState::Pressed,
+                                ..
+                            },
+                        ..
+                    } => {
+                        demo.on_key(code);
+                        if code == KeyCode::Escape {
+                            demo.report();
                             elwt.exit();
                         }
                     }
