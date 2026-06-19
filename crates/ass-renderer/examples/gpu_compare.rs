@@ -11,8 +11,14 @@
 //!     --example gpu_compare -- --ass FILE --size 1280x720 --times 100,12500,90000
 //! ```
 //! Times are centiseconds. Defaults target `benches/benchmark.ass` at 1280x720.
+//! Passing `--bench N` additionally times the GPU and software compositors over
+//! `N` iterations per timestamp and prints milliseconds per frame for each.
+
+use std::time::Instant;
 
 use ass_core::parser::Script;
+use ass_renderer::backends::coverage::{composite_bitmap, RenderBitmap};
+use ass_renderer::backends::gpu::GpuBackend;
 use ass_renderer::backends::BackendType;
 use ass_renderer::renderer::{RenderContext, Renderer};
 
@@ -23,6 +29,7 @@ struct Cfg {
     height: u32,
     times: Vec<u32>,
     tol: u8,
+    bench: u32,
 }
 
 fn parse_cfg() -> Result<Cfg, String> {
@@ -33,6 +40,7 @@ fn parse_cfg() -> Result<Cfg, String> {
         height: 720,
         times: vec![100, 12500, 90000, 133090],
         tol: 4,
+        bench: 0,
     };
     let mut i = 0;
     let val = |argv: &[String], i: &mut usize| -> Result<String, String> {
@@ -57,6 +65,7 @@ fn parse_cfg() -> Result<Cfg, String> {
                     .collect::<Result<Vec<u32>, String>>()?;
             }
             "--tol" => cfg.tol = val(&argv, &mut i)?.parse().map_err(|_| "bad --tol")?,
+            "--bench" => cfg.bench = val(&argv, &mut i)?.parse().map_err(|_| "bad --bench")?,
             other => return Err(format!("unknown arg {other}")),
         }
         i += 1;
@@ -160,6 +169,74 @@ fn run() -> Result<(), String> {
     } else {
         println!("FAIL: GPU output diverges from software (MAE >= 2.0)");
     }
+
+    if cfg.bench > 0 {
+        bench(&cfg, &script, &mut software)?;
+    }
+    Ok(())
+}
+
+/// Time the GPU and software compositors on identical tiles. Each timestamp's
+/// tile list is produced once via the (shared) software pipeline, then composited
+/// `cfg.bench` times per backend. Tile production is excluded so the numbers
+/// isolate the compositing step the backends own. The GPU figure includes its
+/// per-frame upload and the blocking readback, so on this light workload it is
+/// expected to trail the CPU — the point is honest measurement, not a speedup.
+fn bench(cfg: &Cfg, script: &Script, tiles_src: &mut Renderer) -> Result<(), String> {
+    let frames: Vec<Vec<RenderBitmap>> = cfg
+        .times
+        .iter()
+        .map(|&t| {
+            tiles_src
+                .render_frame_bitmaps(script, t)
+                .map_err(|e| format!("tiles @ {t}: {e}"))
+        })
+        .collect::<Result<_, _>>()?;
+    let total = u64::from(cfg.bench) * frames.len() as u64;
+    if total == 0 {
+        return Err("nothing to bench (no timestamps)".into());
+    }
+    let px = (cfg.width * cfg.height) as usize;
+
+    let mut buf = vec![0u8; px * 4];
+    let composite_sw = |buf: &mut [u8], frame: &[RenderBitmap]| {
+        buf.fill(0);
+        for bmp in frame {
+            composite_bitmap(buf, cfg.width, cfg.height, bmp);
+        }
+    };
+    for frame in &frames {
+        composite_sw(&mut buf, frame);
+    }
+    let sw_start = Instant::now();
+    for _ in 0..cfg.bench {
+        for frame in &frames {
+            composite_sw(&mut buf, frame);
+        }
+    }
+    let sw_ms = sw_start.elapsed().as_secs_f64() * 1000.0 / total as f64;
+
+    let mut gpu = GpuBackend::new(cfg.width, cfg.height).map_err(|e| format!("gpu backend: {e}"))?;
+    for frame in &frames {
+        gpu.composite_bitmaps(frame, cfg.width, cfg.height)
+            .map_err(|e| format!("gpu warmup: {e}"))?;
+    }
+    let gpu_start = Instant::now();
+    for _ in 0..cfg.bench {
+        for frame in &frames {
+            gpu.composite_bitmaps(frame, cfg.width, cfg.height)
+                .map_err(|e| format!("gpu composite: {e}"))?;
+        }
+    }
+    let gpu_ms = gpu_start.elapsed().as_secs_f64() * 1000.0 / total as f64;
+
+    let avg_tiles = frames.iter().map(Vec::len).sum::<usize>() as f64 / frames.len() as f64;
+    println!(
+        "bench composite-only ({} iters x {} frames, avg {avg_tiles:.0} tiles/frame): \
+         software={sw_ms:.3} ms/frame  gpu={gpu_ms:.3} ms/frame",
+        cfg.bench,
+        frames.len()
+    );
     Ok(())
 }
 

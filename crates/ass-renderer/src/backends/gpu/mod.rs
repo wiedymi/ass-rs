@@ -12,8 +12,10 @@
 //! `One`/`OneMinusSrcAlpha` blend. See [`compositor`] for the pipeline.
 
 mod compositor;
+mod pipeline;
+mod pool;
 mod shader;
-mod texture;
+mod target;
 
 use compositor::Compositor;
 
@@ -69,9 +71,14 @@ impl GpuBackend {
         })
     }
 
-    /// Composite a list of tiles directly (used by tests and reuse paths).
-    fn composite_bitmaps(
-        &self,
+    /// Composite a pre-rasterized tile list directly on the GPU, returning a
+    /// straight premultiplied-RGBA `width * height * 4` buffer.
+    ///
+    /// This is the entry point integrations (and the `gpu_compare` benchmark) use
+    /// when they already hold [`RenderBitmap`] tiles and only want the GPU
+    /// compositing step, skipping the full-frame pipeline.
+    pub fn composite_bitmaps(
+        &mut self,
         bitmaps: &[RenderBitmap],
         width: u32,
         height: u32,
@@ -129,7 +136,7 @@ mod tests {
     /// matches the software compositor byte-for-byte (within float rounding).
     #[test]
     fn gpu_smoke_composites_white_tile() {
-        let backend = match GpuBackend::new(64, 64) {
+        let mut backend = match GpuBackend::new(64, 64) {
             Ok(backend) => backend,
             Err(e) => {
                 eprintln!("skipping GPU smoke test (no usable adapter): {e}");
@@ -191,7 +198,7 @@ mod tests {
     /// the integer software blend rounds within one or two least-significant bits).
     #[test]
     fn gpu_matches_software_on_blended_tiles() {
-        let backend = match GpuBackend::new(48, 32) {
+        let mut backend = match GpuBackend::new(48, 32) {
             Ok(backend) => backend,
             Err(e) => {
                 eprintln!("skipping GPU parity test (no usable adapter): {e}");

@@ -1,8 +1,10 @@
 //! WGSL source for the hybrid tile compositor.
 //!
 //! A single pipeline draws every tile as a unit quad whose clip-space rectangle,
-//! source colour and mode are supplied per draw through a uniform. Two modes
-//! share one shader:
+//! source colour and mode are supplied per draw through a dynamic-offset uniform
+//! in group 0 (shared with the sampler), while the tile texture lives in its own
+//! group 1 so it can be swapped per draw without rebuilding the uniform binding.
+//! Two modes share one shader:
 //!
 //! * mode `0` — coverage: the bound texture is `R8Unorm`; its red channel is the
 //!   A8 coverage and the uniform carries the straight RGBA colour. The fragment
@@ -21,9 +23,9 @@ struct Quad {
     mode: vec4<f32>,
 };
 
-@group(0) @binding(0) var tile_tex: texture_2d<f32>;
-@group(0) @binding(1) var tile_samp: sampler;
-@group(0) @binding(2) var<uniform> quad: Quad;
+@group(0) @binding(0) var tile_samp: sampler;
+@group(0) @binding(1) var<uniform> quad: Quad;
+@group(1) @binding(0) var tile_tex: texture_2d<f32>;
 
 struct VsOut {
     @builtin(position) position: vec4<f32>,

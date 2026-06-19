@@ -1,130 +1,122 @@
-//! The wgpu pipeline, per-tile render pass and readback for the GPU backend.
+//! The wgpu pipeline, batched render pass and readback for the GPU backend.
 //!
-//! [`Compositor`] owns the single textured-quad pipeline (see [`super::shader`])
-//! plus the shared sampler and bind-group layout. [`Compositor::composite`]
-//! draws an ordered list of [`RenderBitmap`] tiles over a transparent offscreen
-//! `Rgba8Unorm` target (linear, no gamma — matching the software compositor),
-//! then reads the target back to a straight byte layout, stripping wgpu's
-//! 256-byte row padding.
+//! [`Compositor`] builds its textured-quad pipeline (see [`super::shader`]),
+//! sampler and bind-group layouts once, then reuses them every frame.
+//! [`Compositor::composite`] draws an ordered list of [`RenderBitmap`] tiles in a
+//! single render pass over a transparent offscreen `Rgba8Unorm` target (linear,
+//! no gamma — matching the software compositor), then reads the target back to a
+//! straight byte layout, stripping wgpu's 256-byte row padding.
+//!
+//! Per-frame resource churn is avoided: the offscreen target and readback buffer
+//! are cached by size, the per-tile quad uniforms share one dynamic-offset buffer,
+//! and the tile textures come from a [`super::pool::TilePool`].
+
+use std::num::NonZeroU64;
 
 use crate::backends::coverage::RenderBitmap;
 use crate::utils::RenderError;
 
-use super::texture;
+use super::pipeline::Programs;
+use super::pool::{self, TilePool, UNIFORM_SIZE};
+use super::target::Target;
 
-/// Offscreen target format. `Unorm` (not `Srgb`) so blending happens directly on
-/// the stored bytes, reproducing the software backend's gamma-free premultiplied
-/// source-over.
-const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+/// Reusable per-frame quad-uniform buffer plus the group-0 bind group (sampler
+/// and dynamic uniform) that reads it.
+struct Uniforms {
+    buffer: wgpu::Buffer,
+    bind_group: wgpu::BindGroup,
+    capacity: u32,
+}
 
-/// GPU tile compositor: pipeline, sampler and bind-group layout.
+/// GPU tile compositor: pipeline, layouts, sampler and cached frame resources.
 pub(super) struct Compositor {
     pipeline: wgpu::RenderPipeline,
-    bind_group_layout: wgpu::BindGroupLayout,
+    frame_layout: wgpu::BindGroupLayout,
+    tile_layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
+    uniform_stride: u32,
+    target: Option<Target>,
+    uniforms: Option<Uniforms>,
+    pool: TilePool,
 }
 
 impl Compositor {
-    /// Build the compositor pipeline on `device`.
+    /// Build the compositor pipeline, layouts and sampler on `device`.
     pub(super) fn new(device: &wgpu::Device) -> Self {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("ass-gpu-shader"),
-            source: wgpu::ShaderSource::Wgsl(super::shader::SHADER.into()),
-        });
+        let Programs {
+            pipeline,
+            frame_layout,
+            tile_layout,
+            sampler,
+        } = Programs::new(device);
 
-        let bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("ass-gpu-bgl"),
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                ],
-            });
-
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("ass-gpu-pipeline-layout"),
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
-        });
-
-        let blend = wgpu::BlendComponent {
-            src_factor: wgpu::BlendFactor::One,
-            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-            operation: wgpu::BlendOperation::Add,
-        };
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("ass-gpu-pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: TARGET_FORMAT,
-                    blend: Some(wgpu::BlendState {
-                        color: blend,
-                        alpha: blend,
-                    }),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                ..Default::default()
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-        });
-
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("ass-gpu-sampler"),
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
+        let align = device.limits().min_uniform_buffer_offset_alignment;
+        let uniform_stride = UNIFORM_SIZE.div_ceil(align) * align;
 
         Self {
             pipeline,
-            bind_group_layout,
+            frame_layout,
+            tile_layout,
             sampler,
+            uniform_stride,
+            target: None,
+            uniforms: None,
+            pool: TilePool::new(),
         }
+    }
+
+    /// Ensure a cached offscreen target and readback buffer exist for `width *
+    /// height`, recreating them only when the requested size changes.
+    fn ensure_target(&mut self, device: &wgpu::Device, width: u32, height: u32) {
+        if self.target.as_ref().is_some_and(|t| t.matches(width, height)) {
+            return;
+        }
+        self.target = Some(Target::new(device, width, height));
+    }
+
+    /// Ensure the shared uniform buffer holds at least `count` tile slots,
+    /// growing (and rebuilding the group-0 bind group) only when needed.
+    fn ensure_uniforms(&mut self, device: &wgpu::Device, count: u32) {
+        if count == 0 || self.uniforms.as_ref().is_some_and(|u| u.capacity >= count) {
+            return;
+        }
+        let capacity = count.next_power_of_two();
+        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("ass-gpu-uniforms"),
+            size: u64::from(self.uniform_stride) * u64::from(capacity),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("ass-gpu-frame-bind"),
+            layout: &self.frame_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &buffer,
+                        offset: 0,
+                        size: NonZeroU64::new(u64::from(UNIFORM_SIZE)),
+                    }),
+                },
+            ],
+        });
+        self.uniforms = Some(Uniforms {
+            buffer,
+            bind_group,
+            capacity,
+        });
     }
 
     /// Composite `bitmaps` (painter order) over a transparent `width * height`
     /// target and return straight, premultiplied-RGBA bytes (the same layout and
     /// semantics as the software backend's frame buffer).
     pub(super) fn composite(
-        &self,
+        &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         bitmaps: &[RenderBitmap],
@@ -135,38 +127,31 @@ impl Compositor {
             return Err(RenderError::InvalidDimensions);
         }
 
-        let extent = wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        };
-        let target = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("ass-gpu-target"),
-            size: extent,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: TARGET_FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
-        let target_view = target.create_view(&wgpu::TextureViewDescriptor::default());
+        self.ensure_target(device, width, height);
+        let count = u32::try_from(bitmaps.len()).unwrap_or(u32::MAX);
+        self.ensure_uniforms(device, count);
 
-        let binds: Vec<wgpu::BindGroup> = bitmaps
-            .iter()
-            .map(|bmp| {
-                texture::upload_tile(
-                    device,
-                    queue,
-                    &self.bind_group_layout,
-                    &self.sampler,
-                    bmp,
-                    width,
-                    height,
-                )
-            })
-            .collect();
+        let stride = self.uniform_stride as usize;
+        let mut uniform_bytes = vec![0u8; stride * bitmaps.len()];
+        let mut tiles = Vec::with_capacity(bitmaps.len());
+        for (i, bmp) in bitmaps.iter().enumerate() {
+            let desc = pool::describe(bmp, width, height);
+            let off = i * stride;
+            uniform_bytes[off..off + UNIFORM_SIZE as usize]
+                .copy_from_slice(desc.uniform.as_bytes());
+            let tile =
+                self.pool
+                    .acquire(device, &self.tile_layout, desc.format, desc.width, desc.height);
+            tile.upload(queue, desc.data, desc.bytes_per_row);
+            tiles.push(tile);
+        }
+        if let Some(uniforms) = self.uniforms.as_ref() {
+            if !uniform_bytes.is_empty() {
+                queue.write_buffer(&uniforms.buffer, 0, &uniform_bytes);
+            }
+        }
 
+        let target = self.target.as_ref().expect("target set by ensure_target");
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("ass-gpu-encoder"),
         });
@@ -174,7 +159,7 @@ impl Compositor {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("ass-gpu-pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &target_view,
+                    view: target.view(),
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
@@ -185,63 +170,23 @@ impl Compositor {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            pass.set_pipeline(&self.pipeline);
-            for bind in &binds {
-                pass.set_bind_group(0, bind, &[]);
-                pass.draw(0..6, 0..1);
+            if let Some(uniforms) = self.uniforms.as_ref() {
+                pass.set_pipeline(&self.pipeline);
+                let mut offset = 0u32;
+                for tile in &tiles {
+                    pass.set_bind_group(0, &uniforms.bind_group, &[offset]);
+                    pass.set_bind_group(1, &tile.bind_group, &[]);
+                    pass.draw(0..6, 0..1);
+                    offset += self.uniform_stride;
+                }
             }
         }
 
-        let row = width * 4;
-        let padded_row = row.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT)
-            * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-        let readback = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("ass-gpu-readback"),
-            size: u64::from(padded_row) * u64::from(height),
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        });
-        encoder.copy_texture_to_buffer(
-            wgpu::ImageCopyTexture {
-                texture: &target,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::ImageCopyBuffer {
-                buffer: &readback,
-                layout: wgpu::ImageDataLayout {
-                    offset: 0,
-                    bytes_per_row: Some(padded_row),
-                    rows_per_image: Some(height),
-                },
-            },
-            extent,
-        );
+        target.copy_into_readback(&mut encoder);
         queue.submit(Some(encoder.finish()));
 
-        let slice = readback.slice(..);
-        let (tx, rx) = std::sync::mpsc::channel();
-        slice.map_async(wgpu::MapMode::Read, move |res| {
-            let _ = tx.send(res);
-        });
-        device.poll(wgpu::Maintain::Wait);
-        match rx.recv() {
-            Ok(Ok(())) => {}
-            Ok(Err(e)) => return Err(RenderError::BackendError(format!("buffer map failed: {e}"))),
-            Err(e) => return Err(RenderError::BackendError(format!("map channel closed: {e}"))),
-        }
-
-        let mapped = slice.get_mapped_range();
-        let row = row as usize;
-        let padded_row = padded_row as usize;
-        let mut out = vec![0u8; row * height as usize];
-        for (y, dst_row) in out.chunks_exact_mut(row).enumerate() {
-            let src = y * padded_row;
-            dst_row.copy_from_slice(&mapped[src..src + row]);
-        }
-        drop(mapped);
-        readback.unmap();
+        let out = target.read_back(device)?;
+        self.pool.release(tiles);
         Ok(out)
     }
 }
