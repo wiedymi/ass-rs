@@ -42,6 +42,9 @@ pub mod hardware;
 #[cfg(feature = "web-backend")]
 pub mod web;
 
+#[cfg(feature = "gpu")]
+pub mod gpu;
+
 /// Backend type enumeration
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackendType {
@@ -57,6 +60,8 @@ pub enum BackendType {
     WebGPU,
     /// WebGL fallback for web
     WebGL,
+    /// Native hybrid GPU compositor (wgpu) over software-produced tiles
+    Gpu,
 }
 
 impl BackendType {
@@ -69,6 +74,7 @@ impl BackendType {
             Self::Metal => "Metal",
             Self::WebGPU => "WebGPU",
             Self::WebGL => "WebGL",
+            Self::Gpu => "Gpu",
         }
     }
 }
@@ -218,6 +224,12 @@ pub fn create_backend(
         BackendType::Software => {
             let context = crate::renderer::RenderContext::new(width, height);
             let backend = software::SoftwareBackend::new(&context)?;
+            Ok(Box::new(backend))
+        }
+
+        #[cfg(feature = "gpu")]
+        BackendType::Gpu => {
+            let backend = gpu::GpuBackend::new(width, height)?;
             Ok(Box::new(backend))
         }
 

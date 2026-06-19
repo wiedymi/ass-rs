@@ -78,6 +78,9 @@ analysis-integration = ["ass-core/analysis"]
 software-backend = ["rayon"]
 hardware-backend = ["vulkan", "metal"]
 web-backend = ["wgpu", "pollster", "bytemuck", "wasm-bindgen", "wasm-bindgen-futures", "web-sys"]
+# Native hybrid GPU compositor: reuses the software backend's cached coverage/RGBA
+# tiles and composites them on the GPU via wgpu (offscreen render + readback).
+gpu = ["wgpu", "pollster", "bytemuck", "software-backend"]
 backend-probing = []
 backend-metrics = []
 
@@ -151,3 +154,7 @@ required-features = ["software-backend", "analysis-integration"]
 [[example]]
 name = "render_video_libass"
 required-features = ["analysis-integration", "libass-compare"]
+
+[[example]]
+name = "gpu_probe"
+required-features = ["web-backend"]
