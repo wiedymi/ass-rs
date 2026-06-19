@@ -131,7 +131,10 @@ fn encode(
         Background::Texture(_) => wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
     };
 
-    let layer = comp.layer.as_ref().expect("layer presence checked by caller");
+    let layer = comp
+        .layer
+        .as_ref()
+        .expect("layer presence checked by caller");
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
         label: Some("ass-gpu-present-encoder"),
     });

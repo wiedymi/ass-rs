@@ -22,7 +22,10 @@
 //!     --ass FILE --size 1280x720 --frames 120
 //! ```
 //! With `--frames N` the demo renders `N` frames, prints the average FPS and
-//! ms/frame, and exits; without it, it runs until the window is closed.
+//! ms/frame, and exits; without it, it runs until the window is closed. By
+//! default it presents with vsync (`Fifo`, capping FPS at the display refresh);
+//! pass `--no-vsync` to present with `Immediate` (uncapped) to expose the raw
+//! per-frame throughput when the GPU compositing — not the display — is the limit.
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -48,6 +51,8 @@ struct Cfg {
     height: u32,
     /// Optional self-terminating frame budget (`--frames N`).
     frames: Option<u32>,
+    /// Present with vsync (`Fifo`); `--no-vsync` selects `Immediate` (uncapped).
+    vsync: bool,
 }
 
 /// Parse `--ass FILE`, `--size WxH` and `--frames N`, defaulting to the bundled
@@ -59,6 +64,7 @@ fn parse_cfg() -> Result<Cfg, String> {
         width: 1280,
         height: 720,
         frames: None,
+        vsync: true,
     };
     let mut i = 0;
     let val = |argv: &[String], i: &mut usize| -> Result<String, String> {
@@ -79,6 +85,7 @@ fn parse_cfg() -> Result<Cfg, String> {
             "--frames" => {
                 cfg.frames = Some(val(&argv, &mut i)?.parse().map_err(|_| "bad --frames")?);
             }
+            "--no-vsync" => cfg.vsync = false,
             other => return Err(format!("unknown arg {other}")),
         }
         i += 1;
@@ -175,6 +182,7 @@ struct Demo {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     format: wgpu::TextureFormat,
+    present_mode: wgpu::PresentMode,
     compositor: Compositor,
     renderer: Renderer,
     gate: EventSelector,
@@ -199,6 +207,7 @@ impl Demo {
         window: Arc<Window>,
         script: Script<'static>,
         frames_target: Option<u32>,
+        vsync: bool,
     ) -> Result<Self, String> {
         let size = window.inner_size();
         let (width, height) = (size.width.max(1), size.height.max(1));
@@ -237,12 +246,22 @@ impl Demo {
                  subtitle colours may be re-encoded and washed out"
             );
         }
+        let present_mode = if vsync {
+            wgpu::PresentMode::Fifo
+        } else if caps.present_modes.contains(&wgpu::PresentMode::Immediate) {
+            wgpu::PresentMode::Immediate
+        } else if caps.present_modes.contains(&wgpu::PresentMode::Mailbox) {
+            wgpu::PresentMode::Mailbox
+        } else {
+            eprintln!("warning: --no-vsync requested but only Fifo is available");
+            wgpu::PresentMode::Fifo
+        };
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format,
             width,
             height,
-            present_mode: wgpu::PresentMode::Fifo,
+            present_mode,
             alpha_mode: caps
                 .alpha_modes
                 .first()
@@ -266,6 +285,7 @@ impl Demo {
             queue,
             config,
             format,
+            present_mode,
             compositor,
             renderer,
             gate: EventSelector::new(),
@@ -424,10 +444,10 @@ fn run() -> Result<(), String> {
             .map_err(|e| format!("create window: {e}"))?,
     );
 
-    let mut demo = Demo::new(window, script, cfg.frames)?;
+    let mut demo = Demo::new(window, script, cfg.frames, cfg.vsync)?;
     println!(
-        "GPU window playback of {} at {}x{} (surface format {:?})",
-        cfg.ass, demo.width, demo.height, demo.format
+        "GPU window playback of {} at {}x{} (surface format {:?}, {:?})",
+        cfg.ass, demo.width, demo.height, demo.format, demo.present_mode
     );
 
     event_loop

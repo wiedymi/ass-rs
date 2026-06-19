@@ -85,11 +85,14 @@ fn parse_cfg() -> Result<Cfg, String> {
                 );
             }
             "--static-time" => {
-                cfg.static_time = val(&argv, &mut i)?.parse().map_err(|_| "bad --static-time")?;
+                cfg.static_time = val(&argv, &mut i)?
+                    .parse()
+                    .map_err(|_| "bad --static-time")?;
             }
             "--present-iters" => {
-                cfg.present_iters =
-                    val(&argv, &mut i)?.parse().map_err(|_| "bad --present-iters")?;
+                cfg.present_iters = val(&argv, &mut i)?
+                    .parse()
+                    .map_err(|_| "bad --present-iters")?;
             }
             "--fps" => cfg.fps = val(&argv, &mut i)?.parse().map_err(|_| "bad --fps")?,
             other => return Err(format!("unknown arg {other}")),
@@ -215,7 +218,11 @@ fn playback(
     let hit_rate = hits as f64 * 100.0 / total as f64;
     let avg_ms = (hit_ms + miss_ms) / total as f64;
     let avg_hit = if hits > 0 { hit_ms / hits as f64 } else { 0.0 };
-    let avg_miss = if misses > 0 { miss_ms / misses as f64 } else { 0.0 };
+    let avg_miss = if misses > 0 {
+        miss_ms / misses as f64
+    } else {
+        0.0
+    };
     println!(
         "realistic playback @ {} fps over [{start_cs}..{end_cs}]cs: {total} frames, \
          {misses} re-render(s), hit-rate={hit_rate:.1}%",

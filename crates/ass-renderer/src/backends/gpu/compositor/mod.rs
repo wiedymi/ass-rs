@@ -112,7 +112,11 @@ impl Compositor {
 
     /// Ensure the resident subtitle-layer texture matches `width * height`.
     fn ensure_layer(&mut self, device: &wgpu::Device, width: u32, height: u32) {
-        if self.layer.as_ref().is_some_and(|l| l.matches(width, height)) {
+        if self
+            .layer
+            .as_ref()
+            .is_some_and(|l| l.matches(width, height))
+        {
             return;
         }
         self.layer = Some(Layer::new(device, &self.tile_layout, width, height));
@@ -255,7 +259,11 @@ impl Compositor {
         if width == 0 || height == 0 {
             return Err(RenderError::InvalidDimensions);
         }
-        if !self.layer.as_ref().is_some_and(|l| l.matches(width, height)) {
+        if !self
+            .layer
+            .as_ref()
+            .is_some_and(|l| l.matches(width, height))
+        {
             return Err(RenderError::BackendError(
                 "present_over requires a matching render_layer first".into(),
             ));
@@ -298,7 +306,11 @@ impl Compositor {
         if width == 0 || height == 0 {
             return Err(RenderError::InvalidDimensions);
         }
-        if !self.layer.as_ref().is_some_and(|l| l.matches(width, height)) {
+        if !self
+            .layer
+            .as_ref()
+            .is_some_and(|l| l.matches(width, height))
+        {
             return Err(RenderError::BackendError(
                 "present_to_view requires a matching render_layer first".into(),
             ));

@@ -263,12 +263,14 @@ fn resident_layer(
     gpu.render_subtitle_layer(&frames[0], w, h)
         .map_err(|e| format!("layer warmup: {e}"))?;
     for _ in 0..frames.len() {
-        gpu.present_frame(w, h).map_err(|e| format!("present warmup: {e}"))?;
+        gpu.present_frame(w, h)
+            .map_err(|e| format!("present warmup: {e}"))?;
     }
     let present_iters = u64::from(cfg.bench) * frames.len() as u64;
     let present_start = Instant::now();
     for _ in 0..present_iters {
-        gpu.present_frame(w, h).map_err(|e| format!("present: {e}"))?;
+        gpu.present_frame(w, h)
+            .map_err(|e| format!("present: {e}"))?;
     }
     let present_ms = present_start.elapsed().as_secs_f64() * 1000.0 / present_iters.max(1) as f64;
 
