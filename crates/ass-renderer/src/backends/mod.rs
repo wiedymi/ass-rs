@@ -195,6 +195,6 @@ pub fn create_backend(
             Err(RenderError::BackendError(format!(
                 "{backend_name} backend not available in this build"
             )))
-        },
+        }
     }
 }

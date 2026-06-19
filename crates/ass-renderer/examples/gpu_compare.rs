@@ -106,7 +106,11 @@ fn diff_stats(a: &[u8], b: &[u8], tol: u8) -> (f64, u8, f64) {
         }
     }
     let count = (a.len() / 3).max(1);
-    (sum as f64 / a.len() as f64, max, over as f64 * 100.0 / count as f64)
+    (
+        sum as f64 / a.len() as f64,
+        max,
+        over as f64 * 100.0 / count as f64,
+    )
 }
 
 fn run() -> Result<(), String> {
@@ -216,7 +220,8 @@ fn bench(cfg: &Cfg, script: &Script, tiles_src: &mut Renderer) -> Result<(), Str
     }
     let sw_ms = sw_start.elapsed().as_secs_f64() * 1000.0 / total as f64;
 
-    let mut gpu = GpuBackend::new(cfg.width, cfg.height).map_err(|e| format!("gpu backend: {e}"))?;
+    let mut gpu =
+        GpuBackend::new(cfg.width, cfg.height).map_err(|e| format!("gpu backend: {e}"))?;
     for frame in &frames {
         gpu.composite_bitmaps(frame, cfg.width, cfg.height)
             .map_err(|e| format!("gpu warmup: {e}"))?;

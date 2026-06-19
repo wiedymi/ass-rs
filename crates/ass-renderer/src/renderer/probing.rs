@@ -68,7 +68,10 @@ impl BackendProber {
             #[cfg(feature = "gpu")]
             BackendType::Gpu => {
                 use crate::backends::gpu::GpuBackend;
-                Ok(Box::new(GpuBackend::new(context.width(), context.height())?))
+                Ok(Box::new(GpuBackend::new(
+                    context.width(),
+                    context.height(),
+                )?))
             }
 
             _ => Err(RenderError::UnsupportedBackend(backend_type.as_str())),

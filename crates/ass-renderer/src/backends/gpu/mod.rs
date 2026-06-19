@@ -249,7 +249,9 @@ mod tests {
             },
         ];
 
-        let out = backend.composite_bitmaps(&tiles, 48, 32).expect("gpu composite");
+        let out = backend
+            .composite_bitmaps(&tiles, 48, 32)
+            .expect("gpu composite");
 
         let mut reference = vec![0u8; 48 * 32 * 4];
         for tile in &tiles {

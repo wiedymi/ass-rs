@@ -68,7 +68,11 @@ impl Compositor {
     /// Ensure a cached offscreen target and readback buffer exist for `width *
     /// height`, recreating them only when the requested size changes.
     fn ensure_target(&mut self, device: &wgpu::Device, width: u32, height: u32) {
-        if self.target.as_ref().is_some_and(|t| t.matches(width, height)) {
+        if self
+            .target
+            .as_ref()
+            .is_some_and(|t| t.matches(width, height))
+        {
             return;
         }
         self.target = Some(Target::new(device, width, height));
@@ -139,9 +143,13 @@ impl Compositor {
             let off = i * stride;
             uniform_bytes[off..off + UNIFORM_SIZE as usize]
                 .copy_from_slice(desc.uniform.as_bytes());
-            let tile =
-                self.pool
-                    .acquire(device, &self.tile_layout, desc.format, desc.width, desc.height);
+            let tile = self.pool.acquire(
+                device,
+                &self.tile_layout,
+                desc.format,
+                desc.width,
+                desc.height,
+            );
             tile.upload(queue, desc.data, desc.bytes_per_row);
             tiles.push(tile);
         }

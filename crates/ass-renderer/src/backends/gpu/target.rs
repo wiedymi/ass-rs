@@ -104,7 +104,11 @@ impl Target {
         match rx.recv() {
             Ok(Ok(())) => {}
             Ok(Err(e)) => return Err(RenderError::BackendError(format!("buffer map failed: {e}"))),
-            Err(e) => return Err(RenderError::BackendError(format!("map channel closed: {e}"))),
+            Err(e) => {
+                return Err(RenderError::BackendError(format!(
+                    "map channel closed: {e}"
+                )))
+            }
         }
 
         let row = (self.width * 4) as usize;
