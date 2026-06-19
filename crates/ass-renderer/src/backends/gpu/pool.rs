@@ -30,6 +30,16 @@ pub(super) struct QuadUniform {
 }
 
 impl QuadUniform {
+    /// A premultiplied-RGBA passthrough quad covering the whole clip-space frame,
+    /// used by the present pass to draw the layer (or a background) full-screen.
+    pub(super) fn full_frame_rgba() -> Self {
+        Self {
+            rect: [-1.0, 1.0, 1.0, -1.0],
+            color: [0.0; 4],
+            mode: [1.0, 0.0, 0.0, 0.0],
+        }
+    }
+
     /// View the uniform as the raw bytes uploaded into the shared buffer.
     pub(super) fn as_bytes(&self) -> &[u8] {
         bytemuck::bytes_of(self)

@@ -242,6 +242,80 @@ fn bench(cfg: &Cfg, script: &Script, tiles_src: &mut Renderer) -> Result<(), Str
         cfg.bench,
         frames.len()
     );
+
+    resident_layer(cfg, &frames, &mut gpu, total)
+}
+
+/// Measure the resident-layer fast path: the steady-state present-only op (no
+/// re-rasterize, upload or readback), the rare rebuild (compositing tiles into the
+/// cached layer, still no readback), and a realistic playback where each subtitle
+/// state dwells on screen for a couple of seconds — so all but the first frame of
+/// each state is a present-only cache hit.
+fn resident_layer(
+    cfg: &Cfg,
+    frames: &[Vec<RenderBitmap>],
+    gpu: &mut GpuBackend,
+    total: u64,
+) -> Result<(), String> {
+    let (w, h) = (cfg.width, cfg.height);
+
+    // Steady state: layer already built, present it every frame.
+    gpu.render_subtitle_layer(&frames[0], w, h)
+        .map_err(|e| format!("layer warmup: {e}"))?;
+    for _ in 0..frames.len() {
+        gpu.present_frame(w, h).map_err(|e| format!("present warmup: {e}"))?;
+    }
+    let present_iters = u64::from(cfg.bench) * frames.len() as u64;
+    let present_start = Instant::now();
+    for _ in 0..present_iters {
+        gpu.present_frame(w, h).map_err(|e| format!("present: {e}"))?;
+    }
+    let present_ms = present_start.elapsed().as_secs_f64() * 1000.0 / present_iters.max(1) as f64;
+
+    // Rare path: composite tiles into the resident layer, no readback.
+    for frame in frames {
+        gpu.render_subtitle_layer(frame, w, h)
+            .map_err(|e| format!("rebuild warmup: {e}"))?;
+    }
+    let rebuild_start = Instant::now();
+    for _ in 0..cfg.bench {
+        for frame in frames {
+            gpu.render_subtitle_layer(frame, w, h)
+                .map_err(|e| format!("rebuild: {e}"))?;
+        }
+    }
+    let rebuild_ms = rebuild_start.elapsed().as_secs_f64() * 1000.0 / total as f64;
+
+    // Realistic playback: each distinct subtitle dwells for `secs_per_sub` at
+    // `fps`; rebuild the layer on a state change, present every displayed frame.
+    let fps = 24.0_f64;
+    let secs_per_sub = 2.0_f64;
+    let dwell = (fps * secs_per_sub).round() as usize;
+    let mut played = 0u64;
+    let playback_start = Instant::now();
+    for frame in frames {
+        gpu.render_subtitle_layer(frame, w, h)
+            .map_err(|e| format!("playback rebuild: {e}"))?;
+        gpu.present_frame(w, h)
+            .map_err(|e| format!("playback present: {e}"))?;
+        played += 1;
+        for _ in 1..dwell.max(1) {
+            gpu.present_frame(w, h)
+                .map_err(|e| format!("playback present: {e}"))?;
+            played += 1;
+        }
+    }
+    let playback_ms = playback_start.elapsed().as_secs_f64() * 1000.0 / played.max(1) as f64;
+    let hit_rate = (played - frames.len() as u64) as f64 * 100.0 / played.max(1) as f64;
+
+    println!(
+        "bench resident-layer fast path: present-only(steady state)={present_ms:.3} ms/frame  \
+         rebuild(no readback)={rebuild_ms:.3} ms/frame"
+    );
+    println!(
+        "realistic playback ({fps:.0} fps, {secs_per_sub:.0}s/subtitle, dwell={dwell} frames, \
+         hit-rate={hit_rate:.1}%): {playback_ms:.3} ms/frame avg"
+    );
     Ok(())
 }
 
