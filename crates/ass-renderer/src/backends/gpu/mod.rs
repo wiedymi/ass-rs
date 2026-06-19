@@ -9,7 +9,7 @@
 //!
 //! Compositing is gamma-free integer-equivalent premultiplied source-over: the
 //! target is `Rgba8Unorm` (linear), cleared to transparent, with a
-//! `One`/`OneMinusSrcAlpha` blend. See [`compositor`] for the pipeline.
+//! `One`/`OneMinusSrcAlpha` blend. The `compositor` submodule holds the pipeline.
 
 mod compositor;
 mod pipeline;
