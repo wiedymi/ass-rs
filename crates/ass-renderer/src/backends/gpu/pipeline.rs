@@ -16,7 +16,8 @@ pub(super) const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8
 
 /// The compositor's reusable pipeline, bind-group layouts and sampler.
 pub(super) struct Programs {
-    /// Textured-quad render pipeline shared by every tile draw.
+    /// Textured-quad render pipeline targeting [`TARGET_FORMAT`], shared by every
+    /// tile draw and the internal-screen present pass.
     pub(super) pipeline: wgpu::RenderPipeline,
     /// Group-0 layout: sampler + dynamic-offset quad uniform.
     pub(super) frame_layout: wgpu::BindGroupLayout,
@@ -24,6 +25,11 @@ pub(super) struct Programs {
     pub(super) tile_layout: wgpu::BindGroupLayout,
     /// Nearest-neighbour sampler shared by all tiles.
     pub(super) sampler: wgpu::Sampler,
+    /// The compiled WGSL module, retained so present pipelines for other target
+    /// formats (e.g. a window surface) can be built later without recompiling.
+    pub(super) shader: wgpu::ShaderModule,
+    /// The shared pipeline layout, retained for the same reason as [`Self::shader`].
+    pub(super) pipeline_layout: wgpu::PipelineLayout,
 }
 
 impl Programs {
@@ -76,39 +82,7 @@ impl Programs {
             push_constant_ranges: &[],
         });
 
-        let blend = wgpu::BlendComponent {
-            src_factor: wgpu::BlendFactor::One,
-            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-            operation: wgpu::BlendOperation::Add,
-        };
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("ass-gpu-pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: TARGET_FORMAT,
-                    blend: Some(wgpu::BlendState {
-                        color: blend,
-                        alpha: blend,
-                    }),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                ..Default::default()
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-        });
+        let pipeline = build_pipeline(device, &shader, &pipeline_layout, TARGET_FORMAT);
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("ass-gpu-sampler"),
@@ -123,6 +97,56 @@ impl Programs {
             frame_layout,
             tile_layout,
             sampler,
+            shader,
+            pipeline_layout,
         }
     }
+}
+
+/// Build a textured-quad render pipeline targeting `format`, reusing the shared
+/// `shader` and `layout`.
+///
+/// Every tile draw and every present pass uses the same WGSL and bindings; only
+/// the colour-attachment format differs (the offscreen target/layer use
+/// [`TARGET_FORMAT`], a window surface uses its own format). The blend stays the
+/// gamma-free premultiplied source-over (`One` / `OneMinusSrcAlpha`).
+pub(super) fn build_pipeline(
+    device: &wgpu::Device,
+    shader: &wgpu::ShaderModule,
+    layout: &wgpu::PipelineLayout,
+    format: wgpu::TextureFormat,
+) -> wgpu::RenderPipeline {
+    let blend = wgpu::BlendComponent {
+        src_factor: wgpu::BlendFactor::One,
+        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+        operation: wgpu::BlendOperation::Add,
+    };
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("ass-gpu-pipeline"),
+        layout: Some(layout),
+        vertex: wgpu::VertexState {
+            module: shader,
+            entry_point: "vs_main",
+            buffers: &[],
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: shader,
+            entry_point: "fs_main",
+            targets: &[Some(wgpu::ColorTargetState {
+                format,
+                blend: Some(wgpu::BlendState {
+                    color: blend,
+                    alpha: blend,
+                }),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        primitive: wgpu::PrimitiveState {
+            topology: wgpu::PrimitiveTopology::TriangleList,
+            ..Default::default()
+        },
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview: None,
+    })
 }

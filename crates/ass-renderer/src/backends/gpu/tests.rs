@@ -5,7 +5,8 @@
 //! layer) reproduce the software `composite_bitmap` reference within blend/format
 //! rounding (the layer path must match the readback path exactly).
 
-use super::GpuBackend;
+use super::readback::Readback;
+use super::{Background, Compositor, GpuBackend, PresentTarget};
 use crate::backends::coverage::{composite_bitmap, RenderBitmap};
 use std::sync::Arc;
 
@@ -191,4 +192,118 @@ fn gpu_layer_matches_readback_composite() {
 
     // The present pass must run end to end against the cached layer.
     backend.present_frame(48, 32).expect("present frame");
+}
+
+/// Acquire a headless wgpu device/queue, or `None` when no usable adapter exists
+/// (so the test skips gracefully on headless CI).
+fn headless_device() -> Option<(wgpu::Device, wgpu::Queue)> {
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::all(),
+        ..Default::default()
+    });
+    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::HighPerformance,
+        compatible_surface: None,
+        force_fallback_adapter: false,
+    }))?;
+    pollster::block_on(adapter.request_device(
+        &wgpu::DeviceDescriptor {
+            label: Some("ass-gpu-test-device"),
+            required_features: wgpu::Features::empty(),
+            required_limits: wgpu::Limits::default(),
+        },
+        None,
+    ))
+    .ok()
+}
+
+/// The format-parameterized present path must render into an external view of a
+/// non-`Rgba8Unorm` surface format. Build a `Compositor` on a headless device,
+/// composite an opaque-white tile into its resident layer, then `present_to_view`
+/// over an opaque-black clear into a freshly-created `Bgra8Unorm` target (the kind
+/// of format a window surface reports), read that target back and assert the tile
+/// region is white over a black background. Proves the format-matched present
+/// pipeline and external-view path work with no window.
+#[test]
+fn present_to_view_targets_external_bgra_surface() {
+    let Some((device, queue)) = headless_device() else {
+        eprintln!("skipping present_to_view test (no usable adapter)");
+        return;
+    };
+
+    let (width, height) = (64u32, 64u32);
+    let mut compositor = Compositor::new(&device);
+
+    let tile = RenderBitmap::Coverage {
+        width: 10,
+        height: 10,
+        coverage: Arc::new(vec![255u8; 10 * 10]),
+        x: 5,
+        y: 5,
+        color: [255, 255, 255, 255],
+    };
+    compositor
+        .render_layer(&device, &queue, std::slice::from_ref(&tile), width, height)
+        .expect("render layer");
+
+    let format = wgpu::TextureFormat::Bgra8Unorm;
+    let target = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("ass-gpu-test-surface"),
+        size: wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
+    let view = target.create_view(&wgpu::TextureViewDescriptor::default());
+
+    compositor
+        .present_to_view(
+            &device,
+            &queue,
+            PresentTarget {
+                view: &view,
+                format,
+            },
+            Background::Clear(wgpu::Color::BLACK),
+            width,
+            height,
+        )
+        .expect("present to view");
+
+    let readback = Readback::new(&device, width, height);
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("ass-gpu-test-readback-encoder"),
+    });
+    readback.copy_from(&mut encoder, &target);
+    queue.submit(Some(encoder.finish()));
+    let out = readback.read(&device).expect("read external surface back");
+    assert_eq!(out.len(), (width * height * 4) as usize);
+
+    // Opaque white tile (255,255,255,255) is channel-order agnostic, so the
+    // Bgra8Unorm byte layout reads identically; the covered region is white.
+    let at = |x: u32, y: u32| ((y * width + x) * 4) as usize;
+    let center = at(10, 10);
+    assert!(
+        out[center] > 250
+            && out[center + 1] > 250
+            && out[center + 2] > 250
+            && out[center + 3] > 250,
+        "covered pixel should be opaque white over the layer, got {:?}",
+        &out[center..center + 4]
+    );
+
+    // Outside the tile the opaque-black background shows through.
+    let outside = at(40, 40);
+    assert!(
+        out[outside] < 5 && out[outside + 1] < 5 && out[outside + 2] < 5 && out[outside + 3] > 250,
+        "pixel outside the tile should be the opaque black background, got {:?}",
+        &out[outside..outside + 4]
+    );
 }

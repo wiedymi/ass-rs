@@ -22,17 +22,18 @@
 mod present;
 mod tiles;
 
+use std::collections::HashMap;
 use std::num::NonZeroU64;
 
 use crate::backends::coverage::RenderBitmap;
 use crate::utils::RenderError;
 
 use super::layer::{Layer, Screen};
-use super::pipeline::Programs;
+use super::pipeline::{build_pipeline, Programs};
 use super::pool::{TilePool, UNIFORM_SIZE};
 use super::target::Target;
 
-pub(super) use present::Background;
+pub use present::{Background, PresentTarget};
 
 /// Reusable per-frame quad-uniform buffer plus the group-0 bind group (sampler
 /// and dynamic uniform) that reads it.
@@ -43,11 +44,19 @@ struct Uniforms {
 }
 
 /// GPU tile compositor: pipeline, layouts, sampler and cached frame resources.
-pub(super) struct Compositor {
+///
+/// The struct is public so a windowed demo can own its own wgpu device/surface
+/// and drive the resident-layer fast path directly via [`Compositor::new`],
+/// [`Compositor::render_layer`] and [`Compositor::present_to_view`]; the fields
+/// stay private.
+pub struct Compositor {
     pipeline: wgpu::RenderPipeline,
     frame_layout: wgpu::BindGroupLayout,
     tile_layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
+    shader: wgpu::ShaderModule,
+    pipeline_layout: wgpu::PipelineLayout,
+    present_pipelines: HashMap<wgpu::TextureFormat, wgpu::RenderPipeline>,
     uniform_stride: u32,
     target: Option<Target>,
     layer: Option<Layer>,
@@ -58,12 +67,14 @@ pub(super) struct Compositor {
 
 impl Compositor {
     /// Build the compositor pipeline, layouts and sampler on `device`.
-    pub(super) fn new(device: &wgpu::Device) -> Self {
+    pub fn new(device: &wgpu::Device) -> Self {
         let Programs {
             pipeline,
             frame_layout,
             tile_layout,
             sampler,
+            shader,
+            pipeline_layout,
         } = Programs::new(device);
 
         let align = device.limits().min_uniform_buffer_offset_alignment;
@@ -74,6 +85,9 @@ impl Compositor {
             frame_layout,
             tile_layout,
             sampler,
+            shader,
+            pipeline_layout,
+            present_pipelines: HashMap::new(),
             uniform_stride,
             target: None,
             layer: None,
@@ -193,9 +207,9 @@ impl Compositor {
 
     /// Composite `bitmaps` into the resident subtitle-layer texture and leave it on
     /// the GPU. The "rare" path, run only when the subtitle changes; no readback is
-    /// performed. The layer is then presented every frame via
-    /// [`Compositor::present_over`].
-    pub(super) fn render_layer(
+    /// performed. The layer is then presented every frame into the internal screen
+    /// target or, via [`Compositor::present_to_view`], an external surface view.
+    pub fn render_layer(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -254,6 +268,57 @@ impl Compositor {
         };
         self.ensure_uniforms(device, quad_count);
         present::run(self, device, queue, background, quad_count)
+    }
+
+    /// Build (once per format) and cache a present pipeline whose colour target is
+    /// `format`, so an external surface of an arbitrary format can be presented to.
+    fn ensure_present_pipeline(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat) {
+        if self.present_pipelines.contains_key(&format) {
+            return;
+        }
+        let pipeline = build_pipeline(device, &self.shader, &self.pipeline_layout, format);
+        self.present_pipelines.insert(format, pipeline);
+    }
+
+    /// Blend the resident subtitle layer over `background` into the externally owned
+    /// `target` (e.g. a window surface texture view and its format), then submit.
+    /// Unlike the internal-screen present this targets the caller's view with a
+    /// pipeline matched to `target.format` and never waits or reads back — the
+    /// surface's own present call paces it. Requires a prior
+    /// [`Compositor::render_layer`] at the same size.
+    pub fn present_to_view(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        target: PresentTarget<'_>,
+        background: Background,
+        width: u32,
+        height: u32,
+    ) -> Result<(), RenderError> {
+        if width == 0 || height == 0 {
+            return Err(RenderError::InvalidDimensions);
+        }
+        if !self.layer.as_ref().is_some_and(|l| l.matches(width, height)) {
+            return Err(RenderError::BackendError(
+                "present_to_view requires a matching render_layer first".into(),
+            ));
+        }
+        let quad_count = if matches!(background, Background::Texture(_)) {
+            2
+        } else {
+            1
+        };
+        self.ensure_uniforms(device, quad_count);
+        self.ensure_present_pipeline(device, target.format);
+        present::run_to_view(
+            self,
+            device,
+            queue,
+            target.view,
+            target.format,
+            background,
+            quad_count,
+        )
     }
 
     /// Read the resident subtitle layer back to straight premultiplied-RGBA bytes.

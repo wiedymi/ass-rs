@@ -22,7 +22,7 @@ mod target;
 #[cfg(test)]
 mod tests;
 
-use compositor::{Background, Compositor};
+pub use compositor::{Background, Compositor, PresentTarget};
 
 use crate::backends::coverage::RenderBitmap;
 use crate::backends::software::SoftwareBackend;
