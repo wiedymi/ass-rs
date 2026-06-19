@@ -158,3 +158,7 @@ required-features = ["analysis-integration", "libass-compare"]
 [[example]]
 name = "gpu_probe"
 required-features = ["web-backend"]
+
+[[example]]
+name = "gpu_compare"
+required-features = ["gpu", "analysis-integration", "software-backend"]
