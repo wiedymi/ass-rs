@@ -149,4 +149,4 @@ required-features = ["gpu", "analysis-integration", "software-backend"]
 
 [[example]]
 name = "gpu_window"
-required-features = ["window", "analysis-integration", "software-backend"]
+required-features = ["window", "analysis-integration", "software-backend", "image"]
